@@ -1,13 +1,12 @@
 import { X } from "lucide-react";
 
+import { TechIcon } from "@/components/ui/tech-icon";
 import type { StackState } from "@/lib/constant";
 import { TECH_OPTIONS } from "@/lib/constant";
 import { CATEGORY_ORDER } from "@/lib/stack-utils";
 import { getCategoryDisplayName } from "@/lib/stack-validation";
 import type { TechCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-import { TechIcon } from "../tech-icon";
 
 type SelectedStackBadgesProps = {
   stack: StackState;
@@ -18,7 +17,7 @@ type SelectedStackBadgesProps = {
 export function SelectedStackBadges({ stack, onRemove, onJump }: SelectedStackBadgesProps) {
   const selections = CATEGORY_ORDER.flatMap((category) => {
     const options = TECH_OPTIONS[category];
-    const selectedValue = stack[category as keyof StackState];
+    const selectedValue = stack[category];
     if (!options || selectedValue === undefined) return [];
 
     const ids = Array.isArray(selectedValue) ? selectedValue : [selectedValue];

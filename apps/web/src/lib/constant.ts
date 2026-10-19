@@ -1,7 +1,10 @@
+import { MODULE_CATALOG, PRODUCT_PRESETS } from "@xstack/template-generator/modules";
+import type { ProductConfig } from "@xstack/types";
+
 import type { StackState, TechOptions, TechCategory, StackOptionId } from "./types";
 export type { StackState } from "./types";
 
-export const ICON_BASE_URL = "https://r2.xstack.dev/icons";
+export const ICON_BASE_URL = "/icons";
 
 export const TECH_OPTIONS: TechOptions = {
   api: [
@@ -11,7 +14,7 @@ export const TECH_OPTIONS: TechOptions = {
       description: "End-to-end typesafe APIs",
       icon: `${ICON_BASE_URL}/trpc.svg`,
       color: "from-blue-500 to-blue-700",
-      default: true,
+      default: false,
     },
     {
       id: "orpc",
@@ -26,6 +29,7 @@ export const TECH_OPTIONS: TechOptions = {
       description: "No API layer (API routes disabled)",
       icon: "",
       color: "from-gray-400 to-gray-600",
+      default: true,
     },
   ],
   webFrontend: [
@@ -35,7 +39,7 @@ export const TECH_OPTIONS: TechOptions = {
       description: "Modern type-safe router for React",
       icon: `${ICON_BASE_URL}/tanstack.svg`,
       color: "from-blue-400 to-blue-600",
-      default: true,
+      default: false,
     },
     {
       id: "react-router",
@@ -59,7 +63,7 @@ export const TECH_OPTIONS: TechOptions = {
       description: "React framework with hybrid rendering",
       icon: `${ICON_BASE_URL}/nextjs.svg`,
       color: "from-gray-700 to-black",
-      default: false,
+      default: true,
     },
     {
       id: "nuxt",
@@ -110,7 +114,7 @@ export const TECH_OPTIONS: TechOptions = {
       icon: `${ICON_BASE_URL}/expo.svg`,
       color: "from-blue-400 to-blue-600",
       className: "invert-0 dark:invert",
-      default: true,
+      default: false,
     },
     {
       id: "native-uniwind",
@@ -136,7 +140,7 @@ export const TECH_OPTIONS: TechOptions = {
       description: "No native mobile frontend",
       icon: "",
       color: "from-gray-400 to-gray-600",
-      default: false,
+      default: true,
     },
   ],
   runtime: [
@@ -146,7 +150,7 @@ export const TECH_OPTIONS: TechOptions = {
       description: "Fast JavaScript runtime & toolkit",
       icon: `${ICON_BASE_URL}/bun.svg`,
       color: "from-amber-400 to-amber-600",
-      default: true,
+      default: false,
     },
     {
       id: "node",
@@ -168,6 +172,7 @@ export const TECH_OPTIONS: TechOptions = {
       description: "No specific runtime",
       icon: "",
       color: "from-gray-400 to-gray-600",
+      default: true,
     },
   ],
   backend: [
@@ -177,7 +182,7 @@ export const TECH_OPTIONS: TechOptions = {
       description: "Ultrafast web framework",
       icon: `${ICON_BASE_URL}/hono.svg`,
       color: "from-blue-500 to-blue-700",
-      default: true,
+      default: false,
     },
     {
       id: "elysia",
@@ -213,6 +218,7 @@ export const TECH_OPTIONS: TechOptions = {
       description: "Use Next.js built-in API routes",
       icon: `${ICON_BASE_URL}/nextjs.svg`,
       color: "from-gray-700 to-black",
+      default: true,
     },
     {
       id: "self-tanstack-start",
@@ -651,44 +657,15 @@ export const TECH_OPTIONS: TechOptions = {
       default: false,
     },
   ],
-  features: [
-    {
-      id: "auth",
-      name: "Authentication",
-      description: "Email and password sign-in, OAuth, roles and account settings",
-      icon: `${ICON_BASE_URL}/better-auth.svg`,
-      color: "from-green-400 to-green-600",
-      default: true,
-    },
-    {
-      id: "email",
-      name: "Email",
-      description: "Transactional email with swappable providers",
-      icon: "",
-      color: "from-sky-400 to-sky-600",
-    },
-    {
-      id: "admin",
-      name: "Admin Console",
-      description: "Role-based admin area with user management",
+  features: [...MODULE_CATALOG.values()]
+    .filter((manifest) => !manifest.hidden)
+    .map((manifest) => ({
+      id: manifest.id,
+      name: manifest.name.en,
+      description: manifest.description.en,
       icon: "",
       color: "from-slate-500 to-slate-700",
-    },
-    {
-      id: "payment",
-      name: "Payments",
-      description: "Pricing page, one-time payments and subscriptions",
-      icon: "",
-      color: "from-purple-400 to-purple-600",
-    },
-    {
-      id: "credits",
-      name: "Credits",
-      description: "Usage credits with an auditable ledger",
-      icon: "",
-      color: "from-amber-400 to-amber-600",
-    },
-  ],
+    })),
   git: [
     {
       id: "true",
@@ -736,6 +713,28 @@ export function isStackOption<K extends TechCategory>(
   return TECH_OPTIONS[category].some(({ id }) => id === value);
 }
 
+export const DEFAULT_STACK: StackState = {
+  projectName: "my-xstack-app",
+  webFrontend: ["next"],
+  nativeFrontend: ["none"],
+  runtime: "none",
+  backend: "self-next",
+  database: "sqlite",
+  orm: "drizzle",
+  dbSetup: "none",
+  features: ["none"],
+  providers: {},
+  moduleOptions: { i18n: { locales: "en,zh-CN" } },
+  packageManager: "bun",
+  addons: ["turborepo"],
+  git: "true",
+  install: "true",
+  api: "none",
+  webDeploy: "none",
+  serverDeploy: "none",
+  yolo: "false",
+};
+
 export const PRESET_TEMPLATES: {
   id: string;
   name: string;
@@ -743,122 +742,30 @@ export const PRESET_TEMPLATES: {
   stack: StackState;
 }[] = [
   {
-    id: "mern",
-    name: "MERN Stack",
-    description: "MongoDB + Express + React + Node.js - Classic MERN stack",
-    stack: {
-      projectName: "my-better-t-app",
-      webFrontend: ["react-router"],
-      nativeFrontend: ["none"],
-      runtime: "node",
-      backend: "express",
-      database: "mongodb",
-      orm: "mongoose",
-      dbSetup: "mongodb-atlas",
-      features: ["auth"],
-      packageManager: "bun",
-      addons: ["turborepo"],
-      git: "true",
-      install: "true",
-      api: "orpc",
-      webDeploy: "none",
-      serverDeploy: "none",
-      yolo: "false",
-    },
+    id: "shell",
+    name: "Shell",
+    description:
+      "Next.js shell with SQLite, Drizzle and internationalization; no optional features",
+    stack: DEFAULT_STACK,
   },
-  {
-    id: "pern",
-    name: "PERN Stack",
-    description: "PostgreSQL + Express + React + Node.js - Popular PERN stack",
-    stack: {
-      projectName: "my-better-t-app",
-      webFrontend: ["tanstack-router"],
-      nativeFrontend: ["none"],
-      runtime: "node",
-      backend: "express",
-      database: "postgres",
-      orm: "drizzle",
-      dbSetup: "none",
-      features: ["auth"],
-      packageManager: "bun",
-      addons: ["turborepo"],
-      git: "true",
-      install: "true",
-      api: "trpc",
-      webDeploy: "none",
-      serverDeploy: "none",
-      yolo: "false",
-    },
-  },
-  {
-    id: "t3",
-    name: "T3 Stack",
-    description: "Next.js + tRPC + Prisma + PostgreSQL + Better Auth",
-    stack: {
-      projectName: "my-better-t-app",
-      webFrontend: ["next"],
-      nativeFrontend: ["none"],
-      runtime: "none",
-      backend: "self-next",
-      database: "postgres",
-      orm: "prisma",
-      dbSetup: "none",
-      features: ["auth"],
-      packageManager: "bun",
-      addons: ["biome", "turborepo"],
-      git: "true",
-      install: "true",
-      api: "trpc",
-      webDeploy: "none",
-      serverDeploy: "none",
-      yolo: "false",
-    },
-  },
-  {
-    id: "uniwind",
-    name: "Uniwind Native",
-    description: "Expo + Uniwind native app with no backend services",
-    stack: {
-      projectName: "my-better-t-app",
-      webFrontend: ["none"],
-      nativeFrontend: ["native-uniwind"],
-      runtime: "none",
-      backend: "none",
-      database: "none",
-      orm: "none",
-      dbSetup: "none",
-      features: ["none"],
-      packageManager: "bun",
-      addons: ["none"],
-      git: "true",
-      install: "true",
-      api: "none",
-      webDeploy: "none",
-      serverDeploy: "none",
-      yolo: "false",
-    },
-  },
+  ...Object.entries(PRODUCT_PRESETS).map(([id, preset]) => {
+    const product: ProductConfig = preset;
+    return {
+      id,
+      name: id === "starter" ? "Starter" : "Global SaaS",
+      description:
+        id === "starter"
+          ? "Product shell with authentication"
+          : "Authentication, email, admin, payments and credits",
+      stack: {
+        ...DEFAULT_STACK,
+        features: [...product.features],
+        providers: product.providers ?? {},
+        moduleOptions: { ...DEFAULT_STACK.moduleOptions, ...product.options },
+      },
+    };
+  }),
 ];
-
-export const DEFAULT_STACK: StackState = {
-  projectName: "my-better-t-app",
-  webFrontend: ["tanstack-router"],
-  nativeFrontend: ["none"],
-  runtime: "bun",
-  backend: "hono",
-  database: "sqlite",
-  orm: "drizzle",
-  dbSetup: "none",
-  features: ["auth"],
-  packageManager: "bun",
-  addons: ["turborepo"],
-  git: "true",
-  install: "true",
-  api: "trpc",
-  webDeploy: "none",
-  serverDeploy: "none",
-  yolo: "false",
-};
 
 export const isStackDefault = <K extends keyof StackState>(
   stack: StackState,
@@ -875,17 +782,6 @@ export const isStackDefault = <K extends keyof StackState>(
     if (key === "dbSetup" && value === "none") return true;
   }
 
-  if (key === "webFrontend" || key === "nativeFrontend" || key === "addons" || key === "features") {
-    if (Array.isArray(defaultValue) && Array.isArray(value)) {
-      const sortedDefault = [...defaultValue].sort();
-      const sortedValue = [...value].sort();
-      return (
-        sortedDefault.length === sortedValue.length &&
-        sortedDefault.every((item, index) => item === sortedValue[index])
-      );
-    }
-  }
-
   if (Array.isArray(defaultValue) && Array.isArray(value)) {
     const sortedDefault = [...defaultValue].sort();
     const sortedValue = [...value].sort();
@@ -893,6 +789,10 @@ export const isStackDefault = <K extends keyof StackState>(
       sortedDefault.length === sortedValue.length &&
       sortedDefault.every((item, index) => item === sortedValue[index])
     );
+  }
+
+  if (key === "providers" || key === "moduleOptions") {
+    return JSON.stringify(defaultValue) === JSON.stringify(value);
   }
 
   return defaultValue === value;

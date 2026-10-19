@@ -5,7 +5,7 @@ description: What xstack.jsonc does and why it matters
 
 ## What is it?
 
-`xstack.jsonc` is a small config file written to your project root when you create a project. It captures the stack choices you selected (frontend, backend, API, DB/ORM, auth, addons, etc.). The file uses JSONC (JSON with comments) and includes a schema for editor hints.
+`xstack.jsonc` is a small config file written to your project root when you create a project. It captures infrastructure, addons, feature modules, providers and module options. The file uses JSONC (JSON with comments) and includes a schema URL for editor hints; that URL requires the schema host to be deployed.
 
 Where: `./xstack.jsonc`
 
@@ -36,21 +36,21 @@ The file is JSONC with comments enabled and includes a `$schema` URL for tooling
   "$schema": "https://r2.xstack.dev/schema.json",
   "version": "x.y.z",
   "createdAt": "2025-01-01T00:00:00.000Z",
-  "reproducibleCommand": "bun create xstack@latest my-app --frontend tanstack-router ...",
-  "frontend": ["tanstack-router"],
-  "backend": "hono",
-  "runtime": "bun",
+  "reproducibleCommand": "bun create xstack@latest my-app --frontend next --backend self --runtime none --database sqlite --orm drizzle --api none --addons turborepo --db-setup none --web-deploy none --server-deploy none --git --package-manager bun --no-install --features auth credits --providers auth:none --module-options i18n.locales=zh-CN credits.signupBonus=50",
+  "frontend": ["next"],
+  "backend": "self",
+  "runtime": "none",
   "database": "sqlite",
   "orm": "drizzle",
-  "api": "trpc",
+  "api": "none",
   "addons": ["turborepo"],
-  "addonOptions": {
-    "wxt": {
-      "template": "react",
-    },
-  },
   "product": {
-    "features": ["auth"],
+    "features": ["auth", "credits"],
+    "providers": { "auth": [] },
+    "options": {
+      "i18n": { "locales": "zh-CN" },
+      "credits": { "signupBonus": 50 },
+    },
   },
   "dbSetup": "none",
   "dbSetupOptions": {
@@ -69,6 +69,10 @@ Notes:
 - Deeply nested structured options remain in `addonOptions` or `dbSetupOptions` and may not be fully represented in the one-line command
 - `addonOptions` stores nested configuration for prompt-driven addons
 - `dbSetupOptions` stores structured database setup behavior for automation
+- `product.features` selects business capabilities; dependencies are resolved automatically
+- `product.providers.auth: []` explicitly disables OAuth providers while retaining authentication
+- `product.options` stores language order, signup credits, and other catalog-defined settings; numeric CLI values may be stored as strings and are normalized by the module resolver
+- Provider credentials are not part of this file or shared Builder URLs; put them in the generated environment
 - The file may be updated when you run `add` (addons and addon-specific config)
 
 See also: [`add` command](/docs/cli#add)

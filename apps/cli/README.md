@@ -27,9 +27,19 @@ npx xstack@latest
 
 Follow the prompts to configure your project or use the `--yes` flag for defaults.
 
+The default is a Next.js full-stack shell with SQLite, Drizzle, Turborepo, and no optional feature modules. `--preset starter` adds authentication; `--preset saas-global` includes authentication, email, admin, payments, and credits. These differ from legacy technology presets selected by `--template`.
+
+```bash
+xstack my-saas --preset saas-global \
+  --providers auth:none email:smtp payment:polar \
+  --module-options i18n.locales=zh-CN credits.signupBonus=50
+```
+
+OAuth providers are optional (`auth:none` explicitly selects none). Email supports Resend or SMTP; payments support Stripe, Polar, or development-only mock payments. Configure real provider credentials in the generated environment before using their services. The web Template Builder shares this catalog and includes provider/options state in commands, previews, saved preferences, and URLs.
+
 ## Requirements
 
-- Node.js 22 or newer to run the CLI with Node.js. The selected framework may require a newer release; the CLI checks the exact stack before writing files.
+- Node.js 22.12 or newer to run the CLI with Node.js. The selected framework may require a newer release; the CLI checks the exact stack before writing files.
 - Bun 1.4 or newer is recommended. Bun 1.2.14 remains the minimum because generated workspaces use dependency catalogs.
 - pnpm 10.26.0 or newer when using pnpm (catalogs and `allowBuilds`).
 - npm 11.16.0 or newer when using npm (`allowScripts`).
@@ -53,7 +63,7 @@ generated commands.
 | **Authentication**       | • Better Auth<br>• Clerk                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **Styling**              | Tailwind CSS with a shared shadcn/ui package for React web apps                                                                                                                                                                                                                                                                                                                                                                           |
 | **Addons**               | • PWA support<br>• Tauri (desktop applications)<br>• Electrobun (lightweight desktop shell)<br>• Starlight and Fumadocs (documentation sites)<br>• Biome, Oxlint, Ultracite, or Vite+ (linting and formatting)<br>• Lefthook, Husky (Git hooks)<br>• evlog (request logging for server/fullstack backends)<br>• MCP, Skills (agent tooling)<br>• OpenTUI, WXT (platform extensions)<br>• Turborepo, Nx, or Vite+ (monorepo orchestration) |
-| **Examples**             | • Todo app<br>• AI Chat interface (using Vercel AI SDK)                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Product modules** | Authentication, email, admin, payments, and credits; native modules target Next.js full-stack with Drizzle and SQLite/PostgreSQL |
 | **Developer Experience** | • Automatic Git initialization<br>• Package manager choice (npm, pnpm, bun)<br>• Automatic dependency installation                                                                                                                                                                                                                                                                                                                        |
 
 ## Usage
@@ -95,9 +105,9 @@ Options:
 
 ```bash
 # Raw JSON payload input (agent-friendly)
-xstack create-json --input '{"projectName":"my-app","yes":true,"dryRun":true}'
-xstack add-json --input '{"projectDir":"./my-app","addons":["wxt"],"addonOptions":{"wxt":{"template":"react"}}}'
-xstack create-json --input '{"projectName":"db-app","database":"postgres","orm":"drizzle","dbSetup":"neon","dbSetupOptions":{"mode":"manual"}}'
+xstack create-json --json '{"projectName":"my-app","yes":true,"dryRun":true}'
+xstack add-json --json '{"projectDir":"./my-app","addons":["wxt"],"addonOptions":{"wxt":{"template":"react"}}}'
+xstack create-json --json '{"projectName":"db-app","database":"postgres","orm":"drizzle","dbSetup":"neon","dbSetupOptions":{"mode":"manual"}}'
 
 # Runtime schema/introspection output
 xstack schema --name all

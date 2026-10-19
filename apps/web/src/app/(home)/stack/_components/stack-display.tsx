@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ShareDialog } from "@/components/ui/share-dialog";
 import { TechBadge } from "@/components/ui/tech-badge";
 import { stackSnapshot, track } from "@/lib/analytics";
+import { productPlan } from "@/lib/stack-features";
 import type { LoadedStackState } from "@/lib/stack-url-state";
 import {
   formatProjectName,
@@ -34,6 +35,11 @@ export function StackDisplay({ stackState }: StackDisplayProps) {
 
   const stack = stackState;
   const stackSummary = generateStackSummary(stack);
+  const plan = productPlan(stack);
+  const configurationError = plan.issues
+    .filter((issue) => issue.level === "error")
+    .map((issue) => issue.message)
+    .join("\n");
 
   const command = generateStackCommand({
     ...stackState,
@@ -50,6 +56,10 @@ export function StackDisplay({ stackState }: StackDisplayProps) {
   ));
 
   const copyCommand = async () => {
+    if (configurationError) {
+      toast.error(configurationError);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(command);
       setCopied(true);
@@ -67,7 +77,7 @@ export function StackDisplay({ stackState }: StackDisplayProps) {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-2 sm:flex-nowrap">
           <div className="flex items-center gap-2">
             <Terminal className="h-5 w-5 text-primary" />
-            <span className="font-bold font-mono text-lg sm:text-xl">STACK_DISPLAY.SH</span>
+            <span className="font-bold font-mono text-lg sm:text-xl">TEMPLATE_CONFIGURATION</span>
           </div>
           <div className="hidden h-px flex-1 bg-border sm:block" />
           <span className="w-full text-right text-muted-foreground text-xs sm:w-auto sm:text-left">
@@ -89,6 +99,32 @@ export function StackDisplay({ stackState }: StackDisplayProps) {
             <span className="text-muted-foreground">Stack loaded successfully</span>
           </div>
         </div>
+        <section className="space-y-3 rounded border p-4">
+          <h2 className="font-mono text-sm">Product modules & providers</h2>
+          {configurationError && (
+            <p role="alert" className="text-sm text-destructive">
+              {configurationError}
+            </p>
+          )}
+          {plan.modules.map(({ manifest, providers, options, reason }) => (
+            <div key={manifest.id} className="space-y-1 border-b py-2 last:border-b-0">
+              <h3 className="text-sm font-medium">
+                {manifest.name.en}
+                {reason.kind !== "selected" ? " (included dependency)" : ""}
+              </h3>
+              {manifest.providers && (
+                <p className="text-xs text-muted-foreground">
+                  Providers: {providers.length ? providers.join(", ") : "none"}
+                </p>
+              )}
+              {Object.entries(options).map(([key, value]) => (
+                <p key={key} className="text-xs text-muted-foreground">
+                  {key}: {String(value)}
+                </p>
+              ))}
+            </div>
+          ))}
+        </section>
 
         <div className="flex items-center gap-3">
           <Link href={editUrl} onClick={() => track("stack_edit", {})}>

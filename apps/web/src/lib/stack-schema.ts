@@ -8,6 +8,12 @@ import { formatProjectName } from "./stack-utils";
 const option = <K extends keyof typeof TECH_OPTIONS>(category: K) =>
   z.enum(getStackOptionIds(category));
 
+export const StackProvidersSchema = z.record(z.string(), z.array(z.string()));
+export const StackModuleOptionsSchema = z.record(
+  z.string(),
+  z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+);
+
 const stackFields = {
   projectName: z.string().nullable(),
   webFrontend: z.array(option("webFrontend")),
@@ -20,6 +26,8 @@ const stackFields = {
   packageManager: option("packageManager"),
   addons: z.array(z.enum(["none", ...getStackOptionIds("addons")])),
   features: z.array(z.enum(["none", ...getStackOptionIds("features")])),
+  providers: StackProvidersSchema,
+  moduleOptions: StackModuleOptionsSchema,
   git: option("git"),
   install: option("install"),
   api: option("api"),
@@ -42,6 +50,8 @@ export const StackStateSchema = z.object({
   packageManager: stackFields.packageManager.default(DEFAULT_STACK.packageManager),
   addons: stackFields.addons.default(DEFAULT_STACK.addons),
   features: stackFields.features.default(DEFAULT_STACK.features),
+  providers: stackFields.providers.default(DEFAULT_STACK.providers),
+  moduleOptions: stackFields.moduleOptions.default(DEFAULT_STACK.moduleOptions),
   git: stackFields.git.default(DEFAULT_STACK.git),
   install: stackFields.install.default(DEFAULT_STACK.install),
   api: stackFields.api.default(DEFAULT_STACK.api),
@@ -52,16 +62,20 @@ export const StackStateSchema = z.object({
 
 export function stackStateToConfig(stack: StackState) {
   const projectPath = formatProjectName(stack.projectName);
-  const projectName = projectPath.split(/[\\/]/).filter(Boolean).at(-1) || "my-better-t-app";
+  const projectName = projectPath.split(/[\\/]/).filter(Boolean).at(-1) || "my-xstack-app";
   return ProjectConfigSchema.parse({
     ...stack,
-    projectName: projectName === "." ? "my-better-t-app" : projectName,
+    projectName: projectName === "." ? "my-xstack-app" : projectName,
     projectDir: "/virtual",
     relativePath: "./virtual",
     frontend: getStackFrontends(stack),
     backend: getStackBackend(stack.backend),
     addons: stack.addons.filter((id) => id !== "none"),
-    product: { features: stack.features.filter((id) => id !== "none") },
+    product: {
+      features: stack.features.filter((id) => id !== "none"),
+      providers: stack.providers,
+      options: stack.moduleOptions,
+    },
     git: stack.git === "true",
     install: false,
   });

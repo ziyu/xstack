@@ -308,6 +308,8 @@ Selects a curated feature set: `starter` (auth) or `saas-global` (auth, email, a
 Chooses the providers a module uses, for example `--providers payment:stripe,mock auth:github`.
 
 - `payment`: `stripe` (default), `polar` or `mock`; several can be enabled at once and checkout uses the first configured one
+- `auth`: `google`, `github`, or `auth:none` to keep email/password authentication without OAuth providers. Do not combine `none` with named providers for the same module.
+- `email`: choose exactly one of `resend` or `smtp`.
 
 ### `--module-options <module.key=value...>`
 
@@ -315,6 +317,10 @@ Sets module options, for example `--module-options auth.engine=clerk i18n.locale
 
 - `auth.engine`: `better-auth` (default) or `clerk`. Clerk uses the stack templates and needs a React web or native frontend with Convex, a separate server, or backend `self` with Next.js or TanStack Start
 - with `--backend convex`, Better Auth supports `react-router`, `tanstack-router`, `tanstack-start`, `next`, and native Expo frontends
+- `i18n.locales`: `en,zh-CN`, `zh-CN,en`, `en`, or `zh-CN`; the first locale is the default.
+- `credits.signupBonus`: a non-negative number of credits granted when an account is created.
+
+The [Template Builder](/new) uses these same module manifests for presets, provider controls, dependency resolution, command output, and generated-file previews. Share links and saved preferences include provider choices and module options. Provider credentials are configured in the generated project's environment, never entered into the builder.
 
 ## Addons
 

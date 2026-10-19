@@ -22,7 +22,7 @@ If you are automating the CLI from an LLM, CI job, or another tool, start here i
 Create a project from a single JSON payload instead of many flags.
 
 ```bash
-xstack create-json --input '{
+xstack create-json --json '{
   "projectName": "my-app",
   "frontend": ["tanstack-router"],
   "backend": "hono",
@@ -30,7 +30,7 @@ xstack create-json --input '{
   "database": "postgres",
   "orm": "drizzle",
   "api": "trpc",
-  "auth": "none",
+  "product": { "features": [] },
   "addons": ["wxt", "mcp"],
   "addonOptions": {
     "wxt": { "template": "react", "devPort": 5555 },
@@ -55,7 +55,7 @@ This is the best path when:
 Add addons to an existing project with a single JSON payload.
 
 ```bash
-xstack add-json --input '{
+xstack add-json --json '{
   "projectDir": "./my-app",
   "addons": ["skills", "ultracite"],
   "addonOptions": {
@@ -266,7 +266,7 @@ The supported modes are:
 Example:
 
 ```bash
-xstack create-json --input '{
+xstack create-json --json '{
   "projectName": "db-app",
   "database": "postgres",
   "orm": "drizzle",
@@ -310,8 +310,8 @@ Use `--dry-run` to validate inputs and target directories without writing files.
 
 ```bash
 xstack --yes --dry-run
-xstack create-json --input '{"projectName":"my-app","yes":true,"dryRun":true}'
-xstack add-json --input '{"projectDir":"./my-app","addons":["mcp"],"dryRun":true}'
+xstack create-json --json '{"projectName":"my-app","yes":true,"dryRun":true}'
+xstack add-json --json '{"projectDir":"./my-app","addons":["mcp"],"dryRun":true}'
 ```
 
 This is especially useful for:

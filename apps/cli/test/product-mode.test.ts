@@ -187,6 +187,21 @@ describe("product mode", () => {
     expect(productFromFlags({ providers: ["stripe"] }).isErr()).toBe(true);
   });
 
+  it("preserves an explicitly disabled OAuth selection and rejects mixed none providers", async () => {
+    const parsed = productFromFlags({ features: ["auth"], providers: ["auth:none"] });
+    expect(parsed.isOk()).toBe(true);
+    if (parsed.isErr()) throw parsed.error;
+    expect(parsed.value?.providers?.auth).toEqual([]);
+    const { result, read } = await createProduct("product-email-password-only", {
+      product: parsed.value,
+    });
+    expect(result.isOk()).toBe(true);
+    expect(await read("apps/web/.env.schema")).not.toContain("GOOGLE_CLIENT_ID");
+    expect(await read("apps/web/.env.schema")).not.toContain("GITHUB_CLIENT_ID");
+    expect(productFromFlags({ providers: ["auth:none,github"] }).isErr()).toBe(true);
+    expect(productFromFlags({ providers: ["auth:github,none"] }).isErr()).toBe(true);
+  });
+
   it("rejects unknown features", async () => {
     const { result } = await createProduct("product-unknown-feature", {
       product: { features: ["teleport"] },

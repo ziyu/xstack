@@ -14,23 +14,19 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { track } from "@/lib/analytics";
+import { PRESET_TEMPLATES } from "@/lib/constant";
 import { formatStackCommandForDisplay, getDesktopBuildNote } from "@/lib/stack-utils";
-import type { Sponsor } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 import { ActionButtons } from "../action-buttons";
 import { PreviewPanel, useStackPreview } from "../preview-panel";
-import { SpecialSponsorsPanel } from "../special-sponsors-panel";
 import { CategoryNav, scrollToCategorySection } from "./category-nav";
+import { ProductOptions } from "./product-options";
 import { SelectedStackBadges } from "./selected-stack-badges";
 import { TechCategories } from "./tech-categories";
 import { useStackBuilder } from "./use-stack-builder";
 
-type StackBuilderProps = {
-  specialSponsors?: Sponsor[];
-};
-
-export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
+export function StackBuilder() {
   const {
     applyPreset,
     categoryProgress,
@@ -38,13 +34,13 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
     compatibilityAnalysis,
     copied,
     copyToClipboard,
-    getRandomStack,
     getStackUrl,
     handleTechSelect,
     lastSavedStack,
     loadSavedStack,
     mobileTab,
     projectNameError,
+    configurationError,
     removeSelectedTech,
     resetStack,
     saveCurrentStack,
@@ -68,21 +64,40 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
   const actionButtons = (
     <ActionButtons
       onReset={resetStack}
-      onRandom={getRandomStack}
       onSave={saveCurrentStack}
       onLoad={loadSavedStack}
       hasSavedStack={!!lastSavedStack}
-      onApplyPreset={applyPreset}
       stackUrl={getStackUrl()}
       stackState={effectiveStack}
-      yolo={stack.yolo === "true"}
-      onYoloToggle={(yolo) => {
-        track("builder_yolo_toggle", { enabled: yolo === "true" });
-        setStack({ yolo });
-      }}
     />
   );
 
+  const templatePresets = (
+    <section className="mb-6 space-y-3" aria-label="Template presets">
+      <div>
+        <h1 className="font-mono text-lg font-medium">Template builder</h1>
+        <p className="mt-1 text-sm text-fd-muted-foreground">
+          Start with a product template, choose your modules and providers, then generate your
+          project.
+        </p>
+      </div>
+      <div className="grid gap-2 md:grid-cols-3">
+        {PRESET_TEMPLATES.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            onClick={() => applyPreset(preset.id)}
+            className="builder-focus-ring rounded border p-3 text-left transition-colors hover:border-primary"
+          >
+            <span className="font-mono text-sm text-primary">{preset.name}</span>
+            <span className="mt-1 block text-xs leading-relaxed text-fd-muted-foreground">
+              {preset.description}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
   return (
     <TooltipProvider>
       <div className="flex h-full w-full flex-col overflow-hidden bg-fd-background text-fd-foreground">
@@ -158,7 +173,7 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
                             ? "border-destructive text-destructive"
                             : "focus:border-primary",
                         )}
-                        placeholder="my-better-t-app"
+                        placeholder="my-xstack-app"
                       />
                       {projectNameError && (
                         <p
@@ -199,7 +214,7 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
                         <button
                           type="button"
                           onClick={() => copyToClipboard("button")}
-                          disabled={!!projectNameError}
+                          disabled={!!configurationError}
                           className={cn(
                             "builder-focus-ring flex items-center gap-1 rounded-[4px] border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.10em] transition-colors duration-150",
                             copied
@@ -228,7 +243,7 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
                         }
                       }}
                       aria-label="Copy CLI command"
-                      aria-disabled={!!projectNameError}
+                      aria-disabled={!!configurationError}
                       title="Click to copy command"
                       className="builder-focus-ring cursor-pointer rounded-[4px] border px-2.5 py-2 transition-colors duration-150 hover:border-primary/50"
                     >
@@ -246,12 +261,17 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
                         </code>
                       </div>
                     </div>
+                    {configurationError && (
+                      <p role="alert" className="mt-2 text-xs text-destructive">
+                        {configurationError}
+                      </p>
+                    )}
                   </section>
 
                   <section className="space-y-2 px-3 py-3">
                     <div className="flex items-center gap-3">
                       <p className="font-mono text-[11px] text-fd-muted-foreground uppercase tracking-[0.08em]">
-                        Selected stack
+                        Template configuration
                       </p>
                       <span aria-hidden="true" className="h-px flex-1 bg-fd-border" />
                       <span className="font-mono text-[10px] text-fd-muted-foreground uppercase tracking-[0.10em] tabular-nums">
@@ -289,13 +309,7 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
             </ScrollArea>
 
             <div className="border-t bg-fd-background p-2">
-              <div className="@container p-2">
-                <SpecialSponsorsPanel sponsors={specialSponsors} />
-                {specialSponsors.length > 0 ? (
-                  <span aria-hidden="true" className="my-3 block h-px w-full bg-fd-border" />
-                ) : null}
-                {actionButtons}
-              </div>
+              <div className="@container p-2">{actionButtons}</div>
             </div>
           </aside>
 
@@ -348,13 +362,36 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
               <div ref={scrollAreaRef} className="min-h-0 flex-1">
                 <ScrollArea className="h-full overflow-hidden scroll-smooth">
                   <main className="@container p-2 sm:p-4">
+                    {templatePresets}
                     <TechCategories
                       mode="desktop"
                       stack={effectiveStack}
                       compatibilityNotes={compatibilityAnalysis.notes}
                       onSelect={handleTechSelect}
-                      showAllCategories
+                      categories={["features"]}
                     />
+                    <ProductOptions
+                      stack={effectiveStack}
+                      onChange={setStack}
+                      idPrefix="product-desktop"
+                    />
+                    <details className="mt-6 rounded border p-3" open>
+                      <summary className="builder-focus-ring cursor-pointer font-mono text-sm">
+                        Infrastructure & tooling
+                      </summary>
+                      <p className="my-3 text-xs text-fd-muted-foreground">
+                        Native product modules target Next.js full-stack with Drizzle. Other stacks
+                        only expose modules they support.
+                      </p>
+                      <TechCategories
+                        mode="desktop"
+                        stack={effectiveStack}
+                        compatibilityNotes={compatibilityAnalysis.notes}
+                        onSelect={handleTechSelect}
+                        showAllCategories
+                        excludeCategories={["features"]}
+                      />
+                    </details>
                   </main>
                 </ScrollArea>
               </div>
@@ -394,7 +431,7 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
                             ? "border-destructive text-destructive"
                             : "focus:border-primary",
                         )}
-                        placeholder="my-better-t-app"
+                        placeholder="my-xstack-app"
                       />
                       {projectNameError && (
                         <p
@@ -461,7 +498,7 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
                           copied && "border-primary",
                         )}
                         aria-label="Copy command"
-                        aria-disabled={!!projectNameError}
+                        aria-disabled={!!configurationError}
                         title="Click to copy command"
                       >
                         <div className="flex min-w-0 items-start gap-1.5">
@@ -493,24 +530,40 @@ export function StackBuilder({ specialSponsors = [] }: StackBuilderProps) {
                     )}
                   </div>
 
+                  {templatePresets}
                   <TechCategories
                     mode="mobile"
                     stack={effectiveStack}
                     compatibilityNotes={compatibilityAnalysis.notes}
                     onSelect={handleTechSelect}
-                    showAllCategories
+                    categories={["features"]}
                   />
+                  <ProductOptions
+                    stack={effectiveStack}
+                    onChange={setStack}
+                    idPrefix="product-mobile"
+                  />
+                  <details className="mt-6 rounded border p-3">
+                    <summary className="builder-focus-ring cursor-pointer font-mono text-sm">
+                      Infrastructure & tooling
+                    </summary>
+                    <p className="my-3 text-xs text-fd-muted-foreground">
+                      Native product modules target Next.js full-stack with Drizzle.
+                    </p>
+                    <TechCategories
+                      mode="mobile"
+                      stack={effectiveStack}
+                      compatibilityNotes={compatibilityAnalysis.notes}
+                      onSelect={handleTechSelect}
+                      showAllCategories
+                      excludeCategories={["features"]}
+                    />
+                  </details>
                 </main>
               </ScrollArea>
 
               <div className="border-t bg-fd-background p-2">
-                <div className="@container p-2">
-                  <SpecialSponsorsPanel sponsors={specialSponsors} compact />
-                  {specialSponsors.length > 0 ? (
-                    <span aria-hidden="true" className="my-3 block h-px w-full bg-fd-border" />
-                  ) : null}
-                  {actionButtons}
-                </div>
+                <div className="@container p-2">{actionButtons}</div>
               </div>
             </div>
           )}

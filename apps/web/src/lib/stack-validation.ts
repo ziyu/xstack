@@ -19,10 +19,10 @@ import {
   getDatabaseSetupDatabases,
 } from "@xstack/types";
 
-import { DEFAULT_STACK, type StackState, TECH_OPTIONS, isStackOption } from "@/lib/constant";
+import { type StackState, TECH_OPTIONS, isStackOption } from "@/lib/constant";
 import { CATEGORY_ORDER } from "@/lib/stack-utils";
 
-import { featureIssue, resolvableFeatures, stackAuth } from "./stack-features";
+import { featureIssue, productPlan, resolvableFeatures, stackAuth } from "./stack-features";
 import {
   getStackBackend,
   getStackFrontends,
@@ -162,11 +162,11 @@ export const analyzeStackCompatibility = (stack: StackState): CompatibilityResul
     nextStack.runtime === "none" &&
     !supportsRuntimeBackend(nextStack.runtime, getStackBackend(nextStack.backend))
   ) {
-    nextStack.runtime = DEFAULT_STACK.runtime;
+    nextStack.runtime = "bun";
     changed = true;
     changes.push({
       category: "runtime",
-      message: `Runtime set to '${DEFAULT_STACK.runtime}' (required for this backend)`,
+      message: "Runtime set to 'bun' (required for this backend)",
     });
   }
 
@@ -417,6 +417,11 @@ export const analyzeStackCompatibility = (stack: StackState): CompatibilityResul
       category: "serverDeploy",
       message: `Server deploy set to '${nextStack.serverDeploy}' (required for ${nextStack.runtime})`,
     });
+  }
+
+  for (const issue of productPlan(nextStack).issues) {
+    notes.features.notes.push(issue.message);
+    if (issue.level === "error") notes.features.hasIssue = true;
   }
 
   return {

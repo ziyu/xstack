@@ -17,6 +17,8 @@ export const stackUrlKeys: UrlKeys<StackUrlState> = {
   packageManager: "pm",
   addons: "add",
   features: "ft",
+  providers: "providers",
+  moduleOptions: "module-options",
   git: "git",
   install: "i",
   webDeploy: "wd",

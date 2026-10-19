@@ -23,13 +23,18 @@ export type StackState = Pick<
   nativeFrontend: NativeFrontend[];
   /** Feature module ids, or `["none"]`. */
   features: string[];
+  providers: Record<string, string[]>;
+  moduleOptions: Record<string, Record<string, string | number | boolean>>;
   backend: Exclude<Backend, "self"> | `self-${FullstackFrontend}`;
   git: "true" | "false";
   install: "true" | "false";
   yolo: "true" | "false";
 };
 
-export type TechCategory = Exclude<keyof StackState, "projectName" | "yolo">;
+export type TechCategory = Exclude<
+  keyof StackState,
+  "projectName" | "yolo" | "providers" | "moduleOptions"
+>;
 type StackOptionIds = {
   [K in TechCategory]: Extract<StackState[K] extends (infer Id)[] ? Id : StackState[K], string>;
 };

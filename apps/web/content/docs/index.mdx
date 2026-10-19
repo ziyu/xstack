@@ -6,7 +6,7 @@ description: Create your first xstack project in minutes
 ## Philosophy
 
 - Roll your own stack: pick only what you need, nothing extra.
-- Minimal templates: bare-bones scaffolds with zero bloat.
+- Composable product templates: select business modules and providers without hand-assembling their integrations.
 - Latest dependencies: always current and stable by default.
 - Free and open source: forever.
 
@@ -24,7 +24,7 @@ description: Create your first xstack project in minutes
 npm create xstack@latest
 ```
 
-Follow the interactive prompts to choose your frontend, backend, database, ORM, API layer, and addons.
+Follow the interactive prompts to choose your infrastructure, feature modules, providers, languages, and addons.
 
 Skip prompts and use the default stack:
 
@@ -32,10 +32,15 @@ Skip prompts and use the default stack:
 npm create xstack@latest --yes
 ```
 
-### Stack Builder (UI)
+### Template Builder (UI)
 
-- Visit [/new](/new) to pick your stack and copy the generated command
-- Or open it via:
+Visit [/new](/new) to start from **Shell**, **Starter**, or **Global SaaS**. Shell includes Next.js, Drizzle, SQLite and internationalization; Starter adds authentication; Global SaaS adds authentication, email, admin, payments and credits.
+
+Choose modules first, then configure OAuth, email/payment providers, locales, signup credits, infrastructure and deployment. Automatically required modules and compatibility errors come from the generator catalog. The Preview tab renders the generated file tree; Save/Load and Share preserve provider and module settings. The UI does not collect credentials, randomize the stack, or expose the CLI's validation bypass.
+
+Shell is a Builder preset, not a `--preset shell` CLI value. Use `--yes` for the default CLI shell or `--features none` with explicit infrastructure flags. The CLI still supports its separate `--template` technology presets.
+
+Open the hosted builder with:
 
 ```npm
 npm create xstack@latest builder
@@ -55,17 +60,23 @@ Then ask: _"create a fullstack app with Next, Hono, Postgres and Better Auth"_. 
 
 ## Common Setups
 
-### Default Stack
+### Default Product Shell
 
-```npm
-npm create xstack@latest my-webapp \
-  --frontend tanstack-router \
-  --backend hono \
-  --database sqlite \
-  --orm drizzle \
-  --features auth \
-  --addons turborepo
+```bash
+xstack my-webapp --yes
 ```
+
+The default shell uses Next.js full-stack, SQLite, Drizzle, Turborepo, and no optional feature modules or separate API layer.
+
+### SaaS Product Template
+
+```bash
+xstack my-saas --preset saas-global \
+  --providers auth:none email:smtp payment:polar \
+  --module-options i18n.locales=zh-CN credits.signupBonus=50
+```
+
+`auth:none` disables OAuth while retaining email/password authentication. SMTP and Polar credentials must be configured in the generated environment. Polar defaults to its sandbox; mock payments, if selected, are development-only.
 
 ### Convex + React + Clerk
 

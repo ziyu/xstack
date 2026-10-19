@@ -1,13 +1,15 @@
-import { expect, test } from "bun:test";
+import { beforeAll, expect, test } from "bun:test";
 import { join } from "node:path";
 
 import { execa } from "execa";
 import fs from "fs-extra";
 import { parse } from "jsonc-parser";
 
-import { SMOKE_DIR } from "./setup";
+import { ensureSmokeDirectory, SMOKE_DIR } from "./setup";
 
 const cliPath = join(import.meta.dir, "../dist/cli.mjs");
+
+beforeAll(ensureSmokeDirectory);
 
 function runCli(args: string[], env: Record<string, string> = {}) {
   return execa("node", [cliPath, ...args], {

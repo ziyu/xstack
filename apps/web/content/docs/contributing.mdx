@@ -49,27 +49,28 @@ xstack
 
 This will run the locally installed CLI.
 
-## Develop the Docs
+## Develop the Website and Template Builder
+
+From the repository root:
 
 ```bash
-# from repo root
 bun install
-cd packages/backend
-bun dev:setup  # you can choose local development too in prompts
+bun run build:cli
+bun run --filter @xstack/backend dev
 ```
 
-Copy the Convex URL from `packages/backend/.env.local` to `apps/web/.env`:
+Keep the backend running. Local Convex does not require a cloud account. Set `NEXT_PUBLIC_CONVEX_URL` in `apps/web/.env.local` to the client URL printed by Convex, normally `http://127.0.0.1:3210`.
 
-```
-NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210/
-```
-
-Now run `bun dev` in the root. It will complain about GitHub token, so run this in `packages/backend`:
+In `packages/backend`, configure the statistics component's token without placing it in shell history:
 
 ```bash
-npx convex env set GITHUB_ACCESS_TOKEN=xxxxx
-npx convex env set GITHUB_WEBHOOK_SECRET=xxxxx
+gh auth token | bunx --no-install convex env set GITHUB_ACCESS_TOKEN
+bunx --no-install convex env set GITHUB_WEBHOOK_SECRET
 ```
+
+The first command reuses an authenticated GitHub CLI account for local development. The second prompts for a separate webhook signing secret. Do not commit credentials or the local `.convex/` database. Start the website in another terminal with `bun dev:web` from the repository root; open `/new` to use the Template Builder.
+
+Builder presets, provider controls and previews share the generator module catalog. Keep URL state, command generation and preview conversion aligned. Logos are local SVG files in `apps/web/public/icons/`, rendered by the shared `TechIcon` component with CSS-selected theme variants.
 
 ## Contribution Flow
 
@@ -81,12 +82,13 @@ npx convex env set GITHUB_WEBHOOK_SECRET=xxxxx
 6. Test and format
 
 ```bash
-# CLI
-cd apps/cli && bun dev
-cd apps/cli && bun run test
+# From the repository root
+bun run build:cli
+bun test apps/cli/test packages/template-generator/test
+bun run --filter web check-types
 
-# Web
-bun dev
+# Builder preview and generated-command regressions
+(cd apps/web && bun test test)
 
 # Lint + format checks
 bun check

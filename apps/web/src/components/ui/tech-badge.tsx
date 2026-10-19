@@ -1,9 +1,8 @@
 "use client";
 
-import { useTheme } from "next-themes";
-import Image from "next/image";
-
 import { cn } from "@/lib/utils";
+
+import { TechIcon } from "./tech-icon";
 
 interface TechBadgeProps {
   icon: string;
@@ -44,44 +43,6 @@ const getBadgeColors = (category: string): string => {
       return "border-gray-300 bg-gray-100 text-gray-800 dark:border-gray-700/30 dark:bg-gray-900/30 dark:text-gray-300";
   }
 };
-
-function TechIcon({ icon, name, className }: { icon: string; name: string; className?: string }) {
-  const { theme } = useTheme();
-
-  if (!icon) return null;
-
-  if (!icon.startsWith("https://")) {
-    return <span className={cn("inline-flex items-center text-lg", className)}>{icon}</span>;
-  }
-
-  let iconSrc = icon;
-  if (
-    theme === "light" &&
-    (icon.includes("drizzle") ||
-      icon.includes("prisma") ||
-      icon.includes("express") ||
-      icon.includes("clerk") ||
-      icon.includes("planetscale") ||
-      icon.includes("nx") ||
-      icon.includes("polar") ||
-      icon.includes("astro") ||
-      icon.includes("vercel"))
-  ) {
-    iconSrc = icon.replace(".svg", "-light.svg");
-  }
-
-  return (
-    <Image
-      suppressHydrationWarning
-      src={iconSrc}
-      alt={`${name} icon`}
-      width={20}
-      height={20}
-      className={cn("inline-block", className)}
-      unoptimized
-    />
-  );
-}
 
 export function TechBadge({ icon, name, category, className }: TechBadgeProps) {
   return (

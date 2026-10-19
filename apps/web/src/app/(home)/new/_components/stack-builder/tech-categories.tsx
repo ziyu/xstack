@@ -1,5 +1,6 @@
 import { CheckCircle2, InfoIcon, Terminal } from "lucide-react";
 
+import { TechIcon } from "@/components/ui/tech-icon";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { StackState } from "@/lib/constant";
 import { TECH_OPTIONS } from "@/lib/constant";
@@ -12,14 +13,14 @@ import {
 import type { TechCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-import { TechIcon } from "../tech-icon";
-
 type TechCategoriesProps = {
   mode: "desktop" | "mobile";
   stack: StackState;
   compatibilityNotes: Record<string, { hasIssue: boolean; notes: string[] }>;
   onSelect: (category: keyof typeof TECH_OPTIONS, techId: string) => void;
   showAllCategories?: boolean;
+  categories?: TechCategory[];
+  excludeCategories?: TechCategory[];
 };
 
 function getIsSelected(stack: StackState, category: keyof StackState, techId: string) {
@@ -43,9 +44,13 @@ export function TechCategories({
   compatibilityNotes,
   onSelect,
   showAllCategories = false,
+  categories: selectedCategories,
+  excludeCategories = [],
 }: TechCategoriesProps) {
   const isDesktop = mode === "desktop";
-  const categories = showAllCategories ? CATEGORY_ORDER : [CATEGORY_ORDER[0]];
+  const categories = (
+    selectedCategories ?? (showAllCategories ? CATEGORY_ORDER : [CATEGORY_ORDER[0]])
+  ).filter((category) => !excludeCategories.includes(category));
 
   return (
     <>

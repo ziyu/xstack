@@ -1,14 +1,21 @@
 "use client";
-import { parseAsArrayOf, parseAsString, parseAsStringEnum, useQueryStates } from "nuqs";
+import {
+  parseAsArrayOf,
+  parseAsJson,
+  parseAsString,
+  parseAsStringEnum,
+  useQueryStates,
+} from "nuqs";
 import { useCallback, useMemo } from "react";
 
 import { DEFAULT_STACK, type StackState, getStackOptionIds } from "@/lib/constant";
 
 import { sanitizeStackState, type RawStackLists } from "./sanitize-stack-addons";
+import { StackModuleOptionsSchema, StackProvidersSchema } from "./stack-schema";
 import { stackUrlKeys } from "./stack-url-keys";
 
 export const stackParsers = {
-  projectName: parseAsString.withDefault(DEFAULT_STACK.projectName ?? "my-better-t-app"),
+  projectName: parseAsString.withDefault(DEFAULT_STACK.projectName ?? "my-xstack-app"),
   webFrontend: parseAsArrayOf(parseAsString).withDefault(DEFAULT_STACK.webFrontend),
   nativeFrontend: parseAsArrayOf(parseAsString).withDefault(DEFAULT_STACK.nativeFrontend),
   runtime: parseAsStringEnum<StackState["runtime"]>(getStackOptionIds("runtime")).withDefault(
@@ -34,6 +41,10 @@ export const stackParsers = {
   ).withDefault(DEFAULT_STACK.packageManager),
   addons: parseAsArrayOf(parseAsString).withDefault(DEFAULT_STACK.addons),
   features: parseAsArrayOf(parseAsString).withDefault(DEFAULT_STACK.features),
+  providers: parseAsJson(StackProvidersSchema.parse).withDefault(DEFAULT_STACK.providers),
+  moduleOptions: parseAsJson(StackModuleOptionsSchema.parse).withDefault(
+    DEFAULT_STACK.moduleOptions,
+  ),
   git: parseAsStringEnum<StackState["git"]>(["true", "false"]).withDefault(DEFAULT_STACK.git),
   install: parseAsStringEnum<StackState["install"]>(["true", "false"]).withDefault(
     DEFAULT_STACK.install,
@@ -72,6 +83,8 @@ function getStackFromQueryState(queryState: RawStackLists): StackState {
     packageManager: queryState.packageManager,
     addons: queryState.addons,
     features: queryState.features,
+    providers: queryState.providers,
+    moduleOptions: queryState.moduleOptions,
     git: queryState.git,
     install: queryState.install,
     webDeploy: queryState.webDeploy,

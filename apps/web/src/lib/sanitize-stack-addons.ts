@@ -1,6 +1,7 @@
 import { TASK_RUNNER_ADDONS, OBSERVABILITY_ADDONS, type Addons } from "@xstack/types";
 
 import { DEFAULT_STACK, type StackState, TECH_OPTIONS } from "./constant";
+import { StackModuleOptionsSchema, StackProvidersSchema } from "./stack-schema";
 
 const validWebFrontendIds = TECH_OPTIONS.webFrontend.map((option) => option.id);
 const validNativeFrontendIds = TECH_OPTIONS.nativeFrontend.map((option) => option.id);
@@ -99,6 +100,9 @@ export function sanitizeStackState(stack: RawStackLists): StackState {
     nativeFrontend: sanitizeNativeFrontends(stack.nativeFrontend),
     addons: sanitizeAddons(stack.addons),
     features: sanitizeFeatures(stack.features),
+    providers: StackProvidersSchema.safeParse(stack.providers).data ?? DEFAULT_STACK.providers,
+    moduleOptions:
+      StackModuleOptionsSchema.safeParse(stack.moduleOptions).data ?? DEFAULT_STACK.moduleOptions,
   };
 }
 

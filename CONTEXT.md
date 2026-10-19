@@ -1,11 +1,11 @@
 # xstack
 
-xstack is a project scaffolding CLI that turns a stack selection into a reproducible TypeScript starter project.
+xstack composes reproducible TypeScript product templates from a core stack, feature modules, providers, and module options. CLI generation and the web Template Builder share the module catalog and resolver.
 
 ## Language
 
 **Project Configuration**:
-A complete selection of stack choices used to scaffold one project.
+A complete selection of infrastructure, feature modules, providers, module options, and addons used to scaffold one project.
 _Avoid_: Config blob, options bag
 
 **Core Stack**:
@@ -16,9 +16,17 @@ _Avoid_: Main options, basics
 An optional capability layered onto a generated project without changing the core stack identity.
 _Avoid_: Plugin, extra
 
-**Example**:
-A generated sample feature included to demonstrate the selected stack.
-_Avoid_: Demo, sample app
+**Feature Module**:
+A business capability selected with `--features`: authentication, email, admin, payments, or credits. The resolver adds required modules and validates the selected stack.
+
+**Provider**:
+A module implementation selected through `product.providers`, such as SMTP for email or Polar for payments. Credentials belong in the generated project's environment, not in Builder state.
+
+**Module Option**:
+A catalog-defined setting stored in `product.options`, such as locale order or signup credits.
+
+**Template Builder**:
+The `/new` interface for Shell, Starter, and Global SaaS presets, module configuration, command output, and virtual file previews. Saved preferences and shared URLs preserve providers and module options.
 
 **Exhaustive Matrix**:
 The set of all meaningful core-stack combinations after normalizing unordered selections.
@@ -80,7 +88,7 @@ _Avoid_: MCP addon
 
 - A **Project Configuration** contains one **Core Stack**
 - A **Project Configuration** may include zero or more **Addons**
-- A **Project Configuration** may include zero or more **Examples**
+- A **Project Configuration** may include **Feature Modules**, their **Providers**, and **Module Options**
 - The **Exhaustive Matrix** covers **Core Stack** combinations
 - **Addon Compatibility Coverage** covers addon-specific rules outside the exhaustive matrix
 - **Input Shape** checks validate raw CLI input before project-configuration behavior is evaluated

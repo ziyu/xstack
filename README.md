@@ -1,25 +1,11 @@
 # xstack
 
-A modern CLI tool for scaffolding end-to-end type-safe TypeScript projects with best practices and customizable configurations
-
-<br />
-
-<a href="https://vercel.com/oss">
-  <img alt="Vercel OSS Program" src="https://vercel.com/oss/program-badge.svg" />
-</a>
-
-## Sponsors
-
-<p align="center">
-<img src="https://sponsors.xstack.dev/sponsors.png" alt="Sponsors">
-</p>
-
-https://github.com/user-attachments/assets/87b541ea-9d4d-4734-b383-00784b0b43ff
+xstack composes TypeScript product templates from infrastructure choices, feature modules, and providers. The CLI and visual Template Builder share the same generator and compatibility rules.
 
 ## Philosophy
 
 - Roll your own stack: you pick only the parts you need, nothing extra.
-- Minimal templates: bare-bones scaffolds with zero bloat.
+- Composable products: add authentication, email, admin, payments, and credits only when needed.
 - Latest dependencies: always use current, stable versions by default.
 - Free and open source: forever.
 
@@ -57,11 +43,10 @@ Then ask: _"create a fullstack app with Next, Hono, Postgres and Better Auth"_, 
 - Runtime: Bun, Node.js, or Cloudflare Workers
 - Databases: SQLite, PostgreSQL, MySQL, MongoDB (or none)
 - ORMs: Drizzle, Prisma, Mongoose (or none)
-- Auth: Better Auth or Clerk (optional)
+- Product modules: authentication, transactional email, admin console, payments, and credits; native product templates use Next.js full-stack, Drizzle, SQLite or PostgreSQL, and no separate API layer
 - Addons: Turborepo, Nx, PWA, Tauri, Electrobun, Biome, Lefthook, Husky, Starlight, Fumadocs, Ultracite, Oxlint, MCP, OpenTUI, WXT, Skills
-- Examples: Todo, AI
 - DB Setup: Turso, Neon, Supabase, Prisma PostgreSQL, MongoDB Atlas, Cloudflare D1, Docker
-- Web Deploy: Cloudflare Workers
+- Deployment choices: local Node hosting, Docker, Vercel, Cloudflare, or Prisma, subject to stack compatibility
 
 Type safety end-to-end, clean monorepo layout, and zero lock-in: you choose only what you need.
 
@@ -77,13 +62,18 @@ The homepage keeps only the introductory screen: the CLI banner, package-manager
 
 ## Documentation
 
-Visit [xstack.dev](https://xstack.dev) for full documentation, guides, and examples. You can also use the visual Stack Builder at `https://xstack.dev/new` to generate a command for your stack.
+Visit [xstack.dev](https://xstack.dev) for documentation, guides, and examples. The Template Builder at `/new` starts from Shell, Starter, or Global SaaS, then configures feature modules, providers, locales, signup credits, infrastructure, and deployment. Its controls and compatibility checks use the generator's module catalog. Generated commands, file previews, saved preferences, and share links preserve the same product selections.
+
+The builder never collects provider secrets. Configure SMTP/Resend, OAuth, and payment credentials in the generated project's environment before using those integrations. `auth:none` explicitly disables OAuth providers without removing email/password authentication. Builder regression checks: `bun run build:cli`, then `cd apps/web && bun test test`.
+
+Technology logos are served locally from `apps/web/public/icons/`, with one shared theme-aware icon component for builder cards and badges. Assets were sourced from the original Better-T-Stack icon collection (`https://r2.better-t-stack.dev/icons/`); the Prisma mark comes from Simple Icons (`https://cdn.simpleicons.org/prisma/2D3748`). Brand marks remain the property of their respective owners. Runtime icon loading does not depend on an external CDN.
 
 ## Development
 
 ```bash
 # Clone the repository
 git clone https://github.com/ziyu/xstack.git
+cd xstack
 
 # Install dependencies
 bun install
@@ -101,7 +91,7 @@ bun dev:web
 
 The website requires `NEXT_PUBLIC_CONVEX_URL` for a configured Convex deployment. Set it in `apps/web/.env.local` before running `bun dev:web`.
 
-#### Local Convex development
+### Local Convex development
 
 No Convex cloud account is required for local development. In one terminal, run:
 
@@ -133,6 +123,8 @@ Validated the default shell, `starter`, and `saas-global` using Next.js, SQLite,
 - `starter`: browser signup, logout, login, profile updates, session persistence after reload, and anonymous dashboard protection passed against the production server.
 - `saas-global`: verified email using the documented development-console delivery, checked admin/user separation, granted 125 credits, rejected a 200-credit deduction without changing the balance, and rendered English/Chinese pages. After restarting in production, login, existing sessions, access restrictions, and the persisted balance still worked.
 - Reproduction commands now target `xstack` for Bun, pnpm, and npm. Regression tests replay their generated arguments and compare the resulting stack and module configuration.
+- Template Builder: SMTP + Polar, OAuth disabled, Chinese locale, and 50 signup credits survived URL reload, saved preferences, and sharing. The copied command generated a project that installed, typechecked, migrated SQLite, built, and served its Chinese homepage and login page in production mode. This did not verify live SMTP or Polar transactions.
+- Builder icons: all 50 local SVG sources decoded in the browser; light/dark backend cards and selected badges loaded without requests to the former icon CDN.
 
 Run the command regressions with `bun run build:cli && bun test apps/cli/test/cli-output.test.ts packages/template-generator/test`.
 

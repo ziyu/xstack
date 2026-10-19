@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import type { VirtualNode } from "@xstack/template-generator";
 import { createORPCClient, ORPCError } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { RouterClient } from "@orpc/server";
+import type { VirtualNode } from "@xstack/template-generator";
 
 import { POST } from "../src/app/api/rpc/[[...rest]]/route";
 import { DEFAULT_STACK, PRESET_TEMPLATES } from "../src/lib/constant";
@@ -53,12 +53,62 @@ describe("builder preview over oRPC", () => {
   });
 
   test("repairs incompatible shared choices before generating framework-specific files", async () => {
-    const input = StackStateSchema.parse({ ...DEFAULT_STACK, webFrontend: ["nuxt"], api: "trpc" });
+    const input = StackStateSchema.parse({
+      ...DEFAULT_STACK,
+      webFrontend: ["nuxt"],
+      backend: "hono",
+      runtime: "bun",
+      api: "trpc",
+    });
     const preview = await client.preview(input);
     const output = files(preview.root);
     const api = JSON.parse(output.get("packages/api/package.json")!);
     expect(api.dependencies["@orpc/server"]).toBeDefined();
     expect(api.dependencies["@trpc/server"]).toBeUndefined();
+  });
+
+  test("preserves providers and options across a shared URL and renders the chosen product", async () => {
+    const preset = PRESET_TEMPLATES.find((preset) => preset.id === "saas-global")!;
+    const selected = {
+      ...preset.stack,
+      projectName: "product-check",
+      providers: { auth: [], email: ["smtp"], payment: ["polar"] },
+      moduleOptions: { i18n: { locales: "zh-CN" }, credits: { signupBonus: 50 } },
+    };
+    const shared = await loadStackParams(
+      Promise.resolve(new URL(generateStackUrlFromState(selected))),
+    );
+    expect(shared.providers).toEqual(selected.providers);
+    expect(shared.moduleOptions).toEqual(selected.moduleOptions);
+    const output = files((await client.preview(shared)).root);
+    expect(
+      JSON.parse(output.get("packages/email/package.json")!).dependencies.nodemailer,
+    ).toBeDefined();
+    expect(output.has("packages/email/src/providers/resend.ts")).toBe(false);
+    expect(output.has("packages/payment/src/providers/polar.ts")).toBe(true);
+    expect(output.has("packages/payment/src/providers/stripe.ts")).toBe(false);
+    expect(output.get("apps/web/.env.schema")).not.toContain("GOOGLE_CLIENT_ID");
+    expect(output.get("apps/web/.env.schema")).not.toContain("GITHUB_CLIENT_ID");
+    expect(output.get("packages/i18n/src/config.ts")).toContain('defaultLocale: Locale = "zh-CN"');
+    expect(output.get("packages/i18n/src/messages/index.ts")).not.toContain('"./en"');
+    expect(output.get("apps/web/src/integrations/credits-signup.ts")).toContain(
+      "SIGNUP_BONUS = 50",
+    );
+    expect(generateStackCommand(shared)).toContain("auth:none");
+  });
+
+  test("rejects invalid module options and provider selections instead of dropping features", async () => {
+    for (const update of [
+      { providers: { payment: ["missing-provider"] } },
+      { providers: { email: ["resend", "smtp"] } },
+      { moduleOptions: { credits: { signupBonus: -1 } } },
+    ]) {
+      const input = StackStateSchema.parse({
+        ...PRESET_TEMPLATES.find((preset) => preset.id === "saas-global")!.stack,
+        ...update,
+      });
+      await expect(client.preview(input)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    }
   });
 
   test("rejects invalid payloads at the HTTP boundary", async () => {

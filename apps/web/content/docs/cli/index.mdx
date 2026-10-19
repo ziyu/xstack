@@ -39,8 +39,8 @@ xstack [project-directory] [options]
 - `--preset <name>`: `starter`, `saas-global`
 - `--providers <feature:provider...>` and `--module-options <module.key=value...>`: module providers and options
 - `--db-setup <setup>`: `none`, `turso`, `d1`, `neon`, `supabase`, `prisma-postgres`, `planetscale`, `mongodb-atlas`, `docker`
-- `--web-deploy <setup>`: `none`, `cloudflare`
-- `--server-deploy <setup>`: `none`, `cloudflare`
+- `--web-deploy <setup>`: `none`, `cloudflare`, `prisma`, `docker`, `vercel` (subject to compatibility)
+- `--server-deploy <setup>`: `none`, `cloudflare`, `prisma`, `docker`, `vercel` (subject to compatibility)
 - `--template <type>`: `none`, `mern`, `pern`, `t3`, `uniwind`
 - `--directory-conflict <strategy>`: `merge`, `overwrite`, `increment`, `error`
 - `--render-title / --no-render-title`: Show/hide ASCII art title
@@ -106,7 +106,7 @@ xstack add --package shared
 Create a project from a raw JSON payload.
 
 ```bash
-xstack create-json --input '{"projectName":"my-app","yes":true,"dryRun":true}'
+xstack create-json --json '{"projectName":"my-app","yes":true,"dryRun":true}'
 ```
 
 Use this when you want a single machine-readable input object instead of many flags.
@@ -116,7 +116,7 @@ Use this when you want a single machine-readable input object instead of many fl
 Add addons from a raw JSON payload.
 
 ```bash
-xstack add-json --input '{"projectDir":"./my-app","addons":["wxt"],"addonOptions":{"wxt":{"template":"react"}}}'
+xstack add-json --json '{"projectDir":"./my-app","addons":["wxt"],"addonOptions":{"wxt":{"template":"react"}}}'
 ```
 
 ## `schema`
@@ -164,13 +164,13 @@ Opens `https://www.xstack.dev/docs` in your browser.
 
 ## `builder`
 
-Opens the web-based stack builder in your default browser.
+Opens the web-based Template Builder in your default browser.
 
 ```bash
 xstack builder
 ```
 
-Opens `https://www.xstack.dev/new` where you can configure your stack visually.
+Opens `https://www.xstack.dev/new`, with Shell, Starter and Global SaaS presets, module/provider controls, generated-file previews, and shareable configuration. For an unpublished local checkout, use `http://localhost:3333/new` after starting the website.
 
 ## `history`
 

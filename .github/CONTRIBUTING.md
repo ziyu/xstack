@@ -8,8 +8,9 @@ Thank you for your interest in contributing to xstack! This document provides gu
 
 This repository is organized as a monorepo containing:
 
-- **CLI**: [`apps/cli`](apps/cli) - The scaffolding CLI tool (`xstack`)
-- **Documentation**: [`apps/web`](apps/web) - Official website and documentation
+- **CLI**: [`apps/cli`](../apps/cli) - The scaffolding CLI tool (`xstack`)
+- **Website**: [`apps/web`](../apps/web) - Template Builder and documentation
+- **Generator**: [`packages/template-generator`](../packages/template-generator) - Shared module manifests, resolver and templates
 
 ## Development Setup
 
@@ -66,40 +67,27 @@ This repository is organized as a monorepo containing:
 
 ### Web Development
 
-1. **Install dependencies**
+1. From the repository root, run `bun install` and `bun run build:cli`.
+2. Start the local Convex backend in one terminal: `bun run --filter @xstack/backend dev`. A local deployment does not require a Convex cloud account.
+3. Copy its client URL into `apps/web/.env.local`, for example `NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210`.
+4. The statistics component requires a GitHub token. In `packages/backend`, use `gh auth token | bunx --no-install convex env set GITHUB_ACCESS_TOKEN` with an authenticated GitHub CLI, or enter a token through `bunx --no-install convex env set GITHUB_ACCESS_TOKEN`. Configure `GITHUB_WEBHOOK_SECRET` similarly if using webhooks. Never commit secrets or `.convex/` state.
+5. In another terminal at the repository root, run `bun dev:web` and open `http://localhost:3333/new`.
 
-   ```bash
-   # from repo root
-   bun i
-   ```
+The Template Builder reads product options from the shared module catalog. Update the schema, URL parsers, command generation, file preview, and tests together when changing that contract. Technology icons live in `apps/web/public/icons/`; both builder cards and badges use `src/components/ui/tech-icon.tsx`. Add matching theme variants locally rather than introducing an external CDN dependency.
 
-2. **Setup backend**
+### Focused Verification
 
-   ```bash
-   cd packages/backend
-   bun dev:setup  # you can choose local development too in prompts
-   ```
+```bash
+# From the repository root
+bun run build:cli
+bun test apps/cli/test packages/template-generator/test
+bun run --filter web check-types
 
-3. **Configure environment**
-   Copy the Convex URL from `packages/backend/.env.local` to `apps/web/.env`:
+# From apps/web
+bun test test
+```
 
-   ```
-   NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210/
-   ```
-
-4. **Set GitHub tokens**
-   Now run `bun dev` in the root. It will complain about GitHub token, so run this in `packages/backend`:
-
-   ```bash
-   npx convex env set GITHUB_ACCESS_TOKEN=xxxxx
-   npx convex env set GITHUB_WEBHOOK_SECRET=xxxxx
-   ```
-
-5. **Start the documentation website**
-   ```bash
-   bun dev
-   ```
-   This starts the Next.js development server for the documentation site.
+Browser-check presets, provider changes, locale/credit options, saved/shared URLs, file preview, mobile layout, and light/dark icons. A passing preview is not proof that a generated app runs: install, build, and launch a representative output when changing templates. Real email, OAuth, or payment checks require provider credentials and must not be reported as passed without them.
 
 ## Contribution Guidelines
 

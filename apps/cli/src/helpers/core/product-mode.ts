@@ -1,3 +1,4 @@
+import { log } from "@clack/prompts";
 import {
   getModulePlan,
   hasErrors,
@@ -5,7 +6,6 @@ import {
   type RenderConfig,
   toRenderConfig,
 } from "@xstack/template-generator";
-import { log } from "@clack/prompts";
 import { Result } from "better-result";
 import pc from "picocolors";
 
@@ -41,6 +41,7 @@ export function productFromFlags(flags: ProductFlags): Result<ProductConfig | un
 
   const providers: Record<string, string[]> = {};
   let feature: string | undefined;
+  const disabledProviders = new Set<string>();
   for (const pair of providerPairs) {
     const [head, tail] = pair.includes(":") ? pair.split(":") : [feature, pair];
     if (!head || !tail) {
@@ -49,7 +50,22 @@ export function productFromFlags(flags: ProductFlags): Result<ProductConfig | un
       );
     }
     feature = head;
-    providers[feature] = [...(providers[feature] ?? []), tail];
+    if (tail === "none") {
+      if (providers[feature]?.length) {
+        return Result.err(
+          new CLIError({ message: `Cannot combine ${feature}:none with providers` }),
+        );
+      }
+      disabledProviders.add(feature);
+      providers[feature] = [];
+    } else {
+      if (disabledProviders.has(feature)) {
+        return Result.err(
+          new CLIError({ message: `Cannot combine ${feature}:none with providers` }),
+        );
+      }
+      providers[feature] = [...(providers[feature] ?? []), tail];
+    }
   }
 
   const options: Record<string, Record<string, string | boolean>> = {};

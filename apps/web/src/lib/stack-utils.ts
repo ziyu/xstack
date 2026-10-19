@@ -1,10 +1,12 @@
-import { DEFAULT_STACK, isStackDefault, type StackState, TECH_OPTIONS } from "@/lib/constant";
+import { type StackState, TECH_OPTIONS } from "@/lib/constant";
 import { SITE_URL } from "@/lib/site";
 import { stackUrlKeys } from "@/lib/stack-url-keys";
 
+import { productPlan } from "./stack-features";
 import { getStackBackend, getStackFrontends, isSelfHostedFullstackBackend } from "./stack-model";
 
 const CATEGORY_ORDER: Array<keyof typeof TECH_OPTIONS> = [
+  "features",
   "webFrontend",
   "nativeFrontend",
   "backend",
@@ -15,7 +17,6 @@ const CATEGORY_ORDER: Array<keyof typeof TECH_OPTIONS> = [
   "dbSetup",
   "webDeploy",
   "serverDeploy",
-  "features",
   "packageManager",
   "addons",
   "git",
@@ -36,7 +37,7 @@ const staticDesktopFrontendNames = {
 } as const;
 
 export function formatProjectName(name: string | null | undefined) {
-  return (name || "my-better-t-app").replace(/\s+/g, "-");
+  return (name || "my-xstack-app").replace(/\s+/g, "-");
 }
 
 function quoteShellArgument(value: string) {
@@ -58,7 +59,7 @@ export function getSelectedTechs(stack: StackState): SelectedTech[] {
   const selected: SelectedTech[] = [];
   for (const category of CATEGORY_ORDER) {
     const options = TECH_OPTIONS[category];
-    const value = stack[category as keyof StackState];
+    const value = stack[category];
     if (!options || value === undefined) continue;
 
     const ids = Array.isArray(value) ? value : [value];
@@ -82,7 +83,7 @@ export function getSelectedTechs(stack: StackState): SelectedTech[] {
 export function generateStackSummary(stack: StackState) {
   const selectedTechs = CATEGORY_ORDER.flatMap((category) => {
     const options = TECH_OPTIONS[category];
-    const selectedValue = stack[category as keyof StackState];
+    const selectedValue = stack[category];
 
     if (!options) return [];
 
@@ -145,16 +146,22 @@ export function generateStackCommand(stack: StackState) {
   const base =
     packageManagerCommands[stack.packageManager as keyof typeof packageManagerCommands] ||
     packageManagerCommands.default;
-  const projectName = quoteShellArgument(stack.projectName || "my-better-t-app");
-
-  const isStackDefaultExceptProjectName = Object.entries(DEFAULT_STACK).every(
-    ([key]) =>
-      key === "projectName" ||
-      isStackDefault(stack, key as keyof StackState, stack[key as keyof StackState]),
-  );
-
-  if (isStackDefaultExceptProjectName) {
-    return `${base} ${projectName} --yes`;
+  const projectName = quoteShellArgument(stack.projectName || "my-xstack-app");
+  const plan = productPlan(stack);
+  const providers = {
+    ...Object.fromEntries(
+      plan.modules
+        .filter((module) => module.manifest.providers)
+        .map((module) => [module.manifest.id, module.providers]),
+    ),
+    ...stack.providers,
+  };
+  const moduleOptions = { ...stack.moduleOptions };
+  for (const module of plan.modules) {
+    moduleOptions[module.manifest.id] = {
+      ...module.options,
+      ...moduleOptions[module.manifest.id],
+    };
   }
 
   const flags = [
@@ -180,8 +187,22 @@ export function generateStackCommand(stack: StackState) {
             .join(" ") || "none"
         : "none"
     }`,
-    `--features ${stack.features.filter((id) => id !== "none").join(" ") || "none"}`,
+    `--features ${
+      stack.features
+        .filter((id) => id !== "none")
+        .map(quoteShellArgument)
+        .join(" ") || "none"
+    }`,
   ];
+
+  const providerFlags = Object.entries(providers).flatMap(([module, ids]) =>
+    (ids.length ? ids : ["none"]).map((id) => quoteShellArgument(`${module}:${id}`)),
+  );
+  if (providerFlags.length) flags.push(`--providers ${providerFlags.join(" ")}`);
+  const optionFlags = Object.entries(moduleOptions).flatMap(([module, options]) =>
+    Object.entries(options).map(([key, value]) => quoteShellArgument(`${module}.${key}=${value}`)),
+  );
+  if (optionFlags.length) flags.push(`--module-options ${optionFlags.join(" ")}`);
 
   if (stack.yolo === "true") {
     flags.push("--yolo");
@@ -205,7 +226,14 @@ function serializeStackToSearchString(stack: StackState) {
   Object.entries(stackUrlKeys).forEach(([stackKey, urlKey]) => {
     const value = stack[stackKey as keyof StackState];
     if (value !== undefined) {
-      stackParams.set(urlKey as string, Array.isArray(value) ? value.join(",") : String(value));
+      stackParams.set(
+        urlKey as string,
+        Array.isArray(value)
+          ? value.join(",")
+          : value !== null && typeof value === "object"
+            ? JSON.stringify(value)
+            : String(value),
+      );
     }
   });
   return stackParams.toString();

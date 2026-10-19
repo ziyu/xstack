@@ -2,6 +2,7 @@ import {
   createLoader,
   createSerializer,
   parseAsArrayOf as parseAsArrayOfServer,
+  parseAsJson,
   parseAsStringEnum as parseAsStringEnumServer,
   parseAsString as parseAsStringServer,
   type UrlKeys,
@@ -12,9 +13,10 @@ import { resolveStackCompatibility } from "@/lib/stack-compatibility";
 import { stackUrlKeys } from "@/lib/stack-url-keys";
 
 import { sanitizeStackState } from "./sanitize-stack-addons";
+import { StackModuleOptionsSchema, StackProvidersSchema } from "./stack-schema";
 
 const serverStackParsers = {
-  projectName: parseAsStringServer.withDefault(DEFAULT_STACK.projectName || "my-better-t-app"),
+  projectName: parseAsStringServer.withDefault(DEFAULT_STACK.projectName || "my-xstack-app"),
   webFrontend: parseAsArrayOfServer(parseAsStringServer).withDefault(DEFAULT_STACK.webFrontend),
   nativeFrontend: parseAsArrayOfServer(parseAsStringServer).withDefault(
     DEFAULT_STACK.nativeFrontend,
@@ -42,6 +44,10 @@ const serverStackParsers = {
   ).withDefault(DEFAULT_STACK.packageManager),
   addons: parseAsArrayOfServer(parseAsStringServer).withDefault(DEFAULT_STACK.addons),
   features: parseAsArrayOfServer(parseAsStringServer).withDefault(DEFAULT_STACK.features),
+  providers: parseAsJson(StackProvidersSchema.parse).withDefault(DEFAULT_STACK.providers),
+  moduleOptions: parseAsJson(StackModuleOptionsSchema.parse).withDefault(
+    DEFAULT_STACK.moduleOptions,
+  ),
   git: parseAsStringEnumServer<StackState["git"]>(["true", "false"]).withDefault(DEFAULT_STACK.git),
   install: parseAsStringEnumServer<StackState["install"]>(["true", "false"]).withDefault(
     DEFAULT_STACK.install,

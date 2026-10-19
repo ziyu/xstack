@@ -34,11 +34,9 @@ export type AnalyticsEvents = {
   builder_copy_command: StackSnapshot & { source: BuilderCopySource };
   builder_command_expand: { expanded: boolean };
   builder_reset: EmptyData;
-  builder_randomize: EmptyData;
   builder_save: EmptyData;
   builder_load: EmptyData;
   builder_preset_apply: { preset: string };
-  builder_yolo_toggle: { enabled: boolean };
   builder_view_mode: { mode: "command" | "preview" };
   builder_mobile_tab: { tab: "build" | "preview" };
   builder_compat_adjust: { count: number; message: string };

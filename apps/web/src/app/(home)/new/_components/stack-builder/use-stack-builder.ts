@@ -5,6 +5,7 @@ import { type BuilderCopySource, stackSnapshot, track } from "@/lib/analytics";
 import { DEFAULT_STACK, PRESET_TEMPLATES, type StackState, TECH_OPTIONS } from "@/lib/constant";
 import { sanitizeAddons, sanitizeFeatures } from "@/lib/sanitize-stack-addons";
 import { applyStackUpdate, resolveStackCompatibility } from "@/lib/stack-compatibility";
+import { productPlan } from "@/lib/stack-features";
 import { StackStateSchema, StackUpdateSchema } from "@/lib/stack-schema";
 import { useStackState } from "@/lib/stack-url-state.client";
 import {
@@ -178,6 +179,13 @@ export function useStackBuilder() {
   const compatibilityAnalysis = useMemo(() => resolveStackCompatibility(stack), [stack]);
   const effectiveStack = compatibilityAnalysis.stack;
   const projectNameError = validateProjectName(formatProjectName(stack.projectName));
+  const configurationError =
+    projectNameError ||
+    productPlan(effectiveStack)
+      .issues.filter((issue) => issue.level === "error")
+      .map((issue) => issue.message)
+      .join("\n") ||
+    null;
 
   useEffect(() => {
     try {
@@ -239,34 +247,6 @@ export function useStackBuilder() {
     return generateStackSharingUrl(withFormattedProjectName(effectiveStack));
   }
 
-  function getRandomStack() {
-    const entries = CATEGORY_LIST.map((category) => {
-      const options = TECH_OPTIONS[category];
-      if (category === "addons" || category === "features") {
-        const count = Math.floor(Math.random() * Math.min(options.length, 4));
-        const ids = [...options]
-          .filter(({ id }) => id !== "none")
-          .sort(() => 0.5 - Math.random())
-          .slice(0, count)
-          .map(({ id }) => id);
-        return [category, ids.length ? ids : ["none"]];
-      }
-      const id = options[Math.floor(Math.random() * options.length)].id;
-      return [category, category === "webFrontend" || category === "nativeFrontend" ? [id] : id];
-    });
-    const randomStack = StackStateSchema.parse(Object.fromEntries(entries));
-
-    startTransition(() => {
-      setStack({
-        ...randomStack,
-        projectName: stack.projectName || "my-better-t-app",
-      });
-    });
-
-    contentRef.current?.scrollTo(0, 0);
-    track("builder_randomize", {});
-  }
-
   function handleTechSelect(category: keyof typeof TECH_OPTIONS, techId: string) {
     track("builder_tech_select", {
       category,
@@ -286,8 +266,8 @@ export function useStackBuilder() {
   }
 
   async function copyToClipboard(source: BuilderCopySource) {
-    if (projectNameError) {
-      toast.error(projectNameError);
+    if (configurationError) {
+      toast.error(configurationError);
       return;
     }
     try {
@@ -309,8 +289,8 @@ export function useStackBuilder() {
   }
 
   function saveCurrentStack() {
-    if (projectNameError) {
-      toast.error(projectNameError);
+    if (configurationError) {
+      toast.error(configurationError);
       return;
     }
     try {
@@ -345,7 +325,7 @@ export function useStackBuilder() {
     }
 
     startTransition(() => {
-      setStack(preset.stack);
+      setStack({ ...preset.stack, projectName: stack.projectName });
     });
 
     contentRef.current?.scrollTo(0, 0);
@@ -360,13 +340,13 @@ export function useStackBuilder() {
     compatibilityAnalysis,
     copied,
     copyToClipboard,
-    getRandomStack,
     getStackUrl,
     handleTechSelect,
     lastSavedStack,
     loadSavedStack,
     mobileTab,
     projectNameError,
+    configurationError,
     removeSelectedTech,
     resetStack,
     saveCurrentStack,

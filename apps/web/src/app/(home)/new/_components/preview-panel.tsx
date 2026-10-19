@@ -7,6 +7,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { scrubMessage, track } from "@/lib/analytics";
 import type { StackState } from "@/lib/constant";
 import { orpc } from "@/lib/orpc";
+import { productPlan } from "@/lib/stack-features";
 import { StackStateSchema } from "@/lib/stack-schema";
 import { formatProjectName } from "@/lib/stack-utils";
 import { validateProjectName } from "@/lib/stack-validation";
@@ -22,7 +23,13 @@ export function useStackPreview(stack: StackState, enabled: boolean) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const nameError = validateProjectName(formatProjectName(stack.projectName));
+  const nameError =
+    validateProjectName(formatProjectName(stack.projectName)) ||
+    productPlan(stack)
+      .issues.filter((issue) => issue.level === "error")
+      .map((issue) => issue.message)
+      .join("\n") ||
+    null;
   const requestKey = enabled && !nameError ? JSON.stringify(stack) : null;
 
   useEffect(() => {

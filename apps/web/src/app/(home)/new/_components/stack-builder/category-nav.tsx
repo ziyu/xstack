@@ -26,6 +26,8 @@ export function scrollToCategorySection(idPrefix: string, category: string, retr
     }
     return;
   }
+  const details = section.closest("details");
+  if (details) details.open = true;
   const viewport = getScrollViewport(section);
   if (!viewport) {
     section.scrollIntoView({ behavior: "smooth", block: "start" });

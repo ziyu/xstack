@@ -28,7 +28,7 @@ function getBaseCommand(packageManager: ProjectConfig["packageManager"]): string
 function productFlags(product: NonNullable<ProjectConfig["product"]>): string[] {
   const flags = [formatMultiFlag("--features", normalizeMultiValues(product.features))];
   const providers = Object.entries(product.providers ?? {}).flatMap(([feature, ids]) =>
-    ids.map((id) => `${feature}:${id}`),
+    ids.length ? ids.map((id) => `${feature}:${id}`) : [`${feature}:none`],
   );
   if (providers.length) flags.push(`--providers ${providers.join(" ")}`);
   const options = Object.entries(product.options ?? {}).flatMap(([module, values]) =>
