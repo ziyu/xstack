@@ -471,14 +471,6 @@
   font-size: clamp(8px, calc(100cqw / 26), 20px);
 }
 
-/* On the desktop rail the banner also has to fit the viewport height, so the
-   first pane never needs an inner scrollbar. 620px is the rest of the pane. */
-@media (min-width: 768px) {
-  .xstack-banner {
-    font-size: clamp(9px, min(calc(100cqw / 45), calc((100svh - 700px) / 13)), 22px);
-  }
-}
-
 @media (prefers-contrast: more), (forced-colors: active) {
   .xstack-banner,
   .xstack-banner-narrow {
@@ -489,21 +481,8 @@
   }
 }
 
-@media (min-width: 768px) {
-  body:has(#xstack-rail) {
-    overflow: hidden;
-    overscroll-behavior: none;
-  }
-
-  body:has(#xstack-rail) #nd-home-layout {
-    height: 100svh;
-    overflow: hidden;
-  }
-}
-
-/* Docs in the same flat mono language as the rail. Everything here is unlayered,
-   which beats fumadocs' @layer utilities without !important, and every selector is
-   scoped to the notebook layout so the home rail and other routes are untouched. */
+/* Docs share the homepage's flat mono language. These unlayered rules override
+   fumadocs utilities and stay scoped to the notebook layout. */
 #nd-notebook-layout,
 #nd-subnav,
 #nd-sidebar-mobile {

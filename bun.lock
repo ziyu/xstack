@@ -157,7 +157,7 @@
         "create-xstack": "cli.js",
       },
       "dependencies": {
-        "xstack": "^3.42.2",
+        "xstack": "^3.47.0",
       },
     },
     "packages/template-generator": {
@@ -194,6 +194,9 @@
         "typescript": "^6.0.3",
       },
     },
+  },
+  "patchedDependencies": {
+    "next-themes@0.4.6": "patches/next-themes@0.4.6.patch",
   },
   "catalog": {
     "@erquhart/convex-oss-stats": "^0.8.2",

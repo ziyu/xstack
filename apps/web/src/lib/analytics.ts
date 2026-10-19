@@ -55,9 +55,6 @@ export type AnalyticsEvents = {
   home_pm_select: { pm: string };
   home_copy_install: { pm: string };
   home_cta: { target: "builder" | "mcp-docs" | "sponsors" };
-  home_video_play: { video: string; title: string };
-  home_rail_navigate: { pane: string; method: "click" | "keyboard" };
-  home_past_sponsors: { shown: boolean };
   nav_click: { item: string; location: "header" | "mobile-menu" };
   theme_toggle: { theme: "light" | "dark" };
   search_open: EmptyData;

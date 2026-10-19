@@ -1,24 +1,5 @@
 import type { ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
-
-export function Sep({ className }: { className?: string }) {
-  return <span aria-hidden="true" className={cn("h-3 w-px shrink-0 bg-fd-border", className)} />;
-}
-
-export function Keycap({ children, dim }: { children: ReactNode; dim?: boolean }) {
-  return (
-    <span
-      className={cn(
-        "rounded-[2px] bg-foreground px-1 py-px font-medium text-background",
-        dim && "opacity-40",
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
 export function GroupHeader({ label, count }: { label: string; count?: ReactNode }) {
   return (
     <div className="mb-3 flex items-center gap-3">

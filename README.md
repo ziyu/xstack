@@ -73,6 +73,8 @@ This repository is organized as a monorepo containing:
 - **Documentation**: [`apps/web`](apps/web) - Official website and documentation
 - **Plugin**: [`plugin`](plugin) - Claude Code plugin (MCP server + skills + commands + agent)
 
+The homepage keeps only the introductory screen: the CLI banner, package-manager commands, stack-builder links, and live statistics. Sponsor, video, and tweet panels and horizontal pane navigation are removed; standalone documentation, builder, analytics, showcase, and sponsors routes remain available.
+
 ## Documentation
 
 Visit [xstack.dev](https://xstack.dev) for full documentation, guides, and examples. You can also use the visual Stack Builder at `https://xstack.dev/new` to generate a command for your stack.
@@ -98,6 +100,43 @@ bun dev:web
 ```
 
 The website requires `NEXT_PUBLIC_CONVEX_URL` for a configured Convex deployment. Set it in `apps/web/.env.local` before running `bun dev:web`.
+
+#### Local Convex development
+
+No Convex cloud account is required for local development. In one terminal, run:
+
+```bash
+bun run --filter @xstack/backend dev
+```
+
+On first setup, the CLI creates `packages/backend/.env.local` and a real local database under `packages/backend/.convex/`. Set `apps/web/.env.local` to the client URL printed by Convex (normally `NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210`), then run `bun dev:web` in another terminal. Keep the backend running while using the site.
+
+The OSS statistics component requires `GITHUB_ACCESS_TOKEN` before functions can deploy. From `packages/backend`, configure a GitHub token without putting it in shell history:
+
+```bash
+# Reuse an authenticated GitHub CLI account for local development only.
+gh auth token | bunx --no-install convex env set GITHUB_ACCESS_TOKEN
+# Set a separate random signing secret if using GitHub webhooks.
+bunx --no-install convex env set GITHUB_WEBHOOK_SECRET
+# Verify the deployed backend.
+bunx --no-install convex run healthCheck:get
+```
+
+Deployment secrets belong in Convex's environment, not `NEXT_PUBLIC_*` variables. Local deployment data and `.env.local` files must remain ignored by Git. A new database contains no testimonials or analytics events; empty lists and zero counts are expected until real data is added. This setup does not create or deploy a production cloud project.
+
+`next-themes@0.4.6` has a Bun patch in `patches/` for React's client-rendered script warning. Its theme bootstrap remains in SSR output and the hydration pass; client-only mounts use the existing theme effect instead of creating an inert script element. `bun install` applies the patch automatically. After dependency patches change, restart the Next.js development server. Browser smoke checks cover client remounts, persisted dark-theme SSR, hydration, and system-theme changes.
+
+### Generated-project verification (2026-10-19)
+
+Validated the default shell, `starter`, and `saas-global` using Next.js, SQLite, Drizzle, and Bun 1.3.14 on Node.js 26.11.1. All three installed dependencies, passed `bun run check-types`, built with `bun run build`, and started with the generated web workspace's `bun run start --port <port>` command. The auth presets also generated and applied SQLite migrations.
+
+- `starter`: browser signup, logout, login, profile updates, session persistence after reload, and anonymous dashboard protection passed against the production server.
+- `saas-global`: verified email using the documented development-console delivery, checked admin/user separation, granted 125 credits, rejected a 200-credit deduction without changing the balance, and rendered English/Chinese pages. After restarting in production, login, existing sessions, access restrictions, and the persisted balance still worked.
+- Reproduction commands now target `xstack` for Bun, pnpm, and npm. Regression tests replay their generated arguments and compare the resulting stack and module configuration.
+
+Run the command regressions with `bun run build:cli && bun test apps/cli/test/cli-output.test.ts packages/template-generator/test`.
+
+Limits: no live OAuth, Resend delivery, payment checkout, signed payment webhook, PostgreSQL, or deployment-provider certification was performed. `saas-global` requires real email credentials for production signup verification; without them, production email delivery is rejected. Development prints verification links to the server console. Root `db:generate` / `db:migrate` tasks require a terminal because Turbo marks them interactive; automation can run those scripts directly in `packages/db`.
 
 ## Want to contribute?
 

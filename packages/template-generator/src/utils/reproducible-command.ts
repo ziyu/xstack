@@ -15,11 +15,11 @@ function formatMultiFlag(flag: string, values: string[]): string {
 
 function getBaseCommand(packageManager: ProjectConfig["packageManager"]): string {
   if (packageManager === "bun") {
-    return "bun create better-template@latest";
+    return "bun create xstack@latest";
   }
 
   if (packageManager === "pnpm") {
-    return "pnpm create better-template@latest";
+    return "pnpm create xstack@latest";
   }
 
   return "npx xstack@latest";
