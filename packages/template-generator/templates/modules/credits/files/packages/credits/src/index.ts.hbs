@@ -1,0 +1,143 @@
+import type { Database } from "@{{projectName}}/db";
+import { user } from "@{{projectName}}/db/schema/auth";
+import {
+  creditBalance,
+  creditTransaction,
+  type creditTransactionTypes,
+} from "@{{projectName}}/db/schema/credits";
+import type { EventBus } from "@{{projectName}}/events";
+import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+
+import "./events";
+
+export type CreditTransactionType = (typeof creditTransactionTypes)[number];
+
+export type CreditTransaction = typeof creditTransaction.$inferSelect;
+
+export type CreditEntry = {
+  type: CreditTransactionType;
+  reason?: string;
+  /** Applying the same reference twice is a no-op, which makes retries safe. */
+  referenceId?: string;
+};
+
+export class InsufficientCreditsError extends Error {
+  constructor(
+    readonly balance: number,
+    readonly required: number,
+  ) {
+    super(`Insufficient credits: ${balance} available, ${required} required`);
+  }
+}
+
+export function createCredits(db: Database, events: EventBus) {
+  async function getBalance(userId: string): Promise<number> {
+    const [row] = await db
+      .select({ balance: creditBalance.balance })
+      .from(creditBalance)
+      .where(eq(creditBalance.userId, userId));
+    return row?.balance ?? 0;
+  }
+
+  /** Applies a signed change to the balance and records it, atomically. */
+  async function apply(userId: string, amount: number, entry: CreditEntry) {
+    if (!Number.isInteger(amount) || amount === 0) {
+      throw new RangeError("Credit amounts must be non-zero integers");
+    }
+
+    const result = await db.transaction(async (tx) => {
+      if (entry.referenceId) {
+        const [existing] = await tx
+          .select()
+          .from(creditTransaction)
+          .where(eq(creditTransaction.referenceId, entry.referenceId));
+        if (existing) return { transaction: existing, applied: false };
+      }
+
+      const [row] =
+        amount > 0
+          ? await tx
+              .insert(creditBalance)
+              .values({ userId, balance: amount })
+              .onConflictDoUpdate({
+                target: creditBalance.userId,
+                set: { balance: sql`${creditBalance.balance} + ${amount}`, updatedAt: new Date() },
+              })
+              .returning()
+          : await tx
+              .update(creditBalance)
+              .set({ balance: sql`${creditBalance.balance} - ${-amount}`, updatedAt: new Date() })
+              .where(and(eq(creditBalance.userId, userId), gte(creditBalance.balance, -amount)))
+              .returning();
+      if (!row) throw new InsufficientCreditsError(await getBalance(userId), -amount);
+
+      const [transaction] = await tx
+        .insert(creditTransaction)
+        .values({
+          id: crypto.randomUUID(),
+          userId,
+          amount,
+          balanceAfter: row.balance,
+          type: entry.type,
+          reason: entry.reason,
+          referenceId: entry.referenceId,
+        })
+        .returning();
+      return { transaction: transaction!, applied: true };
+    });
+
+    if (result.applied) {
+      await events.emit("credits.changed", {
+        userId,
+        amount,
+        balance: result.transaction.balanceAfter,
+        type: entry.type,
+      });
+    }
+    return result.transaction;
+  }
+
+  return {
+    getBalance,
+
+    grant(userId: string, amount: number, entry: CreditEntry) {
+      return apply(userId, Math.abs(amount), entry);
+    },
+
+    /** Deducts credits or throws `InsufficientCreditsError` without changing anything. */
+    consume(userId: string, amount: number, entry: Omit<CreditEntry, "type">) {
+      return apply(userId, -Math.abs(amount), { ...entry, type: "consume" });
+    },
+
+    /** Signed manual correction, e.g. from the admin console. */
+    adjust(userId: string, amount: number, reason: string) {
+      return apply(userId, amount, { type: "adjust", reason });
+    },
+
+    async listTransactions(userId: string, limit = 50): Promise<CreditTransaction[]> {
+      return db
+        .select()
+        .from(creditTransaction)
+        .where(eq(creditTransaction.userId, userId))
+        .orderBy(desc(creditTransaction.createdAt))
+        .limit(limit);
+    },
+
+    /** All transactions with the account email, newest first. */
+    async listAllTransactions({ limit, offset }: { limit: number; offset: number }) {
+      const [rows, [total]] = await Promise.all([
+        db
+          .select({ transaction: creditTransaction, email: user.email })
+          .from(creditTransaction)
+          .innerJoin(user, eq(creditTransaction.userId, user.id))
+          .orderBy(desc(creditTransaction.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db.select({ value: count() }).from(creditTransaction),
+      ]);
+      return { rows, total: total?.value ?? 0 };
+    },
+  };
+}
+
+export type Credits = ReturnType<typeof createCredits>;

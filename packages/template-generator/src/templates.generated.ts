@@ -1,0 +1,30187 @@
+// Auto-generated - DO NOT EDIT
+// Run 'bun run generate-templates' to regenerate
+
+export const EMBEDDED_TEMPLATES: Map<string, string> = new Map([
+  ["addons/biome/biome.json.hbs", `{
+    "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"vcs": {
+		"enabled": false,
+		"clientKind": "git",
+		"useIgnoreFile": false
+	},
+	"files": {
+		"ignoreUnknown": false,
+		"includes": [
+			"**",
+			"!**/.next",
+			"!**/dist",
+			"!**/.turbo",
+			"!**/.nx",
+			"!**/dev-dist",
+			"!**/.zed",
+			"!**/.vscode",
+			"!**/routeTree.gen.ts",
+			"!**/src-tauri",
+			"!**/.nuxt",
+			"!xstack.jsonc",
+			"!**/.expo",
+			"!**/.wrangler",
+			"!**/.alchemy",
+			"!**/.svelte-kit",
+			"!**/wrangler.jsonc",
+			"!**/.source",
+			"!**/convex/_generated"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab"
+	},
+	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+			"correctness": {
+				"useExhaustiveDependencies": "info"
+			},
+			"nursery": {
+				"useSortedClasses": {
+					"level": "warn",
+					"fix": "safe",
+					"options": {
+						"functions": ["clsx", "cva", "cn"]
+					}
+				}
+			},
+			"style": {
+				"noParameterAssign": "error",
+				"useAsConstAssertion": "error",
+				"useDefaultParameterLast": "error",
+				"useEnumInitializers": "error",
+				"useSelfClosingElements": "error",
+				"useSingleVarDeclarator": "error",
+				"noUnusedTemplateLiteral": "error",
+				"useNumberNamespace": "error",
+				"noInferrableTypes": "error",
+				"noUselessElse": "error"
+			}
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	}
+	{{#if (or (includes frontend "svelte") (includes frontend "nuxt"))}}
+	,
+	"overrides": [
+		{
+			"includes": ["**/*.svelte", "**/*.vue"],
+			"linter": {
+				"rules": {
+					"style": {
+						"useConst": "off",
+						"useImportType": "off"
+					},
+					"correctness": {
+						"noUnusedVariables": "off",
+						"noUnusedImports": "off"
+					}
+				}
+			}
+		}
+	]
+	{{/if}}
+}
+`],
+  ["addons/electrobun/apps/desktop/.gitignore", `.hutch/
+/artifacts/
+/build/
+`],
+  ["addons/electrobun/apps/desktop/electrobun.config.ts.hbs", `import type { ElectrobunConfig } from "electrobun";
+
+const webBuildDir =
+  "{{#if (includes frontend "react-router")}}../web/build/client{{else if (includes frontend "tanstack-start")}}../web/dist/client{{else if (includes frontend "next")}}../web/out{{else if (includes frontend "nuxt")}}../web/.output/public{{else if (includes frontend "svelte")}}../web/build{{else}}../web/dist{{/if}}";
+
+export default {
+  app: {
+    name: "{{projectName}}",
+    identifier: "dev.xstack.{{projectName}}.desktop",
+    version: "0.0.1",
+  },
+  runtime: {
+    exitOnLastWindowClosed: true,
+  },
+  build: {
+    mainProcess: "cottontail",
+    cottontail: {
+      entrypoint: "src/bun/index.ts",
+    },
+    copy: {
+      [webBuildDir]: "views/mainview",
+    },
+    watchIgnore: [\`\${webBuildDir}/**\`],
+    mac: {
+      bundleCEF: true,
+      defaultRenderer: "cef",
+    },
+    linux: {
+      bundleCEF: true,
+      defaultRenderer: "cef",
+    },
+    win: {
+      bundleCEF: true,
+      defaultRenderer: "cef",
+    },
+  },
+} satisfies ElectrobunConfig;
+`],
+  ["addons/electrobun/apps/desktop/package.json.hbs", `{
+  "name": "desktop",
+  "private": true,
+  "type": "module",
+  "scripts": {},
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "concurrently": "^10.0.6",
+    "electrobun": "^2.0.2",
+    "typescript": "^6.0.3"
+  }
+}
+`],
+  ["addons/electrobun/apps/desktop/src/bun/index.ts.hbs", `import { BrowserWindow, Updater } from "electrobun/main";
+
+const DEV_SERVER_PORT = {{#if (or (includes frontend "react-router") (includes frontend "svelte"))}}5173{{else if (includes frontend "astro")}}4321{{else}}3001{{/if}};
+const DEV_SERVER_URL = \`http://localhost:\${DEV_SERVER_PORT}\`;
+
+async function getMainViewUrl(): Promise<string> {
+  const channel = await Updater.localInfo.channel();
+  if (channel === "dev") {
+    try {
+      await fetch(DEV_SERVER_URL, { method: "HEAD" });
+      console.log(\`HMR enabled: Using web dev server at \${DEV_SERVER_URL}\`);
+      return DEV_SERVER_URL;
+    } catch {
+      console.log(
+        "Web dev server not running. Run dev:hmr for live reload.",
+      );
+    }
+  }
+
+  return "views://mainview/index.html";
+}
+
+const url = await getMainViewUrl();
+
+new BrowserWindow({
+  title: "{{projectName}}",
+  url,
+  preload: url.startsWith("views://") ? 'history.replaceState(null, "", "/");' : undefined,
+  frame: {
+    width: 1280,
+    height: 820,
+    x: 120,
+    y: 120,
+  },
+});
+
+console.log("Electrobun desktop shell started.");
+`],
+  ["addons/electrobun/apps/desktop/tsconfig.json.hbs", `{
+  "extends": ["../../packages/config/tsconfig.base.json", "./.hutch/devkit/tsconfig.json"],
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "types": ["bun"]
+  },
+  "include": ["src/**/*.ts", "electrobun.config.ts"]
+}
+`],
+  ["addons/husky/.husky/pre-commit", `lint-staged
+`],
+  ["addons/lefthook/lefthook.yml.hbs", `# Lefthook configuration
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  jobs:
+{{#if (includes addons "biome")}}
+    - name: biome
+      glob: "*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}"
+      run: {{packageManager}} biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+{{else if (includes addons "oxlint")}}
+    - name: oxlint
+      run: {{packageManager}} oxlint --fix {staged_files}
+      stage_fixed: true
+    - name: oxfmt
+      run: {{packageManager}} oxfmt --write {staged_files}
+      stage_fixed: true
+{{else if (includes addons "vite-plus")}}
+    - name: vite-plus
+      run: {{packageManager}} vp staged
+      stage_fixed: true
+{{else}}
+    # Add your pre-commit commands here
+    # Example:
+    # - name: lint
+    #   run: {{packageManagerRunCmd}} lint
+{{/if}}
+`],
+  ["addons/pwa/apps/web/next/public/favicon/apple-touch-icon.png", `[Binary file]`],
+  ["addons/pwa/apps/web/next/public/favicon/favicon-96x96.png", `[Binary file]`],
+  ["addons/pwa/apps/web/next/public/favicon/favicon.svg", `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="92" height="92"><svg width="92" height="92" viewBox="0 0 92 92" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="8" y="8" width="76" height="76" rx="12" fill="#F5EEFF" stroke="#B79AFF" stroke-width="3"></rect>
+  <text x="46" y="56" text-anchor="middle" font-family="monospace" font-size="40" fill="#8F5BFF">$<tspan dx="0" dy="0">_</tspan></text>
+</svg><style>@media (prefers-color-scheme: light) { :root { filter: none; } }
+@media (prefers-color-scheme: dark) { :root { filter: none; } }
+</style></svg>`],
+  ["addons/pwa/apps/web/next/public/favicon/site.webmanifest.hbs", `{
+	"name": "{{projectName}}",
+	"short_name": "{{projectName}}",
+	"icons": [
+		{
+			"src": "/web-app-manifest-192x192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "maskable"
+		},
+		{
+			"src": "/web-app-manifest-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	],
+	"theme_color": "#ffffff",
+	"background_color": "#ffffff",
+	"display": "standalone"
+}
+`],
+  ["addons/pwa/apps/web/next/public/favicon/web-app-manifest-192x192.png", `[Binary file]`],
+  ["addons/pwa/apps/web/next/public/favicon/web-app-manifest-512x512.png", `[Binary file]`],
+  ["addons/pwa/apps/web/next/public/sw.js", `// Bump this version when changing offline.html so installed apps refresh it.
+const CACHE_NAME = "xstack-pwa-offline-v1";
+const OFFLINE_URL = "/offline.html";
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await cache.add(new Request(OFFLINE_URL, { cache: "reload" }));
+      await self.skipWaiting();
+    }),
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then(async (keys) => {
+      await Promise.all(
+        keys
+          .filter((key) => key.startsWith("xstack-pwa-offline-") && key !== CACHE_NAME)
+          .map((key) => caches.delete(key)),
+      );
+      await self.clients.claim();
+    }),
+  );
+});
+
+// Never cache authenticated HTML or API responses. Server-rendered pages need
+// a connection; a precached page keeps offline navigation understandable.
+self.addEventListener("fetch", (event) => {
+  if (event.request.mode !== "navigate" || event.request.method !== "GET") return;
+  event.respondWith(
+    fetch(event.request).catch(async () => {
+      return (await caches.match(OFFLINE_URL)) ?? Response.error();
+    }),
+  );
+});
+`],
+  ["addons/pwa/apps/web/next/pwa.config.ts", `import type { NextConfig } from "next";
+
+export function withPwa(config: NextConfig): NextConfig {
+  // Static exports need these headers configured at the hosting layer.
+  if (config.output === "export") return config;
+  return {
+    ...config,
+    async headers() {
+      return [
+        ...((await config.headers?.()) ?? []),
+        {
+          source: "/sw.js",
+          headers: [
+            { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+            { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+            { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+          ],
+        },
+      ];
+    },
+  };
+}
+`],
+  ["addons/pwa/apps/web/next/src/app/manifest.ts.hbs", `import type { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+	return {
+		name: "{{projectName}}",
+		short_name: "{{projectName}}",
+		description:
+			"my pwa app",
+		start_url: "/",
+		display: "standalone",
+		background_color: "#ffffff",
+		theme_color: "#000000",
+		icons: [
+			{
+				src: "/favicon/web-app-manifest-192x192.png",
+				sizes: "192x192",
+				type: "image/png",
+			},
+			{
+				src: "/favicon/web-app-manifest-512x512.png",
+				sizes: "512x512",
+				type: "image/png",
+			},
+		],
+	};
+}
+`],
+  ["addons/pwa/apps/web/next/src/components/pwa-registration.tsx", `"use client";
+
+import { useEffect } from "react";
+
+export default function PwaRegistration() {
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker
+      .register("/sw.js", { scope: "/", updateViaCache: "none" })
+      .catch((error) => console.error("Service worker registration failed:", error));
+  }, []);
+
+  return null;
+}
+`],
+  ["addons/pwa/apps/web/ssr/public/offline.html", `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>You are offline</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        min-height: 90vh;
+        display: grid;
+        place-content: center;
+        padding: 1.5rem;
+      }
+      a {
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You are offline</h1>
+      <p>Reconnect to the internet to load this page.</p>
+      <a href="/">Try again</a>
+    </main>
+  </body>
+</html>
+`],
+  ["addons/pwa/apps/web/vite/public/logo.png", `[Binary file]`],
+  ["addons/pwa/apps/web/vite/pwa-assets.config.ts.hbs", `import {
+  defineConfig,
+  minimal2023Preset as preset,
+} from "@vite-pwa/assets-generator/config";
+
+export default defineConfig({
+  headLinkOptions: {
+    preset: "2023",
+  },
+  preset,
+  images: ["public/logo.png"],
+});
+`],
+  ["api/orpc/context.ts.hbs", `import type { Context as ApiContext } from "@{{projectName}}/api/context";
+{{#if (ne database "none")}}
+import { {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}getDb{{else}}db{{/if}} } from "@{{projectName}}/app-services";
+{{/if}}
+{{#if (eq auth "clerk")}}
+type ClerkContextAuth = ApiContext["auth"];
+
+
+function toClerkContextAuth(auth: ClerkContextAuth): ClerkContextAuth {
+	return auth ? { userId: auth.userId } : null;
+}
+{{/if}}
+
+{{#if (and (eq auth "clerk") (or (eq backend 'self') (eq backend 'hono') (eq backend 'elysia')))}}
+{{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}
+{{else}}
+import { createClerkClient } from "@clerk/backend";
+import { ENV } from "./env.server";
+
+const clerkClient = createClerkClient({
+	secretKey: ENV.CLERK_SECRET_KEY,
+	publishableKey: ENV.CLERK_PUBLISHABLE_KEY,
+});
+
+async function authenticateClerkRequest(request: Request): Promise<ClerkContextAuth> {
+	const requestState = await clerkClient.authenticateRequest(request, {
+		authorizedParties: [ENV.CORS_ORIGIN],
+	});
+	return toClerkContextAuth(requestState.toAuth());
+}
+{{/if}}
+{{/if}}
+
+{{#if (and (eq backend 'self') (includes frontend "next"))}}
+import type { NextRequest } from "next/server";
+{{#if (eq auth "better-auth")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+
+export async function createContext({{#if (eq auth "none")}}_req{{else}}req{{/if}}: NextRequest): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth({{#if (ne database "none")}}db{{/if}})){{else}}auth{{/if}}.api.getSession({
+		headers: req.headers,
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = await authenticateClerkRequest(req);
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (and (eq backend 'self') (includes frontend "tanstack-start"))}}
+{{#if (eq auth "better-auth")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+
+export async function createContext({{#if (eq auth "none")}}_options{{else}}{ req }{{/if}}: { req: Request }): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth({{#if (ne database "none")}}db{{/if}})){{else}}auth{{/if}}.api.getSession({
+		headers: req.headers,
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = await authenticateClerkRequest(req);
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (and (eq backend 'self') (includes frontend "nuxt"))}}
+{{#if (eq auth "better-auth")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+{{#if (eq webDeploy "cloudflare")}}
+import type { CloudflareEnv } from "./env.server";
+{{/if}}
+
+export type CreateContextOptions = {
+	headers: Headers;
+{{#if (eq webDeploy "cloudflare")}}
+	env: CloudflareEnv;
+{{/if}}
+};
+
+export async function createContext({{#if (eq auth "none")}}{{#if (eq webDeploy "cloudflare")}}{ env }{{else}}_options{{/if}}{{else}}{ headers{{#if (eq webDeploy "cloudflare")}}, env{{/if}} }{{/if}}: CreateContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth({{#if (eq webDeploy "cloudflare")}}env{{#if (ne database "none")}}, {{/if}}{{/if}}{{#if (ne database "none")}}db{{/if}})){{else}}auth{{/if}}.api.getSession({ headers });
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (and (eq backend 'self') (includes frontend "svelte"))}}
+{{#if (eq auth "better-auth")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+{{#if (eq webDeploy "cloudflare")}}
+import type { CloudflareEnv } from "./env.server";
+{{/if}}
+
+export type CreateContextOptions = {
+	headers: Headers;
+{{#if (eq webDeploy "cloudflare")}}
+	env: CloudflareEnv;
+{{/if}}
+};
+
+export async function createContext({{#if (eq auth "none")}}{{#if (eq webDeploy "cloudflare")}}{ env }{{else}}_options{{/if}}{{else}}{ headers{{#if (eq webDeploy "cloudflare")}}, env{{/if}} }{{/if}}: CreateContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth({{#if (eq webDeploy "cloudflare")}}env{{#if (ne database "none")}}, {{/if}}{{/if}}{{#if (ne database "none")}}db{{/if}})){{else}}auth{{/if}}.api.getSession({ headers });
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (and (eq backend 'self') (includes frontend "solid"))}}
+{{#if (eq auth "better-auth")}}
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self"))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+
+export type CreateContextOptions = {
+	headers: Headers;
+};
+
+export async function createContext({{#if (eq auth "none")}}_options{{else}}{ headers }{{/if}}: CreateContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await {{#if (and (eq webDeploy "cloudflare") (eq backend "self"))}}(await createAuth({{#if (ne database "none")}}db{{/if}})){{else}}auth{{/if}}.api.getSession({ headers });
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (and (eq backend 'self') (includes frontend "astro"))}}
+{{#if (eq auth "better-auth")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+
+export type CreateContextOptions = {
+	headers: Headers;
+};
+
+export async function createContext({{#if (eq auth "none")}}_options{{else}}{ headers }{{/if}}: CreateContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth({{#if (ne database "none")}}db{{/if}})){{else}}auth{{/if}}.api.getSession({ headers });
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (eq backend 'hono')}}
+import type { Context as HonoContext } from "hono";
+{{#if (eq auth "better-auth")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+
+export type CreateContextOptions = {
+	context: HonoContext;
+};
+
+export async function createContext({{#if (eq auth "none")}}_options{{else}}{ context }{{/if}}: CreateContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth({{#if (ne database "none")}}db{{/if}})){{else}}auth{{/if}}.api.getSession({
+		headers: context.req.raw.headers,
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = await authenticateClerkRequest(context.req.raw);
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (eq backend 'elysia')}}
+import type { Context as ElysiaContext } from "elysia";
+{{#if (eq auth "better-auth")}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+
+export type CreateContextOptions = {
+	context: ElysiaContext;
+};
+
+export async function createContext({{#if (eq auth "none")}}_options{{else}}{ context }{{/if}}: CreateContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await auth.api.getSession({
+		headers: context.request.headers,
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = await authenticateClerkRequest(context.request);
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (eq backend 'express')}}
+import type { Request } from "express";
+{{#if (eq auth "better-auth")}}
+import { fromNodeHeaders } from "better-auth/node";
+import { auth } from "@{{projectName}}/auth";
+{{else if (eq auth "clerk")}}
+import { getAuth } from "@clerk/express";
+{{/if}}
+
+interface CreateContextOptions {
+	req: Request;
+}
+
+export async function createContext({{#if (eq auth "none")}}_opts{{else}}opts{{/if}}: CreateContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await auth.api.getSession({
+		headers: fromNodeHeaders(opts.req.headers),
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = toClerkContextAuth(getAuth(opts.req));
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (eq backend 'fastify')}}
+{{#if (eq auth "better-auth")}}
+import type { IncomingHttpHeaders } from "node:http";
+import { fromNodeHeaders } from "better-auth/node";
+import { auth } from "@{{projectName}}/auth";
+{{else if (eq auth "clerk")}}
+import { getAuth } from "@clerk/fastify";
+{{else}}
+import type { IncomingHttpHeaders } from "node:http";
+{{/if}}
+
+export async function createContext(req: {{#if (eq auth "clerk")}}Parameters<typeof getAuth>[0]{{else}}IncomingHttpHeaders{{/if}}): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await auth.api.getSession({
+		headers: fromNodeHeaders(req),
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = toClerkContextAuth(getAuth(req));
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	void req;
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else}}
+export async function createContext(): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+}
+{{/if}}
+
+export type Context = Awaited<ReturnType<typeof createContext>>;
+`],
+  ["api/orpc/fullstack/astro/src/pages/rpc/[...rest].ts.hbs", `import type { APIRoute } from "astro";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { RPCHandler } from "@orpc/server/fetch";
+import { onError } from "@orpc/server";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createContext } from "@{{projectName}}/api/context";
+
+const handler = new RPCHandler(appRouter, {
+  interceptors: [
+    onError((error) => {
+      console.error(error);
+    }),
+  ],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+  plugins: [
+    new OpenAPIReferencePlugin({
+      schemaConverters: [new ZodToJsonSchemaConverter()],
+    }),
+  ],
+  interceptors: [
+    onError((error) => {
+      console.error(error);
+    }),
+  ],
+});
+
+export const prerender = false;
+
+export const ALL: APIRoute = async ({ request }) => {
+  const context = await createContext({ headers: request.headers });
+
+  const rpcResult = await handler.handle(request, {
+    prefix: "/rpc",
+    context,
+  });
+  if (rpcResult.response) return rpcResult.response;
+
+  const apiResult = await apiHandler.handle(request, {
+    prefix: "/rpc/api-reference",
+    context,
+  });
+  if (apiResult.response) return apiResult.response;
+
+  return new Response("Not found", { status: 404 });
+};
+`],
+  ["api/orpc/fullstack/next/src/app/api/rpc/[[...rest]]/route.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { RPCHandler } from "@orpc/server/fetch";
+import { onError } from "@orpc/server";
+import { NextRequest } from "next/server";
+
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+async function handleRequest(req: NextRequest) {
+	const rpcResult = await rpcHandler.handle(req, {
+		prefix: "/api/rpc",
+		context: await createContext(req),
+	});
+	if (rpcResult.response) return rpcResult.response;
+
+	const apiResult = await apiHandler.handle(req, {
+		prefix: "/api/rpc/api-reference",
+		context: await createContext(req),
+	});
+	if (apiResult.response) return apiResult.response;
+
+	return new Response("Not found", { status: 404 });
+}
+
+export const GET = handleRequest;
+export const POST = handleRequest;
+export const PUT = handleRequest;
+export const PATCH = handleRequest;
+export const DELETE = handleRequest;`],
+  ["api/orpc/fullstack/nuxt/app/plugins/orpc.client.ts.hbs", `import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+
+export default defineNuxtPlugin(() => {
+  const rpcLink = new RPCLink({
+    url: \`\${window.location.origin}/rpc\`,
+    {{#if (eq auth "better-auth")}}
+    fetch(url, options) {
+        return fetch(url, {
+        ...options,
+        credentials: "include",
+        });
+    },
+    {{/if}}
+  });
+
+  const client: AppRouterClient = createORPCClient(rpcLink);
+  const orpcUtils = createTanstackQueryUtils(client);
+
+  return {
+    provide: {
+      orpc: orpcUtils,
+    },
+  };
+});
+`],
+  ["api/orpc/fullstack/nuxt/app/plugins/orpc.server.ts.hbs", `import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+
+export default defineNuxtPlugin(() => {
+  const event = useRequestEvent();
+
+  if (!event) {
+    throw new Error("Missing Nuxt request event");
+  }
+
+  const rpcLink = new RPCLink({
+    url: new URL("/rpc", useRequestURL()).href,
+    fetch(request, init) {
+      return event.fetch(request, init);
+    },
+  });
+
+  const client: AppRouterClient = createORPCClient(rpcLink);
+  const orpc = createTanstackQueryUtils(client);
+
+  return {
+    provide: {
+      orpc,
+    },
+  };
+});
+`],
+  ["api/orpc/fullstack/nuxt/server/routes/rpc/[...].ts.hbs", `import { RPCHandler } from "@orpc/server/fetch";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { onError } from "@orpc/server";
+import { BatchHandlerPlugin } from "@orpc/server/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createContext } from "@{{projectName}}/api/context";
+{{#if (eq webDeploy "cloudflare")}}
+import type { CloudflareEnv } from "../../../src/env.server";
+{{/if}}
+
+const rpcHandler = new RPCHandler(appRouter, {
+  interceptors: [
+    onError((error) => {
+      console.error(error);
+    }),
+  ],
+  plugins: [new BatchHandlerPlugin()],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+  plugins: [
+    new OpenAPIReferencePlugin({
+      schemaConverters: [new ZodToJsonSchemaConverter()],
+    }),
+  ],
+  interceptors: [
+    onError((error) => {
+      console.error(error);
+    }),
+  ],
+});
+
+export default defineEventHandler(async (event) => {
+  const request = toWebRequest(event);
+  const context = await createContext({
+    headers: request.headers,
+    {{#if (eq webDeploy "cloudflare")}}
+    env: (event.context.cloudflare as { env: CloudflareEnv }).env,
+    {{/if}}
+  });
+
+  const rpcResult = await rpcHandler.handle(request, {
+    prefix: "/rpc",
+    context,
+  });
+  if (rpcResult.response) return rpcResult.response;
+
+  const apiResult = await apiHandler.handle(request, {
+    prefix: "/rpc/api-reference",
+    context,
+  });
+  if (apiResult.response) return apiResult.response;
+
+  setResponseStatus(event, 404, "Not Found");
+  return "Not found";
+});
+`],
+  ["api/orpc/fullstack/nuxt/server/routes/rpc/index.ts.hbs", `export { default } from "./[...]";
+`],
+  ["api/orpc/fullstack/solid/src/routes/rpc/[...rest].ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { onError } from "@orpc/server";
+import { RPCHandler } from "@orpc/server/fetch";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import type { APIHandler } from "filesystem-routing/api";
+
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const handle: APIHandler = async ({ request }) => {
+	const context = await createContext({ headers: request.headers });
+
+	const rpcResult = await rpcHandler.handle(request, {
+		prefix: "/rpc",
+		context,
+	});
+	if (rpcResult.response) return rpcResult.response;
+
+	const apiResult = await apiHandler.handle(request, {
+		prefix: "/rpc/api-reference",
+		context,
+	});
+	if (apiResult.response) return apiResult.response;
+
+	return new Response("Not found", { status: 404 });
+};
+
+export const HEAD = handle;
+export const GET = handle;
+export const POST = handle;
+export const PUT = handle;
+export const PATCH = handle;
+export const DELETE = handle;
+`],
+  ["api/orpc/fullstack/solid/src/routes/rpc/index.ts.hbs", `export {
+	DELETE,
+	GET,
+	HEAD,
+	PATCH,
+	POST,
+	PUT,
+} from "./[...rest]";
+`],
+  ["api/orpc/fullstack/solid/src/utils/orpc.server.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createRouterClient } from "@orpc/server";
+import { getRequestEvent } from "@solidjs/web";
+
+if (!import.meta.env.SSR) {
+  throw new Error("This file must only be imported on the server.");
+}
+
+globalThis.$client = createRouterClient(appRouter, {
+	context: async () => {
+		const headers = getRequestEvent()?.request.headers ?? new Headers();
+		return createContext({ headers });
+	},
+});
+`],
+  ["api/orpc/fullstack/svelte/src/lib/orpc.server.ts.hbs", `import { getRequestEvent } from "$app/server";
+import { createContext } from "@{{projectName}}/api/context";
+import { appRouter, type AppRouterClient } from "@{{projectName}}/api/routers/index";
+{{#if (eq webDeploy "cloudflare")}}
+import { ENV } from "../env.server";
+{{/if}}
+import { createRouterClient } from "@orpc/server";
+
+if (typeof window !== "undefined") {
+	throw new Error("This file should only be imported on the server.");
+}
+
+const serverClient: AppRouterClient = createRouterClient(appRouter, {
+	context: async () => {
+		const event = getRequestEvent();
+{{#if (eq webDeploy "cloudflare")}}
+		const env = event.platform?.env ?? ENV;
+
+{{/if}}
+		return createContext({
+			headers: event.request.headers,
+{{#if (eq webDeploy "cloudflare")}}
+			env,
+{{/if}}
+		});
+	},
+});
+
+// oRPC's SvelteKit SSR setup loads this from hooks.server.ts so $lib/orpc can
+// reuse the in-process server client during SSR and fall back to HTTP in the browser.
+globalThis.$client = serverClient;
+`],
+  ["api/orpc/fullstack/svelte/src/routes/rpc/[...rest]/+server.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+{{#if (eq webDeploy "cloudflare")}}
+import { ENV } from "../../../env.server";
+{{/if}}
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { onError } from "@orpc/server";
+import { RPCHandler } from "@orpc/server/fetch";
+import type { RequestHandler } from "@sveltejs/kit";
+
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const handle: RequestHandler = async ({ request{{#if (eq webDeploy "cloudflare")}}, platform{{/if}} }) => {
+{{#if (eq webDeploy "cloudflare")}}
+	const env = platform?.env ?? ENV;
+
+{{/if}}
+	const context = await createContext({
+		headers: request.headers,
+{{#if (eq webDeploy "cloudflare")}}
+		env,
+{{/if}}
+	});
+
+	const rpcResult = await rpcHandler.handle(request, {
+		prefix: "/rpc",
+		context,
+	});
+	if (rpcResult.response) return rpcResult.response;
+
+	const apiResult = await apiHandler.handle(request, {
+		prefix: "/rpc/api-reference",
+		context,
+	});
+	if (apiResult.response) return apiResult.response;
+
+	return new Response("Not found", { status: 404 });
+};
+
+export const HEAD = handle;
+export const GET = handle;
+export const POST = handle;
+export const PUT = handle;
+export const PATCH = handle;
+export const DELETE = handle;
+`],
+  ["api/orpc/fullstack/tanstack-start/src/routes/api/rpc/$.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { RPCHandler } from "@orpc/server/fetch";
+import { onError } from "@orpc/server";
+import { createFileRoute } from "@tanstack/react-router";
+
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+async function handle({ request }: { request: Request }) {
+	const rpcResult = await rpcHandler.handle(request, {
+		prefix: "/api/rpc",
+		context: await createContext({ req: request }),
+	});
+	if (rpcResult.response) return rpcResult.response;
+
+	const apiResult = await apiHandler.handle(request, {
+		prefix: "/api/rpc/api-reference",
+		context: await createContext({ req: request }),
+	});
+	if (apiResult.response) return apiResult.response;
+
+	return new Response("Not found", { status: 404 });
+}
+
+export const Route = createFileRoute('/api/rpc/$')({
+  server: {
+    handlers: {
+      HEAD: handle,
+      GET: handle,
+      POST: handle,
+      PUT: handle,
+      PATCH: handle,
+      DELETE: handle,
+    },
+  },
+})`],
+  ["api/orpc/native/utils/orpc.ts.hbs", `import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { QueryCache, QueryClient } from "@tanstack/react-query";
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { ENV } from "../src/env";
+{{#if (eq auth "better-auth")}}
+import { authClient } from "@/lib/auth-client";
+import { Platform } from "react-native";
+{{else if (eq auth "clerk")}}
+import { getClerkAuthToken } from "@/utils/clerk-auth";
+{{/if}}
+
+export const queryClient = new QueryClient({
+	queryCache: new QueryCache({
+		onError: (error) => {
+			console.log(error)
+		},
+	}),
+});
+
+async function expoFetch(request: Request, init?: RequestInit) {
+	const { fetch } = await import("expo/fetch");
+
+	return fetch(request.url, {
+		body: await request.blob(),
+		headers: request.headers,
+		method: request.method,
+		signal: request.signal,
+		...init,
+	});
+}
+
+export const link = new RPCLink({
+{{#if (eq backend "self")}}
+{{#if (or (includes frontend "next") (includes frontend "tanstack-start"))}}
+	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/api/rpc\`,
+{{else}}
+	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/rpc\`,
+{{/if}}
+{{else}}
+	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}{{apiPrefix webDeploy serverDeploy}}/rpc\`,
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	fetch(request, init) {
+		return expoFetch(request, {
+			...init,
+			// Better Auth Expo forwards the session cookie manually on native.
+			credentials: Platform.OS === "web" ? "include" : "omit",
+		});
+	},
+	async headers() {
+		if (Platform.OS === "web") {
+			return {};
+		}
+		const headers = new Map<string, string>();
+		const cookies = await authClient.getCookie();
+		if (cookies) {
+			headers.set("Cookie", cookies);
+		}
+		return Object.fromEntries(headers);
+	},
+{{else if (eq auth "clerk")}}
+	headers: async () => {
+		const token = await getClerkAuthToken();
+		return token ? { Authorization: \`Bearer \${token}\` } : {};
+	},
+	fetch: expoFetch,
+{{else}}
+	fetch: expoFetch,
+{{/if}}
+});
+
+export const client: AppRouterClient = createORPCClient(link);
+
+export const orpc = createTanstackQueryUtils(client);
+`],
+  ["api/orpc/server/_gitignore", `# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+`],
+  ["api/orpc/server/package.json.hbs", `{
+  "name": "@{{projectName}}/api",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "check-types": "tsc -b"
+  },
+  "devDependencies": {},
+  "dependencies": {}
+}`],
+  ["api/orpc/server/src/context.ts.hbs", `{{#if (eq auth "better-auth")}}
+import type { Session } from "@{{projectName}}/auth";
+{{/if}}
+{{#if (eq auth "clerk")}}
+import type { SessionAuthObject } from "@clerk/backend";
+{{/if}}
+{{#if (ne database "none")}}
+import type { Database } from "@{{projectName}}/db";
+{{/if}}
+
+export type Context = {
+{{#if (eq auth "clerk")}}
+  auth: Pick<SessionAuthObject, "userId"> | null;
+{{else if (eq auth "better-auth")}}
+  session: Session | null;
+{{/if}}
+{{#if (ne database "none")}}
+  db: Database;
+{{/if}}
+};
+`],
+  ["api/orpc/server/src/index.ts.hbs", `import { {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}ORPCError, {{/if}}os } from "@orpc/server";
+import type { Context } from "./context";
+
+export const o = os.$context<Context>();
+
+export const publicProcedure = o;
+
+{{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+const requireAuth = o.middleware(async ({ context, next }) => {
+  {{#if (eq auth "better-auth")}}
+  if (!context.session?.user) {
+    throw new ORPCError("UNAUTHORIZED");
+  }
+  return next({
+    context: {
+      session: context.session,
+    },
+  });
+  {{else}}
+  if (!context.auth?.userId) {
+    throw new ORPCError("UNAUTHORIZED");
+  }
+  return next({
+    context: {
+      auth: context.auth,
+    },
+  });
+  {{/if}}
+});
+
+export const protectedProcedure = publicProcedure.use(requireAuth);
+{{/if}}
+`],
+  ["api/orpc/server/src/routers/index.ts.hbs", `{{#if (eq api "orpc")}}
+import { {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}protectedProcedure, {{/if}}publicProcedure } from "../index";
+import type { RouterClient } from "@orpc/server";
+
+export const appRouter = {
+  healthCheck: publicProcedure.handler(() => {
+    return "OK";
+  }),
+  {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+  privateData: protectedProcedure.handler(({ context }) => {
+    return {
+      message: "This is private",
+      {{#if (eq auth "better-auth")}}
+      user: context.session?.user,
+      {{else}}
+      userId: context.auth?.userId,
+      {{/if}}
+    };
+  }),
+  {{/if}}
+};
+export type AppRouter = typeof appRouter;
+export type AppRouterClient = RouterClient<typeof appRouter>;
+{{else if (eq api "trpc")}}
+import {
+  {{#if (eq auth "better-auth")}}protectedProcedure, {{/if}}publicProcedure,
+  router,
+} from "../index";
+
+export const appRouter = router({
+  healthCheck: publicProcedure.query(() => {
+    return "OK";
+  }),
+  {{#if (eq auth "better-auth")}}
+  privateData: protectedProcedure.query(({ ctx }) => {
+    return {
+      message: "This is private",
+      user: ctx.session.user,
+    };
+  }),
+  {{/if}}
+});
+export type AppRouter = typeof appRouter;
+{{else}}
+export const appRouter = {};
+export type AppRouter = typeof appRouter;
+{{/if}}
+`],
+  ["api/orpc/server/tsconfig.json.hbs", `{
+  "extends": "@{{projectName}}/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{{#if (ne database "none")}}{ "path": "../db" }{{#if (eq auth "better-auth")}},{{/if}}{{/if}}
+    {{#if (eq auth "better-auth")}}{ "path": "../auth" }{{/if}}]
+}
+`],
+  ["api/orpc/web/astro/src/lib/orpc.ts.hbs", `import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+
+{{#if (eq backend "self")}}
+export const link = new RPCLink({
+  // Lazy: this module is imported during SSR where window does not exist
+  url: () => \`\${window.location.origin}/rpc\`,
+});
+{{else}}
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+{{> getServerUrlSpaces}}
+
+export const link = new RPCLink({
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+  url: \`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}/rpc\`,
+{{else}}
+  url: \`\${ENV.PUBLIC_SERVER_URL.replace(/\\/$/, "")}/rpc\`,
+{{/if}}
+{{#if (eq auth "better-auth")}}
+  fetch(url, options) {
+    return fetch(url, {
+      ...options,
+      credentials: "include",
+    });
+  },
+{{/if}}
+});
+{{/if}}
+
+export const orpc: AppRouterClient = createORPCClient(link);
+`],
+  ["api/orpc/web/nuxt/app/plugins/orpc.ts.hbs", `import { defineNuxtPlugin } from '#app'
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { createORPCClient } from '@orpc/client'
+import { RPCLink } from '@orpc/client/fetch'
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+
+{{> getServerUrlSpaces}}
+
+export default defineNuxtPlugin(() => {
+  const requestURL = useRequestURL();
+  const config = useRuntimeConfig();
+  const serverUrl =
+    (import.meta.server && config.serverUrl) || config.public.serverUrl;
+  const resolvedServerUrl = {{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}getServerUrl(serverUrl){{else}}serverUrl.replace(/\\/$/, ""){{/if}};
+  const rpcUrl = new URL(\`\${resolvedServerUrl}/rpc\`, requestURL.origin).href;
+
+  const rpcLink = new RPCLink({
+    url: rpcUrl,
+    headers: import.meta.server ? useRequestHeaders(["cookie"]) : {},
+    {{#if (eq auth "better-auth")}}
+    fetch(url, options) {
+        return fetch(url, {
+        ...options,
+        credentials: "include",
+        });
+    },
+    {{/if}}
+  })
+
+
+  const client: AppRouterClient = createORPCClient(rpcLink)
+  const orpcUtils = createTanstackQueryUtils(client)
+
+  return {
+    provide: {
+      orpc: orpcUtils
+    }
+  }
+})
+`],
+  ["api/orpc/web/nuxt/app/plugins/vue-query.ts.hbs", `import type {
+  DehydratedState,
+  VueQueryPluginOptions,
+} from '@tanstack/vue-query'
+import {
+  dehydrate,
+  hydrate,
+  QueryCache,
+  QueryClient,
+  VueQueryPlugin,
+} from '@tanstack/vue-query'
+
+export default defineNuxtPlugin((nuxt) => {
+  const vueQueryState = useState<DehydratedState | null>('vue-query')
+
+  const toast = useToast()
+
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 5_000,
+      },
+    },
+    queryCache: new QueryCache({
+      onError: (error) => {
+        console.log(error)
+        toast.add({
+          title: 'Error',
+          description: error?.message || 'An unexpected error occurred.',
+        })
+      },
+    }),
+  })
+  const options: VueQueryPluginOptions = { queryClient }
+
+  nuxt.vueApp.use(VueQueryPlugin, options)
+
+  if (import.meta.server) {
+    nuxt.hooks.hook('app:rendered', () => {
+      vueQueryState.value = dehydrate(queryClient)
+    })
+  }
+
+  if (import.meta.client) {
+    nuxt.hooks.hook('app:created', () => {
+      const dehydratedState = vueQueryState.value
+      if (dehydratedState) {
+        hydrate(queryClient, dehydratedState)
+      }
+    })
+  }
+})
+`],
+  ["api/orpc/web/react/base/src/utils/orpc.ts.hbs", `import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+{{#if (and (includes frontend "tanstack-start") (eq backend "self"))}}
+import { createRouterClient } from "@orpc/server";
+import type { RouterClient } from "@orpc/server";
+import { createIsomorphicFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createContext } from "@{{projectName}}/api/context";
+{{else if (includes frontend "tanstack-start")}}
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{#if (eq auth "clerk")}}
+import { getClerkAuthToken } from "@/utils/clerk-auth";
+{{/if}}
+{{else}}
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+{{#unless (or (eq backend "self") (includes frontend "next"))}}
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{/unless}}
+{{#if (eq auth "clerk")}}
+import { getClerkAuthToken } from "@/utils/clerk-auth";
+{{/if}}
+{{/if}}
+
+export function createQueryClient() {
+	return new QueryClient({
+		queryCache: new QueryCache({
+			onError: (error, query) => {
+				toast.error(\`Error: \${error.message}\`, {
+					action: {
+						label: "retry",
+						onClick: () => {
+							query.invalidate();
+						},
+					},
+				});
+			},
+		}),
+{{#if (includes frontend "tanstack-start")}}
+		defaultOptions: { queries: { staleTime: 60 * 1000 } },
+{{/if}}
+	});
+}
+
+{{#unless (includes frontend "tanstack-start")}}
+export const queryClient = createQueryClient();
+{{/unless}}
+
+{{#unless (eq backend "self")}}
+{{> getServerUrl}}
+
+{{/unless}}
+{{#if (and (includes frontend "tanstack-start") (eq backend "self"))}}
+const getORPCClient = createIsomorphicFn()
+	.server(() =>
+		createRouterClient(appRouter, {
+			context: async () => {
+				return createContext({ req: getRequest() });
+			},
+		}),
+	)
+	.client((): RouterClient<typeof appRouter> => {
+			const link = new RPCLink({
+			url: \`\${window.location.origin}/api/rpc\`,
+{{#if (eq auth "better-auth")}}
+			fetch(url, options) {
+				return fetch(url, {
+					...options,
+					credentials: "include",
+				});
+			},
+{{/if}}
+		});
+
+		return createORPCClient(link);
+	});
+
+export const client: RouterClient<typeof appRouter> = getORPCClient();
+{{else if (includes frontend "tanstack-start")}}
+const link = new RPCLink({
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+	url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/rpc\`,
+{{else}}
+	url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/rpc\`,
+{{/if}}
+{{#if (eq auth "clerk")}}
+	headers: async () => {
+		const token = await getClerkAuthToken();
+		return token ? { Authorization: \`Bearer \${token}\` } : {};
+	},
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	fetch(url, options) {
+		return fetch(url, {
+			...options,
+			credentials: "include",
+		});
+	},
+{{/if}}
+});
+
+export const client: AppRouterClient = createORPCClient(link);
+{{else}}
+export const link = new RPCLink({
+{{#if (and (eq backend "self") (includes frontend "next"))}}
+	url: \`\${typeof window !== "undefined" ? window.location.origin : "http://localhost:3001"}/api/rpc\`,
+{{else if (includes frontend "next")}}
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+	url: \`\${getServerUrl(process.env.NEXT_PUBLIC_SERVER_URL!)}/rpc\`,
+{{else}}
+	url: \`\${process.env.NEXT_PUBLIC_SERVER_URL!.replace(/\\/$/, "")}/rpc\`,
+{{/if}}
+{{else}}
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+	url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/rpc\`,
+{{else}}
+	url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/rpc\`,
+{{/if}}
+{{/if}}
+{{#if (eq auth "clerk")}}
+	headers: async () => {
+		{{#if (includes frontend "next")}}
+		if (typeof window !== "undefined") {
+			const token = await getClerkAuthToken();
+			return token ? { Authorization: \`Bearer \${token}\` } : {};
+		}
+
+		const { auth } = await import("@clerk/nextjs/server");
+		const clerkAuth = await auth();
+		const token = await clerkAuth.getToken();
+
+		return token ? { Authorization: \`Bearer \${token}\` } : {};
+		{{else}}
+		const token = await getClerkAuthToken();
+		return token ? { Authorization: \`Bearer \${token}\` } : {};
+		{{/if}}
+	},
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	fetch(url, options) {
+		return fetch(url, {
+			...options,
+			credentials: "include",
+		});
+	},
+{{#if (includes frontend "next")}}
+	headers: async () => {
+		if (typeof window !== "undefined") {
+			return {}
+		}
+
+		const { headers } = await import("next/headers")
+		return Object.fromEntries(await headers())
+	},
+{{/if}}
+{{/if}}
+});
+
+export const client: AppRouterClient = createORPCClient(link)
+{{/if}}
+
+export const orpc = createTanstackQueryUtils(client)
+`],
+  ["api/orpc/web/solid/src/utils/orpc.ts.hbs", `import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { QueryCache, QueryClient } from "@tanstack/solid-query";
+{{#unless (eq backend "self")}}
+import { getRequestEvent } from "@solidjs/web";
+{{/unless}}
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+{{#unless (eq backend "self")}}
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{/unless}}
+
+{{#if (eq backend "self")}}
+if (import.meta.env.SSR) {
+  await import("./orpc.server");
+}
+
+declare global {
+	var $client: AppRouterClient | undefined;
+}
+
+const link = new RPCLink({
+	url: () => {
+    if (import.meta.env.SSR) {
+      throw new Error("RPCLink is not available on the server.");
+    }
+
+		return \`\${window.location.origin}/rpc\`;
+	},
+{{#if (eq auth "better-auth")}}
+	fetch(url, options) {
+		return fetch(url, {
+			...options,
+			credentials: "include",
+		});
+	},
+{{/if}}
+});
+{{else}}
+{{> getServerUrl}}
+
+const link = new RPCLink({
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+	url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/rpc\`,
+{{else}}
+	url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/rpc\`,
+{{/if}}
+	headers: () => getRequestEvent()?.request.headers ?? {},
+{{#if (eq auth "better-auth")}}
+	fetch(url, options) {
+		return fetch(url, {
+			...options,
+			credentials: "include",
+		});
+	},
+{{/if}}
+});
+{{/if}}
+
+export const client: AppRouterClient = {{#if (eq backend "self")}}globalThis.$client ?? {{/if}}createORPCClient(link);
+
+export const orpc = createTanstackQueryUtils(client);
+
+export function createQueryClient() {
+	return new QueryClient({
+		queryCache: new QueryCache({
+			onError: (error) => {
+				console.error(\`Error: \${error.message}\`);
+			},
+		}),
+	});
+}
+`],
+  ["api/orpc/web/svelte/src/lib/orpc.ts.hbs", `{{#unless (eq backend "self")}}
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{else}}.generated{{/if}}";
+{{/unless}}
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { QueryCache, QueryClient } from "@tanstack/svelte-query";
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+
+export const queryClient = new QueryClient({
+	queryCache: new QueryCache({
+		onError: (error) => {
+			console.error(\`Error: \${error.message}\`);
+		},
+	}),
+});
+
+{{#unless (eq backend "self")}}
+{{> getServerUrl}}
+
+{{/unless}}
+export const link = new RPCLink({
+	{{#if (eq backend "self")}}
+	url: () => {
+		if (typeof window === "undefined") {
+			throw new Error("This link is not allowed on the server side.");
+		}
+
+		return \`\${window.location.origin}/rpc\`;
+	},
+	{{else}}
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+	url: \`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}/rpc\`,
+{{else}}
+	url: \`\${ENV.PUBLIC_SERVER_URL.replace(/\\/$/, "")}/rpc\`,
+{{/if}}
+	{{/if}}
+	{{#if (eq auth "better-auth")}}
+	fetch(url, options) {
+		return fetch(url, {
+			...options,
+			credentials: "include",
+		});
+	},
+	{{/if}}
+});
+
+{{#if (eq backend "self")}}
+export const client: AppRouterClient = globalThis.$client ?? createORPCClient(link);
+{{else}}
+export const client: AppRouterClient = createORPCClient(link);
+{{/if}}
+
+export const orpc = createTanstackQueryUtils(client);
+`],
+  ["api/trpc/context.ts.hbs", `import type { Context as ApiContext } from "@{{projectName}}/api/context";
+{{#if (ne database "none")}}
+import { {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}getDb{{else}}db{{/if}} } from "@{{projectName}}/app-services";
+{{/if}}
+{{#if (eq auth "clerk")}}
+type ClerkContextAuth = ApiContext["auth"];
+
+
+function toClerkContextAuth(auth: ClerkContextAuth): ClerkContextAuth {
+	return auth ? { userId: auth.userId } : null;
+}
+{{/if}}
+
+{{#if (and (eq auth "clerk") (or (eq backend 'self') (eq backend 'hono') (eq backend 'elysia')))}}
+import { createClerkClient } from "@clerk/backend";
+import { ENV } from "./env.server";
+
+const clerkClient = createClerkClient({
+	secretKey: ENV.CLERK_SECRET_KEY,
+	publishableKey: ENV.CLERK_PUBLISHABLE_KEY,
+});
+
+async function authenticateClerkRequest(request: Request): Promise<ClerkContextAuth> {
+	const requestState = await clerkClient.authenticateRequest(request, {
+		authorizedParties: [ENV.CORS_ORIGIN],
+	});
+	return toClerkContextAuth(requestState.toAuth());
+}
+{{/if}}
+
+{{#if (and (eq backend 'self') (includes frontend "next"))}}
+import type { NextRequest } from "next/server";
+{{#if (eq auth "better-auth")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+
+export async function createContext({{#if (eq auth "none")}}_req{{else}}req{{/if}}: NextRequest): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth({{#if (ne database "none")}}db{{/if}})){{else}}auth{{/if}}.api.getSession({
+		headers: req.headers,
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = await authenticateClerkRequest(req);
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (and (eq backend 'self') (includes frontend "tanstack-start"))}}
+{{#if (eq auth "better-auth")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+
+export async function createContext({{#if (eq auth "none")}}_options{{else}}{ req }{{/if}}: { req: Request }): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth({{#if (ne database "none")}}db{{/if}})){{else}}auth{{/if}}.api.getSession({
+		headers: req.headers,
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = await authenticateClerkRequest(req);
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (eq backend 'hono')}}
+import type { Context as HonoContext } from "hono";
+{{#if (eq auth "better-auth")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+
+export type CreateContextOptions = {
+	context: HonoContext;
+};
+
+export async function createContext({{#if (eq auth "none")}}_options{{else}}{ context }{{/if}}: CreateContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth({{#if (ne database "none")}}db{{/if}})){{else}}auth{{/if}}.api.getSession({
+		headers: context.req.raw.headers,
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = await authenticateClerkRequest(context.req.raw);
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (eq backend 'elysia')}}
+import type { Context as ElysiaContext } from "elysia";
+{{#if (eq auth "better-auth")}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+
+export type CreateContextOptions = {
+	context: ElysiaContext;
+};
+
+export async function createContext({{#if (eq auth "none")}}_options{{else}}{ context }{{/if}}: CreateContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await auth.api.getSession({
+		headers: context.request.headers,
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = await authenticateClerkRequest(context.request);
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (eq backend 'express')}}
+import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
+{{#if (eq auth "better-auth")}}
+import { fromNodeHeaders } from "better-auth/node";
+import { auth } from "@{{projectName}}/auth";
+{{else if (eq auth "clerk")}}
+import { getAuth } from "@clerk/express";
+{{/if}}
+
+export async function createContext({{#if (eq auth "none")}}_opts{{else}}opts{{/if}}: CreateExpressContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await auth.api.getSession({
+		headers: fromNodeHeaders(opts.req.headers),
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = toClerkContextAuth(getAuth(opts.req));
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else if (eq backend 'fastify')}}
+import type { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify";
+{{#if (eq auth "better-auth")}}
+import { fromNodeHeaders } from "better-auth/node";
+import { auth } from "@{{projectName}}/auth";
+{{else if (eq auth "clerk")}}
+import { getAuth } from "@clerk/fastify";
+{{/if}}
+
+export async function createContext({ req }: CreateFastifyContextOptions): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	const session = await auth.api.getSession({
+		headers: fromNodeHeaders(req.headers),
+	});
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		session,
+	};
+{{else if (eq auth "clerk")}}
+	const clerkAuth = toClerkContextAuth(getAuth(req));
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+		auth: clerkAuth,
+	};
+{{else}}
+	void req;
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+{{/if}}
+}
+
+{{else}}
+export async function createContext(): Promise<ApiContext> {
+{{#if (and (ne database "none") (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare"))))}}
+  const db = await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}env{{/if}});
+{{/if}}
+	return {
+{{#if (ne database "none")}}
+    db,
+{{/if}}
+	};
+}
+{{/if}}
+
+export type Context = Awaited<ReturnType<typeof createContext>>;
+`],
+  ["api/trpc/fullstack/next/src/app/api/trpc/[trpc]/route.ts.hbs", `import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createContext } from "@{{projectName}}/api/context";
+import { NextRequest } from "next/server";
+
+function handler(req: NextRequest) {
+	return fetchRequestHandler({
+		endpoint: "/api/trpc",
+		req,
+		router: appRouter,
+		createContext: () => createContext(req),
+	});
+}
+export { handler as GET, handler as POST };
+`],
+  ["api/trpc/fullstack/tanstack-start/src/routes/api/trpc/$.ts.hbs", `import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
+import { appRouter } from '@{{projectName}}/api/routers/index'
+import { createContext } from '@{{projectName}}/api/context'
+import { createFileRoute } from '@tanstack/react-router'
+
+function handler({ request }: { request: Request }) {
+  return fetchRequestHandler({
+    req: request,
+    router: appRouter,
+    createContext,
+    endpoint: '/api/trpc',
+  })
+}
+
+export const Route = createFileRoute('/api/trpc/$')({
+  server: {
+    handlers: {
+      GET: handler,
+      POST: handler,
+    },
+  },
+})
+`],
+  ["api/trpc/native/utils/trpc.ts.hbs", `{{#if (eq auth "better-auth")}}
+import { authClient } from "@/lib/auth-client";
+import { Platform } from "react-native";
+{{else if (eq auth "clerk")}}
+import { getClerkAuthToken } from "@/utils/clerk-auth";
+{{/if}}
+import { QueryClient } from "@tanstack/react-query";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
+import type { AppRouter } from "@{{projectName}}/api/routers/index";
+import { ENV } from "../src/env";
+
+export const queryClient = new QueryClient();
+
+const trpcClient = createTRPCClient<AppRouter>({
+	links: [
+		httpBatchLink({
+{{#if (eq backend "self")}}
+			url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/api/trpc\`,
+{{else}}
+			url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}{{apiPrefix webDeploy serverDeploy}}/trpc\`,
+{{/if}}
+{{#if (eq auth "better-auth")}}
+			fetch:
+				function (url, options) {
+					return fetch(url, {
+						...options,
+						// Better Auth Expo forwards the session cookie manually on native.
+						credentials: Platform.OS === "web" ? "include" : "omit",
+					});
+				},
+			async headers() {
+				if (Platform.OS === "web") {
+					return {};
+				}
+				const headers = new Map<string, string>();
+				const cookies = await authClient.getCookie();
+				if (cookies) {
+					headers.set("Cookie", cookies);
+				}
+				return Object.fromEntries(headers);
+			},
+{{else if (eq auth "clerk")}}
+			headers: async function () {
+				const token = await getClerkAuthToken();
+				return token ? { Authorization: \`Bearer \${token}\` } : {};
+			},
+{{/if}}
+		}),
+	],
+});
+
+export const trpc = createTRPCOptionsProxy<AppRouter>({
+	client: trpcClient,
+	queryClient,
+});
+`],
+  ["api/trpc/server/_gitignore", `# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+`],
+  ["api/trpc/server/package.json.hbs", `{
+  "name": "@{{projectName}}/api",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "type": "module",
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {}
+}`],
+  ["api/trpc/server/src/context.ts.hbs", `{{#if (eq auth "better-auth")}}
+import type { Session } from "@{{projectName}}/auth";
+{{/if}}
+{{#if (eq auth "clerk")}}
+import type { SessionAuthObject } from "@clerk/backend";
+{{/if}}
+{{#if (ne database "none")}}
+import type { Database } from "@{{projectName}}/db";
+{{/if}}
+
+export type Context = {
+{{#if (eq auth "clerk")}}
+  auth: Pick<SessionAuthObject, "userId"> | null;
+{{else if (eq auth "better-auth")}}
+  session: Session | null;
+{{/if}}
+{{#if (ne database "none")}}
+  db: Database;
+{{/if}}
+};
+`],
+  ["api/trpc/server/src/index.ts.hbs", `import { initTRPC{{#if (or (eq auth "better-auth") (eq auth "clerk"))}}, TRPCError{{/if}} } from "@trpc/server";
+import type { Context } from "./context";
+
+export const t = initTRPC.context<Context>().create();
+
+export const router = t.router;
+
+export const publicProcedure = t.procedure;
+
+{{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+  {{#if (eq auth "better-auth")}}
+  if (!ctx.session) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Authentication required",
+      cause: "No session",
+    });
+  }
+  {{else}}
+  if (!ctx.auth?.userId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Authentication required",
+      cause: "No Clerk userId",
+    });
+  }
+  {{/if}}
+  return next({
+    ctx: {
+      ...ctx,
+      {{#if (eq auth "better-auth")}}
+      session: ctx.session,
+      {{else}}
+      auth: ctx.auth,
+      {{/if}}
+    },
+  });
+});
+{{/if}}
+`],
+  ["api/trpc/server/src/routers/index.ts.hbs", `{{#if (eq api "orpc")}}
+import { {{#if (eq auth "better-auth")}}protectedProcedure, {{/if}}publicProcedure } from "../index";
+import type { RouterClient } from "@orpc/server";
+
+export const appRouter = {
+  healthCheck: publicProcedure.handler(() => {
+    return "OK";
+  }),
+  {{#if (eq auth "better-auth")}}
+  privateData: protectedProcedure.handler(({ context }) => {
+    return {
+      message: "This is private",
+      user: context.session?.user,
+    };
+  }),
+  {{/if}}
+};
+export type AppRouter = typeof appRouter;
+export type AppRouterClient = RouterClient<typeof appRouter>;
+{{else if (eq api "trpc")}}
+import {
+  {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}protectedProcedure, {{/if}}publicProcedure,
+  router,
+} from "../index";
+
+export const appRouter = router({
+  healthCheck: publicProcedure.query(() => {
+    return "OK";
+  }),
+  {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+  privateData: protectedProcedure.query(({ ctx }) => {
+    return {
+      message: "This is private",
+      {{#if (eq auth "better-auth")}}
+      user: ctx.session.user,
+      {{else}}
+      userId: ctx.auth.userId,
+      {{/if}}
+    };
+  }),
+  {{/if}}
+});
+export type AppRouter = typeof appRouter;
+{{else}}
+export const appRouter = {};
+export type AppRouter = typeof appRouter;
+{{/if}}
+`],
+  ["api/trpc/server/tsconfig.json.hbs", `{
+  "extends": "@{{projectName}}/config/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  }
+}
+`],
+  ["api/trpc/web/react/base/src/utils/trpc.ts.hbs", `{{#if (includes frontend 'next')}}
+import { QueryCache, QueryClient } from '@tanstack/react-query';
+import { createTRPCClient, httpBatchLink } from '@trpc/client';
+import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
+import type { AppRouter } from "@{{projectName}}/api/routers/index";
+import { toast } from 'sonner';
+{{#unless (eq backend "self")}}
+
+{{> getServerUrl}}
+{{/unless}}
+{{#if (eq auth "clerk")}}
+import { getClerkAuthToken } from "@/utils/clerk-auth";
+{{/if}}
+
+export const queryClient = new QueryClient({
+	queryCache: new QueryCache({
+		onError: (error, query) => {
+			toast.error(error.message, {
+				action: {
+					label: "retry",
+					onClick: () => {
+						query.invalidate();
+					},
+				},
+			});
+		},
+	}),
+});
+
+const trpcClient = createTRPCClient<AppRouter>({
+	links: [
+		httpBatchLink({
+{{#if (eq backend "self")}}
+			url: "/api/trpc",
+{{else}}
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+			url: \`\${getServerUrl(process.env.NEXT_PUBLIC_SERVER_URL!)}/trpc\`,
+{{else}}
+			url: \`\${process.env.NEXT_PUBLIC_SERVER_URL!.replace(/\\/$/, "")}/trpc\`,
+{{/if}}
+{{/if}}
+{{#if (eq auth "clerk")}}
+			headers: async () => {
+				if (typeof window !== "undefined") {
+					const token = await getClerkAuthToken();
+					return token ? { Authorization: \`Bearer \${token}\` } : {};
+				}
+
+				const { auth } = await import("@clerk/nextjs/server");
+				const clerkAuth = await auth();
+				const token = await clerkAuth.getToken();
+
+				return token ? { Authorization: \`Bearer \${token}\` } : {};
+			},
+{{/if}}
+{{#if (eq auth "better-auth")}}
+			fetch(url, options) {
+				return fetch(url, {
+					...options,
+					credentials: "include",
+				});
+			},
+{{/if}}
+		}),
+	],
+})
+
+export const trpc = createTRPCOptionsProxy<AppRouter>({
+	client: trpcClient,
+	queryClient,
+});
+
+{{else if (includes frontend 'tanstack-start')}}
+import { createTRPCContext } from "@trpc/tanstack-react-query";
+import type { AppRouter } from "@{{projectName}}/api/routers/index";
+
+export const { TRPCProvider, useTRPC, useTRPCClient } =
+	createTRPCContext<AppRouter>();
+
+{{else}}
+import type { AppRouter } from "@{{projectName}}/api/routers/index";
+import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
+import { toast } from "sonner";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{#if (eq auth "clerk")}}
+import { getClerkAuthToken } from "@/utils/clerk-auth";
+{{/if}}
+
+{{> getServerUrl}}
+
+export const queryClient = new QueryClient({
+	queryCache: new QueryCache({
+		onError: (error, query) => {
+			toast.error(error.message, {
+				action: {
+					label: "retry",
+					onClick: () => {
+						query.invalidate();
+					},
+				},
+			});
+		},
+	}),
+});
+
+export const trpcClient = createTRPCClient<AppRouter>({
+	links: [
+		httpBatchLink({
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+			url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/trpc\`,
+{{else}}
+			url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/trpc\`,
+{{/if}}
+{{#if (eq auth "clerk")}}
+			headers: async () => {
+				const token = await getClerkAuthToken();
+				return token ? { Authorization: \`Bearer \${token}\` } : {};
+			},
+{{/if}}
+{{#if (eq auth "better-auth")}}
+			fetch(url, options) {
+				return fetch(url, {
+					...options,
+					credentials: "include",
+				});
+			},
+{{/if}}
+		}),
+	],
+});
+
+export const trpc = createTRPCOptionsProxy<AppRouter>({
+	client: trpcClient,
+	queryClient,
+});
+{{/if}}
+`],
+  ["backend/convex/packages/backend/_gitignore", `
+.env.local
+`],
+  ["backend/convex/packages/backend/convex/_generated/api.d.ts", `/* eslint-disable */
+export declare const api: any;
+export declare const internal: any;
+export declare const components: any;
+`],
+  ["backend/convex/packages/backend/convex/_generated/api.js", `/* eslint-disable */
+import { anyApi, componentsGeneric } from "convex/server";
+
+export const api = anyApi;
+export const internal = anyApi;
+export const components = componentsGeneric();
+`],
+  ["backend/convex/packages/backend/convex/_generated/dataModel.d.ts", `/* eslint-disable */
+import type {
+  DataModelFromSchemaDefinition,
+  DocumentByName,
+  SystemTableNames,
+  TableNamesInDataModel,
+} from "convex/server";
+import type { GenericId } from "convex/values";
+
+import schema from "../schema.js";
+
+export type DataModel = DataModelFromSchemaDefinition<typeof schema>;
+export type TableNames = TableNamesInDataModel<DataModel>;
+export type Doc<TableName extends TableNames> = DocumentByName<DataModel, TableName>;
+export type Id<TableName extends TableNames | SystemTableNames> = GenericId<TableName>;
+`],
+  ["backend/convex/packages/backend/convex/_generated/server.d.ts", `/* eslint-disable */
+import type {
+  ActionBuilder,
+  GenericActionCtx,
+  GenericDatabaseReader,
+  GenericDatabaseWriter,
+  GenericMutationCtx,
+  GenericQueryCtx,
+  HttpActionBuilder,
+  MutationBuilder,
+  QueryBuilder,
+} from "convex/server";
+
+import type { DataModel } from "./dataModel.js";
+
+export declare const query: QueryBuilder<DataModel, "public">;
+export declare const internalQuery: QueryBuilder<DataModel, "internal">;
+export declare const mutation: MutationBuilder<DataModel, "public">;
+export declare const internalMutation: MutationBuilder<DataModel, "internal">;
+export declare const action: ActionBuilder<DataModel, "public">;
+export declare const internalAction: ActionBuilder<DataModel, "internal">;
+export declare const httpAction: HttpActionBuilder;
+
+export type QueryCtx = GenericQueryCtx<DataModel>;
+export type MutationCtx = GenericMutationCtx<DataModel>;
+export type ActionCtx = GenericActionCtx<DataModel>;
+export type DatabaseReader = GenericDatabaseReader<DataModel>;
+export type DatabaseWriter = GenericDatabaseWriter<DataModel>;
+`],
+  ["backend/convex/packages/backend/convex/_generated/server.js", `/* eslint-disable */
+import {
+  actionGeneric,
+  httpActionGeneric,
+  internalActionGeneric,
+  internalMutationGeneric,
+  internalQueryGeneric,
+  mutationGeneric,
+  queryGeneric,
+} from "convex/server";
+
+export const query = queryGeneric;
+export const internalQuery = internalQueryGeneric;
+export const mutation = mutationGeneric;
+export const internalMutation = internalMutationGeneric;
+export const action = actionGeneric;
+export const internalAction = internalActionGeneric;
+export const httpAction = httpActionGeneric;
+`],
+  ["backend/convex/packages/backend/convex/convex.config.ts.hbs", `import { defineApp } from "convex/server";
+{{#if (eq auth "better-auth")}}
+import betterAuth from "@convex-dev/better-auth/convex.config";
+{{/if}}
+
+const app = defineApp();
+{{#if (eq auth "better-auth")}}
+app.use(betterAuth);
+{{/if}}
+
+export default app;
+`],
+  ["backend/convex/packages/backend/convex/healthCheck.ts.hbs", `import { query } from "./_generated/server";
+
+export const get = query({
+  handler: async () => {
+    return "OK";
+  },
+});
+`],
+  ["backend/convex/packages/backend/convex/README.md", `# Welcome to your Convex functions directory!
+
+Write your Convex functions here.
+See https://docs.convex.dev/functions for more.
+
+A query function that takes two arguments looks like:
+
+\`\`\`ts
+import { v } from "convex/values";
+
+// convex/myFunctions.ts
+import { query } from "./_generated/server";
+
+export const myQueryFunction = query({
+  // Validators for arguments.
+  args: {
+    first: v.number(),
+    second: v.string(),
+  },
+
+  // Function implementation.
+  handler: async (ctx, args) => {
+    // Read the database as many times as you need here.
+    // See https://docs.convex.dev/database/reading-data.
+    const documents = await ctx.db.query("tablename").collect();
+
+    // Arguments passed from the client are properties of the args object.
+    console.log(args.first, args.second);
+
+    // Write arbitrary JavaScript here: filter, aggregate, build derived data,
+    // remove non-public properties, or create new objects.
+    return documents;
+  },
+});
+\`\`\`
+
+Using this query function in a React component looks like:
+
+\`\`\`ts
+const data = useQuery(api.myFunctions.myQueryFunction, {
+  first: 10,
+  second: "hello",
+});
+\`\`\`
+
+A mutation function looks like:
+
+\`\`\`ts
+import { v } from "convex/values";
+
+// convex/myFunctions.ts
+import { mutation } from "./_generated/server";
+
+export const myMutationFunction = mutation({
+  // Validators for arguments.
+  args: {
+    first: v.string(),
+    second: v.string(),
+  },
+
+  // Function implementation.
+  handler: async (ctx, args) => {
+    // Insert or modify documents in the database here.
+    // Mutations can also read from the database like queries.
+    // See https://docs.convex.dev/database/writing-data.
+    const message = { body: args.first, author: args.second };
+    const id = await ctx.db.insert("messages", message);
+
+    // Optionally, return a value from your mutation.
+    return await ctx.db.get("messages", id);
+  },
+});
+\`\`\`
+
+Using this mutation function in a React component looks like:
+
+\`\`\`ts
+const mutation = useMutation(api.myFunctions.myMutationFunction);
+function handleButtonPress() {
+  // fire and forget, the most common way to use mutations
+  mutation({ first: "Hello!", second: "me" });
+  // OR
+  // use the result once the mutation has completed
+  mutation({ first: "Hello!", second: "me" }).then((result) => console.log(result));
+}
+\`\`\`
+
+Use the Convex CLI to push your functions to a deployment. See everything
+the Convex CLI can do by running \`npx convex -h\` in your project root
+directory. To learn more, launch the docs with \`npx convex docs\`.
+`],
+  ["backend/convex/packages/backend/convex/schema.ts.hbs", `import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+export default defineSchema({
+});
+`],
+  ["backend/convex/packages/backend/convex/tsconfig.json.hbs", `{
+  /* This TypeScript project config describes the environment that
+   * Convex functions run in and is used to typecheck them.
+   * You can modify it, but some settings are required to use Convex.
+   */
+  "compilerOptions": {
+    /* These settings are not required by Convex and can be modified. */
+    "allowJs": true,
+    "strict": true,
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "types": ["node"],
+
+    /* These compiler options are required by Convex */
+    "target": "ESNext",
+    "lib": ["ES2021", "dom"],
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "isolatedModules": true,
+    "noEmit": true
+  },
+  "include": ["./**/*"],
+  "exclude": ["./_generated"]
+}
+`],
+  ["backend/convex/packages/backend/package.json.hbs", `{
+  "name": "@{{projectName}}/backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "convex dev",
+    "dev:setup": "convex dev --configure --until-success"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^26.4.1"
+  },
+  "dependencies": {}
+}
+`],
+  ["backend/server/base/_gitignore", `# prod
+dist/
+/build
+/out/
+
+# dev
+.yarn/
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+.vscode/*
+!.vscode/launch.json
+!.vscode/*.code-snippets
+.idea/workspace.xml
+.idea/usage.statistics.xml
+.idea/shelf
+.wrangler
+.alchemy
+/.next/
+.vercel
+prisma/generated/
+
+
+# deps
+node_modules/
+/node_modules
+/.pnp
+.pnp.*
+
+# env
+.env*
+.env.production
+!.env.example
+.dev.vars
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# misc
+.DS_Store
+*.pem
+
+# local db
+*.db*
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+`],
+  ["backend/server/base/package.json.hbs", `{
+	"name": "server",
+	"main": "src/index.ts",
+	"type": "module",
+	"scripts": {
+		"build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsdown",
+		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit",
+		"compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server"
+	},
+	"dependencies": {},
+	{{#if (eq dbSetup 'supabase')}}
+	"trustedDependencies": [
+        "supabase"
+    ],
+    {{/if}}
+	"devDependencies": {}
+}
+`],
+  ["backend/server/base/tsconfig.json.hbs", `{
+  "extends": "@{{projectName}}/config/tsconfig.base.json",
+  {{#if (eq api "orpc")}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "compilerOptions": {
+    "noEmit": true,
+		"paths": {
+      "@/*": ["./src/*"]
+    },
+    "jsx": "react-jsx"{{#if (eq backend "hono")}},
+    "jsxImportSource": "hono/jsx"{{/if}}
+  }
+}
+`],
+  ["backend/server/base/tsdown.config.ts.hbs", `import { defineConfig } from "tsdown";
+{{#if (and (eq runtime "workers") (eq orm "prisma"))}}
+import { unwasm } from "unwasm/plugin";
+{{/if}}
+
+export default defineConfig({
+  entry: "./src/index.ts",
+  format: "esm",
+  outDir: "./dist",
+  clean: true,
+  {{#if (and (eq runtime "workers") (eq orm "prisma"))}}
+  plugins: [unwasm({ esmImport: true })],
+  {{/if}}
+  deps: {
+    alwaysBundle: [/@{{projectName}}\\/.*/],
+    {{#if (eq runtime "workers")}}
+    neverBundle: ["cloudflare:workers"],
+    {{/if}}
+  },
+});
+`],
+  ["backend/server/elysia/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+{{#if (eq runtime "node")}}
+import { node } from "@elysiajs/node";
+{{/if}}
+import { Elysia } from "elysia";
+import { cors } from "@elysiajs/cors";
+{{#if (eq api "trpc")}}
+import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { RPCHandler } from "@orpc/server/fetch";
+import { onError } from "@orpc/server";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createContext } from "@{{projectName}}/api/context";
+{{/if}}
+{{#if (eq auth "better-auth")}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+
+{{#if (eq api "orpc")}}
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+{{/if}}
+
+{{#if (eq serverDeploy "vercel")}}const app = {{/if}}{{#if (eq runtime "node")}}new Elysia({ adapter: node() }){{else}}new Elysia(){{/if}}
+	.use(
+		cors({
+			origin: {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}},
+			methods: ["GET", "POST", "OPTIONS"],
+{{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+			allowedHeaders: ["Content-Type", "Authorization"],
+{{/if}}
+{{#if (eq auth "better-auth")}}
+			credentials: true,
+{{/if}}
+		}),
+	)
+{{#if (eq auth "better-auth")}}
+	.all("/api/auth/*", async (context) => {
+		const { request, status } = context;
+		if (["POST", "GET"].includes(request.method)) {
+			return auth.handler(request);
+		}
+		return status(405)
+	})
+{{/if}}
+{{#if (eq api "orpc")}}
+	.all(
+		"{{apiPrefix webDeploy serverDeploy}}/rpc*",
+		async (context) => {
+			const { response } = await rpcHandler.handle(context.request, {
+				prefix: "{{apiPrefix webDeploy serverDeploy}}/rpc",
+				context: await createContext({ context }),
+			});
+			return response ?? new Response("Not Found", { status: 404 });
+		},
+		{
+			parse: "none",
+		}
+	)
+	.all(
+		"{{apiPrefix webDeploy serverDeploy}}/api-reference*",
+		async (context) => {
+			const { response } = await apiHandler.handle(context.request, {
+				prefix: "{{apiPrefix webDeploy serverDeploy}}/api-reference",
+				context: await createContext({ context }),
+			});
+			return response ?? new Response("Not Found", { status: 404 });
+		},
+		{
+			parse: "none",
+		}
+	)
+{{/if}}
+{{#if (eq api "trpc")}}
+	.all("{{apiPrefix webDeploy serverDeploy}}/trpc/*", async (context) => {
+		const res = await fetchRequestHandler({
+			endpoint: "{{apiPrefix webDeploy serverDeploy}}/trpc",
+			router: appRouter,
+			req: context.request,
+			createContext: () => createContext({ context }),
+		});
+		return res;
+	})
+{{/if}}
+	.get("/", () => "OK")
+{{#if (eq serverDeploy "vercel")}};
+
+export default app;
+
+// Elysia's default export is not auto-served by Bun or Node, so start a local
+// server outside Vercel while still exporting the app for Vercel functions.
+if (!process.env.VERCEL) {
+	app.listen(3000, () => {
+		console.log("Server is running on http://localhost:3000");
+	});
+}
+{{else}}
+	.listen(3000, () => {
+		console.log("Server is running on http://localhost:3000");
+	});
+{{/if}}
+`],
+  ["backend/server/express/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+{{#if (eq api "trpc")}}
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { OpenAPIHandler } from "@orpc/openapi/node";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { RPCHandler } from "@orpc/server/node";
+import { onError } from "@orpc/server";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createContext } from "@{{projectName}}/api/context";
+{{/if}}
+import cors from "cors";
+import express from "express";
+{{#if (eq auth "better-auth")}}
+import { auth } from "@{{projectName}}/auth";
+import { toNodeHandler } from "better-auth/node";
+{{/if}}
+{{#if (eq auth "clerk")}}
+import { clerkMiddleware } from "@clerk/express";
+{{/if}}
+
+const app = express();
+
+app.use(
+	cors({
+		origin: {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}},
+		methods: ["GET", "POST", "OPTIONS"],
+{{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+		allowedHeaders: ["Content-Type", "Authorization"],
+{{/if}}
+{{#if (eq auth "better-auth")}}
+		credentials: true,
+{{/if}}
+	})
+);
+
+{{#if (eq auth "clerk")}}
+app.use(clerkMiddleware());
+{{/if}}
+
+{{#if (eq auth "better-auth")}}
+app.all("/api/auth{/*path}", toNodeHandler(auth));
+{{/if}}
+
+{{#if (eq api "trpc")}}
+app.use(
+	"{{apiPrefix webDeploy serverDeploy}}/trpc",
+	createExpressMiddleware({
+		router: appRouter,
+		createContext,
+	})
+);
+{{/if}}
+
+{{#if (eq api "orpc")}}
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+app.use(async (req, res, next) => {
+	const rpcResult = await rpcHandler.handle(req, res, {
+		prefix: "{{apiPrefix webDeploy serverDeploy}}/rpc",
+		context: await createContext({ req }),
+	});
+	if (rpcResult.matched) return;
+
+	const apiResult = await apiHandler.handle(req, res, {
+		prefix: "{{apiPrefix webDeploy serverDeploy}}/api-reference",
+		context: await createContext({ req }),
+	});
+	if (apiResult.matched) return;
+
+	next();
+});
+{{/if}}
+
+app.use(express.json());
+
+
+app.get("/", (_req, res) => {
+	res.status(200).send("OK");
+});
+
+app.listen(3000, () => {
+	console.log("Server is running on http://localhost:3000");
+});
+`],
+  ["backend/server/fastify/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+import Fastify from "fastify";
+import fastifyCors from "@fastify/cors";
+
+{{#if (eq api "trpc")}}
+import { fastifyTRPCPlugin, type FastifyTRPCPluginOptions } from "@trpc/server/adapters/fastify";
+import { createContext } from "@{{projectName}}/api/context";
+import { appRouter, type AppRouter } from "@{{projectName}}/api/routers/index";
+{{/if}}
+
+{{#if (eq api "orpc")}}
+import { OpenAPIHandler } from "@orpc/openapi/fastify";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { RPCHandler } from "@orpc/server/fastify";
+import { onError } from "@orpc/server";
+import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+{{/if}}
+
+
+{{#if (eq auth "better-auth")}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{#if (eq auth "clerk")}}
+import { clerkPlugin } from "@clerk/fastify";
+{{/if}}
+
+const baseCorsConfig = {
+	origin: {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}},
+	methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+	allowedHeaders: [
+		"Content-Type",
+		"Authorization",
+		"X-Requested-With"
+	],
+	credentials: true,
+	maxAge: 86400,
+};
+
+{{#if (eq api "orpc")}}
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const fastify = Fastify({
+	logger: true,
+});
+{{else}}
+const fastify = Fastify({
+	logger: true,
+});
+{{/if}}
+
+fastify.register(fastifyCors, baseCorsConfig);
+{{#if (eq auth "clerk")}}
+fastify.register(clerkPlugin, {
+	publishableKey: ENV.CLERK_PUBLISHABLE_KEY,
+	secretKey: ENV.CLERK_SECRET_KEY,
+});
+{{/if}}
+
+{{#if (eq api "orpc")}}
+fastify.register(async (rpcApp) => {
+	// Fully utilize oRPC features by letting oRPC parse the request body.
+	rpcApp.addContentTypeParser("*", (_, _payload, done) => {
+		done(null, undefined);
+	});
+
+	rpcApp.all("{{apiPrefix webDeploy serverDeploy}}/rpc/*", async (request, reply) => {
+		const { matched } = await rpcHandler.handle(request, reply, {
+			context: await createContext({{#if (eq auth "clerk")}}request{{else}}request.headers{{/if}}),
+			prefix: "{{apiPrefix webDeploy serverDeploy}}/rpc",
+		});
+
+		if (!matched) {
+			reply.status(404).send();
+		}
+	});
+
+	rpcApp.all("{{apiPrefix webDeploy serverDeploy}}/api-reference/*", async (request, reply) => {
+		const { matched } = await apiHandler.handle(request, reply, {
+			context: await createContext({{#if (eq auth "clerk")}}request{{else}}request.headers{{/if}}),
+			prefix: "{{apiPrefix webDeploy serverDeploy}}/api-reference",
+		});
+
+		if (!matched) {
+			reply.status(404).send();
+		}
+	});
+});
+{{/if}}
+
+{{#if (eq auth "better-auth")}}
+fastify.route({
+	method: ["GET", "POST"],
+	url: "/api/auth/*",
+	async handler(request, reply) {
+		try {
+			const url = new URL(request.url, \`http://\${request.headers.host}\`);
+			const headers = new Headers();
+			Object.entries(request.headers).forEach(([key, value]) => {
+				if (value) headers.append(key, value.toString());
+			});
+			const req = new Request(url.toString(), {
+				method: request.method,
+				headers,
+				body: request.body ? JSON.stringify(request.body) : undefined,
+			});
+			const response = await auth.handler(req);
+			reply.status(response.status);
+			response.headers.forEach((value, key) => reply.header(key, value));
+			reply.send(response.body ? await response.text() : null);
+		} catch (error) {
+			fastify.log.error({ err: error }, "Authentication Error:");
+			reply.status(500).send({
+				error: "Internal authentication error",
+				code: "AUTH_FAILURE"
+			});
+		}
+	}
+});
+{{/if}}
+
+{{#if (eq api "trpc")}}
+fastify.register(fastifyTRPCPlugin, {
+	prefix: "{{apiPrefix webDeploy serverDeploy}}/trpc",
+	trpcOptions: {
+		router: appRouter,
+		createContext,
+		onError({ path, error }) {
+			console.error(\`Error in tRPC handler on path '\${path}':\`, error);
+		},
+	} satisfies FastifyTRPCPluginOptions<AppRouter>["trpcOptions"],
+});
+{{/if}}
+
+
+fastify.get('/', async () => {
+	return 'OK';
+});
+
+fastify.listen({ port: 3000{{#if (or (eq serverDeploy "docker") (eq serverDeploy "prisma"))}}, host: "0.0.0.0"{{/if}} }, (err) => {
+	if (err) {
+		fastify.log.error(err);
+		process.exit(1);
+	}
+	console.log("Server running on port 3000");
+});
+`],
+  ["backend/server/hono/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+{{#if (eq api "orpc")}}
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { RPCHandler } from "@orpc/server/fetch";
+import { onError } from "@orpc/server";
+import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { trpcServer } from "@hono/trpc-server";
+import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+{{/if}}
+{{#if (eq auth "better-auth")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+
+const app = new Hono();
+
+app.use(logger());
+app.use(
+	"/*",
+	cors({
+		origin: {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}},
+		allowMethods: ["GET", "POST", "OPTIONS"],
+{{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+		allowHeaders: ["Content-Type", "Authorization"],
+{{/if}}
+{{#if (eq auth "better-auth")}}
+		credentials: true,
+{{/if}}
+	})
+);
+
+{{#if (eq auth "better-auth")}}
+app.on(
+	["POST", "GET"],
+	"/api/auth/*",
+	async (c) =>
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+		(await createAuth()).handler(c.req.raw)
+{{else}}
+		auth.handler(c.req.raw)
+{{/if}}
+);
+{{/if}}
+
+{{#if (eq api "orpc")}}
+export const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+export const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+app.use("/*", async (c, next) => {
+	const context = await createContext({ context: c });
+
+	const rpcResult = await rpcHandler.handle(c.req.raw, {
+		prefix: "{{apiPrefix webDeploy serverDeploy}}/rpc",
+		context: context,
+	});
+
+	if (rpcResult.matched) {
+		return c.newResponse(rpcResult.response.body, rpcResult.response);
+	}
+
+	const apiResult = await apiHandler.handle(c.req.raw, {
+		prefix: "{{apiPrefix webDeploy serverDeploy}}/api-reference",
+		context: context,
+	});
+
+	if (apiResult.matched) {
+		return c.newResponse(apiResult.response.body, apiResult.response);
+	}
+
+	await next();
+});
+{{/if}}
+
+{{#if (eq api "trpc")}}
+app.use(
+	"{{apiPrefix webDeploy serverDeploy}}/trpc/*",
+	trpcServer({
+		endpoint: "{{apiPrefix webDeploy serverDeploy}}/trpc",
+		router: appRouter,
+		createContext: (_opts, context) => {
+			return createContext({ context });
+		},
+	})
+);
+{{/if}}
+
+
+
+app.get("/", (c) => {
+	return c.text("OK");
+});
+
+{{#if (eq runtime "node")}}
+import { serve } from "@hono/node-server";
+
+{{#if (eq serverDeploy "vercel")}}
+export default app;
+
+if (!process.env.VERCEL) {
+{{/if}}
+	serve(
+		{
+			fetch: app.fetch,
+			port: 3000,
+		},
+		(info) => {
+			console.log(\`Server is running on http://localhost:\${info.port}\`);
+		}
+	);
+{{#if (eq serverDeploy "vercel")}}
+}
+{{/if}}
+{{else}}
+{{#if (eq runtime "bun")}}
+export default app;
+{{/if}}
+{{#if (eq runtime "workers")}}
+export default app;
+{{/if}}
+{{/if}}
+`],
+  ["base/_gitignore", `# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+dist
+build
+*.tsbuildinfo
+
+# Generated files
+apps/web/src/routeTree.gen.ts
+local.db
+local.db-*
+
+# Environment variables
+.env
+.env*.local
+
+# IDEs and editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs
+.evlog/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Turbo
+.turbo
+.nx
+
+# xstack
+.alchemy
+.vercel
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.tgz
+.cache
+tmp
+temp
+`],
+  ["base/package.json.hbs", `{
+  "name": "xstack",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+{{#if (and (includes frontend "solid") (ne packageManager "pnpm"))}}
+  "overrides": {
+    "solid-js": "2.0.0-rc.14",
+    "@solidjs/signals": "2.0.0-rc.14",
+    "@solidjs/compiler": "2.0.0-rc.14",
+    "@solidjs/babel-plugin": "2.0.0-rc.14"
+  },
+{{/if}}
+  "scripts": {}
+}
+`],
+  ["base/tsconfig.json.hbs", `{
+  "extends": "@{{projectName}}/config/tsconfig.base.json",
+}
+`],
+  ["db-setup/docker-compose/mongodb/docker-compose.yml.hbs", `name: {{projectName}}
+
+services:
+  mongodb:
+    image: mongo:8
+    container_name: {{projectName}}-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: {{projectName}}
+    ports:
+      - "27017:27017"
+    volumes:
+      - {{projectName}}_mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  {{projectName}}_mongodb_data:`],
+  ["db-setup/docker-compose/mysql/docker-compose.yml.hbs", `name: {{projectName}}
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: {{projectName}}-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: {{projectName}}
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - {{projectName}}_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  {{projectName}}_mysql_data:`],
+  ["db-setup/docker-compose/postgres/docker-compose.yml.hbs", `name: {{projectName}}
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: {{projectName}}-postgres
+    environment:
+      POSTGRES_DB: {{projectName}}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - {{projectName}}_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  {{projectName}}_postgres_data:`],
+  ["db/base/_gitignore", `# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+/prisma/generated
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+`],
+  ["db/base/package.json.hbs", `{
+  "name": "@{{projectName}}/db",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    {{#if (eq api "orpc")}}
+    "build": "tsc -b",
+    "check-types": "tsc -b"
+    {{else}}
+    "check-types": "tsc --noEmit"
+    {{/if}}
+  },
+  "devDependencies": {}
+}`],
+  ["db/base/src/config.ts.hbs", `{{#if (eq dbSetup "d1")}}
+/// <reference types="@cloudflare/workers-types" />
+{{/if}}
+export type DatabaseConfig = {
+{{#if (eq dbSetup "d1")}}
+  DB: D1Database;
+{{else if (and (eq database "mysql") (eq orm "drizzle") (eq dbSetup "planetscale"))}}
+  DATABASE_HOST: string;
+  DATABASE_USERNAME: string;
+  DATABASE_PASSWORD: string;
+{{else}}
+  DATABASE_URL: string;
+{{#if (eq dbSetup "turso")}}
+  DATABASE_AUTH_TOKEN: string;
+{{/if}}
+{{/if}}
+};
+`],
+  ["db/base/tsconfig.json.hbs", `{
+  "extends": "@{{projectName}}/config/tsconfig.base.json",
+  {{#if (eq api "orpc")}}
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"{{#if (eq orm "prisma")}}, "prisma/generated/**/*.ts"{{/if}}],
+  "references": []
+  {{else}}
+  "compilerOptions": {
+    "noEmit": true
+  }
+  {{/if}}
+}
+`],
+  ["db/drizzle/base/src/relations.ts.hbs", `import { defineRelations } from "drizzle-orm";
+import * as schema from "./schema";
+
+export const relations = {
+  ...defineRelations(schema),
+{{#if (eq auth "better-auth")}}
+  ...schema.authRelations,
+{{/if}}
+};
+`],
+  ["db/drizzle/base/src/schema/index.ts.hbs", `{{#if (eq auth "better-auth")}}
+export * from "./auth";
+{{/if}}
+export {};`],
+  ["db/drizzle/mysql/drizzle.config.ts.hbs", `import { defineConfig } from "drizzle-kit";
+import "varlock/auto-load";
+
+
+export default defineConfig({
+  schema: "./src/schema/index.ts",
+  out: "./src/migrations",
+  dialect: "mysql",
+  dbCredentials: {
+    url: process.env.DATABASE_URL || "",
+  },
+});
+`],
+  ["db/drizzle/mysql/src/index.ts.hbs", `import type { DatabaseConfig } from "./config";
+{{#if (or (eq runtime "bun") (eq runtime "node") (eq runtime "none"))}}
+import { relations } from "./relations";
+
+{{#if (eq dbSetup "planetscale")}}
+import { drizzle } from "drizzle-orm/planetscale-serverless";
+
+export function createDb(env: DatabaseConfig) {
+	return drizzle({
+		connection: {
+			host: env.DATABASE_HOST,
+			username: env.DATABASE_USERNAME,
+			password: env.DATABASE_PASSWORD,
+		},
+		relations,
+	});
+}
+{{else}}
+import { drizzle } from "drizzle-orm/mysql2";
+
+export function createDb(env: DatabaseConfig) {
+	return drizzle({
+		connection: {
+			uri: env.DATABASE_URL,
+		},
+		relations,
+	});
+}
+{{/if}}
+
+{{/if}}
+
+{{#if (eq runtime "workers")}}
+import { relations } from "./relations";
+
+{{#if (eq dbSetup "planetscale")}}
+import { drizzle } from "drizzle-orm/planetscale-serverless";
+
+export function createDb(env: DatabaseConfig) {
+	return drizzle({
+		connection: {
+			host: env.DATABASE_HOST,
+			username: env.DATABASE_USERNAME,
+			password: env.DATABASE_PASSWORD,
+		},
+		relations,
+	});
+}
+{{else}}
+import { drizzle } from "drizzle-orm/mysql2";
+
+export function createDb(env: DatabaseConfig) {
+	return drizzle({
+		connection: {
+			uri: env.DATABASE_URL,
+		},
+		relations,
+	});
+}
+{{/if}}
+{{/if}}
+
+export type Database = ReturnType<typeof createDb>;
+`],
+  ["db/drizzle/mysql/src/migrations/.gitkeep", `
+`],
+  ["db/drizzle/postgres/drizzle.config.ts.hbs", `import { defineConfig } from "drizzle-kit";
+import "varlock/auto-load";
+
+
+export default defineConfig({
+  schema: "./src/schema/index.ts",
+  out: "./src/migrations",
+  dialect: "postgresql",
+  schemaFilter: ["public"],
+  dbCredentials: {
+    url: process.env.DATABASE_URL || "",
+  },
+});
+`],
+  ["db/drizzle/postgres/src/index.ts.hbs", `import type { DatabaseConfig } from "./config";
+{{#if (or (eq runtime "bun") (eq runtime "node") (eq runtime "none"))}}
+import { relations } from "./relations";
+
+{{#if (eq dbSetup "neon")}}
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+
+export function createDb(env: DatabaseConfig) {
+	const sql = neon(env.DATABASE_URL);
+	return drizzle({ client: sql, relations });
+}
+{{else}}
+{{#if (and (eq backend "self") (eq webDeploy "cloudflare"))}}
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+{{else}}
+import { drizzle } from "drizzle-orm/node-postgres";
+{{/if}}
+
+export function createDb(env: DatabaseConfig) {
+{{#if (and (eq backend "self") (eq webDeploy "cloudflare"))}}
+	const client = postgres(env.DATABASE_URL, { max: 1 });
+
+	return drizzle({ client, relations });
+{{else}}
+	return drizzle(env.DATABASE_URL, { relations });
+{{/if}}
+}
+{{/if}}
+
+{{/if}}
+
+{{#if (eq runtime "workers")}}
+import { relations } from "./relations";
+
+{{#if (eq dbSetup "neon")}}
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+
+export function createDb(env: DatabaseConfig) {
+	const sql = neon(env.DATABASE_URL || "");
+	return drizzle({ client: sql, relations });
+}
+{{else}}
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+
+export function createDb(env: DatabaseConfig) {
+	const client = postgres(env.DATABASE_URL || "", { max: 1 });
+
+	return drizzle({ client, relations });
+}
+{{/if}}
+{{/if}}
+
+export type Database = ReturnType<typeof createDb>;
+`],
+  ["db/drizzle/postgres/src/migrations/.gitkeep", `
+`],
+  ["db/drizzle/sqlite/drizzle.config.ts.hbs", `import { defineConfig } from "drizzle-kit";
+import "varlock/auto-load";
+
+
+export default defineConfig({
+  schema: "./src/schema/index.ts",
+  out: "./src/migrations",
+  {{#if (eq dbSetup "d1")}}
+  // DOCS: https://orm.drizzle.team/docs/guides/d1-http-with-drizzle-kit
+  dialect: "sqlite",
+  driver: "d1-http",
+  {{else}}
+  dialect: "turso",
+  dbCredentials: {
+    url: process.env.DATABASE_URL || "",
+    {{#if (eq dbSetup "turso")}}
+    authToken: process.env.DATABASE_AUTH_TOKEN,
+    {{/if}}
+  },
+  {{/if}}
+});
+`],
+  ["db/drizzle/sqlite/src/index.ts.hbs", `import type { DatabaseConfig } from "./config";
+{{#if (eq dbSetup "d1")}}
+import { relations } from "./relations";
+import { drizzle } from "drizzle-orm/d1";
+
+export function createDb(env: DatabaseConfig) {
+	return drizzle(env.DB, { relations });
+}
+{{else if (or (eq runtime "bun") (eq runtime "node") (eq runtime "none"))}}
+import { relations } from "./relations";
+import { drizzle } from "drizzle-orm/libsql";
+import { createClient } from "@libsql/client";
+
+export function createDb(env: DatabaseConfig) {
+	const client = createClient({
+		url: env.DATABASE_URL,
+{{#if (eq dbSetup "turso")}}
+		authToken: env.DATABASE_AUTH_TOKEN,
+{{/if}}
+	});
+
+	return drizzle({ client, relations });
+}
+
+{{else if (eq runtime "workers")}}
+import { relations } from "./relations";
+import { drizzle } from "drizzle-orm/libsql";
+import { createClient } from "@libsql/client";
+
+export function createDb(env: DatabaseConfig) {
+	const client = createClient({
+		url: env.DATABASE_URL || "",
+{{#if (eq dbSetup "turso")}}
+		authToken: env.DATABASE_AUTH_TOKEN,
+{{/if}}
+	});
+
+	return drizzle({ client, relations });
+}
+{{/if}}
+
+export type Database = ReturnType<typeof createDb>;
+`],
+  ["db/drizzle/sqlite/src/migrations/.gitkeep", ``],
+  ["db/mongoose/mongodb/src/index.ts.hbs", `import mongoose from "mongoose";
+import type { DatabaseConfig } from "./config";
+
+export async function createDb(env: DatabaseConfig) {
+  await mongoose.connect(env.DATABASE_URL);
+  return mongoose.connection.getClient().db();
+}
+
+export type Database = Awaited<ReturnType<typeof createDb>>;
+`],
+  ["db/prisma/mongodb/prisma.config.ts.hbs", `import path from "node:path";
+import type { PrismaConfig } from "prisma";
+import "varlock/auto-load";
+
+
+export default {
+  schema: path.join("prisma", "schema"),
+  migrations: {
+    path: path.join("prisma", "migrations"),
+  }
+} satisfies PrismaConfig;
+`],
+  ["db/prisma/mongodb/prisma/schema/schema.prisma.hbs", `generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+  moduleFormat = "esm"
+  {{#if (eq runtime "bun")}}
+  runtime = "bun"
+  {{/if}}
+  {{#if (eq runtime "node")}}
+  runtime = "nodejs"
+  {{/if}}
+  {{#if (or (eq runtime "workers") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  runtime = "cloudflare"
+  {{/if}}
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+`],
+  ["db/prisma/mongodb/src/index.ts.hbs", `import type { DatabaseConfig } from "./config";
+import { PrismaClient } from "../prisma/generated/client";
+
+export function createPrismaClient(env: DatabaseConfig) {
+  return new PrismaClient({ datasourceUrl: env.DATABASE_URL });
+}
+
+export type Database = ReturnType<typeof createPrismaClient>;
+`],
+  ["db/prisma/mysql/prisma.config.ts.hbs", `import path from "node:path";
+import { defineConfig, env } from "prisma/config";
+import "varlock/auto-load";
+
+
+export default defineConfig({
+  schema: path.join("prisma", "schema"),
+  migrations: {
+    path: path.join("prisma", "migrations"),
+  },
+  datasource: {
+    url: {{#if (usesAlchemyDatabase backend dbSetup webDeploy serverDeploy dbSetupOptions)}}process.env.DATABASE_URL!{{else}}env("DATABASE_URL"){{/if}},
+  },
+});
+`],
+  ["db/prisma/mysql/prisma/migrations/.gitkeep", `
+`],
+  ["db/prisma/mysql/prisma/migrations/0000_init/migration.sql.hbs", `{{#if (eq auth "better-auth")}}
+-- CreateTable
+CREATE TABLE \`user\` (
+    \`id\` VARCHAR(191) NOT NULL,
+    \`name\` TEXT NOT NULL,
+    \`email\` VARCHAR(191) NOT NULL,
+    \`emailVerified\` BOOLEAN NOT NULL DEFAULT false,
+    \`image\` TEXT NULL,
+    \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updatedAt\` DATETIME(3) NOT NULL,
+
+    UNIQUE INDEX \`user_email_key\`(\`email\`),
+    PRIMARY KEY (\`id\`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE \`session\` (
+    \`id\` VARCHAR(191) NOT NULL,
+    \`expiresAt\` DATETIME(3) NOT NULL,
+    \`token\` VARCHAR(191) NOT NULL,
+    \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updatedAt\` DATETIME(3) NOT NULL,
+    \`ipAddress\` TEXT NULL,
+    \`userAgent\` TEXT NULL,
+    \`userId\` VARCHAR(191) NOT NULL,
+
+    INDEX \`session_userId_idx\`(\`userId\`(191)),
+    UNIQUE INDEX \`session_token_key\`(\`token\`),
+    PRIMARY KEY (\`id\`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE \`account\` (
+    \`id\` VARCHAR(191) NOT NULL,
+    \`accountId\` TEXT NOT NULL,
+    \`providerId\` TEXT NOT NULL,
+    \`userId\` VARCHAR(191) NOT NULL,
+    \`accessToken\` TEXT NULL,
+    \`refreshToken\` TEXT NULL,
+    \`idToken\` TEXT NULL,
+    \`accessTokenExpiresAt\` DATETIME(3) NULL,
+    \`refreshTokenExpiresAt\` DATETIME(3) NULL,
+    \`scope\` TEXT NULL,
+    \`password\` TEXT NULL,
+    \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updatedAt\` DATETIME(3) NOT NULL,
+
+    INDEX \`account_userId_idx\`(\`userId\`(191)),
+    PRIMARY KEY (\`id\`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE \`verification\` (
+    \`id\` VARCHAR(191) NOT NULL,
+    \`identifier\` TEXT NOT NULL,
+    \`value\` TEXT NOT NULL,
+    \`expiresAt\` DATETIME(3) NOT NULL,
+    \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updatedAt\` DATETIME(3) NOT NULL,
+
+    INDEX \`verification_identifier_idx\`(\`identifier\`(191)),
+    PRIMARY KEY (\`id\`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+{{/if}}
+`],
+  ["db/prisma/mysql/prisma/migrations/migration_lock.toml.hbs", `# Please do not edit this file manually
+# It should be added in your version-control system (e.g., Git)
+provider = "mysql"
+`],
+  ["db/prisma/mysql/prisma/schema/schema.prisma.hbs", `generator client {
+  provider      = "prisma-client"
+  output        = "../generated"
+  moduleFormat  = "esm"
+  {{#if (eq runtime "bun")}}
+  runtime       = "bun"
+  {{/if}}
+  {{#if (eq runtime "node")}}
+  runtime       = "nodejs"
+  {{/if}}
+  {{#if (or (eq runtime "workers") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  runtime       = "cloudflare"
+  {{/if}}
+}
+
+datasource db {
+  provider = "mysql"
+  {{#if (eq dbSetup "planetscale")}}
+  relationMode = "prisma"
+  {{/if}}
+}
+`],
+  ["db/prisma/mysql/src/index.ts.hbs", `import type { DatabaseConfig } from "./config";
+{{#if (eq runtime "workers")}}
+import { PrismaClient } from "../prisma/generated/client";
+
+{{#if (eq dbSetup "planetscale")}}
+import { PrismaPlanetScale } from "@prisma/adapter-planetscale";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaPlanetScale({ url: env.DATABASE_URL });
+	return new PrismaClient({ adapter });
+}
+{{else}}
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const databaseUrl: string = env.DATABASE_URL;
+	const url: URL = new URL(databaseUrl);
+	const connectionConfig = {
+		host: url.hostname,
+		port: parseInt(url.port || "3306"),
+		user: url.username,
+		password: url.password,
+		database: url.pathname.slice(1),
+	};
+
+	const adapter = new PrismaMariaDb(connectionConfig);
+	return new PrismaClient({ adapter });
+}
+{{/if}}
+{{else}}
+import { PrismaClient } from "../prisma/generated/client";
+
+{{#if (eq dbSetup "planetscale")}}
+import { PrismaPlanetScale } from "@prisma/adapter-planetscale";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaPlanetScale({ url: env.DATABASE_URL });
+	return new PrismaClient({ adapter });
+}
+{{else}}
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const databaseUrl: string = env.DATABASE_URL;
+	const url: URL = new URL(databaseUrl);
+	const connectionConfig = {
+		host: url.hostname,
+		port: parseInt(url.port || "3306"),
+		user: url.username,
+		password: url.password,
+		database: url.pathname.slice(1),
+	};
+
+	const adapter = new PrismaMariaDb(connectionConfig);
+	return new PrismaClient({ adapter });
+}
+{{/if}}
+
+{{/if}}
+
+export type Database = ReturnType<typeof createPrismaClient>;
+`],
+  ["db/prisma/postgres/prisma.config.ts.hbs", `import path from "node:path";
+import { defineConfig, env } from 'prisma/config'
+import "varlock/auto-load";
+
+
+export default defineConfig({
+  schema: path.join("prisma", "schema"),
+  migrations: {
+    path: path.join("prisma", "migrations"),
+    },
+    datasource: {
+        url: {{#if (usesAlchemyDatabase backend dbSetup webDeploy serverDeploy dbSetupOptions)}}process.env.DATABASE_URL!{{else}}env('DATABASE_URL'){{/if}},
+    },
+})
+`],
+  ["db/prisma/postgres/prisma/migrations/.gitkeep", `
+`],
+  ["db/prisma/postgres/prisma/migrations/0000_init/migration.sql.hbs", `-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
+{{#if (eq auth "better-auth")}}
+-- CreateTable
+CREATE TABLE "user" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "image" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "user_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "session" (
+    "id" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "token" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "userId" TEXT NOT NULL,
+
+    CONSTRAINT "session_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "account" (
+    "id" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "providerId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "idToken" TEXT,
+    "accessTokenExpiresAt" TIMESTAMP(3),
+    "refreshTokenExpiresAt" TIMESTAMP(3),
+    "scope" TEXT,
+    "password" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "account_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "verification" (
+    "id" TEXT NOT NULL,
+    "identifier" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "verification_pkey" PRIMARY KEY ("id")
+);
+
+{{/if}}
+{{#if (eq auth "better-auth")}}
+-- CreateIndex
+CREATE UNIQUE INDEX "user_email_key" ON "user"("email");
+
+-- CreateIndex
+CREATE INDEX "session_userId_idx" ON "session"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "session_token_key" ON "session"("token");
+
+-- CreateIndex
+CREATE INDEX "account_userId_idx" ON "account"("userId");
+
+-- CreateIndex
+CREATE INDEX "verification_identifier_idx" ON "verification"("identifier");
+
+{{#unless (eq dbSetup "planetscale")}}
+-- AddForeignKey
+ALTER TABLE "session" ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "account" ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+{{/unless}}
+{{/if}}
+`],
+  ["db/prisma/postgres/prisma/migrations/migration_lock.toml.hbs", `# Please do not edit this file manually
+# It should be added in your version-control system (e.g., Git)
+provider = "postgresql"
+`],
+  ["db/prisma/postgres/prisma/schema/schema.prisma.hbs", `generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+  moduleFormat = "esm"
+  {{#if (eq runtime "bun")}}
+  runtime = "bun"
+  {{/if}}
+  {{#if (eq runtime "node")}}
+  runtime = "nodejs"
+  {{/if}}
+  {{#if (or (eq runtime "workers") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  runtime = "cloudflare"
+  {{/if}}
+}
+
+datasource db {
+  provider = "postgresql"
+  {{#if (eq dbSetup "planetscale")}}
+  relationMode = "prisma"
+  {{/if}}
+}
+`],
+  ["db/prisma/postgres/src/index.ts.hbs", `import type { DatabaseConfig } from "./config";
+{{#if (eq runtime "workers")}}
+import { PrismaClient } from "../prisma/generated/client";
+{{#if (eq dbSetup "neon")}}
+import { PrismaNeon } from "@prisma/adapter-neon";
+import { neonConfig } from "@neondatabase/serverless";
+
+neonConfig.poolQueryViaFetch = true;
+
+export function createPrismaClient(env: DatabaseConfig) {
+	return new PrismaClient({
+		adapter: new PrismaNeon({
+			connectionString: env.DATABASE_URL,
+		}),
+	});
+}
+
+{{else if (eq dbSetup "prisma-postgres")}}
+import { PrismaPostgresAdapter } from "@prisma/adapter-ppg";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaPostgresAdapter({
+		connectionString: env.DATABASE_URL,
+	});
+
+	return new PrismaClient({ adapter });
+}
+
+{{else}}
+import { PrismaPg } from "@prisma/adapter-pg";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaPg({
+		connectionString: env.DATABASE_URL,
+		maxUses: 1,
+	});
+	return new PrismaClient({ adapter });
+}
+
+{{/if}}
+{{else}}
+import { PrismaClient } from "../prisma/generated/client";
+{{#if (eq dbSetup "neon")}}
+import { PrismaNeon } from "@prisma/adapter-neon";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaNeon({
+		connectionString: env.DATABASE_URL,
+	});
+
+	return new PrismaClient({ adapter });
+}
+
+{{else if (eq dbSetup "prisma-postgres")}}
+import { PrismaPostgresAdapter } from "@prisma/adapter-ppg";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaPostgresAdapter({
+		connectionString: env.DATABASE_URL,
+	});
+
+	return new PrismaClient({ adapter });
+}
+
+{{else}}
+import { PrismaPg } from "@prisma/adapter-pg";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaPg({
+		connectionString: env.DATABASE_URL,
+{{#if (and (eq backend "self") (eq webDeploy "cloudflare"))}}
+		maxUses: 1,
+{{/if}}
+	});
+	return new PrismaClient({ adapter });
+}
+
+{{/if}}
+{{/if}}
+
+export type Database = ReturnType<typeof createPrismaClient>;
+`],
+  ["db/prisma/sqlite/prisma.config.ts.hbs", `import path from "node:path";
+import { defineConfig{{#unless (or (eq dbSetup "turso") (eq dbSetup "d1"))}}, env{{/unless}} } from "prisma/config";
+import "varlock/auto-load";
+
+
+export default defineConfig({
+  schema: path.join("prisma", "schema"),
+  migrations: {
+    path: path.join("prisma", "migrations"),
+  },
+  datasource: {
+    {{#if (or (eq dbSetup "turso") (eq dbSetup "d1"))}}
+    url: "file:./dev.db",
+    {{else}}
+    url: env("DATABASE_URL"),
+    {{/if}}
+  },
+});
+`],
+  ["db/prisma/sqlite/prisma/migrations/.gitkeep", ``],
+  ["db/prisma/sqlite/prisma/schema/schema.prisma.hbs", `generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+  moduleFormat = "esm"
+  {{#if (eq runtime "bun")}}
+  runtime = "bun"
+  {{/if}}
+  {{#if (eq runtime "node")}}
+  runtime = "nodejs"
+  {{/if}}
+  {{#if (or (eq runtime "workers") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  runtime = "cloudflare"
+  {{/if}}
+}
+
+datasource db {
+  provider = "sqlite"
+}
+`],
+  ["db/prisma/sqlite/src/index.ts.hbs", `import type { DatabaseConfig } from "./config";
+import { PrismaClient } from "../prisma/generated/client";
+
+{{#if (eq dbSetup "d1")}}
+import { PrismaD1 } from "@prisma/adapter-d1";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaD1(env.DB);
+	return new PrismaClient({ adapter });
+}
+
+{{else}}
+import { PrismaLibSql } from "@prisma/adapter-libsql";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaLibSql({
+		url: env.DATABASE_URL,
+{{#if (eq dbSetup "turso")}}
+		authToken: env.DATABASE_AUTH_TOKEN || "",
+{{/if}}
+	});
+
+	return new PrismaClient({ adapter });
+}
+
+{{/if}}
+
+export type Database = ReturnType<typeof createPrismaClient>;
+`],
+  ["deploy/docker/compose/_dockerignore", `**/node_modules
+.git
+
+**/dist
+**/build
+**/.next
+**/.nuxt
+**/.output
+**/.svelte-kit
+**/.astro
+**/.turbo
+.turbo
+
+**/.wrangler
+**/.alchemy
+**/.expo
+**/.vercel
+*.log
+
+Dockerfile
+**/Dockerfile
+docker-compose.yml
+
+# Env value files stay out of COPY layers; runtime env comes from compose env_file,
+# build-time configuration uses BuildKit secrets; public values use build args
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.schema
+
+local.db
+local.db-*
+.data
+`],
+  ["deploy/docker/compose/docker-compose.yml.hbs", `name: {{projectName}}
+
+services:
+{{#if (eq webDeploy "docker")}}
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      secrets:
+{{#if (or (includes frontend "next") (includes frontend "nuxt") (includes frontend "astro") (includes frontend "svelte") (includes frontend "solid") (includes frontend "tanstack-router") (includes frontend "tanstack-start") (includes frontend "react-router"))}}
+        - web_env
+{{/if}}
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+        - server_env
+{{/if}}
+{{#if (or (and (ne backend "self") (ne backend "none") (ne backend "convex")) (eq backend "convex") (and (eq auth "clerk") (or (includes frontend "next") (includes frontend "react-router") (includes frontend "tanstack-router") (includes frontend "tanstack-start"))))}}
+      args:
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+        {{#if (includes frontend "next")}}NEXT_PUBLIC_SERVER_URL{{else if (includes frontend "nuxt")}}NUXT_PUBLIC_SERVER_URL{{else if (or (includes frontend "svelte") (includes frontend "astro"))}}PUBLIC_SERVER_URL{{else}}VITE_SERVER_URL{{/if}}: http://localhost:3000
+{{/if}}
+{{#if (eq backend "convex")}}
+        {{#if (includes frontend "next")}}NEXT_PUBLIC_CONVEX_URL: \${NEXT_PUBLIC_CONVEX_URL:-}{{else if (or (includes frontend "svelte") (includes frontend "astro"))}}PUBLIC_CONVEX_URL: \${PUBLIC_CONVEX_URL:-}{{else}}VITE_CONVEX_URL: \${VITE_CONVEX_URL:-}{{/if}}
+{{/if}}
+{{#if (and (eq auth "clerk") (or (includes frontend "next") (includes frontend "react-router") (includes frontend "tanstack-router") (includes frontend "tanstack-start")))}}
+        {{#if (includes frontend "next")}}NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: \${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}{{else}}VITE_CLERK_PUBLISHABLE_KEY: \${VITE_CLERK_PUBLISHABLE_KEY:-}{{/if}}
+{{/if}}
+{{/if}}
+    init: true
+    ports:
+{{#if (includes frontend "tanstack-router")}}
+      - "3001:80"
+{{else}}
+      - "3001:3001"
+{{/if}}
+    env_file:
+      - path: apps/web/.env
+        required: false
+{{#if (eq backend "self")}}
+{{#if (or (eq dbSetup "docker") (eq auth "better-auth") (and (eq database "sqlite") (eq dbSetup "none")) (includes addons "axiom"))}}
+    environment:
+{{#if (includes addons "axiom")}}
+      AXIOM_API_KEY: \${AXIOM_API_KEY:?Set AXIOM_API_KEY}
+      AXIOM_DATASET: \${AXIOM_DATASET:?Set AXIOM_DATASET}
+      AXIOM_EDGE_URL: \${AXIOM_EDGE_URL:?Set AXIOM_EDGE_URL}
+{{/if}}
+{{#if (eq auth "better-auth")}}
+      BETTER_AUTH_URL: http://localhost:3001
+      CORS_ORIGIN: http://localhost:3001
+{{/if}}
+{{#if (and (eq database "sqlite") (eq dbSetup "none"))}}
+      DATABASE_URL: file:/data/local.db
+{{/if}}
+{{#if (and (eq dbSetup "docker") (eq database "postgres"))}}
+      DATABASE_URL: postgresql://postgres:\${POSTGRES_PASSWORD:-password}@postgres:5432/{{projectName}}
+{{/if}}
+{{#if (and (eq dbSetup "docker") (eq database "mysql"))}}
+      DATABASE_URL: mysql://user:\${MYSQL_PASSWORD:-password}@mysql:3306/{{projectName}}
+{{/if}}
+{{#if (and (eq dbSetup "docker") (eq database "mongodb"))}}
+      DATABASE_URL: mongodb://root:\${MONGO_PASSWORD:-password}@mongodb:27017/{{projectName}}?authSource=admin
+{{/if}}
+{{/if}}
+{{#if (eq dbSetup "docker")}}
+    depends_on:
+      {{database}}:
+        condition: service_healthy
+{{else if (and (eq database "sqlite") (eq dbSetup "none"))}}
+    volumes:
+      - type: bind
+        source: ./.data
+        target: /data
+        bind:
+          create_host_path: false
+{{/if}}
+{{else}}
+{{#if (or (eq serverDeploy "docker") (and (includes addons "axiom") (or (includes frontend "next") (includes frontend "tanstack-start") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "astro"))))}}
+{{#unless (includes frontend "tanstack-router")}}
+    environment:
+{{#if (and (includes addons "axiom") (or (includes frontend "next") (includes frontend "tanstack-start") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "astro")))}}
+      AXIOM_API_KEY: \${AXIOM_API_KEY:?Set AXIOM_API_KEY}
+      AXIOM_DATASET: \${AXIOM_DATASET:?Set AXIOM_DATASET}
+      AXIOM_EDGE_URL: \${AXIOM_EDGE_URL:?Set AXIOM_EDGE_URL}
+{{/if}}
+{{#if (eq serverDeploy "docker")}}
+      SERVER_URL: http://server:3000
+{{#if (includes frontend "next")}}
+      NEXT_PUBLIC_SERVER_URL: http://server:3000
+{{/if}}
+{{#if (includes frontend "nuxt")}}
+      NUXT_SERVER_URL: http://server:3000
+{{/if}}
+{{/if}}
+{{/unless}}
+{{#if (eq serverDeploy "docker")}}
+    depends_on:
+      server:
+        condition: service_healthy
+{{/if}}
+{{/if}}
+{{/if}}
+    healthcheck:
+{{#if (includes frontend "tanstack-router")}}
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+{{else}}
+      test:
+        [
+          "CMD",
+{{#if (and (includes frontend "tanstack-start") (eq runtime "bun"))}}
+          "bun",
+{{else}}
+          "node",
+{{/if}}
+          "-e",
+          "fetch('http://localhost:3001/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+{{/if}}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+{{/if}}
+{{#if (and (eq serverDeploy "docker") (ne backend "self"))}}
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+      secrets:
+{{#if (or (includes frontend "next") (includes frontend "nuxt") (includes frontend "astro") (includes frontend "svelte") (includes frontend "solid") (includes frontend "tanstack-router") (includes frontend "tanstack-start") (includes frontend "react-router"))}}
+        - web_env
+{{/if}}
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+        - server_env
+{{/if}}
+    init: true
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: apps/server/.env
+        required: false
+{{#if (or (eq webDeploy "docker") (eq dbSetup "docker") (and (eq database "sqlite") (eq dbSetup "none")) (includes addons "axiom"))}}
+    environment:
+{{#if (includes addons "axiom")}}
+      AXIOM_API_KEY: \${AXIOM_API_KEY:?Set AXIOM_API_KEY}
+      AXIOM_DATASET: \${AXIOM_DATASET:?Set AXIOM_DATASET}
+      AXIOM_EDGE_URL: \${AXIOM_EDGE_URL:?Set AXIOM_EDGE_URL}
+{{/if}}
+{{#if (eq webDeploy "docker")}}
+      CORS_ORIGIN: http://localhost:3001
+{{/if}}
+{{#if (and (eq database "sqlite") (eq dbSetup "none"))}}
+      DATABASE_URL: file:/data/local.db
+{{/if}}
+{{#if (and (eq dbSetup "docker") (eq database "postgres"))}}
+      DATABASE_URL: postgresql://postgres:\${POSTGRES_PASSWORD:-password}@postgres:5432/{{projectName}}
+{{/if}}
+{{#if (and (eq dbSetup "docker") (eq database "mysql"))}}
+      DATABASE_URL: mysql://user:\${MYSQL_PASSWORD:-password}@mysql:3306/{{projectName}}
+{{/if}}
+{{#if (and (eq dbSetup "docker") (eq database "mongodb"))}}
+      DATABASE_URL: mongodb://root:\${MONGO_PASSWORD:-password}@mongodb:27017/{{projectName}}?authSource=admin
+{{/if}}
+{{/if}}
+    healthcheck:
+      test:
+        [
+          "CMD",
+{{#if (eq runtime "bun")}}
+          "bun",
+{{else}}
+          "node",
+{{/if}}
+          "-e",
+          "fetch('http://localhost:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+{{#if (eq dbSetup "docker")}}
+    depends_on:
+      {{database}}:
+        condition: service_healthy
+{{else if (and (eq database "sqlite") (eq dbSetup "none"))}}
+    volumes:
+      - type: bind
+        source: ./.data
+        target: /data
+        bind:
+          create_host_path: false
+{{/if}}
+    restart: unless-stopped
+
+{{/if}}
+{{#if (eq dbSetup "docker")}}
+{{#if (eq database "postgres")}}
+  postgres:
+    image: postgres:18
+    container_name: {{projectName}}-postgres
+    environment:
+      POSTGRES_DB: {{projectName}}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - {{projectName}}_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+{{/if}}
+{{#if (eq database "mysql")}}
+  mysql:
+    image: mysql:8.4
+    container_name: {{projectName}}-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD:-password}
+      MYSQL_DATABASE: {{projectName}}
+      MYSQL_USER: user
+      MYSQL_PASSWORD: \${MYSQL_PASSWORD:-password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - {{projectName}}_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+{{/if}}
+{{#if (eq database "mongodb")}}
+  mongodb:
+    image: mongo:8
+    container_name: {{projectName}}-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: \${MONGO_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: {{projectName}}
+    ports:
+      - "27017:27017"
+    volumes:
+      - {{projectName}}_mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+{{/if}}
+
+volumes:
+  {{projectName}}_{{database}}_data:
+{{/if}}
+
+# BuildKit makes these available only while install/build commands run.
+secrets:
+{{#if (or (includes frontend "next") (includes frontend "nuxt") (includes frontend "astro") (includes frontend "svelte") (includes frontend "solid") (includes frontend "tanstack-router") (includes frontend "tanstack-start") (includes frontend "react-router"))}}
+  web_env:
+    file: apps/web/.env
+{{/if}}
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+  server_env:
+    file: apps/server/.env
+{{/if}}
+`],
+  ["deploy/docker/server/Dockerfile.hbs", `{{#if (eq packageManager "bun")}}
+FROM oven/bun:1 AS builder
+{{else}}
+FROM node:24-slim AS builder
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+ENV NODE_ENV=production
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/server && {{packageManager}} run build
+
+{{#if (eq runtime "bun")}}
+FROM oven/bun:1 AS runner
+{{else}}
+FROM node:24-slim AS runner
+{{/if}}
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app /app
+
+EXPOSE 3000
+
+WORKDIR /app/apps/server
+{{#if (eq runtime "bun")}}
+CMD ["bun", "dist/index.mjs"]
+{{else}}
+CMD ["node", "dist/index.mjs"]
+{{/if}}
+`],
+  ["deploy/docker/web/astro/Dockerfile.hbs", `FROM node:24-slim AS base
+{{#if (eq packageManager "bun")}}
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+ARG PUBLIC_SERVER_URL
+ENV PUBLIC_SERVER_URL=\${PUBLIC_SERVER_URL}
+{{/if}}
+{{#if (eq backend "convex")}}
+ARG PUBLIC_CONVEX_URL
+ENV PUBLIC_CONVEX_URL=\${PUBLIC_CONVEX_URL}
+{{/if}}
+ENV NODE_ENV=production
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+{{#if (eq orm "prisma")}}
+ENV DATABASE_URL=
+{{/if}}
+
+ENV HOST=0.0.0.0
+ENV PORT=3001
+EXPOSE 3001
+
+WORKDIR /app/apps/web
+CMD ["node", "dist/server/entry.mjs"]
+`],
+  ["deploy/docker/web/nuxt/Dockerfile.hbs", `FROM node:24-slim AS builder
+{{#if (eq packageManager "bun")}}
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+ARG NUXT_PUBLIC_SERVER_URL
+ENV NUXT_PUBLIC_SERVER_URL=\${NUXT_PUBLIC_SERVER_URL}
+{{/if}}
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+ENV NODE_ENV=production
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+
+FROM node:24-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/apps/web/.output ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/web/.env.schema ./.env.schema
+
+ENV HOST=0.0.0.0
+ENV PORT=3001
+EXPOSE 3001
+
+CMD ["node", "server/index.mjs"]
+`],
+  ["deploy/docker/web/react/next/Dockerfile.hbs", `FROM node:24-slim AS builder
+{{#if (eq packageManager "bun")}}
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+ARG NEXT_PUBLIC_SERVER_URL
+ENV NEXT_PUBLIC_SERVER_URL=\${NEXT_PUBLIC_SERVER_URL}
+{{/if}}
+{{#if (eq backend "convex")}}
+ARG NEXT_PUBLIC_CONVEX_URL
+ENV NEXT_PUBLIC_CONVEX_URL=\${NEXT_PUBLIC_CONVEX_URL}
+{{/if}}
+{{#if (eq auth "clerk")}}
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+{{/if}}
+ENV NODE_ENV=production
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build && rm -f .next/standalone/.env* .next/standalone/apps/web/.env*
+# standalone output excludes public/; ensure it exists so the runner copy never fails
+RUN mkdir -p apps/web/public
+
+FROM node:24-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
+# auto-load needs the Varlock CLI and its installed dependencies.
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/web/.env.schema ./apps/web/.env.schema
+
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3001
+EXPOSE 3001
+
+WORKDIR /app/apps/web
+CMD ["node", "--import", "varlock/auto-load", "server.js"]
+`],
+  ["deploy/docker/web/react/react-router/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
+{{#if (eq packageManager "bun")}}
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+ARG VITE_SERVER_URL
+ENV VITE_SERVER_URL=\${VITE_SERVER_URL}
+{{/if}}
+{{#if (eq backend "convex")}}
+ARG VITE_CONVEX_URL
+ENV VITE_CONVEX_URL=\${VITE_CONVEX_URL}
+{{/if}}
+{{#if (eq auth "clerk")}}
+ARG VITE_CLERK_PUBLISHABLE_KEY
+ENV VITE_CLERK_PUBLISHABLE_KEY=\${VITE_CLERK_PUBLISHABLE_KEY}
+{{/if}}
+ENV NODE_ENV=production
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+
+FROM node:24-slim AS runner
+WORKDIR /app
+COPY --from=builder /app .
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV HOST=0.0.0.0
+EXPOSE 3001
+CMD ["sh", "-c", "cd apps/web && npm run start"]
+`],
+  ["deploy/docker/web/react/tanstack-router/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
+{{#if (eq packageManager "bun")}}
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+ARG VITE_SERVER_URL
+ENV VITE_SERVER_URL=\${VITE_SERVER_URL}
+{{/if}}
+{{#if (eq backend "convex")}}
+ARG VITE_CONVEX_URL
+ENV VITE_CONVEX_URL=\${VITE_CONVEX_URL}
+{{/if}}
+{{#if (eq auth "clerk")}}
+ARG VITE_CLERK_PUBLISHABLE_KEY
+ENV VITE_CLERK_PUBLISHABLE_KEY=\${VITE_CLERK_PUBLISHABLE_KEY}
+{{/if}}
+ENV NODE_ENV=production
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+
+FROM nginx:alpine AS runner
+COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+`],
+  ["deploy/docker/web/react/tanstack-router/nginx.conf", `server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript image/svg+xml;
+
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+`],
+  ["deploy/docker/web/react/tanstack-start/Dockerfile.hbs", `{{#if (and (eq packageManager "bun") (eq runtime "bun") (not (includes addons "vite-plus")))}}
+FROM oven/bun:1 AS builder
+{{else}}
+FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
+{{#if (eq packageManager "bun")}}
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+{{/if}}
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+ARG VITE_SERVER_URL
+ENV VITE_SERVER_URL=\${VITE_SERVER_URL}
+{{/if}}
+{{#if (eq backend "convex")}}
+ARG VITE_CONVEX_URL
+ENV VITE_CONVEX_URL=\${VITE_CONVEX_URL}
+{{/if}}
+{{#if (eq auth "clerk")}}
+ARG VITE_CLERK_PUBLISHABLE_KEY
+ENV VITE_CLERK_PUBLISHABLE_KEY=\${VITE_CLERK_PUBLISHABLE_KEY}
+{{/if}}
+ENV NODE_ENV=production
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+{{#if (eq orm "prisma")}}
+ENV DATABASE_URL=
+{{/if}}
+
+{{#if (eq runtime "bun")}}
+FROM oven/bun:1 AS runner
+{{else}}
+FROM node:24-slim AS runner
+{{/if}}
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app /app
+
+ENV HOST=0.0.0.0
+ENV PORT=3001
+EXPOSE 3001
+
+# SSR chunks require workspace dependencies at runtime
+WORKDIR /app/apps/web
+{{#if (eq runtime "bun")}}
+CMD ["bun", ".output/server/index.mjs"]
+{{else}}
+CMD ["node", ".output/server/index.mjs"]
+{{/if}}
+`],
+  ["deploy/docker/web/solid/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
+{{#if (and (eq orm "prisma") (not (includes addons "vite-plus")))}}
+RUN apt-get update -y \\
+  && apt-get install -y --no-install-recommends openssl \\
+  && rm -rf /var/lib/apt/lists/*
+{{/if}}
+{{#if (eq packageManager "bun")}}
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+ARG VITE_SERVER_URL
+ENV VITE_SERVER_URL=\${VITE_SERVER_URL}
+{{/if}}
+{{#if (eq backend "convex")}}
+ARG VITE_CONVEX_URL
+ENV VITE_CONVEX_URL=\${VITE_CONVEX_URL}
+{{/if}}
+ENV NODE_ENV=production
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+{{#if (eq orm "prisma")}}
+ENV DATABASE_URL=
+{{/if}}
+
+FROM node:24-slim AS runner
+{{#if (eq orm "prisma")}}
+RUN apt-get update -y \\
+  && apt-get install -y --no-install-recommends openssl \\
+  && rm -rf /var/lib/apt/lists/*
+{{/if}}
+WORKDIR /app/apps/web
+ENV NODE_ENV=production
+
+COPY --from=builder /app/apps/web/.output ./.output
+COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/apps/web/.env.schema ./.env.schema
+
+ENV HOST=0.0.0.0
+ENV PORT=3001
+EXPOSE 3001
+
+CMD ["node", ".output/server/index.mjs"]
+`],
+  ["deploy/docker/web/svelte/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS base
+{{#if (eq packageManager "bun")}}
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+ARG PUBLIC_SERVER_URL
+ENV PUBLIC_SERVER_URL=\${PUBLIC_SERVER_URL}
+{{/if}}
+{{#if (eq backend "convex")}}
+ARG PUBLIC_CONVEX_URL
+ENV PUBLIC_CONVEX_URL=\${PUBLIC_CONVEX_URL}
+{{/if}}
+ENV NODE_ENV=production
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+{{#if (eq orm "prisma")}}
+ENV DATABASE_URL=
+{{/if}}
+
+ENV HOST=0.0.0.0
+ENV PORT=3001
+EXPOSE 3001
+
+WORKDIR /app/apps/web
+CMD ["node", "build/index.js"]
+`],
+  ["deploy/prisma/web/react/react-router/prisma.server.ts", `import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { createRequestHandler } from "@react-router/express";
+import express from "express";
+
+const app = express();
+const clientDirectory = fileURLToPath(new URL("../client/", import.meta.url));
+
+app.disable("x-powered-by");
+app.use(
+  "/assets",
+  express.static(path.join(clientDirectory, "assets"), {
+    immutable: true,
+    maxAge: "1y",
+  }),
+);
+app.use(express.static(clientDirectory));
+app.use(
+  createRequestHandler({
+    build: () => import("virtual:react-router/server-build"),
+  }),
+);
+
+const port = Number(process.env.PORT ?? 3000);
+app.listen(port, "0.0.0.0", () => {
+  console.log(\`React Router server listening on port \${port}\`);
+});
+`],
+  ["deploy/vercel/_vercelignore", `# Local env files must never ship in deployments: Vercel project env vars are
+# the source of truth (bun env:vercel:*), and frameworks like Next.js would
+# otherwise load these localhost values at runtime.
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.schema
+local.db
+local.db-*
+.alchemy/
+`],
+  ["deploy/vercel/scripts/sync-vercel-env.ts.hbs", `import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { parseEnv } from "node:util";
+
+const DEFAULT_ENVIRONMENT = "preview";
+const VALID_ENVIRONMENTS = new Set(["development", "preview", "production"]);
+const VERCEL_COMMAND = [{{#if (eq packageManager "npm")}}"npx", "--yes", "vercel"{{else if (eq packageManager "pnpm")}}"pnpm", "dlx", "vercel"{{else}}"bunx", "vercel"{{/if}}] as const;
+const DEFAULT_FILES = [
+{{#if (eq webDeploy "vercel")}}
+	"apps/web/.env",
+{{/if}}
+{{#if (and (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+	"apps/server/.env",
+{{/if}}
+];
+const SKIP_KEYS = new Set([
+{{#if (or (and (eq webDeploy "vercel") (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex")) (and (eq webDeploy "vercel") (eq backend "self")))}}
+	"BETTER_AUTH_URL",
+	"CORS_ORIGIN",
+	"NODE_ENV",
+{{else if (and (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+	// BETTER_AUTH_URL derives from the deployment's own origin at runtime;
+	// CORS_ORIGIN stays synced because the web app (if any) lives on another host
+	"BETTER_AUTH_URL",
+	"NODE_ENV",
+{{/if}}
+]);
+const OVERRIDE_KEYS = new Map([
+{{#if (and (eq webDeploy "vercel") (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+	["NEXT_PUBLIC_SERVER_URL", "/api"],
+	["NUXT_PUBLIC_SERVER_URL", "/api"],
+	["PUBLIC_SERVER_URL", "/api"],
+	["VITE_SERVER_URL", "/api"],
+{{/if}}
+]);
+
+const args = process.argv.slice(2);
+const separatorIndex = args.indexOf("--");
+const scriptArgs = separatorIndex === -1 ? args : args.slice(0, separatorIndex);
+const forwardedArgs = separatorIndex === -1 ? [] : args.slice(separatorIndex + 1);
+
+const environment =
+	scriptArgs[0] && VALID_ENVIRONMENTS.has(scriptArgs[0]) ? scriptArgs[0] : DEFAULT_ENVIRONMENT;
+const remainingArgs = scriptArgs.slice(VALID_ENVIRONMENTS.has(scriptArgs[0] ?? "") ? 1 : 0);
+// Split remaining args into env-file paths and passthrough Vercel CLI flags.
+// A bare token counts as a file only when it exists on disk, so flags and their
+// values (e.g. \`--scope my-team\`) forward correctly regardless of argument order.
+const files: string[] = [];
+const passthroughArgs: string[] = [];
+for (const arg of remainingArgs) {
+	if (!arg.startsWith("-") && existsSync(arg)) {
+		files.push(arg);
+	} else {
+		passthroughArgs.push(arg);
+	}
+}
+const vercelArgs = [...passthroughArgs, ...forwardedArgs];
+const envFiles = files.length > 0 ? files : DEFAULT_FILES;
+
+const env = new Map<string, string>();
+const undeclaredKeys: string[] = [];
+const emptyKeys: string[] = [];
+
+for (const file of envFiles) {
+	if (!existsSync(file)) {
+		console.warn(\`Skipping missing env file: \${file}\`);
+		continue;
+	}
+
+	// Only the keys an app declares in its .env.schema are config; tools such as
+	// database CLIs also write local-only values (claim links, direct URLs) to .env
+	const schemaFile = join(dirname(file), ".env.schema");
+	const declaredKeys = existsSync(schemaFile)
+		? new Set(Object.keys(parseEnv(readFileSync(schemaFile, "utf8"))))
+		: undefined;
+
+	for (const [key, value] of Object.entries(parseEnv(readFileSync(file, "utf8")))) {
+		if (SKIP_KEYS.has(key)) continue;
+		if (declaredKeys && !declaredKeys.has(key)) {
+			undeclaredKeys.push(key);
+			continue;
+		}
+		const syncedValue = OVERRIDE_KEYS.get(key) ?? value;
+		if (!syncedValue) {
+			emptyKeys.push(key);
+			continue;
+		}
+		env.set(key, syncedValue);
+	}
+}
+
+if (undeclaredKeys.length > 0) {
+	console.log(\`Skipping \${undeclaredKeys.join(", ")}: not declared in .env.schema.\`);
+}
+if (emptyKeys.length > 0) {
+	console.warn(
+		\`Warning: \${emptyKeys.join(", ")} \${emptyKeys.length === 1 ? "is" : "are"} empty in your .env file(s) and won't be synced. Required values must be set before deploying, or the build or server fails env validation.\`,
+	);
+}
+
+{{#if (includes addons "axiom")}}
+for (const key of ["AXIOM_API_KEY", "AXIOM_DATASET", "AXIOM_EDGE_URL"] as const) {
+	const value = process.env[key];
+	if (value) env.set(key, value);
+}
+{{/if}}
+
+if (env.size === 0) {
+	console.log("No Vercel env vars found to sync.");
+	process.exit(0);
+}
+
+const LOCAL_VALUE_PATTERN = /localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|^file:/i;
+const localKeys = [...env.entries()]
+	.filter(([, value]) => LOCAL_VALUE_PATTERN.test(value))
+	.map(([key]) => key);
+if (localKeys.length > 0) {
+	console.warn(
+		\`Warning: \${localKeys.join(", ")} look\${localKeys.length === 1 ? "s" : ""} like local-only value(s). Update them in your .env file(s) and re-run this sync if your deployed app should not point at local endpoints.\`,
+	);
+}
+
+console.log(\`Syncing \${env.size} env var(s) to Vercel \${environment}.\`);
+for (const [key, value] of env.entries()) {
+	const result = spawnSync(
+		VERCEL_COMMAND[0],
+		[
+			...VERCEL_COMMAND.slice(1),
+			"env",
+			"add",
+			key,
+			environment,
+			"--force",
+			"--yes",
+			"--non-interactive",
+			...vercelArgs,
+		],
+		{
+			input: \`\${value}\\n\`,
+			stdio: ["pipe", "inherit", "inherit"],
+			encoding: "utf8",
+			// Windows resolves bunx/npx/pnpm via .cmd shims, which need a shell
+			shell: process.platform === "win32",
+		},
+	);
+
+	if (result.error) {
+		console.error(\`Failed to sync \${key}: \${result.error.message}\`);
+		process.exit(1);
+	}
+
+	if (result.status !== 0) {
+		console.error(\`Failed to sync \${key}\`);
+		process.exit(result.status ?? 1);
+	}
+}
+
+console.log("Vercel env sync complete. Redeploy for changes to take effect.");
+`],
+  ["env/env.server.ts.hbs", `{{#if (and (eq serverDeploy "cloudflare") (or (ne backend "self") (ne webDeploy "cloudflare")))}}
+/// <reference types="@cloudflare/workers-types" />
+/// <reference path="../cloudflare-env.d.ts" />
+// For Cloudflare Workers, env is accessed via cloudflare:workers module
+// Types are defined in env.d.ts based on your alchemy.run.ts bindings
+export { env as ENV } from "cloudflare:workers";
+{{else if (and (eq backend "self") (eq webDeploy "cloudflare") (includes frontend "next"))}}
+/// <reference path="../cloudflare-env.d.ts" />
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+
+function getNodeEnvValue(key: string) {
+	if (key === "DB") {
+		return undefined;
+	}
+
+	return process.env[key];
+}
+
+function getCloudflareEnvSync() {
+	try {
+		return getCloudflareContext().env as Env;
+	} catch {
+		return undefined;
+	}
+}
+
+function createEnvProxy(getValue: (key: keyof Env & string) => unknown) {
+	return new Proxy({} as Env, {
+		get(_target, prop) {
+			if (typeof prop !== "string") {
+				return undefined;
+			}
+
+			return getValue(prop as keyof Env & string);
+		},
+	});
+}
+
+function resolveEnvValue(key: keyof Env & string) {
+	const nodeValue = getNodeEnvValue(key);
+	if (nodeValue !== undefined) {
+		return nodeValue;
+	}
+
+	return getCloudflareEnvSync()?.[key as keyof Env];
+}
+
+// Next.js local dev runs in Node.js, where env vars are exposed on process.env.
+// In the Cloudflare runtime, fall back to OpenNext's Cloudflare context bindings.
+// For static routes (ISR/SSG), use getEnvAsync() so OpenNext can resolve bindings
+// with the async Cloudflare context API.
+export async function getEnvAsync() {
+	const cloudflareEnv = (await getCloudflareContext({ async: true })).env as Env;
+
+	return createEnvProxy((key) => {
+		const nodeValue = getNodeEnvValue(key);
+		if (nodeValue !== undefined) {
+			return nodeValue;
+		}
+
+		return cloudflareEnv[key as keyof Env];
+	});
+}
+
+export const ENV = createEnvProxy(resolveEnvValue);
+{{else if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}
+import type { CloudflareEnv } from "../cloudflare-env.d.ts";
+export type { CloudflareEnv } from "../cloudflare-env.d.ts";
+
+const runtimeEnv = typeof process === "undefined" ? {} : process.env;
+
+export const ENV = new Proxy({} as CloudflareEnv, {
+	get(_target, prop) {
+		if (typeof prop !== "string") {
+			return undefined;
+		}
+
+		return runtimeEnv[prop];
+	},
+});
+{{else if (and (eq backend "self") (eq webDeploy "cloudflare"))}}
+/// <reference types="@cloudflare/workers-types" />
+/// <reference path="../cloudflare-env.d.ts" />
+// For Cloudflare Workers, env is accessed via cloudflare:workers module
+// Types are defined in env.d.ts based on your alchemy.run.ts bindings
+export { env as ENV } from "cloudflare:workers";
+{{else}}
+{{#if (ne backend "self")}}
+import "varlock/auto-load";
+{{/if}}
+export { ENV } from "./env{{#if (and (eq backend "self") (includes frontend "svelte"))}}.generated{{/if}}";
+{{/if}}
+{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}
+
+/** Packaged desktop builds serve the frontend from their own origin, not CORS_ORIGIN. */
+export const desktopOrigins = [
+{{#if (includes addons "electrobun")}}
+	"views://mainview",
+{{/if}}
+{{#if (includes addons "tauri")}}
+	"tauri://localhost",
+	"http://tauri.localhost",
+{{/if}}
+];
+{{/if}}
+`],
+  ["env/services.ts.hbs", `import { ENV{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}, desktopOrigins{{/if}} } from "./env.server";
+{{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}
+import type { CloudflareEnv } from "../cloudflare-env.d.ts";
+{{/if}}
+{{#if (ne database "none")}}
+import { {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}type Database, {{/if}}{{#if (eq orm "prisma")}}createPrismaClient{{else}}createDb{{/if}} } from "@{{projectName}}/db";
+{{/if}}
+{{#if (eq auth "better-auth")}}
+import { createAuth{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}} as createConfiguredAuth{{/if}} } from "@{{projectName}}/auth";
+{{/if}}
+
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+{{#if (ne database "none")}}
+export function getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}bindings: CloudflareEnv{{/if}}): {{#if (eq orm "mongoose")}}Promise<Database>{{else}}Database{{/if}} {
+  return {{#if (eq orm "prisma")}}createPrismaClient{{else}}createDb{{/if}}({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}bindings{{else}}ENV{{/if}});
+}
+{{/if}}
+{{#if (eq auth "better-auth")}}
+export async function createAuth({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}bindings: CloudflareEnv, {{/if}}{{#if (ne database "none")}}database?: Database{{/if}}) {
+  return createConfiguredAuth({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}bindings{{else}}ENV{{/if}}{{#if (ne database "none")}}, database ?? await getDb({{#if (usesRequestScopedCloudflareEnv backend webDeploy frontend)}}bindings{{/if}}){{/if}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}, desktopOrigins{{/if}});
+}
+{{/if}}
+{{else}}
+{{#if (ne database "none")}}
+export const db = {{#if (eq orm "mongoose")}}await {{/if}}{{#if (eq orm "prisma")}}createPrismaClient{{else}}createDb{{/if}}(ENV);
+{{/if}}
+{{#if (eq auth "better-auth")}}
+export const auth = createAuth(ENV{{#if (ne database "none")}}, db{{/if}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}, desktopOrigins{{/if}});
+{{/if}}
+{{/if}}
+`],
+  ["extras/_npmrc.hbs", `node-linker=isolated
+{{#if (includes frontend "nuxt")}}
+shamefully-hoist=true
+strict-peer-dependencies=false
+{{/if}}`],
+  ["extras/env.d.ts.hbs", `{{#if (eq serverDeploy "cloudflare")}}
+import type { ServerEnv } from "@{{projectName}}/infra/alchemy.run";
+{{else}}
+import type { WebEnv as ServerEnv } from "@{{projectName}}/infra/alchemy.run";
+{{/if}}
+
+// This file infers types for the cloudflare:workers environment from your Alchemy Worker.
+// @see https://alchemy.run/cloudflare/compute/workers
+
+export type CloudflareEnv = ServerEnv;
+
+declare global {
+  type Env = CloudflareEnv;
+}
+
+declare module "cloudflare:workers" {
+  namespace Cloudflare {
+    export interface Env extends CloudflareEnv {}
+  }
+}
+`],
+  ["frontend/astro/_gitignore", `# build output
+dist/
+
+# generated types
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# environment variables
+.env
+.env.production
+
+# macOS-specific files
+.DS_Store
+
+# jetbrains setting folder
+.idea/
+`],
+  ["frontend/astro/astro.config.mjs.hbs", `// @ts-check
+import tailwindcss from "@tailwindcss/vite";
+{{#unless (eq webDeploy "cloudflare")}}
+import varlockAstroIntegration from "@varlock/astro-integration";
+{{/unless}}
+import { defineConfig } from "astro/config";
+{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+{{else if (eq webDeploy "vercel")}}
+import vercel from "@astrojs/vercel";
+{{else if (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
+{{else}}
+import node from "@astrojs/node";
+{{/if}}
+
+// https://astro.build/config
+export default defineConfig({
+{{#unless (eq webDeploy "cloudflare")}}
+  integrations: [varlockAstroIntegration({ ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}" })],
+{{/unless}}
+{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+  output: "static",
+{{else if (eq webDeploy "vercel")}}
+  output: "server",
+  adapter: vercel(),
+{{else if (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
+  output: "server",
+{{else}}
+  output: "server",
+  adapter: node({ mode: "standalone" }),
+{{/if}}
+  vite: {
+    plugins: [tailwindcss()],
+  },
+});
+`],
+  ["frontend/astro/package.json.hbs", `{
+  "name": "web",
+  "type": "module",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+{{#unless (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}astro build",
+
+{{/unless}}
+		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}astro check",
+{{#unless (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
+    "preview": "astro preview",
+{{/unless}}
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^7.3.1"
+  },
+  "devDependencies": {
+		"@astrojs/check": "^0.9.10",
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}
+`],
+  ["frontend/astro/public/favicon.svg", `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 128 128">
+    <path d="M50.4 78.5a75.1 75.1 0 0 0-28.5 6.9l24.2-65.7c.7-2 1.9-3.2 3.4-3.2h29c1.5 0 2.7 1.2 3.4 3.2l24.2 65.7s-11.6-7-28.5-7L67 45.5c-.4-1.7-1.6-2.8-2.9-2.8-1.3 0-2.5 1.1-2.9 2.7L50.4 78.5Zm-1.1 28.2Zm-4.2-20.2c-2 6.6-.6 15.8 4.2 20.2a17.5 17.5 0 0 1 .2-.7 5.5 5.5 0 0 1 5.7-4.5c2.8.1 4.3 1.5 4.7 4.7.2 1.1.2 2.3.2 3.5v.4c0 2.7.7 5.2 2.2 7.4a13 13 0 0 0 5.7 4.9v-.3l-.2-.3c-1.8-5.6-.5-9.5 4.4-12.8l1.5-1a73 73 0 0 0 3.2-2.2 16 16 0 0 0 6.8-11.4c.3-2 .1-4-.6-6l-.8.6-1.6 1a37 37 0 0 1-22.4 2.7c-5-.7-9.7-2-13.2-6.2Z" />
+    <style>
+        path { fill: #000; }
+        @media (prefers-color-scheme: dark) {
+            path { fill: #FFF; }
+        }
+    </style>
+</svg>
+`],
+  ["frontend/astro/src/components/Header.astro.hbs", `---
+const links = [
+  { to: "/", label: "Home" },
+  {{#if (eq auth "better-auth")}}
+  { to: "/dashboard", label: "Dashboard" },
+  {{/if}}
+];
+---
+
+<div>
+  <div class="flex flex-row items-center justify-between px-4 py-2 md:px-6">
+    <nav class="flex gap-4 text-lg">
+      {links.map((link) => (
+        <a href={link.to} class="text-white hover:text-neutral-400 transition-colors">
+          {link.label}
+        </a>
+      ))}
+    </nav>
+    <div class="flex items-center gap-2" id="user-menu-container">
+      {{#if (eq auth "better-auth")}}
+      <a href="/login" id="login-link" class="rounded px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+        Sign In
+      </a>
+      <div id="user-menu" class="hidden flex items-center gap-3">
+        <span class="text-sm text-neutral-400 hidden sm:inline" id="user-display"></span>
+        <button
+          id="signout-button"
+          class="rounded px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white transition-colors"
+        >
+          Sign Out
+        </button>
+      </div>
+      {{/if}}
+    </div>
+  </div>
+  <hr class="border-neutral-800" />
+</div>
+
+{{#if (eq auth "better-auth")}}
+<script>
+  import { authClient } from "../lib/auth-client";
+
+  const loginLink = document.getElementById("login-link");
+  const userMenu = document.getElementById("user-menu");
+  const userDisplay = document.getElementById("user-display");
+  const signOutButton = document.getElementById("signout-button");
+
+  async function checkSession() {
+    try {
+      const { data: session } = await authClient.getSession();
+      if (session?.user) {
+        loginLink?.classList.add("hidden");
+        userMenu?.classList.remove("hidden");
+        if (userDisplay) {
+          userDisplay.textContent = session.user.name || session.user.email?.split("@")[0] || "User";
+        }
+      }
+    } catch (e) {
+      // Not logged in
+    }
+  }
+
+  signOutButton?.addEventListener("click", async () => {
+    await authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          window.location.href = "/";
+        },
+      },
+    });
+  });
+
+  checkSession();
+</script>
+{{/if}}
+`],
+  ["frontend/astro/src/layouts/Layout.astro.hbs", `---
+import "../styles/global.css";
+import Header from "../components/Header.astro";
+
+interface Props {
+  title?: string;
+}
+
+const { title = "{{projectName}}" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-screen bg-neutral-950 text-white">
+    <Header />
+    <slot />
+  </body>
+</html>
+`],
+  ["frontend/astro/src/pages/index.astro.hbs", `---
+import Layout from "../layouts/Layout.astro";
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+---
+
+<Layout title="{{projectName}}">
+  <div class="container mx-auto max-w-3xl px-4 py-2">
+    <pre class="overflow-x-auto font-mono text-sm text-white">{TITLE_TEXT}</pre>
+    <div class="grid gap-6">
+      {{#if (eq api "orpc")}}
+      <section class="rounded-lg border border-neutral-700 p-4">
+        <h2 class="mb-2 font-medium text-white">API Status</h2>
+        <div class="flex items-center gap-2" id="api-status">
+          <div class="h-2 w-2 rounded-full bg-orange-400" id="status-dot"></div>
+          <span class="text-sm text-neutral-400" id="status-text">Checking...</span>
+        </div>
+      </section>
+      {{/if}}
+    </div>
+  </div>
+</Layout>
+
+{{#if (eq api "orpc")}}
+<script>
+  import { orpc } from "../lib/orpc";
+
+  const statusDot = document.getElementById("status-dot")!;
+  const statusText = document.getElementById("status-text")!;
+
+  async function checkHealth() {
+    try {
+      const data = await orpc.healthCheck();
+      statusDot.className = "h-2 w-2 rounded-full bg-green-500";
+      statusText.textContent = "Connected";
+    } catch (error) {
+      statusDot.className = "h-2 w-2 rounded-full bg-red-500";
+      statusText.textContent = "Disconnected";
+    }
+  }
+
+  checkHealth();
+</script>
+{{/if}}
+`],
+  ["frontend/astro/src/styles/global.css", `@import "tailwindcss";
+
+/* Add your theme customizations here. */
+/* See the TailwindCSS v4 docs for more info: https://tailwindcss.com/docs/v4-beta */
+
+@theme {
+  --font-sans: "Inter", sans-serif;
+}
+`],
+  ["frontend/astro/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "extends": "astro/tsconfigs/strict",
+  "include": [".astro/types.d.ts", "**/*"],
+  "exclude": ["dist"]
+}
+`],
+  ["frontend/native/bare/_gitignore", `# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+`],
+  ["frontend/native/bare/app.json.hbs", `{
+	"expo": {
+		"name": "{{projectName}}",
+		"slug": "{{projectName}}",
+		"version": "1.0.0",
+		"orientation": "portrait",
+		"icon": "./assets/images/icon.png",
+		"scheme": "{{projectName}}",
+		"userInterfaceStyle": "automatic",
+		"ios": {
+			"supportsTablet": true,
+			"bundleIdentifier": "{{appId projectName "ios"}}"
+		},
+		"android": {
+			"adaptiveIcon": {
+				"backgroundColor": "#E6F4FE",
+				"foregroundImage": "./assets/images/android-icon-foreground.png",
+				"backgroundImage": "./assets/images/android-icon-background.png",
+				"monochromeImage": "./assets/images/android-icon-monochrome.png"
+			},
+			"predictiveBackGestureEnabled": false,
+			"package": "{{appId projectName "android"}}"
+		},
+		"web": {
+			"output": "static",
+			"favicon": "./assets/images/favicon.png"
+		},
+		"plugins": [
+			"expo-router",
+			[
+				"expo-splash-screen",
+				{
+					"image": "./assets/images/splash-icon.png",
+					"imageWidth": 200,
+					"resizeMode": "contain",
+					"backgroundColor": "#ffffff",
+					"dark": {
+						"backgroundColor": "#000000"
+					}
+				}
+			]
+		],
+		"experiments": {
+			"typedRoutes": true,
+			"reactCompiler": true
+		}
+	}
+}
+`],
+  ["frontend/native/bare/app/_layout.tsx.hbs", `{{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
+import { useEffect } from "react";
+import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
+{{/if}}
+{{#if (and (ne backend "convex") (eq auth "clerk"))}}
+import { ClerkProvider{{#unless (eq api "none")}}, useAuth{{/unless}} } from "@clerk/expo";
+import { tokenCache } from "@clerk/expo/token-cache";
+import { ENV } from "../src/env";
+{{/if}}
+
+{{#if (eq backend "convex")}}
+  {{#if (eq auth "better-auth")}}
+    import { ConvexReactClient } from "convex/react";
+    import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+    import { authClient } from "@/lib/auth-client";
+    import { ENV } from "../src/env";
+  {{else}}
+    import { ConvexProvider, ConvexReactClient } from "convex/react";
+    import { ENV } from "../src/env";
+  {{/if}}
+  {{#if (eq auth "clerk")}}
+    import { ClerkProvider, useAuth } from "@clerk/expo";
+    import { ConvexProviderWithClerk } from "convex/react-clerk";
+    import { tokenCache } from "@clerk/expo/token-cache";
+  {{/if}}
+{{else}}
+  {{#unless (eq api "none")}}
+    import { QueryClientProvider } from "@tanstack/react-query";
+  {{/unless}}
+{{/if}}
+
+import { Stack } from "expo-router";
+import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
+import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+{{#if (eq api "trpc")}}
+import { queryClient } from "@/utils/trpc";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { queryClient } from "@/utils/orpc";
+{{/if}}
+import { NAV_THEME } from "@/lib/constants";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { StyleSheet } from "react-native";
+
+const LIGHT_THEME = {
+  ...DefaultTheme,
+  colors: NAV_THEME.light,
+};
+const DARK_THEME = {
+  ...DarkTheme,
+  colors: NAV_THEME.dark,
+};
+
+export const unstable_settings = {
+  anchor: "(drawer)",
+};
+
+{{#if (eq backend "convex")}}
+const convex = new ConvexReactClient(ENV.EXPO_PUBLIC_CONVEX_URL, {
+  unsavedChangesWarning: false,
+});
+{{/if}}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
+
+{{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
+function ClerkApiAuthBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setClerkAuthTokenGetter(getToken);
+
+    return () => {
+      setClerkAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  return null;
+}
+{{/if}}
+
+export default function RootLayout() {
+  const { isDarkColorScheme } = useColorScheme();
+
+  return (
+    <>
+      {{#if (eq backend "convex")}}
+        {{#if (eq auth "clerk")}}
+          <ClerkProvider tokenCache={tokenCache} publishableKey={ENV.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}>
+            <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+              <ThemeProvider value={isDarkColorScheme ? DARK_THEME : LIGHT_THEME}>
+                <StatusBar style={isDarkColorScheme ? "light" : "dark"} />
+                <GestureHandlerRootView style={styles.container}>
+                  <Stack>
+                    <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+                    <Stack.Screen name="(auth)" options=\\{{ headerShown: false }} />
+                    <Stack.Screen name="modal" options=\\{{ title: "Modal", presentation: "modal" }} />
+                  </Stack>
+                </GestureHandlerRootView>
+              </ThemeProvider>
+            </ConvexProviderWithClerk>
+          </ClerkProvider>
+        {{else if (eq auth "better-auth")}}
+          <ConvexBetterAuthProvider client={convex} authClient={authClient}>
+            <ThemeProvider value={isDarkColorScheme ? DARK_THEME : LIGHT_THEME}>
+              <StatusBar style={isDarkColorScheme ? "light" : "dark"} />
+              <GestureHandlerRootView style={styles.container}>
+                <Stack>
+                  <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+                  <Stack.Screen name="modal" options=\\{{ title: "Modal", presentation: "modal" }} />
+                </Stack>
+              </GestureHandlerRootView>
+            </ThemeProvider>
+          </ConvexBetterAuthProvider>
+        {{else}}
+          <ConvexProvider client={convex}>
+            <ThemeProvider value={isDarkColorScheme ? DARK_THEME : LIGHT_THEME}>
+              <StatusBar style={isDarkColorScheme ? "light" : "dark"} />
+              <GestureHandlerRootView style={styles.container}>
+                <Stack>
+                  <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+                  <Stack.Screen name="modal" options=\\{{ title: "Modal", presentation: "modal" }} />
+                </Stack>
+              </GestureHandlerRootView>
+            </ThemeProvider>
+          </ConvexProvider>
+        {{/if}}
+      {{else}}
+        {{#if (eq auth "clerk")}}
+          <ClerkProvider tokenCache={tokenCache} publishableKey={ENV.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}>
+            {{#unless (eq api "none")}}
+              <ClerkApiAuthBridge />
+              <QueryClientProvider client={queryClient}>
+                <ThemeProvider value={isDarkColorScheme ? DARK_THEME : LIGHT_THEME}>
+                  <StatusBar style={isDarkColorScheme ? "light" : "dark"} />
+                  <GestureHandlerRootView style={styles.container}>
+                    <Stack>
+                      <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+                      <Stack.Screen name="(auth)" options=\\{{ headerShown: false }} />
+                      <Stack.Screen name="modal" options=\\{{ title: "Modal", presentation: "modal" }} />
+                    </Stack>
+                  </GestureHandlerRootView>
+                </ThemeProvider>
+              </QueryClientProvider>
+            {{else}}
+              <ThemeProvider value={isDarkColorScheme ? DARK_THEME : LIGHT_THEME}>
+                <StatusBar style={isDarkColorScheme ? "light" : "dark"} />
+                <GestureHandlerRootView style={styles.container}>
+                  <Stack>
+                    <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+                    <Stack.Screen name="(auth)" options=\\{{ headerShown: false }} />
+                    <Stack.Screen name="modal" options=\\{{ title: "Modal", presentation: "modal" }} />
+                  </Stack>
+                </GestureHandlerRootView>
+              </ThemeProvider>
+            {{/unless}}
+          </ClerkProvider>
+        {{else}}
+          {{#unless (eq api "none")}}
+            <QueryClientProvider client={queryClient}>
+              <ThemeProvider value={isDarkColorScheme ? DARK_THEME : LIGHT_THEME}>
+                <StatusBar style={isDarkColorScheme ? "light" : "dark"} />
+                <GestureHandlerRootView style={styles.container}>
+                  <Stack>
+                    <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+                    <Stack.Screen name="modal" options=\\{{ title: "Modal", presentation: "modal" }} />
+                  </Stack>
+                </GestureHandlerRootView>
+              </ThemeProvider>
+            </QueryClientProvider>
+          {{else}}
+            <ThemeProvider value={isDarkColorScheme ? DARK_THEME : LIGHT_THEME}>
+              <StatusBar style={isDarkColorScheme ? "light" : "dark"} />
+              <GestureHandlerRootView style={styles.container}>
+                <Stack>
+                  <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+                  <Stack.Screen name="modal" options=\\{{ title: "Modal", presentation: "modal" }} />
+                </Stack>
+              </GestureHandlerRootView>
+            </ThemeProvider>
+          {{/unless}}
+        {{/if}}
+      {{/if}}
+    </>
+  );
+}
+`],
+  ["frontend/native/bare/app/(drawer)/_layout.tsx.hbs", `import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Link } from "expo-router";
+import { Drawer } from "expo-router/drawer";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { NAV_THEME } from "@/lib/constants";
+
+import { HeaderButton } from "@/components/header-button";
+
+const DrawerLayout = () => {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+
+  return (
+    <Drawer
+      screenOptions=\\{{
+        headerStyle: {
+          backgroundColor: theme.background,
+        },
+        headerTitleStyle: {
+          color: theme.text,
+        },
+        headerTintColor: theme.text,
+        drawerStyle: {
+          backgroundColor: theme.background,
+        },
+        drawerLabelStyle: {
+          color: theme.text,
+        },
+        drawerInactiveTintColor: theme.text,
+      }}
+    >
+      <Drawer.Screen
+        name="index"
+        options=\\{{
+          headerTitle: "Home",
+          drawerLabel: "Home",
+          drawerIcon: ({ size, color }) => (
+            <Ionicons name="home-outline" size={size} style=\\{{ color: color ?? theme.text }} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="(tabs)"
+        options=\\{{
+          headerTitle: "Tabs",
+          drawerLabel: "Tabs",
+          drawerIcon: ({ size, color }) => (
+            <MaterialIcons name="border-bottom" size={size} style=\\{{ color: color ?? theme.text }} />
+          ),
+          headerRight: () => (
+            <Link href="/modal" asChild>
+              <HeaderButton />
+            </Link>
+          ),
+        }}
+      />
+    </Drawer>
+  );
+};
+
+export default DrawerLayout;
+
+`],
+  ["frontend/native/bare/app/(drawer)/(tabs)/_layout.tsx.hbs", `import { TabBarIcon } from "@/components/tabbar-icon";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { Tabs } from "expo-router";
+import { NAV_THEME } from "@/lib/constants";
+
+export default function TabLayout() {
+  const { isDarkColorScheme } = useColorScheme();
+  const theme = isDarkColorScheme ? NAV_THEME.dark : NAV_THEME.light;
+
+  return (
+    <Tabs
+      screenOptions=\\{{
+        headerShown: false,
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.text,
+        tabBarStyle: {
+          backgroundColor: theme.background,
+          borderTopColor: theme.border,
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options=\\{{
+          title: "Home",
+          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color ?? theme.text} />,
+        }}
+      />
+      <Tabs.Screen
+        name="two"
+        options=\\{{
+          title: "Explore",
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="compass" color={color ?? theme.text} />
+          ),
+        }}
+      />
+    </Tabs>
+  );
+}
+
+`],
+  ["frontend/native/bare/app/(drawer)/(tabs)/index.tsx.hbs", `import { Container } from "@/components/container";
+import { Column, Host, Text as ExpoUIText } from "@expo/ui";
+import { ScrollView, View, StyleSheet } from "react-native";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { NAV_THEME } from "@/lib/constants";
+
+export default function TabOne() {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+
+  return (
+    <Container>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.content}>
+          <Host matchContents=\\{{ vertical: true }}>
+            <Column spacing={8}>
+              <ExpoUIText
+                textStyle=\\{{ color: theme.text, fontSize: 24, fontWeight: "bold" }}
+              >
+                Tab One
+              </ExpoUIText>
+              <ExpoUIText
+                textStyle=\\{{ color: theme.text, fontSize: 16 }}
+                style=\\{{ opacity: 0.7 }}
+              >
+                Explore the first section of your app
+              </ExpoUIText>
+            </Column>
+          </Host>
+        </View>
+      </ScrollView>
+    </Container>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+    padding: 16,
+  },
+  content: {
+    paddingVertical: 16,
+  },
+});
+`],
+  ["frontend/native/bare/app/(drawer)/(tabs)/two.tsx.hbs", `import { Container } from "@/components/container";
+import { Column, Host, Text as ExpoUIText } from "@expo/ui";
+import { ScrollView, View, StyleSheet } from "react-native";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { NAV_THEME } from "@/lib/constants";
+
+export default function TabTwo() {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+
+  return (
+    <Container>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.content}>
+          <Host matchContents=\\{{ vertical: true }}>
+            <Column spacing={8}>
+              <ExpoUIText
+                textStyle=\\{{ color: theme.text, fontSize: 24, fontWeight: "bold" }}
+              >
+                Tab Two
+              </ExpoUIText>
+              <ExpoUIText
+                textStyle=\\{{ color: theme.text, fontSize: 16 }}
+                style=\\{{ opacity: 0.7 }}
+              >
+                Discover more features and content
+              </ExpoUIText>
+            </Column>
+          </Host>
+        </View>
+      </ScrollView>
+    </Container>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+    padding: 16,
+  },
+  content: {
+    paddingVertical: 16,
+  },
+});
+`],
+  ["frontend/native/bare/app/(drawer)/index.tsx.hbs", `import { {{#if (or (eq auth "clerk") (eq auth "better-auth"))}}Button, {{/if}}Column, Host, Text as ExpoUIText } from "@expo/ui";
+import { View, ScrollView, StyleSheet } from "react-native";
+import { Container } from "@/components/container";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { NAV_THEME } from "@/lib/constants";
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { trpc } from "@/utils/trpc";
+{{/if}}
+{{#if (and (eq backend "convex") (eq auth "clerk"))}}
+import { router } from "expo-router";
+import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/react";
+import { api } from "@{{ projectName }}/backend/convex/_generated/api";
+import { useUser } from "@clerk/expo";
+import { SignOutButton } from "@/components/sign-out-button";
+{{else if (and (ne backend "convex") (eq auth "clerk"))}}
+import { router } from "expo-router";
+import { useAuth, useUser } from "@clerk/expo";
+import { SignOutButton } from "@/components/sign-out-button";
+{{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+import { useConvexAuth, useQuery } from "convex/react";
+import { api } from "@{{ projectName }}/backend/convex/_generated/api";
+import { authClient } from "@/lib/auth-client";
+import { SignIn } from "@/components/sign-in";
+import { SignUp } from "@/components/sign-up";
+{{else if (eq backend "convex")}}
+import { useQuery } from "convex/react";
+import { api } from "@{{ projectName }}/backend/convex/_generated/api";
+{{/if}}
+
+export default function Home() {
+const { colorScheme } = useColorScheme();
+const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+{{#if (eq api "orpc")}}
+const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+{{/if}}
+{{#if (eq api "trpc")}}
+const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+{{/if}}
+{{#if (and (eq backend "convex") (eq auth "clerk"))}}
+const { user } = useUser();
+const healthCheck = useQuery(api.healthCheck.get);
+const privateData = useQuery(api.privateData.get);
+{{else if (and (ne backend "convex") (eq auth "clerk"))}}
+const { isLoaded, isSignedIn } = useAuth();
+const { user } = useUser();
+{{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+const healthCheck = useQuery(api.healthCheck.get);
+const { isAuthenticated } = useConvexAuth();
+const user = useQuery(api.auth.getCurrentUser, isAuthenticated ? {} : "skip");
+{{else if (eq backend "convex")}}
+const healthCheck = useQuery(api.healthCheck.get);
+{{/if}}
+
+return (
+<Container>
+  <ScrollView style={styles.scrollView} contentInsetAdjustmentBehavior="never">
+    <View style={styles.content}>
+      <Host style={styles.titleHost}>
+        <ExpoUIText
+          textStyle=\\{{ color: theme.text, fontSize: 24, fontWeight: "bold", textAlign: "center" }}
+        >
+          XSTACK
+        </ExpoUIText>
+      </Host>
+
+      {{#unless (and (eq backend "convex") (eq auth "better-auth"))}}
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        {{#if (eq backend "convex")}}
+        <View style={styles.statusRow}>
+          <View style={[styles.statusIndicator, { backgroundColor: healthCheck ? "#10b981" : "#f59e0b" }]} />
+          <View style={styles.statusContent}>
+            <Host matchContents=\\{{ vertical: true }}>
+              <Column spacing={4}>
+                <ExpoUIText
+                  textStyle=\\{{ color: theme.text, fontSize: 14, fontWeight: "bold" }}
+                >
+                  Convex
+                </ExpoUIText>
+                <ExpoUIText
+                  textStyle=\\{{ color: theme.text, fontSize: 12 }}
+                  style=\\{{ opacity: 0.7 }}
+                >
+                  {healthCheck === undefined
+                  ? "Checking..."
+                  : healthCheck === "OK"
+                  ? "Connected to API"
+                  : "API Disconnected"}
+                </ExpoUIText>
+              </Column>
+            </Host>
+          </View>
+        </View>
+        {{else}}
+        {{#unless (eq api "none")}}
+        <View style={styles.statusRow}>
+          <View style={[styles.statusIndicator, { backgroundColor: healthCheck.data ? "#10b981" : "#f59e0b" }]} />
+          <View style={styles.statusContent}>
+            <Host matchContents=\\{{ vertical: true }}>
+              <Column spacing={4}>
+                <ExpoUIText
+                  textStyle=\\{{ color: theme.text, fontSize: 14, fontWeight: "bold" }}
+                >
+                  {{#if (eq api "orpc")}}ORPC{{else}}TRPC{{/if}}
+                </ExpoUIText>
+                <ExpoUIText
+                  textStyle=\\{{ color: theme.text, fontSize: 12 }}
+                  style=\\{{ opacity: 0.7 }}
+                >
+                  {healthCheck.isLoading
+                  ? "Checking connection..."
+                  : healthCheck.data
+                  ? "All systems operational"
+                  : "Service unavailable"}
+                </ExpoUIText>
+              </Column>
+            </Host>
+          </View>
+        </View>
+        {{/unless}}
+        {{/if}}
+      </View>
+      {{/unless}}
+
+      {{#if (and (eq backend "convex") (eq auth "clerk"))}}
+      <Authenticated>
+        <Host style={styles.authHost} matchContents=\\{{ vertical: true }}>
+          <Column spacing={6}>
+            <ExpoUIText textStyle=\\{{ color: theme.text, fontSize: 14 }}>
+              {\`Hello \${user?.emailAddresses[0].emailAddress ?? ""}\`}
+            </ExpoUIText>
+            <ExpoUIText textStyle=\\{{ color: theme.text, fontSize: 14 }}>
+              {\`Private Data: \${privateData?.message ?? ""}\`}
+            </ExpoUIText>
+          </Column>
+        </Host>
+        <SignOutButton />
+      </Authenticated>
+      <Unauthenticated>
+        <Host style={styles.authActionsHost} matchContents=\\{{ vertical: true }}>
+          <Column spacing={8}>
+            <Button
+              label="Sign in"
+              variant="outlined"
+              onPress={() => router.push("/(auth)/sign-in")}
+            />
+            <Button
+              label="Sign up"
+              onPress={() => router.push("/(auth)/sign-up")}
+            />
+          </Column>
+        </Host>
+      </Unauthenticated>
+      <AuthLoading>
+        <Host matchContents=\\{{ vertical: true }}>
+          <ExpoUIText textStyle=\\{{ color: theme.text, fontSize: 14 }}>
+            Loading...
+          </ExpoUIText>
+        </Host>
+      </AuthLoading>
+      {{/if}}
+
+      {{#if (and (ne backend "convex") (eq auth "clerk"))}}
+      {!isLoaded ? (
+      <Host matchContents=\\{{ vertical: true }}>
+        <ExpoUIText textStyle=\\{{ color: theme.text, fontSize: 14 }}>
+          Loading...
+        </ExpoUIText>
+      </Host>
+      ) : isSignedIn ? (
+      <View style={[styles.userCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Host style={styles.userHeader} matchContents=\\{{ vertical: true }}>
+          <Column spacing={8}>
+            <ExpoUIText textStyle=\\{{ color: theme.text, fontSize: 16 }}>
+              {\`Welcome, \${user?.fullName ?? user?.firstName ?? "there"}\`}
+            </ExpoUIText>
+            <ExpoUIText
+              textStyle=\\{{ color: theme.text, fontSize: 14 }}
+              style=\\{{ opacity: 0.7 }}
+            >
+              {user?.emailAddresses[0]?.emailAddress ?? ""}
+            </ExpoUIText>
+          </Column>
+        </Host>
+        <SignOutButton />
+      </View>
+      ) : (
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Host style={styles.authActionsHost} matchContents=\\{{ vertical: true }}>
+          <Column spacing={8}>
+            <Button
+              label="Sign in"
+              variant="outlined"
+              onPress={() => router.push("/(auth)/sign-in")}
+            />
+            <Button
+              label="Sign up"
+              onPress={() => router.push("/(auth)/sign-up")}
+            />
+          </Column>
+        </Host>
+      </View>
+      )}
+      {{/if}}
+
+      {{#if (and (eq backend "convex") (eq auth "better-auth"))}}
+      <View style={[styles.statusCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Host style={styles.statusCardTitleHost} matchContents=\\{{ vertical: true }}>
+          <ExpoUIText
+            textStyle=\\{{ color: theme.text, fontSize: 16, fontWeight: "bold" }}
+          >
+            API Status
+          </ExpoUIText>
+        </Host>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusIndicator, { backgroundColor: healthCheck ? "#10b981" : "#f59e0b" }]} />
+          <View style={styles.statusContent}>
+            <Host matchContents=\\{{ vertical: true }}>
+              <ExpoUIText
+                textStyle=\\{{ color: theme.text, fontSize: 12 }}
+                style=\\{{ opacity: 0.7 }}
+              >
+                {healthCheck === undefined
+                ? "Checking..."
+                : healthCheck === "OK"
+                ? "Connected to API"
+                : "API Disconnected"}
+              </ExpoUIText>
+            </Host>
+          </View>
+        </View>
+      </View>
+
+      {user ? (
+      <View style={[styles.userCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Host style={styles.userHeader} matchContents>
+          <Column spacing={6}>
+            <ExpoUIText textStyle=\\{{ color: theme.text, fontSize: 16, fontWeight: "bold" }}>
+              {\`Welcome, \${user.name}\`}
+            </ExpoUIText>
+            <ExpoUIText
+              textStyle=\\{{ color: theme.text, fontSize: 14 }}
+              style=\\{{ opacity: 0.7 }}
+            >
+              {user.email}
+            </ExpoUIText>
+          </Column>
+        </Host>
+        <Host matchContents=\\{{ vertical: true }}>
+          <Button
+            label="Sign Out"
+            variant="outlined"
+            onPress={() => {
+              authClient.signOut();
+            }}
+          />
+        </Host>
+      </View>
+      ) : (
+      <>
+        <SignIn />
+        <SignUp />
+      </>
+      )}
+      {{/if}}
+    </View>
+  </ScrollView>
+</Container>
+);
+}
+
+const styles = StyleSheet.create({
+scrollView: {
+flex: 1,
+},
+content: {
+paddingHorizontal: 20,
+paddingTop: 28,
+paddingBottom: 32,
+},
+titleHost: {
+alignSelf: "stretch",
+height: 34,
+marginBottom: 24,
+},
+card: {
+padding: 16,
+marginBottom: 16,
+borderWidth: 1,
+},
+statusRow: {
+flexDirection: "row",
+alignItems: "center",
+gap: 8,
+},
+statusIndicator: {
+height: 10,
+width: 10,
+borderRadius: 999,
+},
+statusContent: {
+flex: 1,
+},
+userCard: {
+marginBottom: 16,
+padding: 16,
+borderWidth: 1,
+borderRadius: 16,
+},
+userHeader: {
+marginBottom: 8,
+},
+authHost: {
+marginBottom: 12,
+},
+authActionsHost: {
+marginTop: 4,
+},
+statusCard: {
+marginBottom: 16,
+padding: 16,
+borderWidth: 1,
+borderRadius: 16,
+},
+statusCardTitleHost: {
+marginBottom: 8,
+},
+});
+`],
+  ["frontend/native/bare/app/+not-found.tsx.hbs", `import { Container } from "@/components/container";
+import { Button, Column, Host, Text as ExpoUIText } from "@expo/ui";
+import { Stack, router } from "expo-router";
+import { Text, View, StyleSheet } from "react-native";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { NAV_THEME } from "@/lib/constants";
+
+export default function NotFoundScreen() {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+
+  return (
+    <>
+      <Stack.Screen options=\\{{ title: "Oops!" }} />
+      <Container>
+        <View style={styles.container}>
+          <View style={styles.content}>
+            <Text style={styles.emoji}>🤔</Text>
+            <Host matchContents=\\{{ vertical: true }}>
+              <Column spacing={12} alignment="center">
+                <ExpoUIText
+                  textStyle=\\{{ color: theme.text, fontSize: 20, fontWeight: "bold", textAlign: "center" }}
+                >
+                  Page Not Found
+                </ExpoUIText>
+                <ExpoUIText
+                  textStyle=\\{{ color: theme.text, fontSize: 14, textAlign: "center" }}
+                  style=\\{{ opacity: 0.7 }}
+                >
+                  Sorry, the page you're looking for doesn't exist.
+                </ExpoUIText>
+                <Button
+                  label="Go to Home"
+                  variant="outlined"
+                  onPress={() => router.replace("/")}
+                />
+              </Column>
+            </Host>
+          </View>
+        </View>
+      </Container>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  content: {
+    alignItems: "center",
+  },
+  emoji: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+});
+`],
+  ["frontend/native/bare/app/modal.tsx.hbs", `import { Container } from "@/components/container";
+import { Button, Column, Host, Text as ExpoUIText } from "@expo/ui";
+import { View, StyleSheet } from "react-native";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { NAV_THEME } from "@/lib/constants";
+
+export default function Modal() {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+
+  return (
+    <Container>
+      <View style={styles.container}>
+        <Host style={styles.expoUiHost}>
+          <Column spacing={12} alignment="center">
+            <ExpoUIText
+              textStyle=\\{{ color: theme.text, fontSize: 20, fontWeight: "bold" }}
+            >
+              Modal
+            </ExpoUIText>
+            <ExpoUIText
+              textStyle=\\{{ color: theme.text, fontSize: 14, textAlign: "center" }}
+              style=\\{{ opacity: 0.7 }}
+            >
+              Built with Expo UI universal components
+            </ExpoUIText>
+            <Button label="Native control" onPress={() => null} />
+          </Column>
+        </Host>
+      </View>
+    </Container>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  expoUiHost: {
+    alignSelf: "stretch",
+    padding: 16,
+  },
+});
+`],
+  ["frontend/native/bare/babel.config.js.hbs", `module.exports = {
+  presets: ["babel-preset-expo"],
+  plugins: [require("@varlock/expo-integration/babel-plugin")],
+};
+`],
+  ["frontend/native/bare/components/container.tsx.hbs", `import React from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { NAV_THEME } from "@/lib/constants";
+import { StyleSheet } from "react-native";
+
+export function Container({ children }: { children: React.ReactNode }) {
+  const { colorScheme } = useColorScheme();
+  const backgroundColor = colorScheme === "dark" 
+    ? NAV_THEME.dark.background 
+    : NAV_THEME.light.background;
+
+  return (
+    <SafeAreaView
+      edges={["left", "right", "bottom"]}
+      style={[styles.container, { backgroundColor }]}
+    >
+      {children}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
+`],
+  ["frontend/native/bare/components/header-button.tsx.hbs", `import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { forwardRef, type ComponentRef } from "react";
+import { Pressable, StyleSheet } from "react-native";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { NAV_THEME } from "@/lib/constants";
+
+export const HeaderButton = forwardRef<
+  ComponentRef<typeof Pressable>,
+  { onPress?: () => void }
+>(({ onPress }, ref) => {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+
+  return (
+    <Pressable
+      ref={ref}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.button,
+        {
+          backgroundColor: pressed 
+            ? theme.background 
+            : theme.card,
+        },
+      ]}
+    >
+      {({ pressed }) => (
+        <FontAwesome
+          name="info-circle"
+          size={20}
+          color={theme.text}
+          style=\\{{
+            opacity: pressed ? 0.7 : 1,
+          }}
+        />
+      )}
+    </Pressable>
+  );
+});
+
+const styles = StyleSheet.create({
+  button: {
+    padding: 8,
+    marginRight: 8,
+  },
+});
+
+`],
+  ["frontend/native/bare/components/tabbar-icon.tsx.hbs", `import FontAwesome from "@expo/vector-icons/FontAwesome";
+import type { TextStyle } from "react-native";
+
+type FontAwesomeProps = React.ComponentProps<typeof FontAwesome>;
+
+export const TabBarIcon = (props: {
+  name: FontAwesomeProps["name"];
+  color: TextStyle["color"];
+}) => {
+  const { color, ...iconProps } = props;
+  return <FontAwesome size={24} style={[{ marginBottom: -3, color }]} {...iconProps} />;
+};
+`],
+  ["frontend/native/bare/lib/constants.ts.hbs", `export const NAV_THEME = {
+  light: {
+    background: "hsl(0 0% 100%)",
+    border: "hsl(220 13% 91%)",
+    card: "hsl(0 0% 100%)",
+    notification: "hsl(0 84.2% 60.2%)",
+    primary: "hsl(221.2 83.2% 53.3%)",
+    text: "hsl(222.2 84% 4.9%)",
+  },
+  dark: {
+    background: "hsl(222.2 84% 4.9%)",
+    border: "hsl(217.2 32.6% 17.5%)",
+    card: "hsl(222.2 84% 4.9%)",
+    notification: "hsl(0 72% 51%)",
+    primary: "hsl(217.2 91.2% 59.8%)",
+    text: "hsl(210 40% 98%)",
+  },
+};
+
+`],
+  ["frontend/native/bare/lib/use-color-scheme.ts.hbs", `import { useColorScheme as useRNColorScheme } from "react-native";
+
+export function useColorScheme() {
+  const systemColorScheme = useRNColorScheme();
+  const colorScheme = systemColorScheme ?? "light";
+  
+  return {
+    colorScheme: colorScheme as "light" | "dark",
+    isDarkColorScheme: colorScheme === "dark",
+    setColorScheme: () => {
+      // Color scheme is managed by the system in bare mode
+      console.warn("setColorScheme is not available in bare mode. Color scheme is managed by the system.");
+    },
+    toggleColorScheme: () => {
+      // Color scheme is managed by the system in bare mode
+      console.warn("toggleColorScheme is not available in bare mode. Color scheme is managed by the system.");
+    },
+  };
+}
+
+`],
+  ["frontend/native/bare/metro.config.js.hbs", `const { withVarlockMetroConfig } = require("@varlock/expo-integration/metro-config");
+// Learn more https://docs.expo.io/guides/customizing-metro
+const { getDefaultConfig } = require("expo/metro-config");
+
+const config = getDefaultConfig(__dirname);
+{{#if (or (eq webDeploy "cloudflare") (eq serverDeploy "cloudflare"))}}
+// Alchemy writes runtime state here; block it to avoid Metro refresh loops.
+const blockList = config.resolver.blockList ?? [];
+const blockListPatterns = Array.isArray(blockList) ? blockList : [blockList];
+
+config.resolver.blockList = [
+	...blockListPatterns,
+	/[/\\\\]packages[/\\\\]infra[/\\\\]\\.alchemy(?:[/\\\\]|$)/,
+];
+{{/if}}
+
+module.exports = withVarlockMetroConfig(config);
+`],
+  ["frontend/native/bare/package.json.hbs", `{
+  "name": "native",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start --clear",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild",
+    "web": "expo start --web",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/ui": "~58.0.19",
+    "@expo/vector-icons": "^15.0.2",
+    "@tanstack/react-query": "^5.102.8",
+    "expo": "~58.0.12",
+    "expo-constants": "~58.0.12",
+    "expo-dev-client": "~58.0.13",
+    "expo-crypto": "~58.0.6",
+    "expo-font": "~58.0.8",
+    "expo-linking": "~58.0.13",
+    "expo-network": "~58.0.3",
+    "expo-router": "~58.0.21",
+    "expo-secure-store": "~58.0.2",
+    "expo-splash-screen": "~58.0.9",
+    "expo-status-bar": "~58.0.3",
+    "expo-system-ui": "~58.0.6",
+    "expo-web-browser": "~58.0.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-gesture-handler": "~3.3.0",
+    "react-native-reanimated": "4.7.1",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "~4.30.0",
+    "react-native-web": "~0.21.4",
+    "react-native-worklets": "0.13.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.3.0",
+    "typescript": "~6.0.3"
+  },
+  "private": true
+}
+`],
+  ["frontend/native/bare/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+	"extends": "expo/tsconfig.base",
+	"compilerOptions": {
+		"strict": true,
+		"paths": {
+			"@/*": ["./*"]
+		}
+	},
+	"include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}
+
+`],
+  ["frontend/native/base/assets/images/android-icon-background.png", `[Binary file]`],
+  ["frontend/native/base/assets/images/android-icon-foreground.png", `[Binary file]`],
+  ["frontend/native/base/assets/images/android-icon-monochrome.png", `[Binary file]`],
+  ["frontend/native/base/assets/images/favicon.png", `[Binary file]`],
+  ["frontend/native/base/assets/images/icon.png", `[Binary file]`],
+  ["frontend/native/base/assets/images/partial-react-logo.png", `[Binary file]`],
+  ["frontend/native/base/assets/images/react-logo.png", `[Binary file]`],
+  ["frontend/native/base/assets/images/react-logo@2x.png", `[Binary file]`],
+  ["frontend/native/base/assets/images/react-logo@3x.png", `[Binary file]`],
+  ["frontend/native/base/assets/images/splash-icon.png", `[Binary file]`],
+  ["frontend/native/unistyles/_gitignore", `# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+`],
+  ["frontend/native/unistyles/app.json.hbs", `{
+  "expo": {
+    "name": "{{projectName}}",
+    "slug": "{{projectName}}",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "{{projectName}}",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "{{appId projectName "ios"}}"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "{{appId projectName "android"}}"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
+`],
+  ["frontend/native/unistyles/app/_layout.tsx.hbs", `import "@/unistyles";
+{{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
+import { useEffect } from "react";
+import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
+{{/if}}
+{{#if (and (ne backend "convex") (eq auth "clerk"))}}
+import { ClerkProvider{{#unless (eq api "none")}}, useAuth{{/unless}} } from "@clerk/expo";
+import { tokenCache } from "@clerk/expo/token-cache";
+import { ENV } from "../src/env";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { queryClient } from "@/utils/trpc";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { queryClient } from "@/utils/orpc";
+{{/if}}
+{{#if (eq backend "convex")}}
+{{#if (eq auth "better-auth")}}
+import { ConvexReactClient } from "convex/react";
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { authClient } from "@/lib/auth-client";
+import { ENV } from "../src/env";
+{{else}}
+import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ENV } from "../src/env";
+{{/if}}
+{{#if (eq auth "clerk")}}
+import { ClerkProvider, useAuth } from "@clerk/expo";
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { tokenCache } from "@clerk/expo/token-cache";
+{{/if}}
+{{else}}
+  {{#unless (eq api "none")}}
+import { QueryClientProvider } from "@tanstack/react-query";
+  {{/unless}}
+{{/if}}
+import { Stack } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useUnistyles } from "react-native-unistyles";
+import { StatusBar } from "expo-status-bar";
+
+export const unstable_settings = {
+  anchor: "(drawer)",
+};
+
+{{#if (eq backend "convex")}}
+const convex = new ConvexReactClient(ENV.EXPO_PUBLIC_CONVEX_URL, {
+  unsavedChangesWarning: false,
+});
+{{/if}}
+
+{{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
+function ClerkApiAuthBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setClerkAuthTokenGetter(getToken);
+
+    return () => {
+      setClerkAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  return null;
+}
+{{/if}}
+
+export default function RootLayout() {
+  const { theme } = useUnistyles();
+
+  return (
+    {{#if (eq backend "convex")}}
+    {{#if (eq auth "clerk")}}
+    <ClerkProvider
+      tokenCache={tokenCache}
+      publishableKey={ENV.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    >
+      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+        <GestureHandlerRootView style=\\{{ flex: 1 }}>
+          <Stack
+            screenOptions=\\{{
+              headerStyle: {
+                backgroundColor: theme.colors.background,
+              },
+              headerTitleStyle: {
+                color: theme.colors.foreground,
+              },
+              headerTintColor: theme.colors.foreground,
+            }}
+          >
+            <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options=\\{{ headerShown: false }} />
+            <Stack.Screen
+              name="modal"
+              options=\\{{ title: "Modal", presentation: "modal" }}
+            />
+          </Stack>
+        </GestureHandlerRootView>
+      </ConvexProviderWithClerk>
+    </ClerkProvider>
+    {{else if (eq auth "better-auth")}}
+    <ConvexBetterAuthProvider client={convex} authClient={authClient}>
+      <GestureHandlerRootView style=\\{{ flex: 1 }}>
+        <Stack
+          screenOptions=\\{{
+            headerStyle: {
+              backgroundColor: theme.colors.background,
+            },
+            headerTitleStyle: {
+              color: theme.colors.foreground,
+            },
+            headerTintColor: theme.colors.foreground,
+          }}
+        >
+          <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+          <Stack.Screen
+            name="modal"
+            options=\\{{ title: "Modal", presentation: "modal" }}
+          />
+        </Stack>
+      </GestureHandlerRootView>
+    </ConvexBetterAuthProvider>
+    {{else}}
+    <ConvexProvider client={convex}>
+      <GestureHandlerRootView style=\\{{ flex: 1 }}>
+        <Stack
+          screenOptions=\\{{
+            headerStyle: {
+              backgroundColor: theme.colors.background,
+            },
+            headerTitleStyle: {
+              color: theme.colors.foreground,
+            },
+            headerTintColor: theme.colors.foreground,
+          }}
+        >
+          <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+          <Stack.Screen
+            name="modal"
+            options=\\{{ title: "Modal", presentation: "modal" }}
+          />
+        </Stack>
+      </GestureHandlerRootView>
+    </ConvexProvider>
+    {{/if}}
+    {{else}}
+      {{#if (eq auth "clerk")}}
+      <ClerkProvider
+        tokenCache={tokenCache}
+        publishableKey={ENV.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      >
+        {{#unless (eq api "none")}}
+        <ClerkApiAuthBridge />
+        <QueryClientProvider client={queryClient}>
+          <GestureHandlerRootView style=\\{{ flex: 1 }}>
+            <Stack
+              screenOptions=\\{{
+                headerStyle: {
+                  backgroundColor: theme.colors.background,
+                },
+                headerTitleStyle: {
+                  color: theme.colors.foreground,
+                },
+                headerTintColor: theme.colors.foreground,
+              }}
+            >
+              <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+              <Stack.Screen name="(auth)" options=\\{{ headerShown: false }} />
+              <Stack.Screen
+                name="modal"
+                options=\\{{ title: "Modal", presentation: "modal" }}
+              />
+            </Stack>
+          </GestureHandlerRootView>
+        </QueryClientProvider>
+        {{else}}
+        <GestureHandlerRootView style=\\{{ flex: 1 }}>
+          <Stack
+            screenOptions=\\{{
+              headerStyle: {
+                backgroundColor: theme.colors.background,
+              },
+              headerTitleStyle: {
+                color: theme.colors.foreground,
+              },
+              headerTintColor: theme.colors.foreground,
+            }}
+          >
+            <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options=\\{{ headerShown: false }} />
+            <Stack.Screen
+              name="modal"
+              options=\\{{ title: "Modal", presentation: "modal" }}
+            />
+          </Stack>
+        </GestureHandlerRootView>
+        {{/unless}}
+      </ClerkProvider>
+      {{else}}
+        {{#unless (eq api "none")}}
+      <QueryClientProvider client={queryClient}>
+        <GestureHandlerRootView style=\\{{ flex: 1 }}>
+          <Stack
+            screenOptions=\\{{
+              headerStyle: {
+                backgroundColor: theme.colors.background,
+              },
+              headerTitleStyle: {
+                color: theme.colors.foreground,
+              },
+              headerTintColor: theme.colors.foreground,
+            }}
+          >
+            <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+            <Stack.Screen
+              name="modal"
+              options=\\{{ title: "Modal", presentation: "modal" }}
+            />
+          </Stack>
+        </GestureHandlerRootView>
+      </QueryClientProvider>
+        {{else}}
+        <GestureHandlerRootView style=\\{{ flex: 1 }}>
+          <Stack
+            screenOptions=\\{{
+              headerStyle: {
+                backgroundColor: theme.colors.background,
+              },
+              headerTitleStyle: {
+                color: theme.colors.foreground,
+              },
+              headerTintColor: theme.colors.foreground,
+            }}
+          >
+            <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+            <Stack.Screen
+              name="modal"
+              options=\\{{ title: "Modal", presentation: "modal" }}
+            />
+          </Stack>
+        </GestureHandlerRootView>
+        {{/unless}}
+      {{/if}}
+    {{/if}}
+  );
+}
+`],
+  ["frontend/native/unistyles/app/(drawer)/_layout.tsx.hbs", `import "@/unistyles";
+
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Link } from "expo-router";
+import { Drawer } from "expo-router/drawer";
+import { useUnistyles } from "react-native-unistyles";
+
+import { HeaderButton } from "../../components/header-button";
+
+const DrawerLayout = () => {
+  const { theme } = useUnistyles();
+
+  return (
+    <Drawer
+      screenOptions=\\{{
+        headerStyle: {
+          backgroundColor: theme.colors.background,
+        },
+        headerTitleStyle: {
+          color: theme.colors.foreground,
+        },
+        headerTintColor: theme.colors.foreground,
+        drawerStyle: {
+          backgroundColor: theme.colors.background,
+        },
+        drawerLabelStyle: {
+          color: theme.colors.foreground,
+        },
+        drawerInactiveTintColor: theme.colors.mutedForeground,
+      }}
+    >
+      <Drawer.Screen
+        name="index"
+        options=\\{{
+          headerTitle: "Home",
+          drawerLabel: "Home",
+          drawerIcon: ({ size, color }) => (
+            <Ionicons name="home-outline" size={size} style=\\{{ color: color ?? theme.colors.foreground }} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="(tabs)"
+        options=\\{{
+          headerTitle: "Tabs",
+          drawerLabel: "Tabs",
+          drawerIcon: ({ size, color }) => (
+            <MaterialIcons name="border-bottom" size={size} style=\\{{ color: color ?? theme.colors.foreground }} />
+          ),
+          headerRight: () => (
+            <Link href="/modal" asChild>
+              <HeaderButton />
+            </Link>
+          ),
+        }}
+      />
+    </Drawer>
+  );
+};
+
+export default DrawerLayout;
+`],
+  ["frontend/native/unistyles/app/(drawer)/(tabs)/_layout.tsx.hbs", `import "@/unistyles";
+
+import { Tabs } from "expo-router";
+import { useUnistyles } from "react-native-unistyles";
+
+import { TabBarIcon } from "@/components/tabbar-icon";
+
+export default function TabLayout() {
+  const { theme } = useUnistyles();
+
+  return (
+    <Tabs
+      screenOptions=\\{{
+        headerShown: false,
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.mutedForeground,
+        tabBarStyle: {
+          backgroundColor: theme.colors.background,
+          borderTopColor: theme.colors.border,
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options=\\{{
+          title: "Home",
+          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color ?? theme.colors.foreground} />,
+        }}
+      />
+      <Tabs.Screen
+        name="two"
+        options=\\{{
+          title: "Explore",
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="compass" color={color ?? theme.colors.foreground} />
+          ),
+        }}
+      />
+    </Tabs>
+  );
+}
+`],
+  ["frontend/native/unistyles/app/(drawer)/(tabs)/index.tsx.hbs", `import "@/unistyles";
+
+import { Container } from "@/components/container";
+import { ScrollView, Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+
+export default function Home() {
+  return (
+    <Container>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.headerSection}>
+          <Text style={styles.title}>Tab One</Text>
+          <Text style={styles.subtitle}>
+            Explore the first section of your app
+          </Text>
+        </View>
+      </ScrollView>
+    </Container>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    padding: theme.spacing.lg,
+  },
+  headerSection: {
+    paddingVertical: theme.spacing.xl,
+  },
+  title: {
+    fontSize: theme.fontSize["3xl"],
+    fontWeight: "bold",
+    color: theme.colors.foreground,
+    marginBottom: theme.spacing.sm,
+  },
+  subtitle: {
+    fontSize: theme.fontSize.lg,
+    color: theme.colors.mutedForeground,
+  },
+}));
+`],
+  ["frontend/native/unistyles/app/(drawer)/(tabs)/two.tsx.hbs", `import "@/unistyles";
+
+import { Container } from "@/components/container";
+import { ScrollView, Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+
+export default function TabTwo() {
+  return (
+    <Container>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.headerSection}>
+          <Text style={styles.title}>Tab Two</Text>
+          <Text style={styles.subtitle}>
+            Discover more features and content
+          </Text>
+        </View>
+      </ScrollView>
+    </Container>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    padding: theme.spacing.lg,
+  },
+  headerSection: {
+    paddingVertical: theme.spacing.xl,
+  },
+  title: {
+    fontSize: theme.fontSize["3xl"],
+    fontWeight: "bold",
+    color: theme.colors.foreground,
+    marginBottom: theme.spacing.sm,
+  },
+  subtitle: {
+    fontSize: theme.fontSize.lg,
+    color: theme.colors.mutedForeground,
+  },
+}));
+`],
+  ["frontend/native/unistyles/app/(drawer)/index.tsx.hbs", `import "@/unistyles";
+
+import { ScrollView, Text, View, TouchableOpacity } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import { Container } from "@/components/container";
+
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { trpc } from "@/utils/trpc";
+{{/if}}
+{{#if (and (eq backend "convex") (eq auth "clerk"))}}
+import { Link } from "expo-router";
+import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/react";
+import { api } from "@{{ projectName }}/backend/convex/_generated/api";
+import { useUser } from "@clerk/expo";
+import { SignOutButton } from "@/components/sign-out-button";
+{{else if (and (ne backend "convex") (eq auth "clerk"))}}
+import { Link } from "expo-router";
+import { useAuth, useUser } from "@clerk/expo";
+import { SignOutButton } from "@/components/sign-out-button";
+{{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+import { useConvexAuth, useQuery } from "convex/react";
+import { api } from "@{{ projectName }}/backend/convex/_generated/api";
+import { authClient } from "@/lib/auth-client";
+import { SignIn } from "@/components/sign-in";
+import { SignUp } from "@/components/sign-up";
+{{else if (eq backend "convex")}}
+import { useQuery } from "convex/react";
+import { api } from "@{{ projectName }}/backend/convex/_generated/api";
+{{/if}}
+
+export default function Home() {
+  {{#if (eq api "orpc")}}
+  const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+  {{/if}}
+  {{#if (eq api "trpc")}}
+  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+  {{/if}}
+  {{#if (and (eq backend "convex") (eq auth "clerk"))}}
+  const { user } = useUser();
+  const healthCheck = useQuery(api.healthCheck.get);
+  const privateData = useQuery(api.privateData.get);
+  {{else if (and (ne backend "convex") (eq auth "clerk"))}}
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+  {{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+  const healthCheck = useQuery(api.healthCheck.get);
+  const { isAuthenticated } = useConvexAuth();
+  const user = useQuery(api.auth.getCurrentUser, isAuthenticated ? {} : "skip");
+  {{else if (eq backend "convex")}}
+  const healthCheck = useQuery(api.healthCheck.get);
+  {{/if}}
+
+  return (
+    <Container>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.heroTitle}>
+          XSTACK
+        </Text>
+
+        {{#unless (and (eq backend "convex") (eq auth "better-auth"))}}
+        <View style={styles.statusCard}>
+          <View style={styles.statusHeader}>
+            <Text style={styles.statusTitle}>System Status</Text>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusBadgeText}>LIVE</Text>
+            </View>
+          </View>
+          {{#if (eq backend "convex")}}
+            {{#unless (eq auth "better-auth")}}
+            <View style={styles.statusRow}>
+              <View
+                style={[
+                  styles.statusDot,
+                  healthCheck === "OK"
+                    ? styles.statusDotSuccess
+                    : styles.statusDotWarning,
+                ]}
+              />
+              <View style={styles.statusContent}>
+                <Text style={styles.statusLabel}>Convex</Text>
+                <Text style={styles.statusDescription}>
+                  {healthCheck === undefined
+                    ? "Checking connection..."
+                    : healthCheck === "OK"
+                    ? "Connected to API"
+                    : "API Disconnected"}
+                </Text>
+              </View>
+            </View>
+            {{/unless}}
+          {{else}}
+            {{#unless (eq api "none")}}
+            <View style={styles.statusRow}>
+              <View
+                style={[
+                  styles.statusDot,
+                  healthCheck.data
+                    ? styles.statusDotSuccess
+                    : styles.statusDotWarning,
+                ]}
+              />
+              <View style={styles.statusContent}>
+                <Text style={styles.statusLabel}>
+                  {{#if (eq api "orpc")}}ORPC{{/if}}
+                  {{#if (eq api "trpc")}}TRPC{{/if}}
+                </Text>
+                <Text style={styles.statusDescription}>
+                  {healthCheck.isLoading
+                    ? "Checking connection..."
+                    : healthCheck.data
+                    ? "Connected to API"
+                    : "API Disconnected"}
+                </Text>
+              </View>
+            </View>
+            {{/unless}}
+          {{/if}}
+        </View>
+        {{/unless}}
+
+        {{#if (and (eq backend "convex") (eq auth "clerk"))}}
+        <Authenticated>
+          <Text>
+            Hello {user?.emailAddresses[0].emailAddress}
+          </Text>
+          <Text>
+            Private Data: {privateData?.message}
+          </Text>
+          <SignOutButton />
+        </Authenticated>
+        <Unauthenticated>
+          <Link href="/(auth)/sign-in">
+            <Text>Sign in</Text>
+          </Link>
+          <Link href="/(auth)/sign-up">
+            <Text>Sign up</Text>
+          </Link>
+        </Unauthenticated>
+        <AuthLoading>
+          <Text>Loading...</Text>
+        </AuthLoading>
+        {{/if}}
+
+        {{#if (and (ne backend "convex") (eq auth "clerk"))}}
+        {!isLoaded ? (
+          <Text style={styles.apiStatusText}>Loading...</Text>
+        ) : isSignedIn ? (
+          <View style={styles.userCard}>
+            <View style={styles.userHeader}>
+              <Text style={styles.userWelcome}>
+                Welcome,{" "}
+                <Text style={styles.userName}>{user?.fullName ?? user?.firstName ?? "there"}</Text>
+              </Text>
+            </View>
+            <Text style={styles.userEmail}>{user?.emailAddresses[0]?.emailAddress}</Text>
+            <SignOutButton />
+          </View>
+        ) : (
+          <>
+            <Link href="/(auth)/sign-in">
+              <Text style={styles.apiStatusText}>Sign in</Text>
+            </Link>
+            <Link href="/(auth)/sign-up">
+              <Text style={styles.apiStatusText}>Sign up</Text>
+            </Link>
+          </>
+        )}
+        {{/if}}
+
+        {{#if (and (eq backend "convex") (eq auth "better-auth"))}}
+        {user ? (
+          <View style={styles.userCard}>
+            <View style={styles.userHeader}>
+              <Text style={styles.userWelcome}>
+                Welcome,{" "}
+                <Text style={styles.userName}>{user.name}</Text>
+              </Text>
+            </View>
+            <Text style={styles.userEmail}>{user.email}</Text>
+            <TouchableOpacity
+              style={styles.signOutButton}
+              onPress={() => {
+                authClient.signOut();
+              }}
+            >
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        <View style={styles.apiStatusCard}>
+          <Text style={styles.apiStatusTitle}>API Status</Text>
+          <View style={styles.apiStatusRow}>
+            <View
+              style={[
+                styles.statusDot,
+                healthCheck === "OK"
+                  ? styles.statusDotSuccess
+                  : styles.statusDotWarning,
+              ]}
+            />
+            <Text style={styles.apiStatusText}>
+              {healthCheck === undefined
+                ? "Checking..."
+                : healthCheck === "OK"
+                ? "Connected to API"
+                : "API Disconnected"}
+            </Text>
+          </View>
+        </View>
+        {!user && (
+          <>
+            <SignIn />
+            <SignUp />
+          </>
+        )}
+        {{/if}}
+      </ScrollView>
+    </Container>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    paddingHorizontal: theme.spacing.md,
+  },
+  heroSection: {
+    paddingVertical: theme.spacing.xl,
+  },
+  heroTitle: {
+    fontSize: theme.fontSize["4xl"],
+    fontWeight: "bold",
+    color: theme.colors.foreground,
+    marginBottom: theme.spacing.sm,
+  },
+  heroSubtitle: {
+    fontSize: theme.fontSize.lg,
+    color: theme.colors.mutedForeground,
+    lineHeight: 28,
+  },
+  statusCard: {
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  statusHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.md,
+  },
+  statusTitle: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: "600",
+    color: theme.colors.cardForeground,
+  },
+  statusBadge: {
+    backgroundColor: theme.colors.secondary,
+    paddingHorizontal: theme.spacing.sm + 4,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: 9999,
+  },
+  statusBadgeText: {
+    fontSize: theme.fontSize.xs,
+    fontWeight: "500",
+    color: theme.colors.secondaryForeground,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm + 4,
+  },
+  statusDot: {
+    height: 12,
+    width: 12,
+    borderRadius: 6,
+  },
+  statusDotSuccess: {
+    backgroundColor: theme.colors.success,
+  },
+  statusDotWarning: {
+    backgroundColor: "#F59E0B",
+  },
+  statusContent: {
+    flex: 1,
+  },
+  statusLabel: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: "500",
+    color: theme.colors.cardForeground,
+  },
+  statusDescription: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.mutedForeground,
+  },
+  userCard: {
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  userHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.xs,
+  },
+  userWelcome: {
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foreground,
+  },
+  userName: {
+    fontWeight: "500",
+  },
+  userEmail: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.mutedForeground,
+    marginBottom: theme.spacing.md,
+  },
+  signOutButton: {
+    backgroundColor: theme.colors.destructive,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignSelf: "flex-start",
+  },
+  signOutText: {
+    color: theme.colors.destructiveForeground,
+    fontWeight: "500",
+  },
+  apiStatusCard: {
+    marginBottom: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: theme.spacing.md,
+  },
+  apiStatusTitle: {
+    marginBottom: theme.spacing.sm,
+    fontWeight: "500",
+    color: theme.colors.foreground,
+  },
+  apiStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xs,
+  },
+  apiStatusText: {
+    color: theme.colors.mutedForeground,
+  },
+}));
+`],
+  ["frontend/native/unistyles/app/+html.tsx.hbs", `import { ScrollViewStyleReset, useServerDocumentContext } from "expo-router/html";
+import { type PropsWithChildren } from "react";
+
+import "../unistyles";
+
+// This file is web-only and used to configure the root HTML for every
+// web page during static rendering.
+// The contents of this function only run in Node.js environments and
+// do not have access to the DOM or browser APIs.
+export default function Root({ children }: PropsWithChildren) {
+  const { htmlAttributes, bodyAttributes, headNodes, bodyNodes } = useServerDocumentContext();
+
+  return (
+    <html lang="en" {...htmlAttributes}>
+      <head>
+        {headNodes}
+        <meta charSet="utf-8" />
+        <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, shrink-to-fit=no"
+        />
+
+        {/*
+          Disable body scrolling on web. This makes ScrollView components work closer to how they do on native.
+          However, body scrolling is often nice to have for mobile web. If you want to enable it, remove this line.
+        */}
+        <ScrollViewStyleReset />
+
+        {/* Add any additional <head> elements that you want globally available on web... */}
+      </head>
+      <body {...bodyAttributes}>{children}{bodyNodes}</body>
+    </html>
+  );
+}
+`],
+  ["frontend/native/unistyles/app/+not-found.tsx.hbs", `import "@/unistyles";
+
+import { Link, Stack } from "expo-router";
+import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import { Container } from "@/components/container";
+
+export default function NotFoundScreen() {
+  return (
+    <>
+      <Stack.Screen options=\\{{ title: "Oops!" }} />
+      <Container>
+        <View style={styles.container}>
+          <View style={styles.content}>
+            <Text style={styles.emoji}>🤔</Text>
+            <Text style={styles.title}>Page Not Found</Text>
+            <Text style={styles.description}>
+              Sorry, the page you're looking for doesn't exist.
+            </Text>
+            <Link href="/" style={styles.button}>
+              <Text style={styles.buttonText}>Go to Home</Text>
+            </Link>
+          </View>
+        </View>
+      </Container>
+    </>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: theme.spacing.lg,
+  },
+  content: {
+    alignItems: "center",
+  },
+  emoji: {
+    fontSize: 64,
+    marginBottom: theme.spacing.md,
+  },
+  title: {
+    fontSize: theme.fontSize["2xl"],
+    fontWeight: "bold",
+    color: theme.colors.foreground,
+    marginBottom: theme.spacing.sm,
+    textAlign: "center",
+  },
+  description: {
+    color: theme.colors.mutedForeground,
+    textAlign: "center",
+    marginBottom: theme.spacing.xl,
+    maxWidth: 280,
+  },
+  button: {
+    backgroundColor: \`\${theme.colors.primary}1A\`, // 10% opacity
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm + 4,
+    borderRadius: theme.borderRadius.lg,
+  },
+  buttonText: {
+    color: theme.colors.primary,
+    fontWeight: "500",
+  },
+}));
+`],
+  ["frontend/native/unistyles/app/modal.tsx.hbs", `import "@/unistyles";
+
+import { Container } from "@/components/container";
+import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+
+export default function Modal() {
+  return (
+    <Container>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Modal</Text>
+        </View>
+      </View>
+    </Container>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    flex: 1,
+    padding: theme.spacing.lg,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.xl,
+  },
+  title: {
+    fontSize: theme.fontSize["2xl"],
+    fontWeight: "bold",
+    color: theme.colors.foreground,
+  },
+}));
+`],
+  ["frontend/native/unistyles/babel.config.js.hbs", `module.exports = (api) => {
+	api.cache(true);
+
+	return {
+		presets: ["babel-preset-expo"],
+		plugins: [
+      require("@varlock/expo-integration/babel-plugin"),
+			[
+				"react-native-unistyles/plugin",
+				{
+					root: "app",
+					autoProcessImports: ["@/components"],
+				},
+			],
+		],
+	};
+};
+`],
+  ["frontend/native/unistyles/breakpoints.ts.hbs", `export const breakpoints = {
+  xs: 0,
+  sm: 576,
+  md: 768,
+  lg: 992,
+  xl: 1200,
+  superLarge: 2000,
+  tvLike: 4000,
+} as const;
+`],
+  ["frontend/native/unistyles/components/container.tsx.hbs", `import "@/unistyles";
+
+import React from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet } from "react-native-unistyles";
+
+export const Container = ({ children }: { children: React.ReactNode }) => {
+  return <SafeAreaView style={styles.container}>{children}</SafeAreaView>;
+};
+
+const styles = StyleSheet.create((theme, rt) => ({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    paddingBottom: rt.insets.bottom,
+  },
+}));
+`],
+  ["frontend/native/unistyles/components/header-button.tsx.hbs", `import "@/unistyles";
+
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { forwardRef, type ComponentRef } from "react";
+import { Pressable } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+
+export const HeaderButton = forwardRef<
+  ComponentRef<typeof Pressable>,
+  { onPress?: () => void }
+>(({ onPress }, ref) => {
+  return (
+    <Pressable ref={ref} onPress={onPress} style={styles.button}>
+      {({ pressed }) => (
+        <FontAwesome
+          name="info-circle"
+          size={20}
+          color={styles.icon.color}
+          style=\\{{
+            opacity: pressed ? 0.7 : 1,
+          }}
+        />
+      )}
+    </Pressable>
+  );
+});
+
+const styles = StyleSheet.create((theme) => ({
+  button: {
+    padding: theme.spacing.sm,
+    marginRight: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: \`\${theme.colors.secondary}80\`, // 50% opacity
+  },
+  icon: {
+    color: theme.colors.secondaryForeground,
+  },
+}));
+`],
+  ["frontend/native/unistyles/components/tabbar-icon.tsx.hbs", `import FontAwesome from "@expo/vector-icons/FontAwesome";
+import type { TextStyle } from "react-native";
+
+type FontAwesomeProps = React.ComponentProps<typeof FontAwesome>;
+
+export const TabBarIcon = (props: {
+  name: FontAwesomeProps["name"];
+  color: TextStyle["color"];
+}) => {
+  const { color, ...iconProps } = props;
+  return <FontAwesome size={24} style={[{ marginBottom: -3, color }]} {...iconProps} />;
+};
+`],
+  ["frontend/native/unistyles/index.js.hbs", `import './unistyles';
+import 'expo-router/entry';
+`],
+  ["frontend/native/unistyles/metro.config.js.hbs", `const { withVarlockMetroConfig } = require("@varlock/expo-integration/metro-config");
+const { getDefaultConfig } = require("expo/metro-config");
+
+const config = getDefaultConfig(__dirname);
+{{#if (or (eq webDeploy "cloudflare") (eq serverDeploy "cloudflare"))}}
+// Alchemy writes runtime state here; block it to avoid Metro refresh loops.
+const blockList = config.resolver.blockList ?? [];
+const blockListPatterns = Array.isArray(blockList) ? blockList : [blockList];
+
+config.resolver.blockList = [
+	...blockListPatterns,
+	/[/\\\\]packages[/\\\\]infra[/\\\\]\\.alchemy(?:[/\\\\]|$)/,
+];
+{{/if}}
+
+module.exports = withVarlockMetroConfig(config);
+`],
+  ["frontend/native/unistyles/package.json.hbs", `{
+  "name": "native",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "dev": "expo start --clear",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "expo": "~58.0.12",
+    "expo-constants": "~58.0.12",
+    "expo-crypto": "~58.0.6",
+    "expo-dev-client": "~58.0.13",
+    "expo-font": "~58.0.8",
+    "expo-linking": "~58.0.13",
+    "expo-network": "~58.0.3",
+    "expo-router": "~58.0.21",
+    "expo-secure-store": "~58.0.2",
+    "expo-splash-screen": "~58.0.9",
+    "expo-status-bar": "~58.0.3",
+    "expo-system-ui": "~58.0.6",
+    "expo-web-browser": "~58.0.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-gesture-handler": "~3.3.0",
+    "react-native-nitro-modules": "0.37.1",
+    "react-native-reanimated": "4.7.1",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "~4.30.0",
+    "react-native-unistyles": "^3.3.0",
+    "react-native-web": "~0.21.4",
+    "react-native-worklets": "0.13.0"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "@babel/core": "^7.29.7",
+    "@types/react": "~19.3.0",
+    "typescript": "~6.0.3"
+  }
+}
+`],
+  ["frontend/native/unistyles/theme.ts.hbs", `const sharedColors = {
+  success: "#22C55E",
+  destructive: "#EF4444",
+  destructiveForeground: "#FFFFFF",
+  warning: "#F59E0B",
+  info: "#3B82F6",
+} as const;
+
+export const lightTheme = {
+  colors: {
+    ...sharedColors,
+    typography: "hsl(0 0% 0%)",
+    background: "hsl(0 0% 100%)",
+    foreground: "hsl(0 0% 0%)",
+    card: "hsl(0 0% 98%)",
+    cardForeground: "hsl(0 0% 0%)",
+    primary: "hsl(0 0% 10%)",
+    primaryForeground: "hsl(0 0% 100%)",
+    secondary: "hsl(0 0% 95%)",
+    secondaryForeground: "hsl(0 0% 0%)",
+    muted: "hsl(0 0% 96%)",
+    mutedForeground: "hsl(0 0% 45%)",
+    accent: "hsl(0 0% 96%)",
+    accentForeground: "hsl(0 0% 0%)",
+    border: "hsl(0 0% 90%)",
+    input: "hsl(0 0% 90%)",
+    ring: "hsl(0 0% 20%)",
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 48,
+  },
+  borderRadius: {
+    sm: 6,
+    md: 8,
+    lg: 12,
+    xl: 16,
+  },
+  fontSize: {
+    xs: 12,
+    sm: 14,
+    base: 16,
+    lg: 18,
+    xl: 20,
+    "2xl": 24,
+    "3xl": 30,
+    "4xl": 36,
+  },
+} as const;
+
+export const darkTheme = {
+  colors: {
+    ...sharedColors,
+    typography: "hsl(0 0% 100%)",
+    background: "hsl(0 0% 0%)",
+    foreground: "hsl(0 0% 100%)",
+    card: "hsl(0 0% 2%)",
+    cardForeground: "hsl(0 0% 100%)",
+    primary: "hsl(0 0% 90%)",
+    primaryForeground: "hsl(0 0% 0%)",
+    secondary: "hsl(0 0% 10%)",
+    secondaryForeground: "hsl(0 0% 100%)",
+    muted: "hsl(0 0% 8%)",
+    mutedForeground: "hsl(0 0% 65%)",
+    accent: "hsl(0 0% 8%)",
+    accentForeground: "hsl(0 0% 100%)",
+    border: "hsl(0 0% 15%)",
+    input: "hsl(0 0% 15%)",
+    ring: "hsl(0 0% 80%)",
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 48,
+  },
+  borderRadius: {
+    sm: 6,
+    md: 8,
+    lg: 12,
+    xl: 16,
+  },
+  fontSize: {
+    xs: 12,
+    sm: 14,
+    base: 16,
+    lg: 18,
+    xl: 20,
+    "2xl": 24,
+    "3xl": 30,
+    "4xl": 36,
+  },
+} as const;
+`],
+  ["frontend/native/unistyles/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}
+`],
+  ["frontend/native/unistyles/unistyles.ts.hbs", `import { StyleSheet } from "react-native-unistyles";
+
+import { breakpoints } from "./breakpoints";
+import { darkTheme, lightTheme } from "./theme";
+
+type AppBreakpoints = typeof breakpoints;
+
+type AppThemes = {
+  light: typeof lightTheme;
+  dark: typeof darkTheme;
+};
+
+declare module "react-native-unistyles" {
+  export interface UnistylesBreakpoints extends AppBreakpoints {}
+  export interface UnistylesThemes extends AppThemes {}
+}
+
+StyleSheet.configure({
+  breakpoints,
+  themes: {
+    light: lightTheme,
+    dark: darkTheme,
+  },
+  settings: {
+    adaptiveThemes: true,
+  },
+});
+`],
+  ["frontend/native/uniwind/_gitignore", `# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# UniWind generated types
+uniwind-types.d.ts
+`],
+  ["frontend/native/uniwind/app.json.hbs", `{
+  "expo": {
+    "name": "{{projectName}}",
+    "slug": "{{projectName}}",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "{{projectName}}",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "{{appId projectName "ios"}}"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "{{appId projectName "android"}}"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
+`],
+  ["frontend/native/uniwind/app/_layout.tsx.hbs", `{{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
+import { useEffect } from "react";
+import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
+{{/if}}
+
+import "@/global.css";
+{{#if (and (ne backend "convex") (eq auth "clerk"))}}
+import { ClerkProvider{{#unless (eq api "none")}}, useAuth{{/unless}} } from "@clerk/expo";
+import { tokenCache } from "@clerk/expo/token-cache";
+import { ENV } from "../src/env";
+{{/if}}
+
+{{#if (eq backend "convex")}}
+  {{#if (eq auth "better-auth")}}
+    import { ConvexReactClient } from "convex/react";
+    import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+    import { authClient } from "@/lib/auth-client";
+    import { ENV } from "../src/env";
+  {{else}}
+    import { ConvexProvider, ConvexReactClient } from "convex/react";
+    import { ENV } from "../src/env";
+  {{/if}}
+
+  {{#if (eq auth "clerk")}}
+    import { ClerkProvider, useAuth } from "@clerk/expo";
+    import { ConvexProviderWithClerk } from "convex/react-clerk";
+    import { tokenCache } from "@clerk/expo/token-cache";
+  {{/if}}
+{{else}}
+  {{#unless (eq api "none")}}
+    import { QueryClientProvider } from "@tanstack/react-query";
+  {{/unless}}
+{{/if}}
+
+import { Stack } from "expo-router";
+import { HeroUINativeProvider } from "heroui-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
+import { AppThemeProvider } from "@/contexts/app-theme-context";
+
+{{#if (eq api "trpc")}}
+  import { queryClient } from "@/utils/trpc";
+{{/if}}
+{{#if (eq api "orpc")}}
+  import { queryClient } from "@/utils/orpc";
+{{/if}}
+
+export const unstable_settings = {
+  anchor: "(drawer)",
+};
+
+{{#if (eq backend "convex")}}
+  const convex = new ConvexReactClient(ENV.EXPO_PUBLIC_CONVEX_URL, {
+    unsavedChangesWarning: false,
+  });
+{{/if}}
+
+{{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
+function ClerkApiAuthBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setClerkAuthTokenGetter(getToken);
+
+    return () => {
+      setClerkAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  return null;
+}
+{{/if}}
+
+function StackLayout() {
+  return (
+    <Stack screenOptions=\\{{}}>
+      <Stack.Screen name="(drawer)" options=\\{{ headerShown: false }} />
+      {{#if (eq auth "clerk")}}
+        <Stack.Screen name="(auth)" options=\\{{ headerShown: false }} />
+      {{/if}}
+      <Stack.Screen name="modal" options=\\{{ title: "Modal", presentation: "modal" }} />
+    </Stack>
+  );
+}
+
+export default function Layout() {
+  return (
+    {{#if (eq backend "convex")}}
+      {{#if (eq auth "clerk")}}
+        <ClerkProvider tokenCache={tokenCache} publishableKey={ENV.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}>
+          <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+            <GestureHandlerRootView style=\\{{ flex: 1 }}>
+              <KeyboardProvider>
+                <AppThemeProvider>
+                  <HeroUINativeProvider>
+                    <StackLayout />
+                  </HeroUINativeProvider>
+                </AppThemeProvider>
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </ConvexProviderWithClerk>
+        </ClerkProvider>
+      {{else if (eq auth "better-auth")}}
+        <ConvexBetterAuthProvider client={convex} authClient={authClient}>
+          <GestureHandlerRootView style=\\{{ flex: 1 }}>
+            <KeyboardProvider>
+              <AppThemeProvider>
+                <HeroUINativeProvider>
+                  <StackLayout />
+                </HeroUINativeProvider>
+              </AppThemeProvider>
+            </KeyboardProvider>
+          </GestureHandlerRootView>
+        </ConvexBetterAuthProvider>
+      {{else}}
+        <ConvexProvider client={convex}>
+          <GestureHandlerRootView style=\\{{ flex: 1 }}>
+            <KeyboardProvider>
+              <AppThemeProvider>
+                <HeroUINativeProvider>
+                  <StackLayout />
+                </HeroUINativeProvider>
+              </AppThemeProvider>
+            </KeyboardProvider>
+          </GestureHandlerRootView>
+        </ConvexProvider>
+      {{/if}}
+    {{else}}
+      {{#if (eq auth "clerk")}}
+        <ClerkProvider tokenCache={tokenCache} publishableKey={ENV.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}>
+          {{#unless (eq api "none")}}
+            <ClerkApiAuthBridge />
+            <QueryClientProvider client={queryClient}>
+              <GestureHandlerRootView style=\\{{ flex: 1 }}>
+                <KeyboardProvider>
+                  <AppThemeProvider>
+                    <HeroUINativeProvider>
+                      <StackLayout />
+                    </HeroUINativeProvider>
+                  </AppThemeProvider>
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </QueryClientProvider>
+          {{else}}
+            <GestureHandlerRootView style=\\{{ flex: 1 }}>
+              <KeyboardProvider>
+                <AppThemeProvider>
+                  <HeroUINativeProvider>
+                    <StackLayout />
+                  </HeroUINativeProvider>
+                </AppThemeProvider>
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          {{/unless}}
+        </ClerkProvider>
+      {{else}}
+        {{#unless (eq api "none")}}
+          <QueryClientProvider client={queryClient}>
+            <GestureHandlerRootView style=\\{{ flex: 1 }}>
+              <KeyboardProvider>
+                <AppThemeProvider>
+                  <HeroUINativeProvider>
+                    <StackLayout />
+                  </HeroUINativeProvider>
+                </AppThemeProvider>
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </QueryClientProvider>
+        {{else}}
+          <GestureHandlerRootView style=\\{{ flex: 1 }}>
+            <KeyboardProvider>
+              <AppThemeProvider>
+                <HeroUINativeProvider>
+                  <StackLayout />
+                </HeroUINativeProvider>
+              </AppThemeProvider>
+            </KeyboardProvider>
+          </GestureHandlerRootView>
+        {{/unless}}
+      {{/if}}
+    {{/if}}
+  );
+}
+`],
+  ["frontend/native/uniwind/app/(drawer)/_layout.tsx.hbs", `import React, { useCallback } from "react";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Link } from "expo-router";
+import { Drawer } from "expo-router/drawer";
+import { useThemeColor } from "heroui-native";
+import { Pressable, Text } from "react-native";
+import { ThemeToggle } from "@/components/theme-toggle";
+
+function DrawerLayout() {
+  const themeColorForeground = useThemeColor("foreground");
+  const themeColorBackground = useThemeColor("background");
+
+  const renderThemeToggle = useCallback(() => <ThemeToggle />, []);
+
+  return (
+    <Drawer
+      screenOptions=\\{{
+        headerTintColor: themeColorForeground,
+        headerStyle: { backgroundColor: themeColorBackground },
+        headerTitleStyle: {
+          fontWeight: "600",
+          color: themeColorForeground,
+        },
+        headerRight: renderThemeToggle,
+        drawerStyle: { backgroundColor: themeColorBackground },
+      }}
+    >
+      <Drawer.Screen
+        name="index"
+        options=\\{{
+          headerTitle: "Home",
+          drawerLabel: ({ color, focused }) => (
+            <Text style=\\{{ color: focused ? color : themeColorForeground }}>Home</Text>
+          ),
+          drawerIcon: ({ size, color, focused }) => (
+            <Ionicons name="home-outline" size={size} style=\\{{ color: focused ? color : themeColorForeground }} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="(tabs)"
+        options=\\{{
+          headerTitle: "Tabs",
+          drawerLabel: ({ color, focused }) => (
+            <Text style=\\{{ color: focused ? color : themeColorForeground }}>Tabs</Text>
+          ),
+          drawerIcon: ({ size, color, focused }) => (
+            <MaterialIcons name="border-bottom" size={size} style=\\{{ color: focused ? color : themeColorForeground }} />
+          ),
+          headerRight: () => (
+            <Link href="/modal" asChild>
+              <Pressable className="mr-4">
+                <Ionicons name="add-outline" size={24} style=\\{{ color: themeColorForeground }} />
+              </Pressable>
+            </Link>
+          ),
+        }}
+      />
+    </Drawer>
+  );
+}
+
+export default DrawerLayout;`],
+  ["frontend/native/uniwind/app/(drawer)/(tabs)/_layout.tsx.hbs", `import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { useThemeColor } from "heroui-native";
+
+export default function TabLayout() {
+	const themeColorForeground = useThemeColor("foreground");
+	const themeColorBackground = useThemeColor("background");
+
+	return (
+		<Tabs
+			screenOptions=\\{{
+				headerShown: false,
+				headerStyle: {
+					backgroundColor: themeColorBackground,
+				},
+				headerTintColor: themeColorForeground,
+				headerTitleStyle: {
+					color: themeColorForeground,
+					fontWeight: "600",
+				},
+				tabBarStyle: {
+					backgroundColor: themeColorBackground,
+				},
+			}}
+		>
+			<Tabs.Screen
+				name="index"
+				options=\\{{
+					title: "Home",
+					tabBarIcon: ({ color, size }) => (
+						<Ionicons name="home" size={size} style=\\{{ color: color ?? themeColorForeground }} />
+					),
+				}}
+			/>
+			<Tabs.Screen
+				name="two"
+				options=\\{{
+					title: "Explore",
+					tabBarIcon: ({ color, size }) => (
+						<Ionicons name="compass" size={size} style=\\{{ color: color ?? themeColorForeground }} />
+					),
+				}}
+			/>
+		</Tabs>
+	);
+}
+`],
+  ["frontend/native/uniwind/app/(drawer)/(tabs)/index.tsx.hbs", `import { Container } from "@/components/container";
+import { Text, View } from "react-native";
+import { Card } from "heroui-native";
+
+export default function Home() {
+	return (
+		<Container className="p-6">
+			<View className="flex-1 justify-center items-center">
+				<Card variant="secondary" className="p-8 items-center">
+					<Card.Title className="text-3xl mb-2">Tab One</Card.Title>
+				</Card>
+			</View>
+		</Container>
+	);
+}
+`],
+  ["frontend/native/uniwind/app/(drawer)/(tabs)/two.tsx.hbs", `import { Container } from "@/components/container";
+import { Text, View } from "react-native";
+import { Card } from "heroui-native";
+
+export default function TabTwo() {
+	return (
+		<Container className="p-6">
+			<View className="flex-1 justify-center items-center">
+				<Card variant="secondary" className="p-8 items-center">
+					<Card.Title className="text-3xl mb-2">TabTwo</Card.Title>
+				</Card>
+			</View>
+		</Container>
+	);
+}
+`],
+  ["frontend/native/uniwind/app/(drawer)/index.tsx.hbs", `import { Text, View } from "react-native";
+import { Container } from "@/components/container";
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { trpc } from "@/utils/trpc";
+{{/if}}
+{{#if (and (eq backend "convex") (eq auth "clerk"))}}
+import { Link } from "expo-router";
+import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import { useUser } from "@clerk/expo";
+import { SignOutButton } from "@/components/sign-out-button";
+{{else if (and (ne backend "convex") (eq auth "clerk"))}}
+import { Link } from "expo-router";
+import { useAuth, useUser } from "@clerk/expo";
+import { SignOutButton } from "@/components/sign-out-button";
+{{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+import { useConvexAuth, useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import { authClient } from "@/lib/auth-client";
+import { SignIn } from "@/components/sign-in";
+import { SignUp } from "@/components/sign-up";
+{{else if (eq backend "convex")}}
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+{{/if}}
+{{#unless (or (eq backend "none") (and (eq backend "convex") (eq auth "better-auth")))}}
+import { Ionicons } from "@expo/vector-icons";
+{{/unless}}
+import { Button, Chip, Separator, Spinner, Surface, useThemeColor } from "heroui-native";
+
+export default function Home() {
+{{#if (eq api "orpc")}}
+const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+{{/if}}
+{{#if (eq api "trpc")}}
+const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+{{/if}}
+{{#if (and (eq backend "convex") (eq auth "clerk"))}}
+const { user } = useUser();
+const healthCheck = useQuery(api.healthCheck.get);
+const privateData = useQuery(api.privateData.get);
+{{else if (and (ne backend "convex") (eq auth "clerk"))}}
+const { isLoaded, isSignedIn } = useAuth();
+const { user } = useUser();
+{{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+const healthCheck = useQuery(api.healthCheck.get);
+const { isAuthenticated } = useConvexAuth();
+const user = useQuery(api.auth.getCurrentUser, isAuthenticated ? {} : "skip");
+{{else if (eq backend "convex")}}
+const healthCheck = useQuery(api.healthCheck.get);
+{{/if}}
+{{#unless (eq backend "none")}}
+const successColor = useThemeColor("success");
+const dangerColor = useThemeColor("danger");
+
+{{#if (eq backend "convex")}}
+const isConnected = healthCheck === "OK";
+const isLoading = healthCheck === undefined;
+{{else}}
+{{#unless (eq api "none")}}
+const isConnected = healthCheck?.data === "OK";
+const isLoading = healthCheck?.isLoading;
+{{/unless}}
+{{/if}}
+{{/unless}}
+
+return (
+<Container className="px-4 pb-4">
+  <View className="py-6 mb-5">
+    <Text className="text-3xl font-semibold text-foreground tracking-tight">
+      xstack
+    </Text>
+    <Text className="text-muted text-sm mt-1">Full-stack TypeScript starter</Text>
+  </View>
+
+  {{#unless (or (eq backend "none") (and (eq backend "convex") (eq auth "better-auth")))}}
+  <Surface variant="secondary" className="p-4 rounded-xl">
+    <View className="flex-row items-center justify-between mb-3">
+      <Text className="text-foreground font-medium">System Status</Text>
+      <Chip variant="secondary" color={isConnected ? "success" : "danger" } size="sm">
+        <Chip.Label>
+          {isConnected ? "LIVE" : "OFFLINE"}
+        </Chip.Label>
+      </Chip>
+    </View>
+
+    <Separator className="mb-3" />
+
+    <Surface variant="tertiary" className="p-3 rounded-lg">
+      <View className="flex-row items-center">
+        <View className={\`w-2 h-2 rounded-full mr-3 \${ isConnected ? "bg-success" : "bg-muted" }\`} />
+        <View className="flex-1">
+          <Text className="text-foreground text-sm font-medium">
+            {{#if (eq backend "convex")}}
+            Convex Backend
+            {{else}}
+            {{#unless (eq api "none")}}
+            {{#if (eq api "orpc")}}ORPC{{else}}TRPC{{/if}} Backend
+            {{/unless}}
+            {{/if}}
+          </Text>
+          <Text className="text-muted text-xs mt-0.5">
+            {isLoading
+            ? "Checking connection..."
+            : isConnected
+            ? "Connected to API"
+            : "API Disconnected"}
+          </Text>
+        </View>
+        {isLoading && <Spinner size="sm" />}
+        {!isLoading && isConnected && (
+        <Ionicons name="checkmark-circle" size={18} color={successColor} />
+        )}
+        {!isLoading && !isConnected && (
+        <Ionicons name="close-circle" size={18} color={dangerColor} />
+        )}
+      </View>
+    </Surface>
+  </Surface>
+  {{/unless}}
+
+  {{#if (and (eq backend "convex") (eq auth "clerk"))}}
+  <Authenticated>
+    <Surface variant="secondary" className="mt-5 p-4 rounded-xl">
+      <View className="flex-row items-center justify-between">
+        <View className="flex-1">
+          <Text className="text-foreground font-medium">{user?.emailAddresses[0].emailAddress}</Text>
+          <Text className="text-muted text-xs mt-0.5">Private: {privateData?.message}</Text>
+        </View>
+        <SignOutButton />
+      </View>
+    </Surface>
+  </Authenticated>
+  <Unauthenticated>
+    <View className="mt-4 gap-3">
+      <Link href="/(auth)/sign-in" asChild>
+        <Button variant="secondary"><Button.Label>Sign In</Button.Label></Button>
+      </Link>
+      <Link href="/(auth)/sign-up" asChild>
+        <Button variant="ghost"><Button.Label>Sign Up</Button.Label></Button>
+      </Link>
+    </View>
+  </Unauthenticated>
+  <AuthLoading>
+    <View className="mt-4 items-center">
+      <Spinner size="sm" />
+    </View>
+  </AuthLoading>
+  {{/if}}
+
+  {{#if (and (ne backend "convex") (eq auth "clerk"))}}
+  {!isLoaded ? (
+  <View className="mt-4 items-center">
+    <Spinner size="sm" />
+  </View>
+  ) : isSignedIn ? (
+  <Surface variant="secondary" className="mt-5 p-4 rounded-xl">
+    <View className="flex-row items-center justify-between">
+      <View className="flex-1">
+        <Text className="text-foreground font-medium">
+          {user?.fullName ?? user?.firstName ?? "Welcome"}
+        </Text>
+        <Text className="text-muted text-xs mt-0.5">
+          {user?.emailAddresses[0]?.emailAddress}
+        </Text>
+      </View>
+      <SignOutButton />
+    </View>
+  </Surface>
+  ) : (
+  <View className="mt-4 gap-3">
+    <Link href="/(auth)/sign-in" asChild>
+      <Button variant="secondary"><Button.Label>Sign In</Button.Label></Button>
+    </Link>
+    <Link href="/(auth)/sign-up" asChild>
+      <Button variant="ghost"><Button.Label>Sign Up</Button.Label></Button>
+    </Link>
+  </View>
+  )}
+  {{/if}}
+
+  {{#if (and (eq backend "convex") (eq auth "better-auth"))}}
+  {user ? (
+  <Surface variant="secondary" className="mb-4 p-4 rounded-xl">
+    <View className="flex-row items-center justify-between">
+      <View className="flex-1">
+        <Text className="text-foreground font-medium">{user.name}</Text>
+        <Text className="text-muted text-xs mt-0.5">{user.email}</Text>
+      </View>
+      <Button
+        variant="danger"
+        size="sm"
+        onPress={() => {
+          authClient.signOut();
+        }}
+      >
+        Sign Out
+      </Button>
+    </View>
+  </Surface>
+  ) : null}
+  <Surface variant="secondary" className="p-4 rounded-xl">
+    <Text className="text-foreground font-medium mb-2">API Status</Text>
+    <View className="flex-row items-center gap-2">
+      <View className={\`w-2 h-2 rounded-full \${healthCheck==="OK" ? "bg-success" : "bg-danger" }\`} />
+      <Text className="text-muted text-xs">
+        {healthCheck === undefined
+        ? "Checking..."
+        : healthCheck === "OK"
+        ? "Connected to API"
+        : "API Disconnected"}
+      </Text>
+    </View>
+  </Surface>
+  {!user && (
+  <View className="mt-5 gap-4">
+    <SignIn />
+    <SignUp />
+  </View>
+  )}
+  {{/if}}
+</Container>
+);
+}
+`],
+  ["frontend/native/uniwind/app/+not-found.tsx.hbs", `import { Link, Stack } from "expo-router";
+import { Button, Surface } from "heroui-native";
+import { Text, View } from "react-native";
+
+import { Container } from "@/components/container";
+
+export default function NotFoundScreen() {
+	return (
+		<>
+			<Stack.Screen options=\\{{ title: "Not Found" }} />
+			<Container>
+				<View className="flex-1 justify-center items-center p-4">
+					<Surface variant="secondary" className="items-center p-6 max-w-sm rounded-lg">
+						<Text className="text-4xl mb-3">🤔</Text>
+						<Text className="text-foreground font-medium text-lg mb-1">Page Not Found</Text>
+						<Text className="text-muted text-sm text-center mb-4">
+							The page you're looking for doesn't exist.
+						</Text>
+						<Link href="/" asChild>
+							<Button size="sm">Go Home</Button>
+						</Link>
+					</Surface>
+				</View>
+			</Container>
+		</>
+	);
+}
+`],
+  ["frontend/native/uniwind/app/modal.tsx.hbs", `import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { Button, Surface, useThemeColor } from "heroui-native";
+import { Text, View } from "react-native";
+
+import { Container } from "@/components/container";
+
+function Modal() {
+	const accentForegroundColor = useThemeColor("accent-foreground");
+
+	function handleClose() {
+		router.back();
+	}
+
+	return (
+		<Container>
+			<View className="flex-1 justify-center items-center p-4">
+				<Surface variant="secondary" className="p-5 w-full max-w-sm rounded-lg">
+					<View className="items-center">
+						<View className="w-12 h-12 bg-accent rounded-lg items-center justify-center mb-3">
+							<Ionicons name="checkmark" size={24} color={accentForegroundColor} />
+						</View>
+						<Text className="text-foreground font-medium text-lg mb-1">Modal Screen</Text>
+						<Text className="text-muted text-sm text-center mb-4">
+							This is an example modal screen for dialogs and confirmations.
+						</Text>
+					</View>
+					<Button onPress={handleClose} className="w-full" size="sm">
+						<Button.Label>Close</Button.Label>
+					</Button>
+				</Surface>
+			</View>
+		</Container>
+	);
+}
+
+export default Modal;
+`],
+  ["frontend/native/uniwind/babel.config.js.hbs", `module.exports = {
+  presets: ["babel-preset-expo"],
+  plugins: [require("@varlock/expo-integration/babel-plugin")],
+};
+`],
+  ["frontend/native/uniwind/components/container.tsx.hbs", `import { cn } from "heroui-native";
+import { type PropsWithChildren } from "react";
+import { ScrollView, View, type ScrollViewProps, type ViewProps } from "react-native";
+import Animated, { type AnimatedProps } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const AnimatedView = Animated.createAnimatedComponent(View);
+
+type Props = AnimatedProps<ViewProps> & {
+  className?: string;
+  isScrollable?: boolean;
+  scrollViewProps?: Omit<ScrollViewProps, "contentContainerStyle">;
+};
+
+export function Container({
+  children,
+  className,
+  isScrollable = true,
+  scrollViewProps,
+  ...props
+}: PropsWithChildren<Props>) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <AnimatedView
+      className={cn("flex-1 bg-background", className)}
+      style=\\{{
+        paddingBottom: insets.bottom,
+      }}
+      {...props}
+    >
+      {isScrollable ? (
+        <ScrollView
+          contentContainerStyle=\\{{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          contentInsetAdjustmentBehavior="automatic"
+          {...scrollViewProps}
+        >
+          {children}
+        </ScrollView>
+      ) : (
+        <View className="flex-1">{children}</View>
+      )}
+    </AnimatedView>
+  );
+}
+`],
+  ["frontend/native/uniwind/components/theme-toggle.tsx.hbs", `import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { Platform, Pressable } from 'react-native';
+import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
+import { withUniwind } from 'uniwind';
+import { useAppTheme } from '@/contexts/app-theme-context';
+
+const StyledIonicons = withUniwind(Ionicons);
+
+export function ThemeToggle() {
+	const { toggleTheme, isLight } = useAppTheme();
+
+	return (
+		<Pressable
+			onPress={() => {
+				if (Platform.OS === 'ios') {
+					Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+				}
+				toggleTheme();
+			}}
+			className="px-2.5"
+		>
+			{isLight ? (
+				<Animated.View key="moon" entering={ZoomIn} exiting={FadeOut}>
+					<StyledIonicons name="moon" size={20} className="text-foreground" />
+				</Animated.View>
+			) : (
+				<Animated.View key="sun" entering={ZoomIn} exiting={FadeOut}>
+					<StyledIonicons name="sunny" size={20} className="text-foreground" />
+				</Animated.View>
+			)}
+		</Pressable>
+	);
+}
+
+`],
+  ["frontend/native/uniwind/contexts/app-theme-context.tsx.hbs", `import React, { createContext, useCallback, useContext, useMemo } from 'react';
+import { Uniwind, useUniwind } from 'uniwind';
+
+type ThemeName = 'light' | 'dark';
+
+type AppThemeContextType = {
+    currentTheme: string;
+    isLight: boolean;
+    isDark: boolean;
+    setTheme: (theme: ThemeName) => void;
+    toggleTheme: () => void;
+}
+
+const AppThemeContext = createContext<AppThemeContextType | undefined>(
+    undefined
+);
+
+export const AppThemeProvider = ({ children }: { children: React.ReactNode }) => {
+    const { theme } = useUniwind();
+
+    const isLight = useMemo(() => {
+        return theme === 'light';
+    }, [theme]);
+
+    const isDark = useMemo(() => {
+        return theme === 'dark';
+    }, [theme]);
+
+    const setTheme = useCallback((newTheme: ThemeName) => {
+        Uniwind.setTheme(newTheme);
+    }, []);
+
+    const toggleTheme = useCallback(() => {
+        Uniwind.setTheme(theme === 'light' ? 'dark' : 'light');
+    }, [theme]);
+
+    const value = useMemo(
+        () => ({
+            currentTheme: theme,
+            isLight,
+            isDark,
+            setTheme,
+            toggleTheme,
+        }),
+        [theme, isLight, isDark, setTheme, toggleTheme]
+    );
+
+    return (
+        <AppThemeContext.Provider value={value}>
+            {children}
+        </AppThemeContext.Provider>
+    );
+};
+
+export function useAppTheme() {
+    const context = useContext(AppThemeContext);
+    if (!context) {
+        throw new Error('useAppTheme must be used within AppThemeProvider');
+    }
+    return context;
+}
+
+`],
+  ["frontend/native/uniwind/global.css", `@import "tailwindcss";
+@import "uniwind";
+@import "heroui-native/styles";
+`],
+  ["frontend/native/uniwind/metro.config.js.hbs", `const { withVarlockMetroConfig } = require("@varlock/expo-integration/metro-config");
+const { getDefaultConfig } = require("expo/metro-config");
+const { withUniwindConfig } = require("uniwind/metro");
+const { wrapWithReanimatedMetroConfig } = require("react-native-reanimated/metro-config");
+
+/** @type {import('expo/metro-config').MetroConfig} */
+const config = getDefaultConfig(__dirname);
+{{#if (or (eq webDeploy "cloudflare") (eq serverDeploy "cloudflare"))}}
+// Alchemy writes runtime state here; block it to avoid Metro refresh loops.
+const blockList = config.resolver.blockList ?? [];
+const blockListPatterns = Array.isArray(blockList) ? blockList : [blockList];
+
+config.resolver.blockList = [
+	...blockListPatterns,
+	/[/\\\\]packages[/\\\\]infra[/\\\\]\\.alchemy(?:[/\\\\]|$)/,
+];
+{{/if}}
+
+const uniwindConfig = withUniwindConfig(wrapWithReanimatedMetroConfig(config), {
+  cssEntryFile: "./global.css",
+  dtsFile: "./uniwind-types.d.ts",
+});
+
+module.exports = withVarlockMetroConfig(uniwindConfig);
+`],
+  ["frontend/native/uniwind/package.json.hbs", `{
+  "name": "native",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "dev": "expo start --clear",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild",
+    "web": "expo start --web",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~58.0.14",
+    "@expo/vector-icons": "^15.0.2",
+    "@gorhom/bottom-sheet": "^5.2.14",
+    "expo": "~58.0.12",
+    "expo-constants": "~58.0.12",
+    "expo-dev-client": "~58.0.13",
+    "expo-font": "~58.0.8",
+    "expo-haptics": "~58.0.6",
+    "expo-linking": "~58.0.13",
+    "expo-network": "~58.0.3",
+    "expo-router": "~58.0.21",
+    "expo-secure-store": "~58.0.2",
+    "expo-splash-screen": "~58.0.9",
+    "expo-status-bar": "~58.0.3",
+    "expo-system-ui": "~58.0.6",
+    "expo-web-browser": "~58.0.6",
+    "heroui-native": "^1.0.10",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-gesture-handler": "~3.3.0",
+    "react-native-keyboard-controller": "1.22.7",
+    "react-native-reanimated": "4.7.1",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "~4.30.0",
+    "react-native-svg": "15.16.0",
+    "react-native-web": "~0.21.4",
+    "react-native-worklets": "0.13.0",
+    "tailwind-merge": "^3.6.0",
+    "tailwind-variants": "^3.3.1",
+    "tailwindcss": "^4.3.3",
+    "uniwind": "^1.12.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/react": "~19.3.0",
+    "typescript": "~6.0.3"
+  }
+}
+`],
+  ["frontend/native/uniwind/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "customConditions": ["react-native", "react-native-legacy-deep-imports"],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}
+`],
+  ["frontend/native/uniwind/uniwind-env.d.ts", `/// <reference types="uniwind/types" />
+
+declare module "*.css";
+`],
+  ["frontend/nuxt/_gitignore", `# Nuxt dev/build outputs
+.output
+.data
+.nuxt
+.nitro
+.cache
+dist
+.wrangler
+.alchemy
+
+# Node dependencies
+node_modules
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+.fleet
+.idea
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+`],
+  ["frontend/nuxt/app/app.config.ts.hbs", `export default defineAppConfig({
+  ui: {
+    colors: {
+      primary: 'emerald',
+      neutral: 'neutral',
+    },
+  }
+})
+`],
+  ["frontend/nuxt/app/app.vue.hbs", `<script setup lang="ts">
+{{#if (eq api "orpc")}}
+import { VueQueryDevtools } from '@tanstack/vue-query-devtools'
+{{/if}}
+</script>
+
+<template>
+    <NuxtAnnouncer />
+    <NuxtRouteAnnouncer />
+    <NuxtLoadingIndicator />
+    <UApp>
+        <NuxtLayout>
+            <NuxtPage />
+        </NuxtLayout>
+    </UApp>
+    {{#if (eq api "orpc")}}
+    <VueQueryDevtools />
+    {{/if}}
+</template>
+`],
+  ["frontend/nuxt/app/assets/css/main.css", `@import "tailwindcss";
+@import "@nuxt/ui";
+`],
+  ["frontend/nuxt/app/components/Header.vue.hbs", `<script setup lang="ts">
+import type { NavigationMenuItem } from '@nuxt/ui'
+{{#if (eq auth "better-auth")}}
+import UserMenu from './UserMenu.vue'
+{{/if}}
+
+const route = useRoute()
+
+const items = computed<NavigationMenuItem[]>(() => [
+    { label: "Home", to: "/", active: route.path === "/" },
+    {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+    { label: "Dashboard", to: "/dashboard", active: route.path.startsWith("/dashboard") },
+    {{/if}}
+])
+</script>
+
+<template>
+  <UHeader>
+    <template #left>
+      <UNavigationMenu :items="items" />
+    </template>
+
+    <template #right>
+      <UColorModeButton />
+      {{#if (eq auth "better-auth")}}
+      <ClientOnly>
+        <UserMenu />
+        <template #fallback>
+          <USkeleton class="h-9 w-24" />
+        </template>
+      </ClientOnly>
+      {{/if}}
+    </template>
+
+    <template #body>
+      <UNavigationMenu :items="items" orientation="vertical" class="-mx-2.5" />
+    </template>
+  </UHeader>
+</template>
+`],
+  ["frontend/nuxt/app/layouts/default.vue.hbs", `<script setup></script>
+
+<template>
+  <div>
+    <Header />
+    <UMain>
+      <slot />
+    </UMain>
+  </div>
+</template>
+`],
+  ["frontend/nuxt/app/pages/index.vue.hbs", `<script setup lang="ts">
+{{#if (eq backend "convex")}}
+import { api } from "@{{ projectName }}/backend/convex/_generated/api";
+import { useConvexQuery } from "convex-vue";
+{{else}}
+  {{#unless (eq api "none")}}
+const { $orpc } = useNuxtApp()
+import { useQuery } from '@tanstack/vue-query'
+  {{/unless}}
+{{/if}}
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+{{#if (eq backend "convex")}}
+const healthCheck = useConvexQuery(api.healthCheck.get, {});
+{{else}}
+  {{#unless (eq api "none")}}
+const healthCheck = useQuery($orpc.healthCheck.queryOptions())
+
+onServerPrefetch(async () => {
+  try {
+    await healthCheck.suspense()
+  } catch {}
+})
+  {{/unless}}
+{{/if}}
+</script>
+
+<template>
+  <UContainer class="py-8">
+    <pre class="overflow-x-auto font-mono text-sm whitespace-pre-wrap">\\{{ TITLE_TEXT }}</pre>
+
+    <div class="grid gap-6 mt-6">
+      <UCard>
+        <template #header>
+          <div class="font-medium">API Status</div>
+        </template>
+
+        {{#if (eq backend "convex")}}
+        <div class="flex items-center gap-2">
+          <UIcon
+            :name="healthCheck === undefined ? 'i-lucide-loader-2' : healthCheck.data.value === 'OK' ? 'i-lucide-check-circle' : 'i-lucide-x-circle'"
+            :class="[
+              healthCheck === undefined ? 'animate-spin text-muted' : '',
+              healthCheck?.data.value === 'OK' ? 'text-success' : 'text-error'
+            ]"
+          />
+          <span class="text-sm">
+            \\{{
+              healthCheck === undefined
+                ? "Checking..."
+                : healthCheck.data.value === "OK"
+                  ? "Connected"
+                  : "Error"
+            }}
+          </span>
+        </div>
+        {{else}}
+        {{#unless (eq api "none")}}
+        <div class="flex items-center gap-2">
+          <UIcon
+            :name="healthCheck.isLoading.value ? 'i-lucide-loader-2' : healthCheck.isSuccess.value ? 'i-lucide-check-circle' : 'i-lucide-x-circle'"
+            :class="[
+              healthCheck.isLoading.value ? 'animate-spin text-muted' : '',
+              healthCheck.isSuccess.value ? 'text-success' : '',
+              healthCheck.isError.value ? 'text-error' : ''
+            ]"
+          />
+          <span class="text-sm">
+            <template v-if="healthCheck.isLoading.value">
+              Checking...
+            </template>
+            <template v-else-if="healthCheck.isSuccess.value">
+              Connected (\\{{ healthCheck.data.value }})
+            </template>
+            <template v-else-if="healthCheck.isError.value">
+              Error: \\{{ healthCheck.error.value?.message || 'Failed to connect' }}
+            </template>
+            <template v-else>
+              Idle
+            </template>
+          </span>
+        </div>
+        {{/unless}}
+        {{/if}}
+      </UCard>
+    </div>
+  </UContainer>
+</template>
+`],
+  ["frontend/nuxt/nuxt.config.ts.hbs", `{{#if (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma")))}}
+import { createRequire } from "node:module";
+import { z } from "zod";
+
+// libsql loads its platform binding by a computed name, which file tracing can't follow
+const libsqlRequire = createRequire(import.meta.resolve("libsql"));
+const libsqlPackage = z.object({
+  optionalDependencies: z.record(z.string(), z.string()),
+}).parse(libsqlRequire("./package.json"));
+const libsqlBindings = Object.keys(libsqlPackage.optionalDependencies).flatMap(
+  (name) => {
+    try {
+      return [libsqlRequire.resolve(name)];
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "MODULE_NOT_FOUND") return [];
+      throw error;
+    }
+  },
+);
+{{/if}}
+{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+import { fileURLToPath } from "node:url";
+
+const apiReference = { path: fileURLToPath(new URL("../../packages/api", import.meta.url)) };
+{{/if}}
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+import { defineNuxtModule } from "nuxt/kit";
+import { unwasm } from "unwasm/plugin";
+
+const prismaWasm = defineNuxtModule({
+  setup(_options, nuxt) {
+    nuxt.hook("vite:extendConfig", (viteConfig) => {
+      viteConfig.plugins?.unshift(unwasm({ esmImport: true }));
+    });
+  },
+});
+{{/if}}
+
+// https://nuxt.com/docs/api/configuration/nuxt-config
+export default defineNuxtConfig({
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  typescript: {
+    tsConfig: { references: [apiReference] },
+    nodeTsConfig: { references: [apiReference] },
+    sharedTsConfig: { references: [apiReference] },
+  },
+  {{/if}}
+  compatibilityDate: 'latest',
+  devtools: { enabled: true },
+  experimental: {
+    payloadExtraction: 'client',
+  },
+  modules: [
+    {{#unless (eq webDeploy "cloudflare")}}
+    "@varlock/nuxt-integration",
+    {{/unless}}
+    {{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+    prismaWasm,
+    {{/if}}
+    '@nuxt/ui'
+    {{#if (eq backend "convex")}},
+    'convex-nuxt'
+    {{/if}}
+  ],
+  {{#unless (eq webDeploy "cloudflare")}}
+  varlock: {
+    ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}",
+  },
+  {{/unless}}
+  css: ['~/assets/css/main.css'],
+  {{#if (and (eq webDeploy "vercel") (eq serverDeploy "vercel"))}}
+  icon: {
+    localApiEndpoint: "/_nuxt_icon",
+  },
+  {{/if}}
+{{#if (or (and (eq auth "better-auth") (ne backend "convex")) (and (eq api "orpc") (ne backend "convex") (ne backend "none")))}}
+  vite: {
+    optimizeDeps: {
+      include: [
+{{#if (and (eq auth "better-auth") (ne backend "convex"))}}
+        "better-auth/vue",
+{{/if}}
+{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+        "@orpc/client",
+        "@orpc/client/fetch",
+        "@orpc/tanstack-query",
+        "@tanstack/vue-query",
+        "@tanstack/vue-query-devtools",
+{{/if}}
+      ],
+    },
+  },
+{{/if}}
+  devServer: {
+    port: 3001
+  },
+  {{#if (or (and (eq api "orpc") (ne backend "convex") (ne backend "none")) (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma")) (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma"))))}}
+  nitro: {
+    {{#if (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma")))}}
+    externals: { traceInclude: libsqlBindings },
+    {{/if}}
+    {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+    typescript: {
+      tsConfig: { references: [apiReference] },
+    },
+    {{/if}}
+    {{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+    {{#if (eq database "postgres")}}
+    alias: {
+      // pg-native is optional and unavailable in Workers; pg uses its JavaScript driver.
+      'pg-native': 'unenv/mock/proxy'
+    },
+    {{/if}}
+    experimental: {
+      wasm: true
+    },
+    wasm: {
+      esmImport: true
+    }
+    {{/if}}
+  },
+  {{/if}}
+  {{#if (eq backend "convex")}}
+  convex: {
+    url: process.env.NUXT_PUBLIC_CONVEX_URL,
+  },
+  {{else if (and (ne backend "self") (ne backend "none"))}}
+  runtimeConfig: {
+    // server-side override for SSR fetches (NUXT_SERVER_URL); falls back to the public URL
+    serverUrl: "",
+    public: {
+      serverUrl: process.env.NUXT_PUBLIC_SERVER_URL ?? "",
+    }
+  },
+  {{/if}}
+})
+`],
+  ["frontend/nuxt/package.json.hbs", `{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}nuxt build",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}nuxt prepare && vue-tsc -b{{else}}nuxt typecheck{{/if}}",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "{{#if (or (eq webDeploy "none") (eq webDeploy "docker"))}}node .output/server/index.mjs{{else}}nuxt preview{{/if}}",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.11.0",
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.42",
+    "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.3.3",
+    "@iconify-json/lucide": "^1.2.129",
+    "vue-tsc": "^3.3.11"
+  }
+}
+`],
+  ["frontend/nuxt/public/favicon.ico", `[Binary file]`],
+  ["frontend/nuxt/public/robots.txt", `User-Agent: *
+Disallow:
+`],
+  ["frontend/nuxt/server/tsconfig.json", `{
+  "extends": "../.nuxt/tsconfig.server.json"
+}
+`],
+  ["frontend/nuxt/tsconfig.json.hbs", `{
+  // https://nuxt.com/docs/guide/concepts/typescript
+  "files": [],
+  "references": [
+    {
+      "path": "./.nuxt/tsconfig.app.json"
+    },
+    {
+      "path": "./.nuxt/tsconfig.server.json"
+    },
+    {
+      "path": "./.nuxt/tsconfig.shared.json"
+    },
+    {
+      "path": "./.nuxt/tsconfig.node.json"
+    }
+  ]
+}
+`],
+  ["frontend/react/next/AGENTS.md.hbs", `<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in \`node_modules/next/dist/docs/\` (resolved from this file's directory; in monorepos the \`next\` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by \`next dev\` — verify at \`node_modules/next/dist/server/lib/generate-agent-files.js\`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
+`],
+  ["frontend/react/next/next-env.d.ts.hbs", `/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+`],
+  ["frontend/react/next/next.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockNextConfigPlugin } from "@varlock/nextjs-integration/plugin";
+
+const withVarlock = varlockNextConfigPlugin();
+{{/unless}}
+{{#if (eq webDeploy "cloudflare")}}
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+{{/if}}
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+	typedRoutes: true,
+	reactCompiler: true,
+	{{#if (or (includes addons "tauri") (and (includes addons "electrobun") (or (ne backend "convex") (ne auth "better-auth"))))}}
+	output: "export",
+	{{else if (or (eq webDeploy "docker") (eq webDeploy "prisma"))}}
+	output: "standalone",
+	{{/if}}
+	{{#if (and (eq backend "self") (eq dbSetup "turso"))}}
+	serverExternalPackages: ["libsql", "@libsql/client"],
+	{{/if}}
+};
+
+export default {{#if (eq webDeploy "cloudflare")}}nextConfig{{else}}withVarlock(nextConfig){{/if}};
+
+{{#if (eq webDeploy "cloudflare")}}
+initOpenNextCloudflareForDev();
+{{/if}}
+`],
+  ["frontend/react/next/package.json.hbs", `{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}next build",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@{{projectName}}/ui": "{{#if (eq packageManager "npm")}}*{{else}}workspace:*{{/if}}",
+    "@swc/helpers": "^0.5.23",
+    "lucide-react": "^1.41.0",
+    "next": "^16.3.4",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sonner": "^2.0.8",
+    "babel-plugin-react-compiler": "^1.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.3"
+  }
+}
+`],
+  ["frontend/react/next/postcss.config.mjs.hbs", `const config = {
+  plugins: ["@tailwindcss/postcss"],
+};
+
+export default config;
+`],
+  ["frontend/react/next/src/app/favicon.ico", `[Binary file]`],
+  ["frontend/react/next/src/app/layout.tsx.hbs", `import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "../index.css";
+{{#if (eq auth "clerk")}}import { ClerkProvider } from "@clerk/nextjs";
+{{/if}}{{#if (and (eq backend "convex") (eq auth "better-auth"))}}
+import { getToken } from "@/lib/auth-server";
+{{/if}}
+import Providers from "@/components/providers";
+import Header from "@/components/header";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "{{projectName}}",
+  description: "{{projectName}}",
+};
+
+{{#if (and (eq backend "convex") (eq auth "better-auth"))}}
+export default async function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const token = await getToken();
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={\`\${geistSans.variable} \${geistMono.variable} antialiased\`}
+      >
+        <Providers initialToken={token}>
+          <div className="grid grid-rows-[auto_1fr] h-svh">
+            <Header />
+            {children}
+          </div>
+        </Providers>
+      </body>
+    </html>
+  );
+}
+{{else}}
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+	return (
+		<html lang="en" suppressHydrationWarning>
+			<body
+				className={\`\${geistSans.variable} \${geistMono.variable} antialiased\`}
+			>
+				{{#if (eq auth "clerk")}}<ClerkProvider>
+					<Providers>
+						<div className="grid grid-rows-[auto_1fr] h-svh">
+							<Header />
+							{children}
+						</div>
+					</Providers>
+				</ClerkProvider>{{else}}<Providers>
+					<div className="grid grid-rows-[auto_1fr] h-svh">
+						<Header />
+						{children}
+					</div>
+				</Providers>{{/if}}
+			</body>
+		</html>
+	);
+}
+{{/if}}
+`],
+  ["frontend/react/next/src/app/page.tsx.hbs", `"use client"
+{{#if (eq backend "convex")}}
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+{{else if (or (eq api "orpc") (eq api "trpc"))}}
+import { useQuery } from "@tanstack/react-query";
+  {{#if (eq api "orpc")}}
+import { orpc } from "@/utils/orpc";
+  {{/if}}
+  {{#if (eq api "trpc")}}
+import { trpc } from "@/utils/trpc";
+  {{/if}}
+{{/if}}
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+export default function Home() {
+  {{#if (eq backend "convex")}}
+  const healthCheck = useQuery(api.healthCheck.get);
+  {{else if (eq api "orpc")}}
+  const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+  {{else if (eq api "trpc")}}
+  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+  {{/if}}
+
+  return (
+    <div className="container mx-auto max-w-3xl px-4 py-2">
+      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+      <div className="grid gap-6">
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">API Status</h2>
+          {{#if (eq backend "convex")}}
+          <div className="flex items-center gap-2">
+            <div
+              className={\`h-2 w-2 rounded-full \${healthCheck === "OK" ? "bg-green-500" : healthCheck === undefined ? "bg-orange-400" : "bg-red-500"}\`}
+            />
+            <span className="text-sm text-muted-foreground">
+              {healthCheck === undefined
+                ? "Checking..."
+                : healthCheck === "OK"
+                  ? "Connected"
+                  : "Error"}
+            </span>
+          </div>
+          {{else}}
+            {{#unless (eq api "none")}}
+            <div className="flex items-center gap-2">
+              <div
+                className={\`h-2 w-2 rounded-full \${healthCheck.data ? "bg-green-500" : "bg-red-500"}\`}
+              />
+              <span className="text-sm text-muted-foreground">
+                {healthCheck.isLoading
+                  ? "Checking..."
+                  : healthCheck.data
+                    ? "Connected"
+                    : "Disconnected"}
+              </span>
+            </div>
+            {{/unless}}
+          {{/if}}
+        </section>
+      </div>
+    </div>
+  );
+}
+`],
+  ["frontend/react/next/src/components/mode-toggle.tsx.hbs", `"use client"
+
+import * as React from "react"
+import { Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
+import { Button } from "@{{projectName}}/ui/components/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu"
+
+export function ModeToggle() {
+  const { setTheme } = useTheme()
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
+        <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+        <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        <span className="sr-only">Toggle theme</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme("light")}>
+          Light
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
+          Dark
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>
+          System
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+`],
+  ["frontend/react/next/src/components/providers.tsx.hbs", `"use client";
+
+{{#if (and (eq auth "clerk") (ne api "none"))}}
+import { useEffect } from "react";
+import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
+{{/if}}
+{{#if (and (eq auth "clerk") (or (eq backend "convex") (ne api "none")))}}
+import { useAuth } from "@clerk/nextjs";
+{{/if}}
+{{#if (eq backend "convex")}}
+{{#if (eq auth "clerk")}}
+import { ConvexReactClient } from "convex/react";
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{else if (eq auth "better-auth")}}
+import { ConvexReactClient } from "convex/react";
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { authClient } from "@/lib/auth-client";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{else}}
+import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{/if}}
+{{else}}
+{{#unless (eq api "none")}}
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+{{#if (eq api "orpc")}}
+import { queryClient } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { queryClient } from "@/utils/trpc";
+{{/if}}
+{{/unless}}
+{{/if}}
+import { ThemeProvider } from "./theme-provider";
+import { Toaster } from "@{{projectName}}/ui/components/sonner";
+
+{{#if (eq backend "convex")}}
+const convex = new ConvexReactClient(ENV.NEXT_PUBLIC_CONVEX_URL);
+{{/if}}
+
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+function ClerkApiAuthBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setClerkAuthTokenGetter(getToken);
+
+    return () => {
+      setClerkAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  return null;
+}
+{{/if}}
+
+export default function Providers({
+  children,
+{{#if (and (eq backend "convex") (eq auth "better-auth"))}}
+  initialToken,
+{{/if}}
+}: {
+  children: React.ReactNode;
+{{#if (and (eq backend "convex") (eq auth "better-auth"))}}
+  initialToken?: string | null;
+{{/if}}
+}) {
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      {{#if (eq backend "convex")}}
+      {{#if (eq auth "clerk")}}
+      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+        {children}
+      </ConvexProviderWithClerk>
+      {{else if (eq auth "better-auth")}}
+      <ConvexBetterAuthProvider
+        client={convex}
+        authClient={authClient}
+        initialToken={initialToken}
+      >
+        {children}
+      </ConvexBetterAuthProvider>
+      {{else}}
+      <ConvexProvider client={convex}>{children}</ConvexProvider>
+      {{/if}}
+      {{else}}
+      {{#unless (eq api "none")}}
+      <QueryClientProvider client={queryClient}>
+        {{#if (eq auth "clerk")}}
+        <ClerkApiAuthBridge />
+        {{/if}}
+        {{#if (eq api "orpc")}}
+        {children}
+        {{/if}}
+        {{#if (eq api "trpc")}}
+        {children}
+        {{/if}}
+        <ReactQueryDevtools />
+      </QueryClientProvider>
+      {{else}}
+      {children}
+      {{/unless}}
+      {{/if}}
+      <Toaster richColors />
+    </ThemeProvider>
+  );
+}
+`],
+  ["frontend/react/next/src/components/theme-provider.tsx.hbs", `"use client"
+
+import * as React from "react"
+import { ThemeProvider as NextThemesProvider } from "next-themes"
+
+export function ThemeProvider({
+  children,
+  ...props
+}: React.ComponentProps<typeof NextThemesProvider>) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+}
+`],
+  ["frontend/react/next/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@{{projectName}}/ui/*": ["../../packages/ui/src/*"]
+    }{{#if (or (eq serverDeploy "cloudflare") (eq webDeploy "cloudflare"))}},
+    "types": [
+      "@cloudflare/workers-types"
+    ]{{/if}}
+  },
+  "include": [
+    {{#if (eq serverDeploy "cloudflare")}}
+    "../server/env.d.ts",
+    {{/if}}
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "./node_modules"
+  ]
+}
+`],
+  ["frontend/react/react-router/package.json.hbs", `{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}react-router build",
+    "dev": "react-router dev",
+    "start": "react-router-serve ./build/server/index.js",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}react-router typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@{{projectName}}/ui": "{{#if (eq packageManager "npm")}}*{{else}}workspace:*{{/if}}",
+    "@react-router/fs-routes": "^8.3.1",
+    "@react-router/node": "^8.3.1",
+    "@react-router/serve": "^8.3.1",
+    "isbot": "^5.2.2",
+    "lucide-react": "^1.41.0",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router": "^8.3.1",
+    "sonner": "^2.0.8"
+  },
+  "devDependencies": {
+    "@react-router/dev": "^8.3.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.2.2"
+  }
+}
+`],
+  ["frontend/react/react-router/public/favicon.ico", `[Binary file]`],
+  ["frontend/react/react-router/react-router.config.ts.hbs", `import type { Config } from "@react-router/dev/config";
+
+export default {
+{{#if (and (eq webDeploy "vercel") (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
+  // Adopt vercelPreset() once @vercel/react-router supports RR8 (vercel/vercel#16730)
+{{/if}}
+{{#if (or (includes addons "tauri") (includes addons "electrobun"))}}
+  // Desktop addons package static web assets; SSR output cannot be bundled
+  ssr: false,
+{{/if}}
+  appDirectory: "src",
+} satisfies Config;
+`],
+  ["frontend/react/react-router/src/components/mode-toggle.tsx.hbs", `import { Moon, Sun } from "lucide-react";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { useTheme } from "@/components/theme-provider";
+
+export function ModeToggle() {
+  const { setTheme } = useTheme();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
+        <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+        <Moon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+        <span className="sr-only">Toggle theme</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme("light")}>Light</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["frontend/react/react-router/src/components/theme-provider.tsx.hbs", `import * as React from "react";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+
+export function ThemeProvider({
+  children,
+  ...props
+}: React.ComponentProps<typeof NextThemesProvider>) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
+}
+
+export { useTheme } from "next-themes";
+`],
+  ["frontend/react/react-router/src/root.tsx.hbs", `import {
+  isRouteErrorResponse,
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+} from "react-router";
+import type { Route } from "./+types/root";
+import "./index.css";
+import Header from "./components/header";
+import { ThemeProvider } from "./components/theme-provider";
+import { Toaster } from "@{{projectName}}/ui/components/sonner";
+{{#if (eq auth "clerk")}}
+import { ClerkProvider{{#if (or (eq backend "convex") (ne api "none"))}}, useAuth{{/if}} } from "@clerk/react-router";
+import { clerkMiddleware, rootAuthLoader } from "@clerk/react-router/server";
+{{/if}}
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+import { useEffect } from "react";
+import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
+{{/if}}
+
+{{#if (eq backend "convex")}}
+import { ConvexReactClient } from "convex/react";
+import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+  {{#if (eq auth "clerk")}}
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+  {{else if (eq auth "better-auth")}}
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { authClient } from "@/lib/auth-client";
+  {{else}}
+import { ConvexProvider } from "convex/react";
+  {{/if}}
+{{else}}
+  {{#unless (eq api "none")}}
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+    {{#if (eq api "orpc")}}
+import { queryClient } from "./utils/orpc";
+    {{/if}}
+    {{#if (eq api "trpc")}}
+import { queryClient } from "./utils/trpc";
+    {{/if}}
+  {{/unless}}
+{{/if}}
+
+{{#if (eq auth "clerk")}}
+export const middleware: Route.MiddlewareFunction[] = [clerkMiddleware()];
+
+export const loader = (args: Route.LoaderArgs) => rootAuthLoader(args);
+{{/if}}
+
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+function ClerkApiAuthBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setClerkAuthTokenGetter(getToken);
+
+    return () => {
+      setClerkAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  return null;
+}
+{{/if}}
+
+export const links: Route.LinksFunction = () => [
+  { rel: "preconnect", href: "https://fonts.googleapis.com" },
+  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+  {
+    rel: "stylesheet",
+    href:
+      "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+  },
+];
+
+export function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Meta />
+        <Links />
+      </head>
+      <body>
+        {children}
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+{{#if (eq backend "convex")}}
+{{#if (eq auth "clerk")}}
+export default function App({ loaderData }: Route.ComponentProps) {
+{{else if (eq auth "better-auth")}}
+export default function App() {
+{{else}}
+export default function App() {
+{{/if}}
+  const convex = new ConvexReactClient(ENV.VITE_CONVEX_URL);
+  {{#if (eq auth "clerk")}}
+  return (
+    <ClerkProvider loaderData={loaderData}>
+      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          disableTransitionOnChange
+          storageKey="vite-ui-theme"
+        >
+          <div className="grid grid-rows-[auto_1fr] h-svh">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+        </ThemeProvider>
+      </ConvexProviderWithClerk>
+    </ClerkProvider>
+  );
+  {{else if (eq auth "better-auth")}}
+  return (
+    <ConvexBetterAuthProvider client={convex} authClient={authClient}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+    </ConvexBetterAuthProvider>
+  );
+  {{else}}
+  return (
+    <ConvexProvider client={convex}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+    </ConvexProvider>
+  );
+  {{/if}}
+}
+{{else if (eq auth "clerk")}}
+export default function App({ loaderData }: Route.ComponentProps) {
+  return (
+    <ClerkProvider loaderData={loaderData}>
+      {{#unless (eq api "none")}}
+      <ClerkApiAuthBridge />
+      {{/unless}}
+      {{#if (eq api "orpc")}}
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          disableTransitionOnChange
+          storageKey="vite-ui-theme"
+        >
+          <div className="grid grid-rows-[auto_1fr] h-svh">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+        </ThemeProvider>
+        <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+      </QueryClientProvider>
+      {{else if (eq api "trpc")}}
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          disableTransitionOnChange
+          storageKey="vite-ui-theme"
+        >
+          <div className="grid grid-rows-[auto_1fr] h-svh">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+        </ThemeProvider>
+        <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+      </QueryClientProvider>
+      {{else}}
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+      {{/if}}
+    </ClerkProvider>
+  );
+}
+{{else if (eq api "orpc")}}
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+      <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+    </QueryClientProvider>
+  );
+}
+{{else if (eq api "trpc")}}
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+      <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+    </QueryClientProvider>
+  );
+}
+{{else}}
+export default function App() {
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="dark"
+      disableTransitionOnChange
+      storageKey="vite-ui-theme"
+    >
+      <div className="grid grid-rows-[auto_1fr] h-svh">
+        <Header />
+        <Outlet />
+      </div>
+      <Toaster richColors />
+    </ThemeProvider>
+  );
+}
+{{/if}}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  let message = "Oops!";
+  let details = "An unexpected error occurred.";
+  let stack: string | undefined;
+  if (isRouteErrorResponse(error)) {
+    message = error.status === 404 ? "404" : "Error";
+    details =
+      error.status === 404
+        ? "The requested page could not be found."
+        : error.statusText || details;
+  } else if (import.meta.env.DEV && error && error instanceof Error) {
+    details = error.message;
+    stack = error.stack;
+  }
+  return (
+    <main className="pt-16 p-4 container mx-auto">
+      <h1>{message}</h1>
+      <p>{details}</p>
+      {stack && (
+        <pre className="w-full p-4 overflow-x-auto">
+          <code>{stack}</code>
+        </pre>
+      )}
+    </main>
+  );
+}
+`],
+  ["frontend/react/react-router/src/routes.ts", `import { type RouteConfig } from "@react-router/dev/routes";
+import { flatRoutes } from "@react-router/fs-routes";
+
+export default flatRoutes() satisfies RouteConfig;
+`],
+  ["frontend/react/react-router/src/routes/_index.tsx.hbs", `import type { Route } from "./+types/_index";
+{{#if (eq backend "convex")}}
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+{{else if (or (eq api "orpc") (eq api "trpc"))}}
+import { useQuery } from "@tanstack/react-query";
+  {{#if (eq api "orpc")}}
+  import { orpc } from "@/utils/orpc";
+  {{/if}}
+  {{#if (eq api "trpc")}}
+  import { trpc } from "@/utils/trpc";
+  {{/if}}
+{{/if}}
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+export function meta({}: Route.MetaArgs) {
+  return [{ title: "{{projectName}}" }, { name: "description", content: "{{projectName}} is a web application" }];
+}
+
+export default function Home() {
+  {{#if (eq backend "convex")}}
+  const healthCheck = useQuery(api.healthCheck.get);
+  {{else if (eq api "orpc")}}
+  const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+  {{else if (eq api "trpc")}}
+  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+  {{/if}}
+
+  return (
+    <div className="container mx-auto max-w-3xl px-4 py-2">
+      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+      <div className="grid gap-6">
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">API Status</h2>
+          {{#if (eq backend "convex")}}
+          <div className="flex items-center gap-2">
+            <div
+              className={\`h-2 w-2 rounded-full \${healthCheck === "OK" ? "bg-green-500" : healthCheck === undefined ? "bg-orange-400" : "bg-red-500"}\`}
+            />
+            <span className="text-sm text-muted-foreground">
+              {healthCheck === undefined
+                ? "Checking..."
+                : healthCheck === "OK"
+                  ? "Connected"
+                  : "Error"}
+            </span>
+          </div>
+          {{else}}
+            {{#unless (eq api "none")}}
+            <div className="flex items-center gap-2">
+              <div
+                className={\`h-2 w-2 rounded-full \${
+                  healthCheck.data ? "bg-green-500" : "bg-red-500"
+                }\`}
+              />
+              <span className="text-sm text-muted-foreground">
+                {healthCheck.isLoading
+                  ? "Checking..."
+                  : healthCheck.data
+                  ? "Connected"
+                  : "Disconnected"}
+              </span>
+            </div>
+            {{/unless}}
+          {{/if}}
+        </section>
+      </div>
+    </div>
+  );
+}
+`],
+  ["frontend/react/react-router/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "include": [
+    "**/*",
+    "**/.server/**/*",
+    "**/.client/**/*",
+    ".react-router/types/**/*"
+  ],
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "types": ["node", "vite/client"],
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "rootDirs": [".", "./.react-router/types"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@{{projectName}}/ui/*": ["../../packages/ui/src/*"]
+    },
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true
+  }
+}
+`],
+  ["frontend/react/react-router/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockVitePlugin } from "@varlock/vite-integration";
+{{/unless}}
+{{#if (and (eq webDeploy "cloudflare") (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
+import { fileURLToPath } from "node:url";
+{{/if}}
+import { reactRouter } from "@react-router/dev/vite";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{else}}vite{{/if}}";
+
+export default defineConfig({{#if (and (or (eq webDeploy "vercel") (eq webDeploy "prisma")) (not (or (includes addons "tauri") (includes addons "electrobun"))))}}({ command }) => ({{/if}}{
+  resolve: {
+    tsconfigPaths: true,
+  },
+  optimizeDeps: {
+    entries: ["src/**/*.{ts,tsx}"],
+  },
+  plugins: [
+{{#unless (eq webDeploy "cloudflare")}}
+    varlockVitePlugin({ ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}" }),
+{{/unless}}
+    tailwindcss(),
+    reactRouter(),
+  ],
+{{#if (and (or (eq webDeploy "vercel") (eq webDeploy "prisma")) (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
+  ssr: {
+    // The deployment artifact has no node_modules; bundle all server dependencies.
+    noExternal: command === "build" ? true : undefined,
+  },
+{{/if}}
+{{#if (and (eq webDeploy "prisma") (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
+  environments: {
+    ssr: {
+      build: {
+        rollupOptions: {
+          input: "./prisma.server.ts",
+        },
+      },
+    },
+  },
+{{/if}}
+{{#if (and (eq webDeploy "cloudflare") (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
+  environments: {
+    ssr: {
+      build: {
+        rollupOptions: {
+          // Worker entry wrapping the React Router request handler; must be absolute
+          input: fileURLToPath(new URL("./workers/app.ts", import.meta.url)),
+        },
+      },
+    },
+  },
+{{/if}}
+}{{#if (and (or (eq webDeploy "vercel") (eq webDeploy "prisma")) (not (or (includes addons "tauri") (includes addons "electrobun"))))}}){{/if}});
+`],
+  ["frontend/react/tanstack-router/index.html.hbs", `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{projectName}}</title>
+  </head>
+
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+`],
+  ["frontend/react/tanstack-router/package.json.hbs", `{
+	"name": "web",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
+		"serve": "vite preview",
+		"start": "vite",
+		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build && tsc --noEmit"
+	},
+	"dependencies": {
+        "@{{projectName}}/ui": "{{#if (eq packageManager "npm")}}*{{else}}workspace:*{{/if}}",
+		"@tailwindcss/vite": "^4.3.3",
+		"@tanstack/react-router": "^1.170.44",
+		"lucide-react": "^1.56.0",
+        "next-themes": "^0.4.6",
+		"react": "^19.3.0",
+		"react-dom": "^19.3.0",
+        "sonner": "^2.0.8"
+	},
+	"devDependencies": {
+		"@tanstack/react-router-devtools": "^1.167.2",
+		"@tanstack/router-plugin": "^1.168.45",
+		"@types/node": "^26.6.5",
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0",
+		"@vitejs/plugin-react": "^6.1.2",
+		"postcss": "^8.5.30",
+		"tailwindcss": "^4.3.3",
+		"vite": "^8.3.4"
+	}
+}
+`],
+  ["frontend/react/tanstack-router/src/components/mode-toggle.tsx.hbs", `import { Moon, Sun } from "lucide-react";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { useTheme } from "@/components/theme-provider";
+
+export function ModeToggle() {
+  const { setTheme } = useTheme();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
+        <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+        <Moon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+        <span className="sr-only">Toggle theme</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme("light")}>Light</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["frontend/react/tanstack-router/src/components/theme-provider.tsx.hbs", `import * as React from "react";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+
+export function ThemeProvider({
+  children,
+  ...props
+}: React.ComponentProps<typeof NextThemesProvider>) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
+}
+
+export { useTheme } from "next-themes";
+`],
+  ["frontend/react/tanstack-router/src/main.tsx.hbs", `import { RouterProvider, createRouter } from "@tanstack/react-router";
+import ReactDOM from "react-dom/client";
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+import { useEffect } from "react";
+import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
+{{/if}}
+import Loader from "./components/loader";
+import { routeTree } from "./routeTree.gen";
+
+{{#if (eq api "orpc")}}
+  import { QueryClientProvider } from "@tanstack/react-query";
+  import { orpc, queryClient } from "./utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+  import { QueryClientProvider } from "@tanstack/react-query";
+  import { queryClient, trpc } from "./utils/trpc";
+{{/if}}
+{{#if (or (eq backend "convex") (eq auth "clerk"))}}
+  import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{/if}}
+{{#if (eq auth "clerk")}}
+  import { ClerkProvider{{#if (or (eq backend "convex") (ne api "none"))}}, useAuth{{/if}} } from "@clerk/react";
+{{/if}}
+{{#if (eq backend "convex")}}
+  import { ConvexReactClient } from "convex/react";
+  {{#if (eq auth "clerk")}}
+  import { ConvexProviderWithClerk } from "convex/react-clerk";
+  {{else if (eq auth "better-auth")}}
+  import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+  import { authClient } from "@/lib/auth-client";
+  {{else}}
+  import { ConvexProvider } from "convex/react";
+  {{/if}}
+  const convex = new ConvexReactClient(ENV.VITE_CONVEX_URL);
+{{/if}}
+
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+function ClerkApiAuthBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setClerkAuthTokenGetter(getToken);
+
+    return () => {
+      setClerkAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  return null;
+}
+{{/if}}
+
+const router = createRouter({
+  routeTree,
+  defaultPreload: "intent",
+  scrollRestoration: true,
+  defaultPendingComponent: () => <Loader />,
+  {{#if (eq api "orpc")}}
+  context: { orpc, queryClient },
+  Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
+    return (
+      {{#if (eq auth "clerk")}}
+      <ClerkProvider publishableKey={ENV.VITE_CLERK_PUBLISHABLE_KEY}>
+        <ClerkApiAuthBridge />
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      </ClerkProvider>
+      {{else}}
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+      {{/if}}
+    );
+  },
+  {{else if (eq api "trpc")}}
+  context: { trpc, queryClient },
+  Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
+    return (
+      {{#if (eq auth "clerk")}}
+      <ClerkProvider publishableKey={ENV.VITE_CLERK_PUBLISHABLE_KEY}>
+        <ClerkApiAuthBridge />
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      </ClerkProvider>
+      {{else}}
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+      {{/if}}
+    );
+  },
+  {{else if (eq backend "convex")}}
+  context: {},
+  Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
+    {{#if (eq auth "clerk")}}
+    return (
+      <ClerkProvider
+        publishableKey={ENV.VITE_CLERK_PUBLISHABLE_KEY}
+      >
+        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+          {children}
+        </ConvexProviderWithClerk>
+      </ClerkProvider>
+    );
+    {{else if (eq auth "better-auth")}}
+    return <ConvexBetterAuthProvider client={convex} authClient={authClient}>{children}</ConvexBetterAuthProvider>;
+    {{else}}
+    return <ConvexProvider client={convex}>{children}</ConvexProvider>;
+    {{/if}}
+  },
+  {{else if (eq auth "clerk")}}
+  context: {},
+  Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
+    return <ClerkProvider publishableKey={ENV.VITE_CLERK_PUBLISHABLE_KEY}>{children}</ClerkProvider>;
+  },
+  {{else}}
+  context: {},
+  {{/if}}
+});
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
+
+const rootElement = document.getElementById("app");
+
+if (!rootElement) {
+  throw new Error("Root element not found");
+}
+
+if (!rootElement.innerHTML) {
+  const root = ReactDOM.createRoot(rootElement);
+  root.render(<RouterProvider router={router} />);
+}
+`],
+  ["frontend/react/tanstack-router/src/routes/__root.tsx.hbs", `import Header from "@/components/header";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@{{projectName}}/ui/components/sonner";
+{{#if (eq api "orpc")}}
+import { link, orpc } from "@/utils/orpc";
+import type { QueryClient } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { useState } from "react";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { createORPCClient } from "@orpc/client";
+{{/if}}
+{{#if (eq api "trpc")}}
+import type { trpc } from "@/utils/trpc";
+import type { QueryClient } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+{{/if}}
+import {
+  HeadContent,
+  Outlet,
+  createRootRouteWithContext,
+} from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import "../index.css";
+
+{{#if (eq api "orpc")}}
+export interface RouterAppContext {
+  orpc: typeof orpc;
+  queryClient: QueryClient;
+}
+{{else if (eq api "trpc")}}
+export interface RouterAppContext {
+  trpc: typeof trpc;
+  queryClient: QueryClient;
+}
+{{else}}
+export interface RouterAppContext {}
+{{/if}}
+
+export const Route = createRootRouteWithContext<RouterAppContext>()({
+  component: RootComponent,
+  head: () => ({
+    meta: [
+      {
+        title: "{{projectName}}",
+      },
+      {
+        name: "description",
+        content: "{{projectName}} is a web application",
+      },
+    ],
+    links: [
+      {
+        rel: "icon",
+        href: "/favicon.ico",
+      },
+    ],
+  }),
+});
+
+function RootComponent() {
+  {{#if (eq api "orpc")}}
+  const [client] = useState<AppRouterClient>(() => createORPCClient(link));
+  const [orpcUtils] = useState(() => createTanstackQueryUtils(client));
+  {{/if}}
+
+  return (
+    <>
+      <HeadContent />
+      {{#if (eq api "orpc")}}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          disableTransitionOnChange
+          storageKey="vite-ui-theme"
+        >
+          <div className="grid grid-rows-[auto_1fr] h-svh">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+        </ThemeProvider>
+      {{else}}
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+      {{/if}}
+      <TanStackRouterDevtools position="bottom-left" />
+      {{#if (or (eq api "orpc") (eq api "trpc"))}}
+      <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+      {{/if}}
+    </>
+  );
+}
+`],
+  ["frontend/react/tanstack-router/src/routes/index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+{{#if (eq api "orpc")}}
+import { orpc } from "@/utils/orpc";
+import { useQuery } from "@tanstack/react-query";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { trpc } from "@/utils/trpc";
+import { useQuery } from "@tanstack/react-query";
+{{/if}}
+{{#if (eq backend "convex")}}
+import { useQuery } from "convex/react";
+import { api } from "@{{ projectName }}/backend/convex/_generated/api";
+{{/if}}
+
+export const Route = createFileRoute("/")({
+  component: HomeComponent,
+});
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+function HomeComponent() {
+  {{#if (eq api "orpc")}}
+  const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+  {{/if}}
+  {{#if (eq api "trpc")}}
+  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+  {{/if}}
+  {{#if (eq backend "convex")}}
+  const healthCheck = useQuery(api.healthCheck.get);
+  {{/if}}
+
+  return (
+    <div className="container mx-auto max-w-3xl px-4 py-2">
+      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+      <div className="grid gap-6">
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">API Status</h2>
+          {{#if (eq backend "convex")}}
+          <div className="flex items-center gap-2">
+            <div
+              className={\`h-2 w-2 rounded-full \${healthCheck === "OK" ? "bg-green-500" : healthCheck === undefined ? "bg-orange-400" : "bg-red-500"}\`}
+            />
+            <span className="text-sm text-muted-foreground">
+              {healthCheck === undefined
+                ? "Checking..."
+                : healthCheck === "OK"
+                  ? "Connected"
+                  : "Error"}
+            </span>
+          </div>
+          {{else}}
+            {{#unless (eq api "none")}}
+            <div className="flex items-center gap-2">
+              <div
+                className={\`h-2 w-2 rounded-full \${healthCheck.data ? "bg-green-500" : "bg-red-500"}\`}
+              />
+              <span className="text-sm text-muted-foreground">
+                {healthCheck.isLoading
+                  ? "Checking..."
+                  : healthCheck.data
+                    ? "Connected"
+                    : "Disconnected"}
+              </span>
+            </div>
+            {{/unless}}
+          {{/if}}
+        </section>
+      </div>
+    </div>
+  );
+}
+`],
+  ["frontend/react/tanstack-router/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "compilerOptions": {
+    "strict": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "skipLibCheck": true,
+    "types": ["vite/client"],
+    "rootDirs": ["."],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@{{projectName}}/ui/*": ["../../packages/ui/src/*"]
+    }
+  }
+}
+`],
+  ["frontend/react/tanstack-router/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockVitePlugin } from "@varlock/vite-integration";
+{{/unless}}
+import tailwindcss from "@tailwindcss/vite";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{else}}vite{{/if}}";
+
+export default defineConfig({
+  server: {
+    port: 3001,
+  },
+  resolve: {
+    tsconfigPaths: true,
+  },
+  plugins: [
+{{#unless (eq webDeploy "cloudflare")}}
+    varlockVitePlugin({ ssrInjectMode: "auto-load" }),
+{{/unless}}
+    tailwindcss(),
+    tanstackRouter({
+      target: "react",
+      autoCodeSplitting: true,
+    }),
+    react(),
+  ],
+});
+`],
+  ["frontend/react/tanstack-start/package.json.hbs", `{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
+    "serve": "vite preview",
+    "dev": "vite dev",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build && tsc --noEmit"
+  },
+  "dependencies": {
+    "@{{projectName}}/ui": "{{#if (eq packageManager "npm")}}*{{else}}workspace:*{{/if}}",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-query": "^5.104.2",
+    "@tanstack/react-router": "^1.170.44",
+    "@tanstack/react-start": "^1.169.1",
+    "lucide-react": "^1.56.0",
+    "next-themes": "^0.4.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "sonner": "^2.0.8",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@tanstack/react-router-devtools": "^1.167.2",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^30.1.2",
+    "vite": "^8.3.4",
+    "web-vitals": "^6.2.3"
+  }
+}
+`],
+  ["frontend/react/tanstack-start/public/robots.txt", `# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow:
+`],
+  ["frontend/react/tanstack-start/src/router.tsx.hbs", `{{#if (eq backend "convex")}}
+import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import { QueryClient } from "@tanstack/react-query";
+import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
+import { ConvexQueryClient } from "@convex-dev/react-query";
+import { routeTree } from "./routeTree.gen";
+import Loader from "./components/loader";
+import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{else}}
+import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import Loader from "./components/loader";
+import { routeTree } from "./routeTree.gen";
+{{#if (eq api "trpc")}}
+import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
+import { toast } from "sonner";
+import type { AppRouter } from "@{{projectName}}/api/routers/index";
+import { TRPCProvider } from "./utils/trpc";
+{{#unless (eq backend "self")}}
+import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{/unless}}
+{{#if (eq auth "clerk")}}
+import { getClerkAuthToken } from "@/utils/clerk-auth";
+{{/if}}
+{{else if (eq api "orpc")}}
+import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
+import { createQueryClient, orpc } from "./utils/orpc";
+{{/if}}
+{{/if}}
+
+{{#if (eq backend "convex")}}
+export function getRouter() {
+	const convexUrl = ENV.VITE_CONVEX_URL;
+	if (!convexUrl) {
+		throw new Error("VITE_CONVEX_URL is not set");
+	}
+
+	const convexQueryClient = new ConvexQueryClient(convexUrl);
+
+	const queryClient: QueryClient = new QueryClient({
+		defaultOptions: {
+			queries: {
+				queryKeyHashFn: convexQueryClient.hashFn(),
+				queryFn: convexQueryClient.queryFn(),
+			},
+		},
+	});
+	convexQueryClient.connect(queryClient);
+
+	const router = createTanStackRouter({
+		routeTree,
+		defaultPreload: "intent",
+		defaultPendingComponent: () => <Loader />,
+		defaultNotFoundComponent: () => <div>Not Found</div>,
+		context: { queryClient, convexQueryClient },
+	});
+
+	setupRouterSsrQueryIntegration({
+		router,
+		queryClient,
+	});
+
+	return router;
+}
+{{else}}
+{{#if (eq api "trpc")}}
+{{#unless (eq backend "self")}}
+{{> getServerUrl}}
+
+{{/unless}}
+function createQueryClient() {
+	return new QueryClient({
+		queryCache: new QueryCache({
+			onError: (error, query) => {
+				toast.error(error.message, {
+					action: {
+						label: "retry",
+						onClick: () => {
+							query.invalidate();
+						},
+					},
+				});
+			},
+		}),
+		defaultOptions: { queries: { staleTime: 60 * 1000 } },
+	});
+}
+
+const trpcClient = createTRPCClient<AppRouter>({
+	links: [
+		httpBatchLink({
+{{#if (eq backend "self")}}
+			url: "/api/trpc",
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+			url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/trpc\`,
+{{else}}
+			url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/trpc\`,
+{{/if}}
+{{#if (eq auth "clerk")}}
+			headers: async () => {
+				const token = await getClerkAuthToken();
+				return token ? { Authorization: \`Bearer \${token}\` } : {};
+			},
+{{/if}}
+{{#if (eq auth "better-auth")}}
+			fetch(url, options) {
+				return fetch(url, {
+					...options,
+					credentials: "include",
+				});
+			},
+{{/if}}
+		}),
+	],
+});
+{{else if (eq api "orpc")}}
+{{/if}}
+
+export const getRouter = () => {
+{{#if (eq api "trpc")}}
+	const queryClient = createQueryClient();
+	const trpc = createTRPCOptionsProxy({
+		client: trpcClient,
+		queryClient,
+	});
+{{else if (eq api "orpc")}}
+	const queryClient = createQueryClient();
+{{/if}}
+
+	const router = createTanStackRouter({
+		routeTree,
+		scrollRestoration: true,
+		defaultPreloadStaleTime: 0,
+{{#if (eq api "trpc")}}
+		context: { trpc, queryClient },
+{{else if (eq api "orpc")}}
+		context: { orpc, queryClient },
+{{else}}
+		context: {},
+{{/if}}
+		defaultPendingComponent: () => <Loader />,
+		defaultNotFoundComponent: () => <div>Not Found</div>,
+{{#if (eq api "trpc")}}
+		Wrap: ({ children }) => (
+			<TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+				{children}
+			</TRPCProvider>
+		),
+{{/if}}
+	});
+{{#if (or (eq api "trpc") (eq api "orpc"))}}
+
+	setupRouterSsrQueryIntegration({
+		router,
+		queryClient,
+	});
+{{/if}}
+
+	return router;
+};
+{{/if}}
+
+declare module "@tanstack/react-router" {
+	interface Register {
+		router: ReturnType<typeof getRouter>;
+	}
+}
+`],
+  ["frontend/react/tanstack-start/src/routes/__root.tsx.hbs", `import { Toaster } from "@{{projectName}}/ui/components/sonner";
+{{#unless (eq backend "convex")}} {{#unless (eq api "none")}}
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+{{/unless}} {{/unless}}
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+{{#if (and (eq backend "convex") (or (eq auth "clerk") (eq auth "better-auth")))}}
+  useRouteContext,
+{{/if}}
+} from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import Header from "../components/header";
+import appCss from "../index.css?url";
+{{#if (eq backend "convex")}}
+import type { QueryClient } from "@tanstack/react-query";
+import type { ConvexQueryClient } from "@convex-dev/react-query";
+{{else}}
+{{#if (or (eq api "trpc") (eq api "orpc"))}}
+import type { QueryClient } from "@tanstack/react-query";
+{{/if}}
+{{/if}}
+
+{{#if (eq auth "clerk")}}
+import { ClerkProvider{{#if (or (eq backend "convex") (ne api "none"))}}, useAuth{{/if}} } from "@clerk/tanstack-react-start";
+{{/if}}
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+import { useEffect } from "react";
+import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
+{{/if}}
+{{#if (and (eq backend "convex") (eq auth "clerk"))}}
+import { auth } from "@clerk/tanstack-react-start/server";
+import { createServerFn } from "@tanstack/react-start";
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+
+const fetchClerkAuth = createServerFn({ method: "GET" }).handler(async () => {
+  const { userId, getToken } = await auth();
+  const token = await getToken();
+  return { userId, token };
+});
+{{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+import { createServerFn } from "@tanstack/react-start";
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { authClient } from "@/lib/auth-client";
+import { getToken } from "@/lib/auth-server";
+
+const getAuth = createServerFn({ method: "GET" }).handler(async () => {
+  return await getToken();
+});
+{{else if (eq backend "convex")}}
+import { ConvexProvider } from "convex/react";
+{{/if}}
+
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+function ClerkApiAuthBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setClerkAuthTokenGetter(getToken);
+
+    return () => {
+      setClerkAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  return null;
+}
+{{/if}}
+
+{{#if (eq backend "convex")}}
+export interface RouterAppContext {
+  queryClient: QueryClient;
+  convexQueryClient: ConvexQueryClient;
+}
+{{else}}
+  {{#if (eq api "trpc")}}
+import type { TRPCOptionsProxy } from "@trpc/tanstack-react-query";
+import type { AppRouter } from "@{{projectName}}/api/routers/index";
+export interface RouterAppContext {
+  trpc: TRPCOptionsProxy<AppRouter>;
+  queryClient: QueryClient;
+}
+  {{else if (eq api "orpc")}}
+import type { orpc } from "@/utils/orpc";
+export interface RouterAppContext {
+  orpc: typeof orpc;
+  queryClient: QueryClient;
+}
+  {{else}}
+export interface RouterAppContext {
+}
+  {{/if}}
+{{/if}}
+
+export const Route = createRootRouteWithContext<RouterAppContext>()({
+  head: () => ({
+    meta: [
+      {
+        charSet: "utf-8",
+      },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1",
+      },
+      {
+        title: "My App",
+      },
+    ],
+    links: [
+      {
+        rel: "stylesheet",
+        href: appCss,
+      },
+    ],
+  }),
+
+  component: RootDocument,
+  {{#if (and (eq backend "convex") (eq auth "clerk"))}}
+  beforeLoad: async (ctx) => {
+    const { userId, token } = await fetchClerkAuth();
+    if (token) {
+      ctx.context.convexQueryClient.serverHttpClient?.setAuth(token);
+    }
+    return { userId, token };
+  },
+  {{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+  beforeLoad: async (ctx) => {
+    const token = await getAuth();
+    if (token) {
+      ctx.context.convexQueryClient.serverHttpClient?.setAuth(token);
+    }
+    return {
+      isAuthenticated: !!token,
+      token,
+    };
+  },
+  {{/if}}
+});
+
+function RootDocument() {
+  {{#if (and (eq backend "convex") (eq auth "clerk"))}}
+  const context = useRouteContext({ from: Route.id });
+  return (
+    <ClerkProvider>
+      <ConvexProviderWithClerk client={context.convexQueryClient.convexClient} useAuth={useAuth}>
+        <html lang="en" className="dark">
+          <head>
+            <HeadContent />
+          </head>
+          <body>
+            <div className="grid h-svh grid-rows-[auto_1fr]">
+              <Header />
+              <Outlet />
+            </div>
+            <Toaster richColors />
+            <TanStackRouterDevtools position="bottom-left" />
+            <Scripts />
+          </body>
+        </html>
+      </ConvexProviderWithClerk>
+    </ClerkProvider>
+  );
+  {{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+  const context = useRouteContext({ from: Route.id });
+  return (
+    <ConvexBetterAuthProvider
+      client={context.convexQueryClient.convexClient}
+      authClient={authClient}
+      initialToken={context.token}
+    >
+      <html lang="en" className="dark">
+        <head>
+          <HeadContent />
+        </head>
+        <body>
+          <div className="grid h-svh grid-rows-[auto_1fr]">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+          <TanStackRouterDevtools position="bottom-left" />
+          <Scripts />
+        </body>
+      </html>
+    </ConvexBetterAuthProvider>
+  );
+  {{else if (eq auth "clerk")}}
+  return (
+    <ClerkProvider>
+      {{#unless (eq api "none")}}
+      <ClerkApiAuthBridge />
+      {{/unless}}
+      <html lang="en" className="dark">
+        <head>
+          <HeadContent />
+        </head>
+        <body>
+          <div className="grid h-svh grid-rows-[auto_1fr]">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+          <TanStackRouterDevtools position="bottom-left" />
+          {{#unless (eq api "none")}}
+          <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+          {{/unless}}
+          <Scripts />
+        </body>
+      </html>
+    </ClerkProvider>
+  );
+  {{else if (eq backend "convex")}}
+  const { convexQueryClient } = Route.useRouteContext();
+  return (
+    <ConvexProvider client={convexQueryClient.convexClient}>
+      <html lang="en" className="dark">
+        <head>
+          <HeadContent />
+        </head>
+        <body>
+          <div className="grid h-svh grid-rows-[auto_1fr]">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+          <TanStackRouterDevtools position="bottom-left" />
+          <Scripts />
+        </body>
+      </html>
+    </ConvexProvider>
+  );
+  {{else}}
+  return (
+    <html lang="en" className="dark">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <div className="grid h-svh grid-rows-[auto_1fr]">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+        <TanStackRouterDevtools position="bottom-left" />
+        {{#unless (eq api "none")}}
+        <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+        {{/unless}}
+        <Scripts />
+      </body>
+    </html>
+  );
+  {{/if}}
+}
+`],
+  ["frontend/react/tanstack-start/src/routes/index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+{{#if (eq backend "convex")}}
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+{{else if (or (eq api "trpc") (eq api "orpc"))}}
+import { useQuery } from "@tanstack/react-query";
+  {{#if (eq api "trpc")}}
+import { useTRPC } from "@/utils/trpc";
+  {{/if}}
+  {{#if (eq api "orpc")}}
+import { orpc } from "@/utils/orpc";
+  {{/if}}
+{{/if}}
+
+export const Route = createFileRoute("/")({
+  component: HomeComponent,
+});
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+function HomeComponent() {
+  {{#if (eq backend "convex")}}
+  const healthCheck = useQuery(convexQuery(api.healthCheck.get, {}));
+  {{else if (eq api "trpc")}}
+  const trpc = useTRPC();
+  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+  {{else if (eq api "orpc")}}
+  const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+  {{/if}}
+
+  return (
+    <div className="container mx-auto max-w-3xl px-4 py-2">
+      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+      <div className="grid gap-6">
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">API Status</h2>
+          {{#if (eq backend "convex")}}
+          <div className="flex items-center gap-2">
+            <div
+              className={\`h-2 w-2 rounded-full \${healthCheck.data === "OK" ? "bg-green-500" : healthCheck.isLoading ? "bg-orange-400" : "bg-red-500"}\`}
+            />
+            <span className="text-muted-foreground text-sm">
+              {healthCheck.isLoading
+                ? "Checking..."
+                : healthCheck.data === "OK"
+                  ? "Connected"
+                  : "Error"}
+            </span>
+          </div>
+          {{else}}
+            {{#unless (eq api "none")}}
+            <div className="flex items-center gap-2">
+              <div
+                className={\`h-2 w-2 rounded-full \${healthCheck.data ? "bg-green-500" : "bg-red-500"}\`}
+              />
+              <span className="text-muted-foreground text-sm">
+                {healthCheck.isLoading
+                  ? "Checking..."
+                  : healthCheck.data
+                    ? "Connected"
+                    : "Disconnected"}
+              </span>
+            </div>
+            {{/unless}}
+          {{/if}}
+        </section>
+      </div>
+    </div>
+  );
+}
+`],
+  ["frontend/react/tanstack-start/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "include": ["**/*.ts", "**/*.tsx"],
+  "compilerOptions": {
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
+    /* Linting */
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@{{projectName}}/ui/*": ["../../packages/ui/src/*"]
+    }
+  }
+}
+`],
+  ["frontend/react/tanstack-start/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockVitePlugin } from "@varlock/vite-integration";
+{{/unless}}
+import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{else}}vite{{/if}}";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+{{#if (or (eq webDeploy "docker") (eq webDeploy "vercel") (and (eq webDeploy "prisma") (ne backend "none")) (and (ne webDeploy "cloudflare") (not (and (eq webDeploy "prisma") (eq backend "none"))) (includes addons "axiom")))}}
+import { nitro } from "nitro/vite";
+{{/if}}
+import tailwindcss from "@tailwindcss/vite";
+import viteReact from "@vitejs/plugin-react";
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+import { unwasm } from "unwasm/plugin";
+
+const prismaWasm =
+  process.env.ALCHEMY_CLOUDFLARE_VITE_INJECTED === "1"
+    ? null
+    : unwasm({ esmImport: true });
+{{/if}}
+
+export default defineConfig({
+  server: {
+    port: 3001,
+  },
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self"))}}
+  build: {
+    rollupOptions: {
+      // resolved by workerd at runtime; node builds cannot bundle it
+      external: ["cloudflare:workers"],
+    },
+  },
+{{/if}}
+  resolve: {
+    tsconfigPaths: true,
+  },
+  plugins: [
+{{#unless (eq webDeploy "cloudflare")}}
+    varlockVitePlugin({ ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}" }),
+{{/unless}}
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+    prismaWasm,
+{{/if}}
+    tailwindcss(),
+    tanstackStart({{#if (or (includes addons "tauri") (and (includes addons "electrobun") (or (ne backend "convex") (ne auth "better-auth"))))}}
+      {
+        prerender: {
+          enabled: true,
+        },
+      },
+{{/if}}),
+{{#if (or (eq webDeploy "docker") (eq webDeploy "vercel") (and (eq webDeploy "prisma") (ne backend "none")) (and (ne webDeploy "cloudflare") (not (and (eq webDeploy "prisma") (eq backend "none"))) (includes addons "axiom")))}}
+    nitro({{#if (eq webDeploy "docker")}}{ preset: "{{#if (eq runtime "bun")}}bun{{else}}node-server{{/if}}" }{{/if}}),
+{{/if}}
+    viteReact(),
+  ],
+{{#if (or (eq webDeploy "vercel") (and (eq webDeploy "prisma") (ne backend "none")))}}
+  // These deployments run the standalone build artifact.
+  ssr: {
+    noExternal: true,
+  },
+{{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+  ssr: {
+    noExternal: ["@convex-dev/better-auth"],
+  },
+{{/if}}
+});
+`],
+  ["frontend/react/web-base/_gitignore", `# Dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Testing
+/coverage
+
+# Build outputs
+/.next/
+/out/
+/build/
+/dist/
+.vinxi
+.output
+.react-router/
+.tanstack/
+.nitro/
+
+# Deployment
+.vercel
+.netlify
+.wrangler
+.alchemy
+
+# Environment & local files
+.env*
+!.env.example
+.DS_Store
+*.pem
+*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Other
+dev-dist
+
+.wrangler
+.dev.vars*
+
+.open-next
+`],
+  ["frontend/react/web-base/components.json.hbs", `{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-lyra",
+  "rsc": {{#if (includes frontend "next")}}true{{else}}false{{/if}},
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "../../packages/ui/src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@/components",
+    "utils": "@{{projectName}}/ui/lib/utils",
+    "ui": "@{{projectName}}/ui/components",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "menuColor": "default",
+  "menuAccent": "subtle",
+  "registries": {}
+}
+`],
+  ["frontend/react/web-base/src/components/header.tsx.hbs", `{{#if (includes frontend "next")}}
+"use client";
+import Link from "next/link";
+{{else if (includes frontend "react-router")}}
+import { NavLink } from "react-router";
+{{else if (or (includes frontend "tanstack-router") (includes frontend "tanstack-start"))}}
+import { Link } from "@tanstack/react-router";
+{{/if}}
+{{#unless (includes frontend "tanstack-start")}}
+import { ModeToggle } from "./mode-toggle";
+{{/unless}}
+{{#if (and (eq auth "better-auth") (ne backend "convex"))}}
+import UserMenu from "./user-menu";
+{{/if}}
+
+export default function Header() {
+  const links = [
+    { to: "/", label: "Home" },
+    {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+      { to: "/dashboard", label: "Dashboard" },
+    {{/if}}
+  ] as const;
+
+  return (
+    <div>
+      <div className="flex flex-row items-center justify-between px-2 py-1">
+        <nav className="flex gap-4 text-lg">
+          {links.map(({ to, label }) => {
+            {{#if (includes frontend "next")}}
+            return (
+              <Link key={to} href={to}>
+                {label}
+              </Link>
+            );
+            {{else if (includes frontend "react-router")}}
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) => isActive ? "font-bold" : ""}
+                end
+              >
+                {label}
+              </NavLink>
+            );
+            {{else if (or (includes frontend "tanstack-router") (includes frontend "tanstack-start"))}}
+            return (
+              <Link
+                key={to}
+                to={to}
+              >
+                {label}
+              </Link>
+            );
+            {{else}}
+            return null;
+            {{/if}}
+          })}
+        </nav>
+        <div className="flex items-center gap-2">
+          {{#unless (includes frontend "tanstack-start")}}
+          <ModeToggle />
+          {{/unless}}
+          {{#if (and (eq auth "better-auth") (ne backend "convex"))}}
+          <UserMenu />
+          {{/if}}
+        </div>
+      </div>
+      <hr />
+    </div>
+  );
+}
+`],
+  ["frontend/react/web-base/src/components/loader.tsx.hbs", `import { Loader2 } from "lucide-react";
+
+export default function Loader() {
+  return (
+    <div className="flex h-full items-center justify-center pt-8">
+      <Loader2 className="animate-spin" />
+    </div>
+  );
+}
+`],
+  ["frontend/react/web-base/src/index.css.hbs", `@import '@{{projectName}}/ui/globals.css';
+`],
+  ["frontend/solid/_gitignore", `node_modules
+.DS_Store
+dist
+.output
+.vercel
+.netlify
+*.local
+.env
+.env.*
+
+.wrangler
+.alchemy
+.dev.vars*
+`],
+  ["frontend/solid/package.json.hbs", `{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit",
+    "start": "{{#if (eq webDeploy "cloudflare")}}vite preview{{else}}node .output/server/index.mjs{{/if}}",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@solidjs/meta": "1.0.0-next.2",
+    "@solidjs/router": "2.0.0-next.38",
+    "@solidjs/web": "2.0.0-rc.14",
+    "solid-js": "2.0.0-rc.14"
+  },
+  "devDependencies": {
+    "@solidjs/vite-plugin": "3.0.0-next.49",
+    "@tailwindcss/vite": "^4.3.3",
+    "filesystem-routing": "0.4.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.2.2"{{#unless (eq webDeploy "cloudflare")}},
+    "nitro": "3.0.260903-beta"{{/unless}}
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
+`],
+  ["frontend/solid/public/robots.txt", `# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow:
+`],
+  ["frontend/solid/src/App.tsx.hbs", `import { Title } from "@solidjs/meta";
+import { Loading } from "solid-js";
+import Header from "~/components/header";
+import Loader from "~/components/loader";
+import { Router } from "~/router";
+{{#if (eq api "orpc")}}
+import { QueryClientProvider } from "@tanstack/solid-query";
+import { createQueryClient } from "~/utils/orpc";
+{{/if}}
+import "./styles.css";
+
+export default function App() {
+{{#if (eq api "orpc")}}
+  const queryClient = createQueryClient();
+{{/if}}
+
+  return (
+{{#if (eq api "orpc")}}
+    <QueryClientProvider client={queryClient}>
+{{/if}}
+      <Router>
+        {(props) => (
+          <>
+            <Title>{{projectName}}</Title>
+            <div class="grid h-svh grid-rows-[auto_1fr]">
+              <Header />
+              <Loading fallback={<Loader />}>{props.children}</Loading>
+            </div>
+          </>
+        )}
+      </Router>
+{{#if (eq api "orpc")}}
+    </QueryClientProvider>
+{{/if}}
+  );
+}
+`],
+  ["frontend/solid/src/components/header.tsx.hbs", `{{#if (eq auth "better-auth")}}
+import UserMenu from "./user-menu";
+{{/if}}
+import { For } from "solid-js";
+
+export default function Header() {
+  const links = [
+    { to: "/", label: "Home" },
+    {{#if (eq auth "better-auth")}}
+    { to: "/dashboard", label: "Dashboard" },
+    {{/if}}
+  ];
+
+  return (
+    <div>
+      <div class="flex flex-row items-center justify-between px-2 py-1">
+        <nav class="flex gap-4 text-lg">
+          <For each={links}>
+            {(link) => <a href={link.to}>{link.label}</a>}
+          </For>
+        </nav>
+        <div class="flex items-center gap-2">
+          {{#if (eq auth "better-auth")}}
+          <UserMenu />
+          {{/if}}
+        </div>
+      </div>
+      <hr />
+    </div>
+  );
+}
+`],
+  ["frontend/solid/src/components/loader.tsx", `export default function Loader() {
+  return (
+    <div class="flex h-full items-center justify-center pt-8" role="status">
+      <span class="h-5 w-5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+      <span class="sr-only">Loading</span>
+    </div>
+  );
+}
+`],
+  ["frontend/solid/src/Document.tsx", `import { HydrationScript } from "@solidjs/web";
+import type { ParentProps } from "solid-js";
+
+export default function Document(props: ParentProps) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <HydrationScript />
+      </head>
+      <body>{props.children}</body>
+    </html>
+  );
+}
+`],
+  ["frontend/solid/src/middleware.ts", `import type { StartMiddleware } from "@solidjs/vite-plugin";
+import { createAPIHandler } from "filesystem-routing/api";
+import routes from "virtual:file-routes";
+
+const handleAPI = createAPIHandler(routes);
+
+export default ((event, next) => handleAPI(event.request, next)) satisfies StartMiddleware;
+`],
+  ["frontend/solid/src/router.ts", `import { createRouter } from "@solidjs/router";
+import { fileRoutes } from "@solidjs/router/fs";
+import { pageRoutes } from "virtual:file-routes";
+
+export const Router = createRouter({ routes: fileRoutes(pageRoutes) });
+`],
+  ["frontend/solid/src/routes/[...404].tsx", `import { Title } from "@solidjs/meta";
+import type { RouteDefinition } from "@solidjs/router";
+import { httpStatus } from "@solidjs/web";
+
+export const route = {
+  preload: () => httpStatus(404),
+} satisfies RouteDefinition;
+
+export default function NotFound() {
+  return (
+    <main class="container mx-auto max-w-3xl px-4 py-10">
+      <Title>Not Found</Title>
+      <h1 class="text-3xl font-bold">Page not found</h1>
+    </main>
+  );
+}
+`],
+  ["frontend/solid/src/routes/index.tsx.hbs", `{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/solid-query";
+import { orpc } from "~/utils/orpc";
+{{/if}}
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+export default function Home() {
+  {{#if (eq api "orpc")}}
+  const healthCheck = useQuery(() => ({
+    ...orpc.healthCheck.queryOptions(),
+    deferStream: true,
+  }));
+  const isConnected = () => healthCheck.data === "OK";
+  {{/if}}
+
+  return (
+    <div class="container mx-auto max-w-3xl px-4 py-2">
+      <pre class="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+      <div class="grid gap-6">
+        {{#if (eq api "orpc")}}
+        <section class="rounded-lg border p-4">
+          <h2 class="mb-2 font-medium">API Status</h2>
+          <div class="flex items-center gap-2">
+            <div
+              class={\`h-2 w-2 rounded-full \${healthCheck.isPending ? "bg-orange-400" : isConnected() ? "bg-green-500" : "bg-red-500"}\`}
+            />
+            <span class="text-sm text-muted-foreground">
+              {healthCheck.isPending
+                ? "Checking..."
+                : isConnected()
+                  ? "Connected"
+                  : "Disconnected"}
+            </span>
+          </div>
+        </section>
+        {{/if}}
+      </div>
+    </div>
+  );
+}
+`],
+  ["frontend/solid/src/styles.css", `@import "tailwindcss";
+
+body {
+  @apply bg-neutral-950 text-neutral-100;
+}
+`],
+  ["frontend/solid/src/vite-env.d.ts", `/// <reference types="vite/client" />
+/// <reference types="filesystem-routing/types" />
+`],
+  ["frontend/solid/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "preserve",
+    "jsxImportSource": "@solidjs/web",
+    "allowJs": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["vite/client"],
+    "isolatedModules": true,
+    "paths": {
+      "~/*": ["./src/*"]
+    }
+  },
+  "exclude": ["dist", ".output"]
+}
+`],
+  ["frontend/solid/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockVitePlugin } from "@varlock/vite-integration";
+{{/unless}}
+import tailwindcss from "@tailwindcss/vite";
+import solid from "@solidjs/vite-plugin";
+import { fileRoutes } from "filesystem-routing/vite";
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+import { unwasm } from "unwasm/plugin";
+{{/if}}
+{{#if (eq webDeploy "cloudflare")}}
+import { fileURLToPath } from "node:url";
+{{/if}}
+{{#unless (eq webDeploy "cloudflare")}}
+import { nitro } from "nitro/vite";
+{{/unless}}
+import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{else}}vite{{/if}}";
+
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+const prismaWasm =
+  process.env.ALCHEMY_CLOUDFLARE_VITE_INJECTED === "1"
+    ? null
+    : unwasm({ esmImport: true });
+{{/if}}
+
+{{#if (eq webDeploy "cloudflare")}}
+export default defineConfig(({ command }) => {
+  const cloudflareWorkersAlias: Record<string, string> =
+    command === "serve" && process.env.ALCHEMY_CLOUDFLARE_VITE_INJECTED !== "1"
+      ? {
+          "cloudflare:workers": fileURLToPath(
+            new URL("./cloudflare-workers.dev.ts", import.meta.url),
+          ),
+        }
+      : {};
+
+  return {
+{{else}}
+export default defineConfig({
+{{/if}}
+  optimizeDeps: {
+    entries: ["src/**/*.tsx"],
+  },
+  plugins: [
+{{#unless (eq webDeploy "cloudflare")}}
+    varlockVitePlugin({ ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}" }),
+{{/unless}}
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+    prismaWasm,
+{{/if}}
+    solid({
+      start: { middleware: "./src/middleware.ts" },
+      ssr: true,
+      extensions: [".jsx", ".tsx"],
+    }),
+{{#unless (eq webDeploy "cloudflare")}}
+    nitro({ serverEntry: false }),
+{{/unless}}
+    fileRoutes({ httpMethods: true }),
+    tailwindcss(),
+  ],
+  server: {
+    port: 3001,
+  },
+{{#if (eq webDeploy "cloudflare")}}
+  build: {
+    rollupOptions: {
+      external: ["cloudflare:workers"],
+    },
+  },
+{{/if}}
+  ssr: {
+    noExternal: ["solid-js", /^@solidjs\\//, "@tanstack/solid-query"],
+  },
+  resolve: {
+    tsconfigPaths: true,
+{{#if (eq webDeploy "cloudflare")}}
+    alias: cloudflareWorkersAlias,
+{{/if}}
+  },
+{{#if (eq webDeploy "cloudflare")}}
+  };
+{{else}}
+});
+{{/if}}
+{{#if (eq webDeploy "cloudflare")}}
+});
+{{/if}}
+`],
+  ["frontend/svelte/_gitignore", `node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+.alchemy
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+`],
+  ["frontend/svelte/_npmrc", `engine-strict=true
+`],
+  ["frontend/svelte/package.json.hbs", `{
+	"name": "web",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+	},
+	"devDependencies": {
+		{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+		"@sveltejs/adapter-static": "^3.0.10",
+		{{else if (eq webDeploy "prisma")}}
+		"@sveltejs/adapter-node": "^5.5.7",
+		{{else}}
+		"@sveltejs/adapter-auto": "^7.0.1",
+		{{/if}}
+		"@sveltejs/kit": "^2.70.3",
+		"@sveltejs/vite-plugin-svelte": "^7.3.0",
+		"@tailwindcss/vite": "^4.3.3",
+		"svelte": "^5.57.0",
+		"svelte-check": "^4.7.6",
+		"tailwindcss": "^4.3.3",
+		"vite": "^8.2.2"
+	},
+	"dependencies": {}
+}
+`],
+  ["frontend/svelte/src/app.css", `@import "tailwindcss";
+
+body {
+  @apply bg-neutral-950 text-neutral-100;
+}
+`],
+  ["frontend/svelte/src/app.d.ts.hbs", `{{#if (eq webDeploy "cloudflare")}}
+/// <reference path="../../../packages/env/env.d.ts" />
+{{/if}}
+{{#if (and (eq backend "self") (eq api "orpc"))}}
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+
+{{/if}}
+// See https://svelte.dev/docs/kit/types#app.d.ts
+// for information about these interfaces
+declare global {
+{{#if (and (eq backend "self") (eq api "orpc"))}}
+	var $client: AppRouterClient | undefined;
+
+{{/if}}
+	namespace App {
+		// interface Error {}
+		// interface Locals {}
+		// interface PageData {}
+		// interface PageState {}
+{{#if (eq webDeploy "cloudflare")}}
+		interface Platform {
+			env: Env;
+			ctx: ExecutionContext;
+			caches: CacheStorage;
+			cf: IncomingRequestCfProperties;
+		}
+{{else}}
+		// interface Platform {}
+{{/if}}
+	}
+}
+
+export {};
+`],
+  ["frontend/svelte/src/app.html", `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
+`],
+  ["frontend/svelte/src/components/Header.svelte.hbs", `<script lang="ts">
+
+    {{#if (eq auth "better-auth")}}
+	import UserMenu from './UserMenu.svelte';
+    {{/if}}
+
+</script>
+
+<div>
+	<div class="flex flex-row items-center justify-between px-4 py-2 md:px-6">
+		<nav class="flex gap-4 text-lg">
+			<a href="/" class="hover:text-neutral-400 transition-colors">Home</a>
+		    {{#if (eq auth "better-auth")}}
+			<a href="/dashboard" class="hover:text-neutral-400 transition-colors">Dashboard</a>
+		    {{/if}}
+		</nav>
+		<div class="flex items-center gap-2">
+		    {{#if (eq auth "better-auth")}}
+            <UserMenu />
+             {{/if}}
+		</div>
+	</div>
+	<hr class="border-neutral-800" />
+</div>
+`],
+  ["frontend/svelte/src/lib/index.ts", `// place files you want to import through the \`$lib\` alias in this folder.
+export {};
+`],
+  ["frontend/svelte/src/routes/+layout.svelte.hbs", `{{#if (eq backend "convex")}}
+<script lang="ts">
+	import '../app.css';
+    import Header from '../components/Header.svelte';
+    import { PUBLIC_CONVEX_URL } from '$env/static/public';
+	import { setupConvex } from 'convex-svelte';
+
+	const { children } = $props();
+	setupConvex(PUBLIC_CONVEX_URL);
+</script>
+
+<div class="grid h-svh grid-rows-[auto_1fr]">
+	<Header />
+	<main class="overflow-y-auto">
+		{@render children()}
+	</main>
+</div>
+{{else}}
+  {{#if (eq api "orpc")}}
+<script lang="ts">
+    import { QueryClientProvider } from '@tanstack/svelte-query';
+    import { SvelteQueryDevtools } from '@tanstack/svelte-query-devtools'
+	import '../app.css';
+    import { queryClient } from '$lib/orpc';
+    import Header from '../components/Header.svelte';
+
+	const { children } = $props();
+</script>
+
+<QueryClientProvider client={queryClient}>
+    <div class="grid h-svh grid-rows-[auto_1fr]">
+		<Header />
+		<main class="overflow-y-auto">
+			{@render children()}
+		</main>
+    </div>
+    <SvelteQueryDevtools />
+</QueryClientProvider>
+  {{else}}
+<script lang="ts">
+	import '../app.css';
+    import Header from '../components/Header.svelte';
+
+	const { children } = $props();
+</script>
+
+<div class="grid h-svh grid-rows-[auto_1fr]">
+	<Header />
+	<main class="overflow-y-auto">
+		{@render children()}
+	</main>
+</div>
+  {{/if}}
+{{/if}}
+`],
+  ["frontend/svelte/src/routes/+page.svelte.hbs", `{{#if (eq backend "convex")}}
+<script lang="ts">
+import { useQuery } from 'convex-svelte';
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+
+const healthCheck = useQuery(api.healthCheck.get, {});
+
+const TITLE_TEXT = \`
+   ██████╗ ███████╗████████╗████████╗███████╗██████╗
+   ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+   ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+   ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+   ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+   ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+   ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+   ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+      ██║       ███████╗   ██║   ███████║██║     █████╔╝
+      ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+      ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+      ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+   \`;
+</script>
+
+<div class="container mx-auto max-w-3xl px-4 py-2">
+	<pre class="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+	<div class="grid gap-6">
+		<section class="rounded-lg border p-4">
+			<h2 class="mb-2 font-medium">API Status</h2>
+			<div class="flex items-center gap-2">
+				<div
+					class={\`h-2 w-2 rounded-full \${healthCheck.data ? "bg-green-500" : "bg-red-500"}\`}
+				></div>
+				<span class="text-muted-foreground text-sm">
+					{healthCheck.isLoading
+						? "Checking..."
+						: healthCheck.data
+							? "Connected"
+							: "Disconnected"}
+				</span>
+			</div>
+		</section>
+	</div>
+</div>
+{{else}}
+<script lang="ts">
+{{#if (eq api "orpc")}}
+import { orpc } from "$lib/orpc";
+import { createQuery } from "@tanstack/svelte-query";
+const healthCheck = createQuery(() => orpc.healthCheck.queryOptions());
+{{/if}}
+
+const TITLE_TEXT = \`
+   ██████╗ ███████╗████████╗████████╗███████╗██████╗
+   ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+   ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+   ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+   ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+   ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+   ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+   ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+      ██║       ███████╗   ██║   ███████║██║     █████╔╝
+      ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+      ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+      ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+   \`;
+</script>
+
+<div class="container mx-auto max-w-3xl px-4 py-2">
+	<pre class="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+	<div class="grid gap-6">
+	    {{#if (eq api "orpc")}}
+		<section class="rounded-lg border p-4">
+			<h2 class="mb-2 font-medium">API Status</h2>
+			<div class="flex items-center gap-2">
+				<div
+					class={\`h-2 w-2 rounded-full \${healthCheck.data ? "bg-green-500" : "bg-red-500"}\`}
+				></div>
+				<span class="text-muted-foreground text-sm">
+					{healthCheck.isLoading
+						? "Checking..."
+						: healthCheck.data
+							? "Connected"
+							: "Disconnected"}
+				</span>
+			</div>
+		</section>
+	    {{/if}}
+	</div>
+</div>
+{{/if}}
+`],
+  ["frontend/svelte/static/favicon.png", `[Binary file]`],
+  ["frontend/svelte/svelte.config.js.hbs", `{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+import adapter from '@sveltejs/adapter-static';
+{{else if (eq webDeploy "cloudflare")}}
+import adapter from '@sveltejs/adapter-cloudflare';
+{{else if (or (eq webDeploy "docker") (eq webDeploy "prisma"))}}
+import adapter from '@sveltejs/adapter-node';
+{{else if (eq webDeploy "vercel")}}
+import adapter from '@sveltejs/adapter-vercel';
+{{else}}
+import adapter from '@sveltejs/adapter-auto';
+{{/if}}
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+/** @type {import('@sveltejs/kit').Config} */
+const config = {
+	// Consult https://svelte.dev/docs/kit/integrations
+	// for more information about preprocessors
+	preprocess: vitePreprocess(),
+
+	kit: {
+{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+		// adapter-static emits files Electrobun and Tauri can bundle directly.
+		adapter: adapter({
+			pages: 'build',
+			assets: 'build',
+			fallback: 'index.html'
+		})
+{{else if (eq webDeploy "cloudflare")}}
+		adapter: adapter()
+{{else if (or (eq webDeploy "docker") (eq webDeploy "prisma"))}}
+		// adapter-node builds a standalone Node server (run with \`node build/index.js\`).
+		adapter: adapter()
+{{else if (eq webDeploy "vercel")}}
+		adapter: adapter({ runtime: 'nodejs24.x' })
+{{else}}
+		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
+		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
+		// See https://svelte.dev/docs/kit/adapters for more information about adapters.
+		adapter: adapter()
+{{/if}}
+	}
+};
+
+export default config;
+`],
+  ["frontend/svelte/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+    {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+    "disableSourceOfProjectReferenceRedirect": true,
+    {{/if}}
+		"allowJs": true,
+		"checkJs": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"strict": true,
+		"moduleResolution": "bundler"{{#if (eq webDeploy "cloudflare")}},
+			"types": ["@cloudflare/workers-types"]{{/if}}
+	}
+	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
+	// except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
+	//
+	// If you want to overwrite includes/excludes, make sure to copy over the relevant includes/excludes
+	// from the referenced tsconfig.json - TypeScript does not merge them in
+}
+`],
+  ["frontend/svelte/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockVitePlugin } from "@varlock/vite-integration";
+{{/unless}}
+import tailwindcss from "@tailwindcss/vite";
+import { sveltekit } from "@sveltejs/kit/vite";
+import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{else}}vite{{/if}}";
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+import { unwasm } from "unwasm/plugin";
+{{/if}}
+
+export default defineConfig({
+  plugins: [
+{{#unless (eq webDeploy "cloudflare")}}
+    varlockVitePlugin({ ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}" }),
+{{/unless}}
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+    unwasm({ esmImport: true }),
+{{/if}}
+    tailwindcss(),
+    sveltekit(),
+  ],
+{{#if (eq webDeploy "prisma")}}
+  // Prisma Compute uploads only the build artifact, so keep the official
+  // adapter-node output self-contained instead of requiring node_modules.
+  ssr: {
+    noExternal: true,
+  },
+{{/if}}
+});
+`],
+  ["modules/admin/files/docs/modules/admin.md", `# Admin console
+
+The admin area lives at \`/admin\` and is visible only to users with the \`admin\` role. Everyone else gets a 404.
+
+## Becoming an admin
+
+Set \`ADMIN_EMAILS\` before signing up:
+
+\`\`\`bash
+ADMIN_EMAILS=you@example.com
+\`\`\`
+
+Existing admins can promote other users from \`/admin/users\`.
+
+## Permissions
+
+\`packages/permissions\` defines abilities with [CASL](https://casl.js.org):
+
+\`\`\`ts
+import { defineAbilityFor } from "@app/permissions";
+
+const ability = defineAbilityFor(user);
+ability.can("access", "Admin");
+\`\`\`
+
+Admins \`manage\` everything. Add roles or finer rules in \`defineAbilityFor\`, and register new subjects through declaration merging on \`SubjectMap\`.
+
+Pages call \`requireAdmin(locale)\` from \`apps/web/src/lib/admin.ts\`.
+
+## Adding pages
+
+Create \`apps/web/src/app/[lang]/admin/<page>/page.tsx\` and add an entry to \`navigation.admin\` in \`apps/web/src/config/navigation.ts\`. Modules such as payment and credits add their pages this way.
+`],
+  ["modules/admin/files/packages/i18n/src/messages/en/admin.ts", `export default {
+  nav: {
+    admin: "Admin",
+    overview: "Overview",
+    users: "Users",
+  },
+  overview: {
+    title: "Admin overview",
+    users: "Users",
+    admins: "Admins",
+    recent: "Recent sign-ups",
+  },
+  users: {
+    title: "Users",
+    search: "Search",
+    searchPlaceholder: "Search by email",
+    empty: "No users found.",
+    columns: {
+      name: "Name",
+      email: "Email",
+      role: "Role",
+      status: "Status",
+      joined: "Joined",
+    },
+    status: {
+      active: "Active",
+      banned: "Banned",
+    },
+    actions: {
+      makeAdmin: "Make admin",
+      removeAdmin: "Remove admin",
+      ban: "Ban",
+      unban: "Unban",
+    },
+    banReason: "Banned by an administrator",
+  },
+  pagination: {
+    previous: "Previous",
+    next: "Next",
+    page: "Page {page} of {pages}",
+  },
+} as const;
+`],
+  ["modules/admin/files/packages/i18n/src/messages/zh-CN/admin.ts", `export default {
+  nav: {
+    admin: "后台",
+    overview: "概览",
+    users: "用户",
+  },
+  overview: {
+    title: "后台概览",
+    users: "用户数",
+    admins: "管理员",
+    recent: "最近注册",
+  },
+  users: {
+    title: "用户管理",
+    search: "搜索",
+    searchPlaceholder: "按邮箱搜索",
+    empty: "没有找到用户。",
+    columns: {
+      name: "姓名",
+      email: "邮箱",
+      role: "角色",
+      status: "状态",
+      joined: "注册时间",
+    },
+    status: {
+      active: "正常",
+      banned: "已封禁",
+    },
+    actions: {
+      makeAdmin: "设为管理员",
+      removeAdmin: "取消管理员",
+      ban: "封禁",
+      unban: "解封",
+    },
+    banReason: "已被管理员封禁",
+  },
+  pagination: {
+    previous: "上一页",
+    next: "下一页",
+    page: "第 {page} / {pages} 页",
+  },
+} as const;
+`],
+  ["modules/admin/files/packages/permissions/src/index.ts", `import { AbilityBuilder, createMongoAbility, type MongoAbility } from "@casl/ability";
+
+export type Action = "manage" | "access" | "read" | "create" | "update" | "delete";
+
+/**
+ * Permission subjects. Modules add theirs through declaration merging:
+ *
+ *   declare module "@app/permissions" {
+ *     interface SubjectMap {
+ *       Order: true;
+ *     }
+ *   }
+ */
+export interface SubjectMap {
+  all: true;
+  Admin: true;
+  User: true;
+}
+
+export type Subject = keyof SubjectMap;
+
+export type AppAbility = MongoAbility<[Action, Subject]>;
+
+export type Actor = { id: string; role?: string | null };
+
+/** Rules per role. Admins manage everything; extend this for finer-grained roles. */
+export function defineAbilityFor(actor: Actor | null | undefined): AppAbility {
+  const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+  if (actor?.role === "admin") can("manage", "all");
+  return build();
+}
+`],
+  ["modules/admin/frameworks/next/apps/web/src/app/[lang]/admin/layout.tsx", `import SideNav from "@/components/side-nav";
+import { requireAdmin } from "@/lib/admin";
+import { resolveLocale } from "@/lib/i18n/server";
+
+export default async function AdminLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ lang: string }>;
+}) {
+  await requireAdmin(resolveLocale((await params).lang));
+
+  return (
+    <div className="container mx-auto flex max-w-6xl flex-1 flex-col gap-6 px-4 py-8 md:flex-row">
+      <aside className="md:w-48 md:shrink-0">
+        <SideNav area="admin" />
+      </aside>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+`],
+  ["modules/admin/frameworks/next/apps/web/src/app/[lang]/admin/page.tsx.hbs", `import { auth } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+
+import { StatCard } from "@/components/admin/stat-card";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+type Props = { params: Promise<{ lang: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("admin.overview.title") };
+}
+
+export default async function AdminOverviewPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  await requireAdmin(locale);
+
+  const requestHeaders = await headers();
+  const [recent, admins] = await Promise.all([
+    auth.api.listUsers({
+      headers: requestHeaders,
+      query: { limit: 5, sortBy: "createdAt", sortDirection: "desc" },
+    }),
+    auth.api.listUsers({
+      headers: requestHeaders,
+      query: { limit: 1, filterField: "role", filterValue: "admin", filterOperator: "eq" },
+    }),
+  ]);
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="font-semibold text-2xl">{t("admin.overview.title")}</h1>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label={t("admin.overview.users")} value={recent.total} />
+        <StatCard label={t("admin.overview.admins")} value={admins.total} />
+      </div>
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium">{t("admin.overview.recent")}</h2>
+        <ul className="divide-y border">
+          {recent.users.map((user) => (
+            <li key={user.id} className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+              <span className="truncate">{user.email}</span>
+              <span className="text-muted-foreground text-xs">{date.format(user.createdAt)}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
+`],
+  ["modules/admin/frameworks/next/apps/web/src/app/[lang]/admin/users/page.tsx.hbs", `import { auth } from "@{{projectName}}/app-services";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+
+import { Pagination } from "@/components/admin/pagination";
+import { UserActions } from "@/components/admin/user-actions";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+const PAGE_SIZE = 20;
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("admin.users.title") };
+}
+
+export default async function AdminUsersPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const { user: me } = await requireAdmin(locale);
+  const { q = "", page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
+
+  const { users, total } = await auth.api.listUsers({
+    headers: await headers(),
+    query: {
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+      sortBy: "createdAt",
+      sortDirection: "desc",
+      ...(q ? { searchValue: q, searchField: "email", searchOperator: "contains" } : {}),
+    },
+  });
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="font-semibold text-2xl">{t("admin.users.title")}</h1>
+      <form className="flex max-w-sm gap-2">
+        <Input name="q" defaultValue={q} placeholder={t("admin.users.searchPlaceholder")} />
+        <Button type="submit" variant="outline">
+          {t("admin.users.search")}
+        </Button>
+      </form>
+      <div className="overflow-x-auto border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-muted-foreground text-xs">
+            <tr>
+              <th className="px-4 py-2 font-medium">{t("admin.users.columns.name")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.users.columns.email")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.users.columns.role")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.users.columns.status")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.users.columns.joined")}</th>
+              <th className="px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td className="px-4 py-2">{user.name}</td>
+                <td className="px-4 py-2">{user.email}</td>
+                <td className="px-4 py-2">{user.role}</td>
+                <td className="px-4 py-2">
+                  {user.banned ? t("admin.users.status.banned") : t("admin.users.status.active")}
+                </td>
+                <td className="px-4 py-2 text-muted-foreground">{date.format(user.createdAt)}</td>
+                <td className="px-4 py-2 text-right">
+                  {user.id !== me.id && (
+                    <UserActions
+                      userId={user.id}
+                      isAdmin={user.role === "admin"}
+                      banned={Boolean(user.banned)}
+                    />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {users.length === 0 && (
+          <p className="px-4 py-6 text-center text-muted-foreground text-sm">
+            {t("admin.users.empty")}
+          </p>
+        )}
+      </div>
+      <Pagination
+        locale={locale}
+        page={page}
+        pages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        query={ { q } }
+      />
+    </div>
+  );
+}
+`],
+  ["modules/admin/frameworks/next/apps/web/src/components/admin/pagination.tsx.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+
+import { getTranslator } from "@/lib/i18n/server";
+
+/** Previous/next links that keep the current query string. */
+export function Pagination({
+  locale,
+  page,
+  pages,
+  query,
+}: {
+  locale: Locale;
+  page: number;
+  pages: number;
+  query: Record<string, string>;
+}) {
+  if (pages <= 1) return null;
+  const t = getTranslator(locale);
+  const href = (target: number) => \`?\${new URLSearchParams({ ...query, page: String(target) })}\`;
+
+  return (
+    <nav className="flex items-center gap-4 text-sm">
+      {page > 1 && <a href={href(page - 1)}>{t("admin.pagination.previous")}</a>}
+      <span className="text-muted-foreground">{t("admin.pagination.page", { page, pages })}</span>
+      {page < pages && <a href={href(page + 1)}>{t("admin.pagination.next")}</a>}
+    </nav>
+  );
+}
+`],
+  ["modules/admin/frameworks/next/apps/web/src/components/admin/stat-card.tsx", `export function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1 border p-4">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className="font-semibold text-2xl tabular-nums">{value}</span>
+    </div>
+  );
+}
+`],
+  ["modules/admin/frameworks/next/apps/web/src/components/admin/user-actions.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+
+import { useT } from "../i18n-provider";
+
+export function UserActions({
+  userId,
+  isAdmin,
+  banned,
+}: {
+  userId: string;
+  isAdmin: boolean;
+  banned: boolean;
+}) {
+  const t = useT();
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+
+  async function run(action: () => Promise<{ error: { message?: string } | null }>) {
+    setPending(true);
+    const { error } = await action();
+    setPending(false);
+    if (error) toast.error(error.message);
+    else router.refresh();
+  }
+
+  return (
+    <div className="flex justify-end gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={pending}
+        onClick={() =>
+          run(() => authClient.admin.setRole({ userId, role: isAdmin ? "user" : "admin" }))
+        }
+      >
+        {isAdmin ? t("admin.users.actions.removeAdmin") : t("admin.users.actions.makeAdmin")}
+      </Button>
+      <Button
+        size="sm"
+        variant={banned ? "outline" : "destructive"}
+        disabled={pending}
+        onClick={() =>
+          run(() =>
+            banned
+              ? authClient.admin.unbanUser({ userId })
+              : authClient.admin.banUser({ userId, banReason: t("admin.users.banReason") }),
+          )
+        }
+      >
+        {banned ? t("admin.users.actions.unban") : t("admin.users.actions.ban")}
+      </Button>
+    </div>
+  );
+}
+`],
+  ["modules/admin/frameworks/next/apps/web/src/lib/admin.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+import { defineAbilityFor } from "@{{projectName}}/permissions";
+import { notFound } from "next/navigation";
+
+import { requireUser } from "./session";
+
+/** Guards admin pages; non-admins get a 404 so the area stays undiscoverable. */
+export async function requireAdmin(locale: Locale) {
+  const user = await requireUser(locale, "/admin");
+  const ability = defineAbilityFor(user);
+  if (ability.cannot("access", "Admin")) notFound();
+  return { user, ability };
+}
+`],
+  ["modules/auth/dialects/postgres/packages/db/src/schema/auth.ts", `import { defineRelationsPart } from "drizzle-orm";
+import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  image: text("image"),
+  role: text("role").default("user").notNull(),
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const session = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    impersonatedBy: text("impersonated_by"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("session_userId_idx").on(table.userId)],
+);
+
+export const account = pgTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("account_userId_idx").on(table.userId)],
+);
+
+export const verification = pgTable(
+  "verification",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("verification_identifier_idx").on(table.identifier)],
+);
+
+export const authRelations = defineRelationsPart({ user, session, account, verification }, (r) => ({
+  user: {
+    sessions: r.many.session({
+      from: r.user.id,
+      to: r.session.userId,
+    }),
+    accounts: r.many.account({
+      from: r.user.id,
+      to: r.account.userId,
+    }),
+  },
+  session: {
+    user: r.one.user({
+      from: r.session.userId,
+      to: r.user.id,
+    }),
+  },
+  account: {
+    user: r.one.user({
+      from: r.account.userId,
+      to: r.user.id,
+    }),
+  },
+}));
+`],
+  ["modules/auth/dialects/sqlite/packages/db/src/schema/auth.ts", `import { defineRelationsPart, sql } from "drizzle-orm";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+
+export const user = sqliteTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: integer("email_verified", { mode: "boolean" }).default(false).notNull(),
+  image: text("image"),
+  role: text("role").default("user").notNull(),
+  banned: integer("banned", { mode: "boolean" }).default(false),
+  banReason: text("ban_reason"),
+  banExpires: integer("ban_expires", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const session = sqliteTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    impersonatedBy: text("impersonated_by"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("session_userId_idx").on(table.userId)],
+);
+
+export const account = sqliteTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: integer("access_token_expires_at", {
+      mode: "timestamp_ms",
+    }),
+    refreshTokenExpiresAt: integer("refresh_token_expires_at", {
+      mode: "timestamp_ms",
+    }),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("account_userId_idx").on(table.userId)],
+);
+
+export const verification = sqliteTable(
+  "verification",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("verification_identifier_idx").on(table.identifier)],
+);
+
+export const authRelations = defineRelationsPart({ user, session, account, verification }, (r) => ({
+  user: {
+    sessions: r.many.session({
+      from: r.user.id,
+      to: r.session.userId,
+    }),
+    accounts: r.many.account({
+      from: r.user.id,
+      to: r.account.userId,
+    }),
+  },
+  session: {
+    user: r.one.user({
+      from: r.session.userId,
+      to: r.user.id,
+    }),
+  },
+  account: {
+    user: r.one.user({
+      from: r.account.userId,
+      to: r.user.id,
+    }),
+  },
+}));
+`],
+  ["modules/auth/files/docs/modules/auth.md.hbs", `# Authentication
+
+Built on [Better Auth](https://better-auth.com). The \`packages/auth\` package exports \`createAuth(env, db, events)\`; \`apps/web/src/services.ts\` creates the instance.
+
+## What you get
+
+- Email and password sign-up and sign-in (\`/login\`, \`/signup\`)
+{{#if (includes module.integrations "email")}}
+- Email verification on sign-up and password reset (\`/forgot-password\`, \`/reset-password\`), sent by the email module
+{{/if}}
+{{#each module.providers}}
+- {{this}} OAuth
+{{/each}}
+- Roles (\`user\`, \`admin\`) through the Better Auth admin plugin
+- Account settings at \`/dashboard/settings\`
+
+## Configuration
+
+| Variable | Purpose |
+| --- | --- |
+| \`BETTER_AUTH_SECRET\` | Session signing secret, at least 32 characters |
+| \`BETTER_AUTH_URL\` | Public URL of the app |
+| \`ADMIN_EMAILS\` | Comma-separated emails that get the \`admin\` role when they sign up |
+{{#if (includes module.providers "google")}}
+| \`GOOGLE_CLIENT_ID\`, \`GOOGLE_CLIENT_SECRET\` | Google OAuth app. Redirect URI: \`<BETTER_AUTH_URL>/api/auth/callback/google\` |
+{{/if}}
+{{#if (includes module.providers "github")}}
+| \`GITHUB_CLIENT_ID\`, \`GITHUB_CLIENT_SECRET\` | GitHub OAuth app. Callback URL: \`<BETTER_AUTH_URL>/api/auth/callback/github\` |
+{{/if}}
+
+OAuth buttons appear only when both the client ID and secret are set.
+
+## Events
+
+| Event | When |
+| --- | --- |
+| \`auth.user_created\` | A user record was created |
+| \`auth.verification_requested\` | A verification email should be sent |
+| \`auth.password_reset_requested\` | A password reset email should be sent |
+
+Subscribe in \`apps/web/src/integrations/*.ts\`.
+
+## Protecting pages
+
+\`\`\`ts
+import { requireUser } from "@/lib/session";
+
+const user = await requireUser(locale, "/dashboard/billing");
+\`\`\`
+
+\`requireUser\` redirects anonymous visitors to \`/login?next=…\`.
+
+## Schema changes
+
+After adding Better Auth plugins, regenerate the schema with \`bun run auth:generate\` in \`apps/web\`, then \`bun run db:push\`.
+`],
+  ["modules/auth/files/packages/auth/src/events.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+
+type AuthEmail = { email: string; name: string; url: string; locale: Locale };
+
+declare module "@{{projectName}}/events" {
+  interface EventMap {
+    "auth.user_created": { userId: string; email: string; name: string };
+    "auth.verification_requested": AuthEmail;
+    "auth.password_reset_requested": AuthEmail;
+  }
+}
+`],
+  ["modules/auth/files/packages/auth/src/index.ts.hbs", `import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
+import type { Database } from "@{{projectName}}/db";
+import * as schema from "@{{projectName}}/db/schema/auth";
+import type { EventBus } from "@{{projectName}}/events";
+{{#if (includes module.integrations "email")}}
+import { localeFromHeaders } from "@{{projectName}}/i18n";
+{{/if}}
+import { betterAuth } from "better-auth";
+import { nextCookies } from "better-auth/next-js";
+import { admin } from "better-auth/plugins";
+
+import "./events";
+
+export type AuthConfig = {
+  BETTER_AUTH_URL: string;
+  BETTER_AUTH_SECRET: string;
+  ADMIN_EMAILS?: string;
+{{#if (includes module.providers "google")}}
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+{{/if}}
+{{#if (includes module.providers "github")}}
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+{{/if}}
+};
+
+export const roles = ["user", "admin"] as const;
+
+export type Role = (typeof roles)[number];
+
+function parseEmails(value: string | undefined): Set<string> {
+  return new Set(
+    (value ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export function createAuth(env: AuthConfig, database: Database, events: EventBus) {
+  const adminEmails = parseEmails(env.ADMIN_EMAILS);
+
+  return betterAuth({
+    database: drizzleAdapter(database, {
+      provider: "{{#if (eq database "postgres")}}pg{{else}}sqlite{{/if}}",
+      schema,
+    }),
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL,
+    trustedOrigins: [env.BETTER_AUTH_URL],
+    emailAndPassword: {
+      enabled: true,
+{{#if (includes module.integrations "email")}}
+      requireEmailVerification: true,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }, request) => {
+        await events.emit("auth.password_reset_requested", {
+          email: user.email,
+          name: user.name,
+          url,
+          locale: localeFromHeaders(request?.headers),
+        });
+      },
+{{/if}}
+    },
+{{#if (includes module.integrations "email")}}
+    emailVerification: {
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
+      sendVerificationEmail: async ({ user, url }, request) => {
+        await events.emit("auth.verification_requested", {
+          email: user.email,
+          name: user.name,
+          url,
+          locale: localeFromHeaders(request?.headers),
+        });
+      },
+    },
+{{/if}}
+    socialProviders: {
+{{#if (includes module.providers "google")}}
+      ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+        ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
+        : {}),
+{{/if}}
+{{#if (includes module.providers "github")}}
+      ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+        ? { github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET } }
+        : {}),
+{{/if}}
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => ({
+            data: { ...user, role: adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
+          }),
+          after: async (user) => {
+            await events.emit("auth.user_created", {
+              userId: user.id,
+              email: user.email,
+              name: user.name,
+            });
+          },
+        },
+      },
+    },
+    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }), nextCookies()],
+  });
+}
+
+export type Auth = ReturnType<typeof createAuth>;
+
+export type Session = Auth["$Infer"]["Session"];
+`],
+  ["modules/auth/files/packages/i18n/src/messages/en/auth.ts", `export default {
+  dashboard: {
+    title: "Dashboard",
+    welcome: "Welcome back, {name}",
+    empty: "Your product starts here. Feature modules add their pages to this dashboard.",
+  },
+  user: {
+    signIn: "Sign in",
+    signOut: "Sign out",
+    account: "My account",
+  },
+  nav: {
+    dashboard: "Dashboard",
+    overview: "Overview",
+    settings: "Settings",
+  },
+  fields: {
+    name: "Name",
+    email: "Email",
+    password: "Password",
+    currentPassword: "Current password",
+    newPassword: "New password",
+  },
+  errors: {
+    invalidEmail: "Enter a valid email address",
+    passwordLength: "Use at least 8 characters",
+    nameRequired: "Enter your name",
+    generic: "Something went wrong. Please try again.",
+  },
+  signIn: {
+    title: "Welcome back",
+    subtitle: "Sign in to your account",
+    submit: "Sign in",
+    noAccount: "Don't have an account?",
+    signUpLink: "Sign up",
+    forgot: "Forgot password?",
+  },
+  signUp: {
+    title: "Create an account",
+    subtitle: "Start in less than a minute",
+    submit: "Create account",
+    hasAccount: "Already have an account?",
+    signInLink: "Sign in",
+    checkEmail: "Check your inbox for {email} to verify your account.",
+  },
+  social: {
+    divider: "or",
+    continueWith: "Continue with {provider}",
+  },
+  forgot: {
+    title: "Reset your password",
+    subtitle: "We'll email you a link to choose a new one.",
+    submit: "Send reset link",
+    sent: "If an account exists for {email}, a reset link is on its way.",
+    back: "Back to sign in",
+  },
+  reset: {
+    title: "Choose a new password",
+    submit: "Update password",
+    success: "Password updated. Sign in with your new password.",
+    invalidToken: "This reset link is invalid or has expired.",
+  },
+  settings: {
+    title: "Account settings",
+    profile: "Profile",
+    password: "Password",
+    save: "Save",
+    saved: "Saved",
+  },
+  emails: {
+    verify: {
+      subject: "Verify your email",
+      heading: "Confirm your email address",
+      body: "Hi {name}, click the button below to verify your email and finish signing up.",
+      action: "Verify email",
+    },
+    reset: {
+      subject: "Reset your password",
+      heading: "Reset your password",
+      body: "Hi {name}, we received a request to reset your password. The link expires in one hour.",
+      action: "Choose a new password",
+    },
+    ignore: "If you didn't request this, you can safely ignore this email.",
+  },
+} as const;
+`],
+  ["modules/auth/files/packages/i18n/src/messages/zh-CN/auth.ts", `export default {
+  dashboard: {
+    title: "控制台",
+    welcome: "欢迎回来，{name}",
+    empty: "你的产品从这里开始。功能模块会把各自的页面加到控制台中。",
+  },
+  user: {
+    signIn: "登录",
+    signOut: "退出登录",
+    account: "我的账户",
+  },
+  nav: {
+    dashboard: "控制台",
+    overview: "概览",
+    settings: "设置",
+  },
+  fields: {
+    name: "姓名",
+    email: "邮箱",
+    password: "密码",
+    currentPassword: "当前密码",
+    newPassword: "新密码",
+  },
+  errors: {
+    invalidEmail: "请输入有效的邮箱地址",
+    passwordLength: "密码至少 8 位",
+    nameRequired: "请输入姓名",
+    generic: "出错了，请重试。",
+  },
+  signIn: {
+    title: "欢迎回来",
+    subtitle: "登录你的账户",
+    submit: "登录",
+    noAccount: "还没有账户？",
+    signUpLink: "注册",
+    forgot: "忘记密码？",
+  },
+  signUp: {
+    title: "创建账户",
+    subtitle: "不到一分钟即可开始",
+    submit: "创建账户",
+    hasAccount: "已有账户？",
+    signInLink: "登录",
+    checkEmail: "验证邮件已发送至 {email}，请查收并完成验证。",
+  },
+  social: {
+    divider: "或",
+    continueWith: "使用 {provider} 继续",
+  },
+  forgot: {
+    title: "重置密码",
+    subtitle: "我们会发送一封邮件，帮你设置新密码。",
+    submit: "发送重置链接",
+    sent: "如果 {email} 已注册，重置链接已发出。",
+    back: "返回登录",
+  },
+  reset: {
+    title: "设置新密码",
+    submit: "更新密码",
+    success: "密码已更新，请使用新密码登录。",
+    invalidToken: "重置链接无效或已过期。",
+  },
+  settings: {
+    title: "账户设置",
+    profile: "个人资料",
+    password: "密码",
+    save: "保存",
+    saved: "已保存",
+  },
+  emails: {
+    verify: {
+      subject: "验证你的邮箱",
+      heading: "确认你的邮箱地址",
+      body: "{name}，你好！点击下方按钮验证邮箱，完成注册。",
+      action: "验证邮箱",
+    },
+    reset: {
+      subject: "重置密码",
+      heading: "重置你的密码",
+      body: "{name}，你好！我们收到了重置密码的请求，链接一小时内有效。",
+      action: "设置新密码",
+    },
+    ignore: "如果这不是你本人的操作，请忽略这封邮件。",
+  },
+} as const;
+`],
+  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/dashboard/layout.tsx", `import SideNav from "@/components/side-nav";
+import { resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+export default async function DashboardLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ lang: string }>;
+}) {
+  await requireUser(resolveLocale((await params).lang), "/dashboard");
+
+  return (
+    <div className="container mx-auto flex max-w-6xl flex-1 flex-col gap-6 px-4 py-8 md:flex-row">
+      <aside className="md:w-48 md:shrink-0">
+        <SideNav area="dashboard" />
+      </aside>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/dashboard/page.tsx", `import type { Metadata } from "next";
+
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = { params: Promise<{ lang: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("auth.dashboard.title") };
+}
+
+export default async function DashboardPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const user = await requireUser(locale);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h1 className="font-semibold text-2xl">{t("auth.dashboard.welcome", { name: user.name })}</h1>
+      <p className="text-muted-foreground text-sm">{t("auth.dashboard.empty")}</p>
+    </div>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/dashboard/settings/page.tsx", `import type { Metadata } from "next";
+
+import { PasswordForm, ProfileForm } from "@/components/auth/account-forms";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = { params: Promise<{ lang: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("auth.settings.title") };
+}
+
+export default async function SettingsPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const user = await requireUser(locale);
+
+  return (
+    <div className="flex max-w-md flex-col gap-8">
+      <h1 className="font-semibold text-2xl">{t("auth.settings.title")}</h1>
+      <section className="flex flex-col gap-4">
+        <h2 className="font-medium">{t("auth.settings.profile")}</h2>
+        <ProfileForm name={user.name} email={user.email} />
+      </section>
+      <section className="flex flex-col gap-4">
+        <h2 className="font-medium">{t("auth.settings.password")}</h2>
+        <PasswordForm />
+      </section>
+    </div>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/login/page.tsx.hbs", `import type { Metadata } from "next";
+import Link from "next/link";
+
+import { AuthCard } from "@/components/auth/auth-card";
+import SignInForm from "@/components/auth/sign-in-form";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { safeNext } from "@/lib/session";
+import { enabledSocialProviders } from "@/lib/social-providers.server";
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ next?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("auth.signIn.submit") };
+}
+
+export default async function LoginPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const { next } = await searchParams;
+  const target = safeNext(next, localePath(locale, "/dashboard"));
+
+  return (
+    <AuthCard
+      title={t("auth.signIn.title")}
+      description={t("auth.signIn.subtitle")}
+      footer={
+        <>
+          {t("auth.signIn.noAccount")}&nbsp;
+          <Link
+            href={ { pathname: localePath(locale, "/signup"), query: next ? { next: target } : {} } }
+            className="text-foreground underline-offset-4 hover:underline"
+          >
+            {t("auth.signIn.signUpLink")}
+          </Link>
+        </>
+      }
+    >
+      <SignInForm
+        next={target}
+        providers={enabledSocialProviders()}
+        canResetPassword={ {{#if (includes module.integrations "email")}}true{{else}}false{{/if}} }
+      />
+    </AuthCard>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/signup/page.tsx.hbs", `import type { Metadata } from "next";
+import Link from "next/link";
+
+import { AuthCard } from "@/components/auth/auth-card";
+import SignUpForm from "@/components/auth/sign-up-form";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { safeNext } from "@/lib/session";
+import { enabledSocialProviders } from "@/lib/social-providers.server";
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ next?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("auth.signUp.submit") };
+}
+
+export default async function SignUpPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const { next } = await searchParams;
+
+  return (
+    <AuthCard
+      title={t("auth.signUp.title")}
+      description={t("auth.signUp.subtitle")}
+      footer={
+        <>
+          {t("auth.signUp.hasAccount")}&nbsp;
+          <Link
+            href={localePath(locale, "/login")}
+            className="text-foreground underline-offset-4 hover:underline"
+          >
+            {t("auth.signUp.signInLink")}
+          </Link>
+        </>
+      }
+    >
+      <SignUpForm
+        next={safeNext(next, localePath(locale, "/dashboard"))}
+        providers={enabledSocialProviders()}
+        verifyEmail={ {{#if (includes module.integrations "email")}}true{{else}}false{{/if}} }
+      />
+    </AuthCard>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/app/api/auth/[...all]/route.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+import { toNextJsHandler } from "better-auth/next-js";
+
+export const { GET, POST } = toNextJsHandler(auth);
+`],
+  ["modules/auth/frameworks/next/apps/web/src/components/auth/account-forms.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+
+import { useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+
+function useSubmit(
+  action: (form: FormData) => Promise<{ error: { message?: string } | null }>,
+  { reset = false } = {},
+) {
+  const t = useT();
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const target = event.currentTarget;
+    setPending(true);
+    const { error } = await action(new FormData(target));
+    setPending(false);
+    if (error) {
+      toast.error(error.message ?? t("auth.errors.generic"));
+      return;
+    }
+    toast.success(t("auth.settings.saved"));
+    if (reset) target.reset();
+  }
+
+  return { pending, onSubmit };
+}
+
+export function ProfileForm({ name, email }: { name: string; email: string }) {
+  const t = useT();
+  const router = useRouter();
+  const { pending, onSubmit } = useSubmit(async (form) => {
+    const result = await authClient.updateUser({ name: formValue(form, "name") });
+    router.refresh();
+    return result;
+  });
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field label={t("auth.fields.email")} name="email" value={email} disabled readOnly />
+      <Field label={t("auth.fields.name")} name="name" defaultValue={name} autoComplete="name" />
+      <Button type="submit" disabled={pending} className="self-start">
+        {t("auth.settings.save")}
+      </Button>
+    </form>
+  );
+}
+
+export function PasswordForm() {
+  const t = useT();
+  const { pending, onSubmit } = useSubmit(
+    (form) =>
+      authClient.changePassword({
+        currentPassword: formValue(form, "currentPassword"),
+        newPassword: formValue(form, "newPassword"),
+        revokeOtherSessions: true,
+      }),
+    { reset: true },
+  );
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field
+        label={t("auth.fields.currentPassword")}
+        name="currentPassword"
+        type="password"
+        autoComplete="current-password"
+      />
+      <Field
+        label={t("auth.fields.newPassword")}
+        name="newPassword"
+        type="password"
+        autoComplete="new-password"
+        minLength={8}
+      />
+      <Button type="submit" disabled={pending} className="self-start">
+        {t("auth.settings.save")}
+      </Button>
+    </form>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/components/auth/auth-card.tsx.hbs", `import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@{{projectName}}/ui/components/card";
+
+export function AuthCard({
+  title,
+  description,
+  footer,
+  children,
+}: {
+  title: string;
+  description?: string;
+  footer?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-1 items-center justify-center px-4 py-12">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">{title}</CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">{children}</CardContent>
+        {footer && (
+          <CardFooter className="justify-center text-muted-foreground text-xs">{footer}</CardFooter>
+        )}
+      </Card>
+    </div>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/components/auth/field.tsx.hbs", `import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export function Field({
+  label,
+  name,
+  ...props
+}: { label: string; name: string } & React.ComponentProps<"input">) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={name}>{label}</Label>
+      <Input id={name} name={name} required {...props} />
+    </div>
+  );
+}
+
+export function formValue(form: FormData, name: string): string {
+  const value = form.get(name);
+  return value instanceof File ? "" : (value ?? "");
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/components/auth/sign-in-form.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import Link from "next/link";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+import { localePath } from "@/lib/i18n/paths";
+import type { SocialProvider } from "@/lib/social-providers";
+
+import { useLocale, useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+import { SocialButtons } from "./social-buttons";
+
+export default function SignInForm({
+  next,
+  providers,
+  canResetPassword,
+}: {
+  next: string;
+  providers: SocialProvider[];
+  canResetPassword: boolean;
+}) {
+  const locale = useLocale();
+  const t = useT();
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setPending(true);
+    const { error } = await authClient.signIn.email({
+      email: formValue(form, "email"),
+      password: formValue(form, "password"),
+      callbackURL: next,
+    });
+    setPending(false);
+    if (error) {
+      toast.error(error.message ?? t("auth.errors.generic"));
+      return;
+    }
+    window.location.assign(next);
+  }
+
+  return (
+    <>
+      <SocialButtons providers={providers} callbackURL={next} />
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+        <Field
+          label={t("auth.fields.password")}
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          minLength={8}
+        />
+        {canResetPassword && (
+          <Link
+            href={localePath(locale, "/forgot-password")}
+            className="self-end text-muted-foreground text-xs hover:text-foreground"
+          >
+            {t("auth.signIn.forgot")}
+          </Link>
+        )}
+        <Button type="submit" disabled={pending}>
+          {t("auth.signIn.submit")}
+        </Button>
+      </form>
+    </>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/components/auth/sign-up-form.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+import type { SocialProvider } from "@/lib/social-providers";
+
+import { useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+import { SocialButtons } from "./social-buttons";
+
+export default function SignUpForm({
+  next,
+  providers,
+  verifyEmail,
+}: {
+  next: string;
+  providers: SocialProvider[];
+  /** Accounts must confirm their email before they can sign in. */
+  verifyEmail: boolean;
+}) {
+  const t = useT();
+  const [pending, setPending] = useState(false);
+  const [sentTo, setSentTo] = useState<string>();
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const email = formValue(form, "email");
+    setPending(true);
+    const { error } = await authClient.signUp.email({
+      name: formValue(form, "name"),
+      email,
+      password: formValue(form, "password"),
+      callbackURL: next,
+    });
+    setPending(false);
+    if (error) {
+      toast.error(error.message ?? t("auth.errors.generic"));
+      return;
+    }
+    if (verifyEmail) setSentTo(email);
+    else window.location.assign(next);
+  }
+
+  if (sentTo) {
+    return <p className="text-sm">{t("auth.signUp.checkEmail", { email: sentTo })}</p>;
+  }
+
+  return (
+    <>
+      <SocialButtons providers={providers} callbackURL={next} />
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field label={t("auth.fields.name")} name="name" autoComplete="name" />
+        <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+        <Field
+          label={t("auth.fields.password")}
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          minLength={8}
+        />
+        <Button type="submit" disabled={pending}>
+          {t("auth.signUp.submit")}
+        </Button>
+      </form>
+    </>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/components/auth/social-buttons.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+
+import { authClient } from "@/lib/auth-client";
+import { type SocialProvider, socialProviderLabels } from "@/lib/social-providers";
+
+import { useT } from "../i18n-provider";
+
+export function SocialButtons({
+  providers,
+  callbackURL,
+}: {
+  providers: SocialProvider[];
+  callbackURL: string;
+}) {
+  const t = useT();
+  if (providers.length === 0) return null;
+
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        {providers.map((provider) => (
+          <Button
+            key={provider}
+            variant="outline"
+            type="button"
+            onClick={() => authClient.signIn.social({ provider, callbackURL })}
+          >
+            {t("auth.social.continueWith", { provider: socialProviderLabels[provider] })}
+          </Button>
+        ))}
+      </div>
+      <div className="flex items-center gap-3 text-muted-foreground text-xs">
+        <span className="h-px flex-1 bg-border" />
+        {t("auth.social.divider")}
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    </>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/components/user-menu.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { Skeleton } from "@{{projectName}}/ui/components/skeleton";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { authClient } from "@/lib/auth-client";
+import { localePath } from "@/lib/i18n/paths";
+
+import { useLocale, useT } from "./i18n-provider";
+
+export default function UserMenu() {
+  const router = useRouter();
+  const locale = useLocale();
+  const t = useT();
+  const { data: session, isPending } = authClient.useSession();
+
+  if (isPending) {
+    return <Skeleton className="h-8 w-20" />;
+  }
+
+  if (!session) {
+    return (
+      <Link href={localePath(locale, "/login")}>
+        <Button variant="outline">{t("auth.user.signIn")}</Button>
+      </Link>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" />}>
+        {session.user.name}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-card" align="end">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{t("auth.user.account")}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => {
+              authClient.signOut({
+                fetchOptions: {
+                  onSuccess: () => {
+                    router.push(localePath(locale, "/"));
+                  },
+                },
+              });
+            }}
+          >
+            {t("auth.user.signOut")}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/lib/auth-client.ts", `import { adminClient } from "better-auth/client/plugins";
+import { createAuthClient } from "better-auth/react";
+
+export const authClient = createAuthClient({ plugins: [adminClient()] });
+`],
+  ["modules/auth/frameworks/next/apps/web/src/lib/session.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+import type { Locale } from "@{{projectName}}/i18n";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { cache } from "react";
+
+import { localePath } from "./i18n/paths";
+
+export const getSession = cache(async () => auth.api.getSession({ headers: await headers() }));
+
+/** Returns the signed-in user or redirects to the login page, coming back to \`next\` afterwards. */
+export async function requireUser(locale: Locale, next?: \`/\${string}\`) {
+  const session = await getSession();
+  if (!session) {
+    const login = localePath(locale, "/login");
+    redirect(next ? \`\${login}?next=\${encodeURIComponent(localePath(locale, next))}\` : login);
+  }
+  return session.user;
+}
+
+/** Accepts only same-origin paths so \`?next=\` cannot redirect off-site. */
+export function safeNext(value: string | undefined, fallback: string): string {
+  return value?.startsWith("/") && !value.startsWith("//") ? value : fallback;
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/lib/social-providers.server.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+
+import { isSocialProvider, type SocialProvider } from "./social-providers";
+
+/** OAuth providers whose credentials are configured. */
+export function enabledSocialProviders(): SocialProvider[] {
+  return Object.keys(auth.options.socialProviders).filter(isSocialProvider);
+}
+`],
+  ["modules/auth/frameworks/next/apps/web/src/lib/social-providers.ts", `export const socialProviderLabels = {
+  google: "Google",
+  github: "GitHub",
+} as const;
+
+export type SocialProvider = keyof typeof socialProviderLabels;
+
+export function isSocialProvider(value: string): value is SocialProvider {
+  return value in socialProviderLabels;
+}
+`],
+  ["modules/auth/integrations/email/apps/web/src/app/[lang]/forgot-password/page.tsx", `import type { Metadata } from "next";
+import Link from "next/link";
+
+import { AuthCard } from "@/components/auth/auth-card";
+import { ForgotPasswordForm } from "@/components/auth/password-reset-forms";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+type Props = { params: Promise<{ lang: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("auth.forgot.title") };
+}
+
+export default async function ForgotPasswordPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+
+  return (
+    <AuthCard
+      title={t("auth.forgot.title")}
+      description={t("auth.forgot.subtitle")}
+      footer={
+        <Link href={localePath(locale, "/login")} className="hover:text-foreground">
+          {t("auth.forgot.back")}
+        </Link>
+      }
+    >
+      <ForgotPasswordForm />
+    </AuthCard>
+  );
+}
+`],
+  ["modules/auth/integrations/email/apps/web/src/app/[lang]/reset-password/page.tsx", `import type { Metadata } from "next";
+import Link from "next/link";
+
+import { AuthCard } from "@/components/auth/auth-card";
+import { ResetPasswordForm } from "@/components/auth/password-reset-forms";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ token?: string; error?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("auth.reset.title") };
+}
+
+export default async function ResetPasswordPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const { token, error } = await searchParams;
+
+  return (
+    <AuthCard title={t("auth.reset.title")}>
+      {token && !error ? (
+        <ResetPasswordForm token={token} />
+      ) : (
+        <>
+          <p className="text-sm">{t("auth.reset.invalidToken")}</p>
+          <Link href={localePath(locale, "/forgot-password")} className="text-sm underline">
+            {t("auth.forgot.submit")}
+          </Link>
+        </>
+      )}
+    </AuthCard>
+  );
+}
+`],
+  ["modules/auth/integrations/email/apps/web/src/components/auth/password-reset-forms.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+import { localePath } from "@/lib/i18n/paths";
+
+import { useLocale, useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+
+export function ForgotPasswordForm() {
+  const locale = useLocale();
+  const t = useT();
+  const [pending, setPending] = useState(false);
+  const [sentTo, setSentTo] = useState<string>();
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const email = formValue(new FormData(event.currentTarget), "email");
+    setPending(true);
+    const { error } = await authClient.requestPasswordReset({
+      email,
+      redirectTo: localePath(locale, "/reset-password"),
+    });
+    setPending(false);
+    if (error) {
+      toast.error(error.message ?? t("auth.errors.generic"));
+      return;
+    }
+    setSentTo(email);
+  }
+
+  if (sentTo) return <p className="text-sm">{t("auth.forgot.sent", { email: sentTo })}</p>;
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+      <Button type="submit" disabled={pending}>
+        {t("auth.forgot.submit")}
+      </Button>
+    </form>
+  );
+}
+
+export function ResetPasswordForm({ token }: { token: string }) {
+  const locale = useLocale();
+  const t = useT();
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    const { error } = await authClient.resetPassword({
+      token,
+      newPassword: formValue(new FormData(event.currentTarget), "newPassword"),
+    });
+    setPending(false);
+    if (error) {
+      toast.error(error.message ?? t("auth.errors.generic"));
+      return;
+    }
+    toast.success(t("auth.reset.success"));
+    window.location.assign(localePath(locale, "/login"));
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field
+        label={t("auth.fields.newPassword")}
+        name="newPassword"
+        type="password"
+        autoComplete="new-password"
+        minLength={8}
+      />
+      <Button type="submit" disabled={pending}>
+        {t("auth.reset.submit")}
+      </Button>
+    </form>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/client/auth-client.ts.hbs", `import { createClient, type AuthClient } from "@{{projectName}}/auth/client";
+{{#unless (eq backend "self")}}
+import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+{{> getServerUrl}}
+{{/unless}}
+
+export const authClient: AuthClient = createClient({{#unless (eq backend "self")}}{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}new URL("/api/auth", getServerUrl(ENV.VITE_SERVER_URL)).toString(){{else}}ENV.VITE_SERVER_URL{{/if}}{{/unless}});
+`],
+  ["modules/auth/stack/better-auth/client/solid/src/client.ts.hbs", `import { createAuthClient } from "better-auth/client";
+
+type ClientOptions = {
+  baseURL?: string;
+};
+
+export function createClient(baseURL?: string): ReturnType<typeof createAuthClient<ClientOptions>> {
+  return createAuthClient({
+    baseURL,
+  });
+}
+
+export type AuthClient = ReturnType<typeof createClient>;
+`],
+  ["modules/auth/stack/better-auth/convex/backend/convex/auth.config.ts.hbs", `import { getAuthConfigProvider } from "@convex-dev/better-auth/auth-config";
+import type { AuthConfig } from "convex/server";
+
+export default {
+  providers: [getAuthConfigProvider()],
+} satisfies AuthConfig;
+`],
+  ["modules/auth/stack/better-auth/convex/backend/convex/auth.ts.hbs", `import { createClient, type GenericCtx } from "@convex-dev/better-auth";
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
+import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
+{{else}}
+import { convex } from "@convex-dev/better-auth/plugins";
+{{/if}}
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+import { expo } from "@better-auth/expo";
+{{/if}}
+import { components } from "./_generated/api";
+import type { DataModel } from "./_generated/dataModel";
+import { query } from "./_generated/server";
+import { betterAuth } from "better-auth/minimal";
+import authConfig from "./auth.config";
+
+{{#if (or (includes frontend "tanstack-start") (includes frontend "next") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid") (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+const siteUrl = process.env.SITE_URL{{#if (or (includes frontend "tanstack-start") (includes frontend "next") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}!{{else}} || "http://localhost:8081"{{/if}};
+{{/if}}
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+const nativeAppUrl = process.env.NATIVE_APP_URL || "{{projectName}}://";
+{{/if}}
+
+export const authComponent = createClient<DataModel>(components.betterAuth);
+
+function createAuth(ctx: GenericCtx<DataModel>) {
+  return betterAuth({
+    {{#if (or (includes frontend "tanstack-router") (includes frontend "react-router"))}}
+    baseURL: process.env.CONVEX_SITE_URL,
+    {{/if}}
+    {{#if (or (includes frontend "tanstack-start") (includes frontend "next"))}}
+    baseURL: siteUrl,
+    {{/if}}
+    {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+    trustedOrigins: [siteUrl, nativeAppUrl, "exp://"],
+    {{else if (or (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
+    trustedOrigins: [siteUrl],
+    {{else if (or (includes frontend "tanstack-start") (includes frontend "next"))}}
+    trustedOrigins: [siteUrl],
+    {{/if}}
+    database: authComponent.adapter(ctx),
+    emailAndPassword: {
+      enabled: true,
+      requireEmailVerification: false,
+    },
+    plugins: [
+      {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+      expo(),
+      {{/if}}
+      {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
+      crossDomain({ siteUrl }),
+      {{/if}}
+      convex({
+        authConfig,
+        jwksRotateOnTokenGenerationError: true,
+      }),
+    ],
+  });
+}
+
+export { createAuth };
+
+export const getCurrentUser = query({
+  args: {},
+  handler: async (ctx) => {
+    return await authComponent.safeGetAuthUser(ctx);
+  },
+});
+`],
+  ["modules/auth/stack/better-auth/convex/backend/convex/http.ts.hbs", `import { httpRouter } from "convex/server";
+import { authComponent, createAuth } from "./auth";
+
+const http = httpRouter();
+
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
+authComponent.registerRoutes(http, createAuth, { cors: true });
+{{else}}
+authComponent.registerRoutes(http, createAuth);
+{{/if}}
+
+export default http;
+`],
+  ["modules/auth/stack/better-auth/convex/backend/convex/privateData.ts.hbs", `import { query } from "./_generated/server";
+import { authComponent } from "./auth";
+
+export const get = query({
+  args: {},
+  handler: async (ctx) => {
+    const authUser = await authComponent.safeGetAuthUser(ctx);
+    if (!authUser) {
+      return {
+        message: "Not authenticated",
+      };
+    }
+    return {
+      message: "This is private",
+    };
+  },
+});
+`],
+  ["modules/auth/stack/better-auth/convex/native/bare/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { NAV_THEME } from "@/lib/constants";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import z from "zod";
+
+const signInSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+function SignIn() {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signInSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign in");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Text style={[styles.title, { color: theme.text }]}>Sign In</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={[styles.errorContainer, { backgroundColor: theme.notification + "20" }]}>
+                  <Text style={[styles.errorText, { color: theme.notification }]}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Email"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Password"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={[
+                  styles.button,
+                  {
+                    backgroundColor: theme.primary,
+                    opacity: isSubmitting ? 0.5 : 1,
+                  },
+                ]}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign In</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    marginTop: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  errorContainer: {
+    marginBottom: 12,
+    padding: 8,
+  },
+  errorText: {
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  button: {
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontSize: 16,
+  },
+});
+
+export { SignIn };
+`],
+  ["modules/auth/stack/better-auth/convex/native/bare/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { NAV_THEME } from "@/lib/constants";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import z from "zod";
+
+const signUpSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+function SignUp() {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signUpSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signUp.email(
+        {
+          name: value.name.trim(),
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign up");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={[styles.errorContainer, { backgroundColor: theme.notification + "20" }]}>
+                  <Text style={[styles.errorText, { color: theme.notification }]}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="name">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Name"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Email"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Password"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={[
+                  styles.button,
+                  {
+                    backgroundColor: theme.primary,
+                    opacity: isSubmitting ? 0.5 : 1,
+                  },
+                ]}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign Up</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    marginTop: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  errorContainer: {
+    marginBottom: 12,
+    padding: 8,
+  },
+  errorText: {
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  button: {
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontSize: 16,
+  },
+});
+
+export { SignUp };
+`],
+  ["modules/auth/stack/better-auth/convex/native/base/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+import { convexClient, crossDomainClient } from "@convex-dev/better-auth/client/plugins";
+import { expoClient } from "@better-auth/expo/client";
+import Constants from "expo-constants";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+import { ENV } from "../src/env";
+
+export const authClient = createAuthClient({
+	baseURL: ENV.EXPO_PUBLIC_CONVEX_SITE_URL,
+	plugins: [
+		convexClient(),
+		Platform.OS === "web"
+			? crossDomainClient()
+			: expoClient({
+				scheme: Constants.expoConfig?.scheme as string,
+				storagePrefix: Constants.expoConfig?.scheme as string,
+				storage: SecureStore,
+			}),
+	],
+});
+`],
+  ["modules/auth/stack/better-auth/convex/native/unistyles/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import z from "zod";
+
+const signInSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignIn() {
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signInSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign in");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign In</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={styles.button}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign In</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.typography,
+    marginBottom: 16,
+  },
+  errorContainer: {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 6,
+  },
+  errorText: {
+    color: theme.colors.destructive,
+    fontSize: 14,
+  },
+  input: {
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 6,
+    color: theme.colors.typography,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  button: {
+    backgroundColor: theme.colors.primary,
+    padding: 16,
+    borderRadius: 6,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonText: {
+    fontWeight: "500",
+  },
+}));
+`],
+  ["modules/auth/stack/better-auth/convex/native/unistyles/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import z from "zod";
+
+const signUpSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignUp() {
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signUpSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signUp.email(
+        {
+          name: value.name.trim(),
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign up");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Create Account</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="name">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Name"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={styles.inputLast}
+                    placeholder="Password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={styles.button}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign Up</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.typography,
+    marginBottom: 16,
+  },
+  errorContainer: {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 6,
+  },
+  errorText: {
+    color: theme.colors.destructive,
+    fontSize: 14,
+  },
+  input: {
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 6,
+    color: theme.colors.typography,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  inputLast: {
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 6,
+    color: theme.colors.typography,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  button: {
+    backgroundColor: theme.colors.primary,
+    padding: 16,
+    borderRadius: 6,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonText: {
+    fontWeight: "500",
+  },
+}));
+`],
+  ["modules/auth/stack/better-auth/convex/native/uniwind/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useRef } from "react";
+import { Text, View } from "react-native";
+import { Button, FieldError, Input, type InputRef, Label, Spinner, Surface, TextField, useToast } from "heroui-native";
+import z from "zod";
+
+const signInSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignIn() {
+  const passwordInputRef = useRef<InputRef>(null);
+  const { toast } = useToast();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signInSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            toast.show({
+              variant: "danger",
+              label: error.error?.message || "Failed to sign in",
+            });
+          },
+          onSuccess() {
+            formApi.reset();
+            toast.show({
+              variant: "success",
+              label: "Signed in successfully",
+            });
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <Surface variant="secondary" className="p-4 rounded-lg">
+      <Text className="text-foreground font-medium mb-4">Sign In</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = validationError;
+
+          return (
+            <>
+              <FieldError isInvalid={!!formError} className="mb-3">
+                {formError}
+              </FieldError>
+
+              <View className="gap-3">
+                <form.Field name="email">
+                  {(field) => (
+                    <TextField>
+                      <Label>Email</Label>
+                      <Input
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="email@example.com"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        textContentType="emailAddress"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => {
+                          passwordInputRef.current?.focus();
+                        }}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <form.Field name="password">
+                  {(field) => (
+                    <TextField>
+                      <Label>Password</Label>
+                      <Input
+                        ref={passwordInputRef}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="••••••••"
+                        secureTextEntry
+                        autoComplete="password"
+                        textContentType="password"
+                        returnKeyType="go"
+                        onSubmitEditing={form.handleSubmit}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <Button onPress={form.handleSubmit} isDisabled={isSubmitting} className="mt-1">
+                  {isSubmitting ? <Spinner size="sm" color="default" /> : <Button.Label>Sign In</Button.Label>}
+                </Button>
+              </View>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </Surface>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/native/uniwind/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useRef } from "react";
+import { Text, View } from "react-native";
+import { Button, FieldError, Input, type InputRef, Label, Spinner, Surface, TextField, useToast } from "heroui-native";
+import z from "zod";
+
+const signUpSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignUp() {
+  const emailInputRef = useRef<InputRef>(null);
+  const passwordInputRef = useRef<InputRef>(null);
+  const { toast } = useToast();
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signUpSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signUp.email(
+        {
+          name: value.name.trim(),
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            toast.show({
+              variant: "danger",
+              label: error.error?.message || "Failed to sign up",
+            });
+          },
+          onSuccess() {
+            formApi.reset();
+            toast.show({
+              variant: "success",
+              label: "Account created successfully",
+            });
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <Surface variant="secondary" className="p-4 rounded-lg">
+      <Text className="text-foreground font-medium mb-4">Create Account</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = validationError;
+
+          return (
+            <>
+              <FieldError isInvalid={!!formError} className="mb-3">
+                {formError}
+              </FieldError>
+
+              <View className="gap-3">
+                <form.Field name="name">
+                  {(field) => (
+                    <TextField>
+                      <Label>Name</Label>
+                      <Input
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="John Doe"
+                        autoComplete="name"
+                        textContentType="name"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => {
+                          emailInputRef.current?.focus();
+                        }}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <form.Field name="email">
+                  {(field) => (
+                    <TextField>
+                      <Label>Email</Label>
+                      <Input
+                        ref={emailInputRef}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="email@example.com"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        textContentType="emailAddress"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => {
+                          passwordInputRef.current?.focus();
+                        }}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <form.Field name="password">
+                  {(field) => (
+                    <TextField>
+                      <Label>Password</Label>
+                      <Input
+                        ref={passwordInputRef}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="••••••••"
+                        secureTextEntry
+                        autoComplete="new-password"
+                        textContentType="newPassword"
+                        returnKeyType="go"
+                        onSubmitEditing={form.handleSubmit}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <Button onPress={form.handleSubmit} isDisabled={isSubmitting} className="mt-1">
+                  {isSubmitting ? (
+                    <Spinner size="sm" color="default" />
+                  ) : (
+                    <Button.Label>Create Account</Button.Label>
+                  )}
+                </Button>
+              </View>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </Surface>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/next/src/app/api/auth/[...all]/route.ts.hbs", `import { handler } from "@/lib/auth-server";
+
+export const { GET, POST } = handler;
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/next/src/app/dashboard/page.tsx.hbs", `"use client"
+
+import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import UserMenu from "@/components/user-menu";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import {
+    Authenticated,
+    AuthLoading,
+    Unauthenticated,
+    useQuery,
+} from "convex/react";
+import { useState } from "react";
+
+function DashboardContent() {
+    const privateData = useQuery(api.privateData.get);
+
+    return (
+        <div>
+            <h1>Dashboard</h1>
+            <p>privateData: {privateData?.message}</p>
+            <UserMenu />
+        </div>
+    );
+}
+
+export default function DashboardPage() {
+    const [showSignIn, setShowSignIn] = useState(false);
+
+    return (
+        <>
+            <Authenticated>
+                <DashboardContent />
+            </Authenticated>
+            <Unauthenticated>
+                {showSignIn ? (
+                    <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+                ) : (
+                    <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+                )}
+            </Unauthenticated>
+            <AuthLoading>
+                <div>Loading...</div>
+            </AuthLoading>
+        </>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/next/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+import { useRouter } from "next/navigation";
+
+export default function SignInForm({
+	onSwitchToSignUp,
+}: {
+	onSwitchToSignUp: () => void;
+}) {
+	const router = useRouter();
+
+	const form = useForm({
+		defaultValues: {
+			email: "",
+			password: "",
+		},
+		onSubmit: async ({ value }) => {
+			await authClient.signIn.email(
+				{
+					email: value.email,
+					password: value.password,
+				},
+				{
+					onSuccess: () => {
+						router.push("/dashboard");
+						toast.success("Sign in successful");
+					},
+					onError: (error) => {
+						toast.error(error.error.message || error.error.statusText);
+					},
+				},
+			);
+		},
+		validators: {
+			onSubmit: z.object({
+				email: z.email("Invalid email address"),
+				password: z.string().min(8, "Password must be at least 8 characters"),
+			}),
+		},
+	});
+
+	return (
+		<div className="mx-auto w-full mt-10 max-w-md p-6">
+			<h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+			<form
+				onSubmit={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					form.handleSubmit();
+				}}
+				className="space-y-4"
+			>
+				<div>
+					<form.Field name="email">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Email</Label>
+								<Input
+									id={field.name}
+									name={field.name}
+									type="email"
+									value={field.state.value}
+									onBlur={field.handleBlur}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								{field.state.meta.errors.map((error) => (
+									<p key={error?.message} className="text-red-500">
+										{error?.message}
+									</p>
+								))}
+							</div>
+						)}
+					</form.Field>
+				</div>
+
+				<div>
+					<form.Field name="password">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Password</Label>
+								<Input
+									id={field.name}
+									name={field.name}
+									type="password"
+									value={field.state.value}
+									onBlur={field.handleBlur}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								{field.state.meta.errors.map((error) => (
+									<p key={error?.message} className="text-red-500">
+										{error?.message}
+									</p>
+								))}
+							</div>
+						)}
+					</form.Field>
+				</div>
+
+				<form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+						<Button
+							type="submit"
+							className="w-full"
+							disabled={!canSubmit || isSubmitting}
+						>
+							{isSubmitting ? "Submitting..." : "Sign In"}
+						</Button>
+					)}
+				</form.Subscribe>
+			</form>
+
+			<div className="mt-4 text-center">
+				<Button
+					variant="link"
+					onClick={onSwitchToSignUp}
+					className="text-indigo-600 hover:text-indigo-800"
+				>
+					Need an account? Sign Up
+				</Button>
+			</div>
+		</div>
+	);
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/next/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+import { useRouter } from "next/navigation";
+
+export default function SignUpForm({
+	onSwitchToSignIn,
+}: {
+	onSwitchToSignIn: () => void;
+}) {
+	const router = useRouter();
+
+	const form = useForm({
+		defaultValues: {
+			email: "",
+			password: "",
+			name: "",
+		},
+		onSubmit: async ({ value }) => {
+			await authClient.signUp.email(
+				{
+					email: value.email,
+					password: value.password,
+					name: value.name,
+				},
+				{
+					onSuccess: () => {
+						router.push("/dashboard");
+						toast.success("Sign up successful");
+					},
+					onError: (error) => {
+						toast.error(error.error.message || error.error.statusText);
+					},
+				},
+			);
+		},
+		validators: {
+			onSubmit: z.object({
+				name: z.string().min(2, "Name must be at least 2 characters"),
+				email: z.email("Invalid email address"),
+				password: z.string().min(8, "Password must be at least 8 characters"),
+			}),
+		},
+	});
+
+	return (
+		<div className="mx-auto w-full mt-10 max-w-md p-6">
+			<h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+			<form
+				onSubmit={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					form.handleSubmit();
+				}}
+				className="space-y-4"
+			>
+				<div>
+					<form.Field name="name">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Name</Label>
+								<Input
+									id={field.name}
+									name={field.name}
+									value={field.state.value}
+									onBlur={field.handleBlur}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								{field.state.meta.errors.map((error) => (
+									<p key={error?.message} className="text-red-500">
+										{error?.message}
+									</p>
+								))}
+							</div>
+						)}
+					</form.Field>
+				</div>
+
+				<div>
+					<form.Field name="email">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Email</Label>
+								<Input
+									id={field.name}
+									name={field.name}
+									type="email"
+									value={field.state.value}
+									onBlur={field.handleBlur}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								{field.state.meta.errors.map((error) => (
+									<p key={error?.message} className="text-red-500">
+										{error?.message}
+									</p>
+								))}
+							</div>
+						)}
+					</form.Field>
+				</div>
+
+				<div>
+					<form.Field name="password">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Password</Label>
+								<Input
+									id={field.name}
+									name={field.name}
+									type="password"
+									value={field.state.value}
+									onBlur={field.handleBlur}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								{field.state.meta.errors.map((error) => (
+									<p key={error?.message} className="text-red-500">
+										{error?.message}
+									</p>
+								))}
+							</div>
+						)}
+					</form.Field>
+				</div>
+
+				<form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+						<Button
+							type="submit"
+							className="w-full"
+							disabled={!canSubmit || isSubmitting}
+						>
+							{isSubmitting ? "Submitting..." : "Sign Up"}
+						</Button>
+					)}
+				</form.Subscribe>
+			</form>
+
+			<div className="mt-4 text-center">
+				<Button
+					variant="link"
+					onClick={onSwitchToSignIn}
+					className="text-indigo-600 hover:text-indigo-800"
+				>
+					Already have an account? Sign In
+				</Button>
+			</div>
+		</div>
+	);
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/next/src/components/user-menu.tsx.hbs", `import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+
+export default function UserMenu() {
+	const router = useRouter();
+	const user = useQuery(api.auth.getCurrentUser)
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger render={<Button variant="outline" />}>
+				{user?.name}
+			</DropdownMenuTrigger>
+			<DropdownMenuContent className="bg-card">
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>My Account</DropdownMenuLabel>
+					<DropdownMenuSeparator />
+					<DropdownMenuItem>{user?.email}</DropdownMenuItem>
+					<DropdownMenuItem
+						variant="destructive"
+						onClick={() => {
+							authClient.signOut({
+								fetchOptions: {
+									onSuccess: () => {
+										router.push("/dashboard");
+									},
+								},
+							});
+						}}
+					>
+						Sign Out
+					</DropdownMenuItem>
+				</DropdownMenuGroup>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/next/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+import { convexClient } from "@convex-dev/better-auth/client/plugins";
+
+export const authClient = createAuthClient({
+  plugins: [convexClient()],
+});
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/next/src/lib/auth-server.ts.hbs", `import { convexBetterAuthNextJs } from "@convex-dev/better-auth/nextjs";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+export const {
+	handler,
+	preloadAuthQuery,
+	isAuthenticated,
+	getToken,
+	fetchAuthQuery,
+	fetchAuthMutation,
+	fetchAuthAction,
+} = convexBetterAuthNextJs({
+	convexUrl: ENV.NEXT_PUBLIC_CONVEX_URL,
+	convexSiteUrl: ENV.NEXT_PUBLIC_CONVEX_SITE_URL,
+});
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/react-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignInForm({
+  onSwitchToSignUp,
+}: {
+  onSwitchToSignUp: () => void;
+}) {
+  const navigate = useNavigate();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email,
+          password: value.password,
+        },
+        {
+          onSuccess: () => {
+            navigate("/dashboard");
+            toast.success("Sign in successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        },
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  return (
+    <div className="mx-auto mt-10 w-full max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error, index) => (
+                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error, index) => (
+                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe
+          selector={(state) => ({
+            canSubmit: state.canSubmit,
+            isSubmitting: state.isSubmitting,
+          })}
+        >
+          {({ canSubmit, isSubmitting }) => (
+            <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
+              {isSubmitting ? "Submitting..." : "Sign In"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignUp}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Need an account? Sign Up
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/react-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignUpForm({
+  onSwitchToSignIn,
+}: {
+  onSwitchToSignIn: () => void;
+}) {
+  const navigate = useNavigate();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+      name: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signUp.email(
+        {
+          email: value.email,
+          password: value.password,
+          name: value.name,
+        },
+        {
+          onSuccess: () => {
+            navigate("/dashboard");
+            toast.success("Sign up successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        },
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        name: z.string().min(2, "Name must be at least 2 characters"),
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  return (
+    <div className="mx-auto mt-10 w-full max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="name">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Name</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error, index) => (
+                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error, index) => (
+                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error, index) => (
+                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe
+          selector={(state) => ({
+            canSubmit: state.canSubmit,
+            isSubmitting: state.isSubmitting,
+          })}
+        >
+          {({ canSubmit, isSubmitting }) => (
+            <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
+              {isSubmitting ? "Submitting..." : "Sign Up"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignIn}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Already have an account? Sign In
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/react-router/src/components/user-menu.tsx.hbs", `import { useNavigate } from "react-router";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+
+export default function UserMenu() {
+  const navigate = useNavigate();
+  const user = useQuery(api.auth.getCurrentUser);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" />}>
+        {user?.name}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-card">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>{user?.email}</DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => {
+              authClient.signOut({
+                fetchOptions: {
+                  onSuccess: () => {
+                    navigate("/dashboard");
+                  },
+                },
+              });
+            }}
+          >
+            Sign Out
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/react-router/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+import {
+  convexClient,
+  crossDomainClient,
+} from "@convex-dev/better-auth/client/plugins";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+export const authClient = createAuthClient({
+  baseURL: ENV.VITE_CONVEX_SITE_URL,
+  plugins: [convexClient(), crossDomainClient()],
+});
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/react-router/src/routes/dashboard.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import UserMenu from "@/components/user-menu";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import {
+  Authenticated,
+  AuthLoading,
+  Unauthenticated,
+  useQuery,
+} from "convex/react";
+import { useState } from "react";
+
+function PrivateDashboardContent() {
+  const privateData = useQuery(api.privateData.get);
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>privateData: {privateData?.message}</p>
+      <UserMenu />
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const [showSignIn, setShowSignIn] = useState(false);
+
+  return (
+    <>
+      <Authenticated>
+        <PrivateDashboardContent />
+      </Authenticated>
+      <Unauthenticated>
+        {showSignIn ? (
+          <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+        ) : (
+          <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+        )}
+      </Unauthenticated>
+      <AuthLoading>
+        <div>Loading...</div>
+      </AuthLoading>
+    </>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignInForm({
+    onSwitchToSignUp,
+}: {
+    onSwitchToSignUp: () => void;
+}) {
+    const navigate = useNavigate({
+        from: "/",
+    });
+
+    const form = useForm({
+        defaultValues: {
+            email: "",
+            password: "",
+        },
+        onSubmit: async ({ value }) => {
+            await authClient.signIn.email(
+                {
+                    email: value.email,
+                    password: value.password,
+                },
+                {
+                    onSuccess: () => {
+                        navigate({
+                            to: "/dashboard",
+                        });
+                        toast.success("Sign in successful");
+                    },
+                    onError: (error) => {
+                        toast.error(error.error.message || error.error.statusText);
+                    },
+                },
+            );
+        },
+        validators: {
+            onSubmit: z.object({
+                email: z.email("Invalid email address"),
+                password: z.string().min(8, "Password must be at least 8 characters"),
+            }),
+        },
+    });
+
+    return (
+        <div className="mx-auto w-full mt-10 max-w-md p-6">
+            <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.handleSubmit();
+                }}
+                className="space-y-4"
+            >
+                <div>
+                    <form.Field name="email">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Email</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="email"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error, index) => (
+                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="password">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Password</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="password"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error, index) => (
+                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={!canSubmit || isSubmitting}
+                        >
+                            {isSubmitting ? "Submitting..." : "Sign In"}
+                        </Button>
+                    )}
+                </form.Subscribe>
+            </form>
+
+            <div className="mt-4 text-center">
+                <Button
+                    variant="link"
+                    onClick={onSwitchToSignUp}
+                    className="text-indigo-600 hover:text-indigo-800"
+                >
+                    Need an account? Sign Up
+                </Button>
+            </div>
+        </div>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignUpForm({
+    onSwitchToSignIn,
+}: {
+    onSwitchToSignIn: () => void;
+}) {
+    const navigate = useNavigate({
+        from: "/",
+    });
+
+    const form = useForm({
+        defaultValues: {
+            email: "",
+            password: "",
+            name: "",
+        },
+        onSubmit: async ({ value }) => {
+            await authClient.signUp.email(
+                {
+                    email: value.email,
+                    password: value.password,
+                    name: value.name,
+                },
+                {
+                    onSuccess: () => {
+                        navigate({
+                            to: "/dashboard",
+                        });
+                        toast.success("Sign up successful");
+                    },
+                    onError: (error) => {
+                        toast.error(error.error.message || error.error.statusText);
+                    },
+                },
+            );
+        },
+        validators: {
+            onSubmit: z.object({
+                name: z.string().min(2, "Name must be at least 2 characters"),
+                email: z.email("Invalid email address"),
+                password: z.string().min(8, "Password must be at least 8 characters"),
+            }),
+        },
+    });
+
+    return (
+        <div className="mx-auto w-full mt-10 max-w-md p-6">
+            <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.handleSubmit();
+                }}
+                className="space-y-4"
+            >
+                <div>
+                    <form.Field name="name">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Name</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error, index) => (
+                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="email">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Email</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="email"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error, index) => (
+                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="password">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Password</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="password"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error, index) => (
+                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={!canSubmit || isSubmitting}
+                        >
+                            {isSubmitting ? "Submitting..." : "Sign Up"}
+                        </Button>
+                    )}
+                </form.Subscribe>
+            </form>
+
+            <div className="mt-4 text-center">
+                <Button
+                    variant="link"
+                    onClick={onSwitchToSignIn}
+                    className="text-indigo-600 hover:text-indigo-800"
+                >
+                    Already have an account? Sign In
+                </Button>
+            </div>
+        </div>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/components/user-menu.tsx.hbs", `import { useNavigate } from "@tanstack/react-router";
+
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+
+export default function UserMenu() {
+    const navigate = useNavigate();
+    const user = useQuery(api.auth.getCurrentUser)
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" />}>
+                {user?.name}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-card">
+                <DropdownMenuGroup>
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>{user?.email}</DropdownMenuItem>
+                    <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => {
+                            authClient.signOut({
+                                fetchOptions: {
+                                    onSuccess: () => {
+                                        navigate({
+                                            to: "/dashboard",
+                                        });
+                                    },
+                                },
+                            });
+                        }}
+                    >
+                        Sign Out
+                    </DropdownMenuItem>
+                </DropdownMenuGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+import {
+	convexClient,
+	crossDomainClient,
+} from "@convex-dev/better-auth/client/plugins";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+export const authClient = createAuthClient({
+	baseURL: ENV.VITE_CONVEX_SITE_URL,
+	plugins: [convexClient(), crossDomainClient()],
+});
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `import UserMenu from "@/components/user-menu";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
+
+export const Route = createFileRoute("/_auth/dashboard")({
+  component: DashboardContent,
+});
+
+function DashboardContent() {
+  const privateData = useQuery(api.privateData.get);
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>privateData: {privateData?.message}</p>
+      <UserMenu />
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
+import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
+import { useState } from "react";
+
+export const Route = createFileRoute("/_auth")({
+  component: AuthLayout,
+});
+
+function AuthLayout() {
+  const [showSignIn, setShowSignIn] = useState(false);
+
+  return (
+    <>
+      <Authenticated>
+        <Outlet />
+      </Authenticated>
+      <Unauthenticated>
+        {showSignIn ? (
+          <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+        ) : (
+          <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+        )}
+      </Unauthenticated>
+      <AuthLoading>
+        <div>Loading...</div>
+      </AuthLoading>
+    </>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignInForm({
+    onSwitchToSignUp,
+}: {
+    onSwitchToSignUp: () => void;
+}) {
+    const navigate = useNavigate({
+        from: "/",
+    });
+
+    const form = useForm({
+        defaultValues: {
+            email: "",
+            password: "",
+        },
+        onSubmit: async ({ value }) => {
+            await authClient.signIn.email(
+                {
+                    email: value.email,
+                    password: value.password,
+                },
+                {
+                    onSuccess: () => {
+                        navigate({
+                            to: "/dashboard",
+                        });
+                        toast.success("Sign in successful");
+                    },
+                    onError: (error) => {
+                        toast.error(error.error.message || error.error.statusText);
+                    },
+                },
+            );
+        },
+        validators: {
+            onSubmit: z.object({
+                email: z.email("Invalid email address"),
+                password: z.string().min(8, "Password must be at least 8 characters"),
+            }),
+        },
+    });
+
+    return (
+        <div className="mx-auto w-full mt-10 max-w-md p-6">
+            <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.handleSubmit();
+                }}
+                className="space-y-4"
+            >
+                <div>
+                    <form.Field name="email">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Email</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="email"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error) => (
+                                    <p key={error?.message} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="password">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Password</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="password"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error) => (
+                                    <p key={error?.message} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={!canSubmit || isSubmitting}
+                        >
+                            {isSubmitting ? "Submitting..." : "Sign In"}
+                        </Button>
+                    )}
+                </form.Subscribe>
+            </form>
+
+            <div className="mt-4 text-center">
+                <Button
+                    variant="link"
+                    onClick={onSwitchToSignUp}
+                    className="text-indigo-600 hover:text-indigo-800"
+                >
+                    Need an account? Sign Up
+                </Button>
+            </div>
+        </div>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignUpForm({
+    onSwitchToSignIn,
+}: {
+    onSwitchToSignIn: () => void;
+}) {
+    const navigate = useNavigate({
+        from: "/",
+    });
+
+    const form = useForm({
+        defaultValues: {
+            email: "",
+            password: "",
+            name: "",
+        },
+        onSubmit: async ({ value }) => {
+            await authClient.signUp.email(
+                {
+                    email: value.email,
+                    password: value.password,
+                    name: value.name,
+                },
+                {
+                    onSuccess: () => {
+                        navigate({
+                            to: "/dashboard",
+                        });
+                        toast.success("Sign up successful");
+                    },
+                    onError: (error) => {
+                        toast.error(error.error.message || error.error.statusText);
+                    },
+                },
+            );
+        },
+        validators: {
+            onSubmit: z.object({
+                name: z.string().min(2, "Name must be at least 2 characters"),
+                email: z.email("Invalid email address"),
+                password: z.string().min(8, "Password must be at least 8 characters"),
+            }),
+        },
+    });
+
+    return (
+        <div className="mx-auto w-full mt-10 max-w-md p-6">
+            <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.handleSubmit();
+                }}
+                className="space-y-4"
+            >
+                <div>
+                    <form.Field name="name">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Name</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error) => (
+                                    <p key={error?.message} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="email">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Email</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="email"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error) => (
+                                    <p key={error?.message} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="password">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Password</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="password"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error) => (
+                                    <p key={error?.message} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={!canSubmit || isSubmitting}
+                        >
+                            {isSubmitting ? "Submitting..." : "Sign Up"}
+                        </Button>
+                    )}
+                </form.Subscribe>
+            </form>
+
+            <div className="mt-4 text-center">
+                <Button
+                    variant="link"
+                    onClick={onSwitchToSignIn}
+                    className="text-indigo-600 hover:text-indigo-800"
+                >
+                    Already have an account? Sign In
+                </Button>
+            </div>
+        </div>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/components/user-menu.tsx.hbs", `import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+
+export default function UserMenu() {
+    const user = useQuery(api.auth.getCurrentUser)
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" />}>
+                {user?.name}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-card">
+                <DropdownMenuGroup>
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>{user?.email}</DropdownMenuItem>
+                    <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => {
+                            authClient.signOut({
+                                fetchOptions: {
+                                    onSuccess: () => {
+                                        location.reload();
+                                    },
+                                },
+                            });
+                        }}
+                    >
+                        Sign Out
+                    </DropdownMenuItem>
+                </DropdownMenuGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+import { convexClient } from "@convex-dev/better-auth/client/plugins";
+
+export const authClient = createAuthClient({
+  plugins: [convexClient()],
+});`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/lib/auth-server.ts.hbs", `import { convexBetterAuthReactStart } from "@convex-dev/better-auth/react-start";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+export const {
+	handler,
+	getToken,
+	fetchAuthQuery,
+	fetchAuthMutation,
+	fetchAuthAction,
+} = convexBetterAuthReactStart({
+	convexUrl: ENV.VITE_CONVEX_URL,
+	convexSiteUrl: ENV.VITE_CONVEX_SITE_URL,
+});
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `import UserMenu from "@/components/user-menu";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
+
+export const Route = createFileRoute("/_auth/dashboard")({
+  component: DashboardContent,
+});
+
+function DashboardContent() {
+  const privateData = useQuery(api.privateData.get);
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>privateData: {privateData?.message}</p>
+      <UserMenu />
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
+import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
+import { useState } from "react";
+
+export const Route = createFileRoute("/_auth")({
+  component: AuthLayout,
+});
+
+function AuthLayout() {
+  const [showSignIn, setShowSignIn] = useState(false);
+
+  return (
+    <>
+      <Authenticated>
+        <Outlet />
+      </Authenticated>
+      <Unauthenticated>
+        {showSignIn ? (
+          <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+        ) : (
+          <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+        )}
+      </Unauthenticated>
+      <AuthLoading>
+        <div>Loading...</div>
+      </AuthLoading>
+    </>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/routes/api/auth/$.ts.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { handler } from "@/lib/auth-server";
+
+export const Route = createFileRoute("/api/auth/$")({
+  server: {
+    handlers: {
+      GET: ({ request }) => handler(request),
+      POST: ({ request }) => handler(request),
+    },
+  },
+});
+`],
+  ["modules/auth/stack/better-auth/fullstack/astro/src/app.d.ts.hbs", `/// <reference path="../.astro/types.d.ts" />
+
+declare namespace App {
+  interface Locals {
+    user: import("better-auth").User | null;
+    session: import("better-auth").Session | null;
+  }
+}
+`],
+  ["modules/auth/stack/better-auth/fullstack/astro/src/middleware.ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+import { defineMiddleware } from "astro:middleware";
+
+export const onRequest = defineMiddleware(async (context, next) => {
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  const auth = await createAuth();
+{{/if}}
+  const isAuthed = await auth.api.getSession({
+    headers: context.request.headers,
+  });
+
+  if (isAuthed) {
+    context.locals.user = isAuthed.user;
+    context.locals.session = isAuthed.session;
+  } else {
+    context.locals.user = null;
+    context.locals.session = null;
+  }
+
+  return next();
+});
+`],
+  ["modules/auth/stack/better-auth/fullstack/astro/src/pages/api/auth/[...all].ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+import type { APIRoute } from "astro";
+
+export const ALL: APIRoute = async (ctx) => {
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  const auth = await createAuth();
+{{/if}}
+  return auth.handler(ctx.request);
+};
+`],
+  ["modules/auth/stack/better-auth/fullstack/next/src/app/api/auth/[...all]/route.ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+import { toNextJsHandler } from "better-auth/next-js";
+
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+export async function GET(request: Request) {
+	return toNextJsHandler(await createAuth()).GET(request);
+}
+
+export async function POST(request: Request) {
+	return toNextJsHandler(await createAuth()).POST(request);
+}
+{{else}}
+export const { GET, POST } = toNextJsHandler(auth);
+{{/if}}
+`],
+  ["modules/auth/stack/better-auth/fullstack/nuxt/server/api/auth/[...all].ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{#if (eq webDeploy "cloudflare")}}
+import type { CloudflareEnv } from "../../../src/env.server";
+{{/if}}
+
+export default defineEventHandler(async (event) => {
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  const auth = (await createAuth({{#if (eq webDeploy "cloudflare")}}(event.context.cloudflare as { env: CloudflareEnv }).env{{/if}}));
+{{/if}}
+  return auth.handler(toWebRequest(event));
+});
+`],
+  ["modules/auth/stack/better-auth/fullstack/solid/src/routes/api/auth/[...auth].ts.hbs", `{{#if (and (eq backend "self") (eq webDeploy "cloudflare"))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+import type { APIHandler } from "filesystem-routing/api";
+
+{{#if (and (eq backend "self") (eq webDeploy "cloudflare"))}}
+const handle: APIHandler = async ({ request }) => (await createAuth()).handler(request);
+{{else}}
+const handle: APIHandler = ({ request }) => auth.handler(request);
+{{/if}}
+
+export const GET = handle;
+export const POST = handle;
+`],
+  ["modules/auth/stack/better-auth/fullstack/svelte/src/hooks.server.ts.hbs", `{{#if (eq api "orpc")}}
+import "./lib/orpc.server";
+{{/if}}
+import { building } from "$app/environment";
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{#if (and (eq backend "self") (eq webDeploy "cloudflare"))}}
+import { ENV } from "./env.server";
+{{/if}}
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+import { svelteKitHandler } from "better-auth/svelte-kit";
+import type { Handle } from "@sveltejs/kit";
+
+export const handle: Handle = async ({ event, resolve }) => {
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+{{#if (and (eq backend "self") (eq webDeploy "cloudflare"))}}
+	if (building) {
+		return resolve(event);
+	}
+
+	const authEnv = event.platform?.env ?? ENV;
+	const authInstance = await createAuth(authEnv);
+{{else}}
+	const authInstance = await createAuth();
+{{/if}}
+{{else}}
+	const authInstance = auth;
+{{/if}}
+
+	return svelteKitHandler({
+		event,
+		resolve,
+		auth: authInstance,
+		building,
+	});
+};
+`],
+  ["modules/auth/stack/better-auth/fullstack/tanstack-start/src/routes/api/auth/$.ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from '@{{projectName}}/auth'
+{{else}}
+import { auth } from '@{{projectName}}/auth'
+{{/if}}
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/api/auth/$')({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+        const auth = await createAuth()
+        {{/if}}
+        return auth.handler(request)
+      },
+      POST: async ({ request }) => {
+        {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+        const auth = await createAuth()
+        {{/if}}
+        return auth.handler(request)
+      },
+    },
+  },
+})
+`],
+  ["modules/auth/stack/better-auth/loaders/svelte/dashboard.ts.hbs", `import { authClient } from '$lib/auth-client';
+import type { BetterFetchOption } from 'better-auth/client';
+import { redirect } from '@sveltejs/kit';
+{{#if (or (eq backend "self") (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker"))))}}
+import type { PageServerLoad } from './$types';
+
+export const load = (async ({ fetch, request{{#if (eq backend "self")}}, url{{/if}} }) => {
+{{else}}
+import type { PageLoad } from './$types';
+
+// The session cookie belongs to the separate API origin and is available in the browser.
+export const ssr = false;
+
+export const load = (async ({ fetch }) => {
+{{/if}}
+  const fetchOptions = {
+    customFetchImpl: fetch,
+{{#if (eq backend "self")}}
+    baseURL: new URL('/api/auth', url).toString(),
+{{/if}}
+{{#if (or (eq backend "self") (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker"))))}}
+    headers: { cookie: request.headers.get('cookie') ?? '' },
+    signal: request.signal,
+{{/if}}
+    throw: true,
+  } satisfies BetterFetchOption;
+  const session = await authClient.getSession({ fetchOptions });
+  if (!session) redirect(307, '/login');
+  return { user: session.user };
+}) satisfies {{#if (or (eq backend "self") (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker"))))}}PageServerLoad{{else}}PageLoad{{/if}};
+`],
+  ["modules/auth/stack/better-auth/native/bare/app/(drawer)/index.tsx.hbs", `import { Button, Column, Host, Text as ExpoUIText } from "@expo/ui";
+import { View, ScrollView, StyleSheet } from "react-native";
+import { Container } from "@/components/container";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import { NAV_THEME } from "@/lib/constants";
+import { authClient } from "@/lib/auth-client";
+import { SignIn } from "@/components/sign-in";
+import { SignUp } from "@/components/sign-up";
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { queryClient, orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { queryClient, trpc } from "@/utils/trpc";
+{{/if}}
+
+export default function Home() {
+const { colorScheme } = useColorScheme();
+const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+{{#if (eq api "orpc")}}
+const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+const privateData = useQuery(orpc.privateData.queryOptions());
+const isConnected = healthCheck?.data === "OK";
+const isLoading = healthCheck?.isLoading;
+{{/if}}
+{{#if (eq api "trpc")}}
+const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+const privateData = useQuery(trpc.privateData.queryOptions());
+const isConnected = healthCheck?.data === "OK";
+const isLoading = healthCheck?.isLoading;
+{{/if}}
+const { data: session } = authClient.useSession();
+
+return (
+<Container>
+  <ScrollView style={styles.scrollView} contentInsetAdjustmentBehavior="never">
+    <View style={styles.content}>
+      <Host style={styles.titleHost}>
+        <ExpoUIText
+          textStyle=\\{{ color: theme.text, fontSize: 24, fontWeight: "bold", textAlign: "center" }}
+        >
+          XSTACK
+        </ExpoUIText>
+      </Host>
+
+      {session?.user ? (
+      <View style={[styles.userCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Host style={styles.userHeader} matchContents=\\{{ vertical: true }}>
+          <Column spacing={8}>
+            <ExpoUIText textStyle=\\{{ color: theme.text, fontSize: 16 }}>
+              {\`Welcome, \${session.user.name}\`}
+            </ExpoUIText>
+            <ExpoUIText
+              textStyle=\\{{ color: theme.text, fontSize: 14 }}
+              style=\\{{ opacity: 0.7 }}
+            >
+              {session.user.email}
+            </ExpoUIText>
+          </Column>
+        </Host>
+        <Host matchContents=\\{{ vertical: true }}>
+          <Button
+            label="Sign Out"
+            variant="outlined"
+            onPress={() => {
+              authClient.signOut();
+              {{#if (eq api "orpc")}}
+              queryClient.invalidateQueries();
+              {{/if}}
+              {{#if (eq api "trpc")}}
+              queryClient.invalidateQueries();
+              {{/if}}
+            }}
+          />
+        </Host>
+      </View>
+      ) : null}
+
+      {{#unless (eq api "none")}}
+      <View style={[styles.statusCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Host style={styles.cardTitleHost} matchContents=\\{{ vertical: true }}>
+          <ExpoUIText
+            textStyle=\\{{ color: theme.text, fontSize: 16, fontWeight: "bold" }}
+          >
+            System Status
+          </ExpoUIText>
+        </Host>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusIndicator, { backgroundColor: isConnected ? "#10b981" : "#ef4444" }]} />
+          <View style={styles.statusContent}>
+            <Host matchContents=\\{{ vertical: true }}>
+              <Column spacing={4}>
+                <ExpoUIText
+                  textStyle=\\{{ color: theme.text, fontSize: 14, fontWeight: "bold" }}
+                >
+                  {{#if (eq api "orpc")}}ORPC{{else}}TRPC{{/if}} Backend
+                </ExpoUIText>
+                <ExpoUIText
+                  textStyle=\\{{ color: theme.text, fontSize: 12 }}
+                  style=\\{{ opacity: 0.7 }}
+                >
+                  {isLoading
+                  ? "Checking connection..."
+                  : isConnected
+                  ? "Connected to API"
+                  : "API Disconnected"}
+                </ExpoUIText>
+              </Column>
+            </Host>
+          </View>
+        </View>
+      </View>
+
+      <View style={[styles.privateDataCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Host style={styles.cardTitleHost} matchContents=\\{{ vertical: true }}>
+          <ExpoUIText
+            textStyle=\\{{ color: theme.text, fontSize: 16, fontWeight: "bold" }}
+          >
+            Private Data
+          </ExpoUIText>
+        </Host>
+        {privateData && (
+        <Host matchContents=\\{{ vertical: true }}>
+          <ExpoUIText
+            textStyle=\\{{ color: theme.text, fontSize: 14 }}
+            style=\\{{ opacity: 0.7 }}
+          >
+            {privateData.data?.message ?? ""}
+          </ExpoUIText>
+        </Host>
+        )}
+      </View>
+      {{/unless}}
+
+      {!session?.user && (
+      <>
+        <SignIn />
+        <SignUp />
+      </>
+      )}
+    </View>
+  </ScrollView>
+</Container>
+);
+}
+
+const styles = StyleSheet.create({
+scrollView: {
+flex: 1,
+},
+content: {
+paddingHorizontal: 20,
+paddingTop: 28,
+paddingBottom: 32,
+},
+titleHost: {
+alignSelf: "stretch",
+height: 34,
+marginBottom: 24,
+},
+userCard: {
+marginBottom: 16,
+padding: 16,
+borderWidth: 1,
+borderRadius: 16,
+},
+userHeader: {
+marginBottom: 8,
+},
+statusCard: {
+marginBottom: 16,
+padding: 16,
+borderWidth: 1,
+borderRadius: 16,
+},
+cardTitleHost: {
+marginBottom: 12,
+},
+statusRow: {
+flexDirection: "row",
+alignItems: "center",
+gap: 8,
+},
+statusIndicator: {
+height: 8,
+width: 8,
+},
+statusContent: {
+flex: 1,
+},
+privateDataCard: {
+marginBottom: 16,
+padding: 16,
+borderWidth: 1,
+borderRadius: 16,
+},
+});
+`],
+  ["modules/auth/stack/better-auth/native/bare/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+{{#if (eq api "trpc")}}
+import { queryClient } from "@/utils/trpc";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { queryClient } from "@/utils/orpc";
+{{/if}}
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { NAV_THEME } from "@/lib/constants";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import z from "zod";
+
+const signInSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+function SignIn() {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signInSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign in");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+            {{#if (eq api "orpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+            {{#if (eq api "trpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Text style={[styles.title, { color: theme.text }]}>Sign In</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={[styles.errorContainer, { backgroundColor: theme.notification + "20" }]}>
+                  <Text style={[styles.errorText, { color: theme.notification }]}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Email"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Password"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={[
+                  styles.button,
+                  {
+                    backgroundColor: theme.primary,
+                    opacity: isSubmitting ? 0.5 : 1,
+                  },
+                ]}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign In</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    marginTop: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  errorContainer: {
+    marginBottom: 12,
+    padding: 8,
+  },
+  errorText: {
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  button: {
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontSize: 16,
+  },
+});
+
+export { SignIn };
+`],
+  ["modules/auth/stack/better-auth/native/bare/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+{{#if (eq api "trpc")}}
+import { queryClient } from "@/utils/trpc";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { queryClient } from "@/utils/orpc";
+{{/if}}
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { NAV_THEME } from "@/lib/constants";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import z from "zod";
+
+const signUpSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+function SignUp() {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signUpSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signUp.email(
+        {
+          name: value.name.trim(),
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign up");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+            {{#if (eq api "orpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+            {{#if (eq api "trpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={[styles.errorContainer, { backgroundColor: theme.notification + "20" }]}>
+                  <Text style={[styles.errorText, { color: theme.notification }]}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="name">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Name"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Email"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Password"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={[
+                  styles.button,
+                  {
+                    backgroundColor: theme.primary,
+                    opacity: isSubmitting ? 0.5 : 1,
+                  },
+                ]}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign Up</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    marginTop: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  errorContainer: {
+    marginBottom: 12,
+    padding: 8,
+  },
+  errorText: {
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  button: {
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontSize: 16,
+  },
+});
+
+export { SignUp };
+`],
+  ["modules/auth/stack/better-auth/native/base/lib/auth-client.ts.hbs", `import { expoClient } from "@better-auth/expo/client";
+import { createAuthClient } from "better-auth/react";
+import * as SecureStore from "expo-secure-store";
+import Constants from "expo-constants";
+import { ENV } from "../src/env";
+
+export const authClient = createAuthClient({
+	baseURL: ENV.EXPO_PUBLIC_SERVER_URL,
+	plugins: [
+		expoClient({
+			scheme: Constants.expoConfig?.scheme as string,
+			storagePrefix: Constants.expoConfig?.scheme as string,
+			storage: SecureStore,
+		}),
+	],
+});
+`],
+  ["modules/auth/stack/better-auth/native/unistyles/app/(drawer)/index.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+
+import { Container } from "@/components/container";
+import { SignIn } from "@/components/sign-in";
+import { SignUp } from "@/components/sign-up";
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { queryClient, orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { queryClient, trpc } from "@/utils/trpc";
+{{/if}}
+
+export default function Home() {
+    {{#if (eq api "orpc")}}
+    const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+    const privateData = useQuery(orpc.privateData.queryOptions());
+    {{/if}}
+    {{#if (eq api "trpc")}}
+    const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+    const privateData = useQuery(trpc.privateData.queryOptions());
+    {{/if}}
+  const { data: session } = authClient.useSession();
+
+  return (
+    <Container>
+      <ScrollView>
+        <View style={styles.pageContainer}>
+          <Text style={styles.headerTitle}>XSTACK</Text>
+          {session?.user ? (
+            <View style={styles.sessionInfoCard}>
+              <View style={styles.sessionUserRow}>
+                <Text style={styles.welcomeText}>
+                  Welcome,{" "}
+                  <Text style={styles.userNameText}>{session.user.name}</Text>
+                </Text>
+              </View>
+              <Text style={styles.emailText}>{session.user.email}</Text>
+
+              <TouchableOpacity
+                style={styles.signOutButton}
+                onPress={() => {
+                  authClient.signOut();
+                  {{#if (eq api "orpc")}}
+                  queryClient.invalidateQueries();
+                  {{/if}}
+                  {{#if (eq api "trpc")}}
+                  queryClient.invalidateQueries();
+                  {{/if}}
+                }}
+              >
+                <Text style={styles.signOutButtonText}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {{#unless (eq api "none")}}
+          <View style={styles.apiStatusCard}>
+            <Text style={styles.cardTitle}>API Status</Text>
+            <View style={styles.apiStatusRow}>
+              <View
+                style={[
+                  styles.statusIndicatorDot,
+                  healthCheck.data
+                    ? styles.statusIndicatorGreen
+                    : styles.statusIndicatorRed,
+                ]}
+              />
+              <Text style={styles.mutedText}>
+                {healthCheck.isLoading
+                  ? "Checking..."
+                  : healthCheck.data
+                    ? "Connected to API"
+                    : "API Disconnected"}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.privateDataCard}>
+            <Text style={styles.cardTitle}>Private Data</Text>
+            {privateData && (
+              <View>
+                <Text style={styles.mutedText}>
+                  {privateData.data?.message}
+                </Text>
+              </View>
+            )}
+          </View>
+          {{/unless}}
+          {!session?.user && (
+            <>
+              <SignIn />
+              <SignUp />
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </Container>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  pageContainer: {
+    paddingHorizontal: 8,
+  },
+  headerTitle: {
+    color: theme?.colors?.typography,
+    fontSize: 30,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  sessionInfoCard: {
+    marginBottom: 24,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme?.colors?.border,
+  },
+  sessionUserRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  welcomeText: {
+    color: theme?.colors?.typography,
+    fontSize: 16,
+  },
+  userNameText: {
+    fontWeight: "500",
+    color: theme?.colors?.typography,
+  },
+  emailText: {
+    color: theme?.colors?.typography,
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  signOutButton: {
+    backgroundColor: theme?.colors?.destructive,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
+  signOutButtonText: {
+    fontWeight: "500",
+  },
+  apiStatusCard: {
+    marginBottom: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme?.colors?.border,
+    padding: 16,
+  },
+  cardTitle: {
+    marginBottom: 12,
+    fontWeight: "500",
+    color: theme?.colors?.typography,
+  },
+  apiStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusIndicatorDot: {
+    height: 12,
+    width: 12,
+    borderRadius: 9999,
+  },
+  statusIndicatorGreen: {
+    backgroundColor: theme.colors.success,
+  },
+  statusIndicatorRed: {
+    backgroundColor: theme.colors.destructive,
+  },
+  mutedText: {
+    color: theme?.colors?.typography,
+  },
+  privateDataCard: {
+    marginBottom: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme?.colors?.border,
+    padding: 16,
+  },
+}));
+`],
+  ["modules/auth/stack/better-auth/native/unistyles/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+{{#if (eq api "trpc")}}
+import { queryClient } from "@/utils/trpc";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { queryClient } from "@/utils/orpc";
+{{/if}}
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import z from "zod";
+
+const signInSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignIn() {
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signInSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign in");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+            {{#if (eq api "orpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+            {{#if (eq api "trpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign In</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={styles.button}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign In</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.typography,
+    marginBottom: 16,
+  },
+  errorContainer: {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 6,
+  },
+  errorText: {
+    color: theme.colors.destructive,
+    fontSize: 14,
+  },
+  input: {
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 6,
+    color: theme.colors.typography,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  button: {
+    backgroundColor: theme.colors.primary,
+    padding: 16,
+    borderRadius: 6,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonText: {
+    fontWeight: "500",
+  },
+}));
+`],
+  ["modules/auth/stack/better-auth/native/unistyles/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+{{#if (eq api "trpc")}}
+import { queryClient } from "@/utils/trpc";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { queryClient } from "@/utils/orpc";
+{{/if}}
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import z from "zod";
+
+const signUpSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignUp() {
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signUpSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signUp.email(
+        {
+          name: value.name.trim(),
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign up");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+            {{#if (eq api "orpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+            {{#if (eq api "trpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Create Account</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="name">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Name"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={styles.inputLast}
+                    placeholder="Password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={styles.button}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign Up</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.typography,
+    marginBottom: 16,
+  },
+  errorContainer: {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 6,
+  },
+  errorText: {
+    color: theme.colors.destructive,
+    fontSize: 14,
+  },
+  input: {
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 6,
+    color: theme.colors.typography,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  inputLast: {
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 6,
+    color: theme.colors.typography,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  button: {
+    backgroundColor: theme.colors.primary,
+    padding: 16,
+    borderRadius: 6,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonText: {
+    fontWeight: "500",
+  },
+}));
+`],
+  ["modules/auth/stack/better-auth/native/uniwind/app/(drawer)/index.tsx.hbs", `import { Text, View, Pressable } from "react-native";
+import { Container } from "@/components/container";
+import { authClient } from "@/lib/auth-client";
+import { Ionicons } from "@expo/vector-icons";
+import { Card, Chip, useThemeColor } from "heroui-native";
+import { SignIn } from "@/components/sign-in";
+import { SignUp } from "@/components/sign-up";
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { queryClient, orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { queryClient, trpc } from "@/utils/trpc";
+{{/if}}
+
+export default function Home() {
+{{#if (eq api "orpc")}}
+const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+const privateData = useQuery(orpc.privateData.queryOptions());
+const isConnected = healthCheck?.data === "OK";
+const isLoading = healthCheck?.isLoading;
+{{/if}}
+{{#if (eq api "trpc")}}
+const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+const privateData = useQuery(trpc.privateData.queryOptions());
+const isConnected = healthCheck?.data === "OK";
+const isLoading = healthCheck?.isLoading;
+{{/if}}
+const { data: session } = authClient.useSession();
+
+const mutedColor = useThemeColor("muted");
+const successColor = useThemeColor("success");
+const dangerColor = useThemeColor("danger");
+const foregroundColor = useThemeColor("foreground");
+
+return (
+<Container className="p-6">
+  <View className="py-4 mb-6">
+    <Text className="text-4xl font-bold text-foreground mb-2">
+      XSTACK
+    </Text>
+  </View>
+
+  {session?.user ? (
+  <Card variant="secondary" className="mb-6 p-4">
+    <Text className="text-foreground text-base mb-2">
+      Welcome, <Text className="font-medium">{session.user.name}</Text>
+    </Text>
+    <Text className="text-muted text-sm mb-4">
+      {session.user.email}
+    </Text>
+    <Pressable className="bg-danger py-3 px-4 rounded-lg self-start active:opacity-70" onPress={()=> {
+      authClient.signOut();
+      {{#if (eq api "orpc")}}
+      queryClient.invalidateQueries();
+      {{/if}}
+      {{#if (eq api "trpc")}}
+      queryClient.invalidateQueries();
+      {{/if}}
+      }}
+      >
+      <Text className="text-foreground font-medium">Sign Out</Text>
+    </Pressable>
+  </Card>
+  ) : null}
+
+  {{#unless (eq api "none")}}
+  <Card variant="secondary" className="p-6">
+    <View className="flex-row items-center justify-between mb-4">
+      <Card.Title>System Status</Card.Title>
+      <Chip variant="secondary" color={isConnected ? "success" : "danger" } size="sm">
+        <Chip.Label>{isConnected ? "LIVE" : "OFFLINE"}</Chip.Label>
+      </Chip>
+    </View>
+
+    <Card className="p-4">
+      <View className="flex-row items-center">
+        <View className={\`w-3 h-3 rounded-full mr-3 \${isConnected ? "bg-success" : "bg-muted" }\`} />
+        <View className="flex-1">
+          <Text className="text-foreground font-medium mb-1">
+            {{#if (eq api "orpc")}}ORPC{{else}}TRPC{{/if}} Backend
+          </Text>
+          <Card.Description>
+            {isLoading
+            ? "Checking connection..."
+            : isConnected
+            ? "Connected to API"
+            : "API Disconnected"}
+          </Card.Description>
+        </View>
+        {isLoading && (
+        <Ionicons name="hourglass-outline" size={20} color={mutedColor} />
+        )}
+        {!isLoading && isConnected && (
+        <Ionicons name="checkmark-circle" size={20} color={successColor} />
+        )}
+        {!isLoading && !isConnected && (
+        <Ionicons name="close-circle" size={20} color={dangerColor} />
+        )}
+      </View>
+    </Card>
+  </Card>
+
+  <Card variant="secondary" className="mt-6 p-4">
+    <Card.Title className="mb-3">Private Data</Card.Title>
+    {privateData && (
+    <Card.Description>
+      {privateData.data?.message}
+    </Card.Description>
+    )}
+  </Card>
+  {{/unless}}
+
+  {!session?.user && (
+  <>
+    <SignIn />
+    <SignUp />
+  </>
+  )}
+</Container>
+);
+}
+`],
+  ["modules/auth/stack/better-auth/native/uniwind/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+{{#if (eq api "trpc")}}
+import { queryClient } from "@/utils/trpc";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { queryClient } from "@/utils/orpc";
+{{/if}}
+import { useForm } from "@tanstack/react-form";
+import { useRef } from "react";
+import { Text, View } from "react-native";
+import { Button, FieldError, Input, type InputRef, Label, Spinner, Surface, TextField, useToast } from "heroui-native";
+import z from "zod";
+
+const signInSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+function SignIn() {
+  const passwordInputRef = useRef<InputRef>(null);
+  const { toast } = useToast();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signInSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            toast.show({
+              variant: "danger",
+              label: error.error?.message || "Failed to sign in",
+            });
+          },
+          onSuccess() {
+            formApi.reset();
+            toast.show({
+              variant: "success",
+              label: "Signed in successfully",
+            });
+            {{#if (eq api "orpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+            {{#if (eq api "trpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <Surface variant="secondary" className="p-4 rounded-lg">
+      <Text className="text-foreground font-medium mb-4">Sign In</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = validationError;
+
+          return (
+            <>
+              <FieldError isInvalid={!!formError} className="mb-3">
+                {formError}
+              </FieldError>
+
+              <View className="gap-3">
+                <form.Field name="email">
+                  {(field) => (
+                    <TextField>
+                      <Label>Email</Label>
+                      <Input
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="email@example.com"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        textContentType="emailAddress"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => {
+                          passwordInputRef.current?.focus();
+                        }}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <form.Field name="password">
+                  {(field) => (
+                    <TextField>
+                      <Label>Password</Label>
+                      <Input
+                        ref={passwordInputRef}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="••••••••"
+                        secureTextEntry
+                        autoComplete="password"
+                        textContentType="password"
+                        returnKeyType="go"
+                        onSubmitEditing={form.handleSubmit}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <Button onPress={form.handleSubmit} isDisabled={isSubmitting} className="mt-1">
+                  {isSubmitting ? <Spinner size="sm" color="default" /> : <Button.Label>Sign In</Button.Label>}
+                </Button>
+              </View>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </Surface>
+  );
+}
+
+export { SignIn };
+`],
+  ["modules/auth/stack/better-auth/native/uniwind/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+{{#if (eq api "trpc")}}
+import { queryClient } from "@/utils/trpc";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { queryClient } from "@/utils/orpc";
+{{/if}}
+import { useForm } from "@tanstack/react-form";
+import { useRef } from "react";
+import { Text, View } from "react-native";
+import { Button, FieldError, Input, type InputRef, Label, Spinner, Surface, TextField, useToast } from "heroui-native";
+import z from "zod";
+
+const signUpSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignUp() {
+  const emailInputRef = useRef<InputRef>(null);
+  const passwordInputRef = useRef<InputRef>(null);
+  const { toast } = useToast();
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signUpSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signUp.email(
+        {
+          name: value.name.trim(),
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            toast.show({
+              variant: "danger",
+              label: error.error?.message || "Failed to sign up",
+            });
+          },
+          onSuccess() {
+            formApi.reset();
+            toast.show({
+              variant: "success",
+              label: "Account created successfully",
+            });
+            {{#if (eq api "orpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+            {{#if (eq api "trpc")}}
+            queryClient.refetchQueries();
+            {{/if}}
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <Surface variant="secondary" className="p-4 rounded-lg">
+      <Text className="text-foreground font-medium mb-4">Create Account</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = validationError;
+
+          return (
+            <>
+              <FieldError isInvalid={!!formError} className="mb-3">
+                {formError}
+              </FieldError>
+
+              <View className="gap-3">
+                <form.Field name="name">
+                  {(field) => (
+                    <TextField>
+                      <Label>Name</Label>
+                      <Input
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="John Doe"
+                        autoComplete="name"
+                        textContentType="name"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => {
+                          emailInputRef.current?.focus();
+                        }}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <form.Field name="email">
+                  {(field) => (
+                    <TextField>
+                      <Label>Email</Label>
+                      <Input
+                        ref={emailInputRef}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="email@example.com"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        textContentType="emailAddress"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => {
+                          passwordInputRef.current?.focus();
+                        }}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <form.Field name="password">
+                  {(field) => (
+                    <TextField>
+                      <Label>Password</Label>
+                      <Input
+                        ref={passwordInputRef}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="••••••••"
+                        secureTextEntry
+                        autoComplete="new-password"
+                        textContentType="newPassword"
+                        returnKeyType="go"
+                        onSubmitEditing={form.handleSubmit}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <Button onPress={form.handleSubmit} isDisabled={isSubmitting} className="mt-1">
+                  {isSubmitting ? (
+                    <Spinner size="sm" color="default" />
+                  ) : (
+                    <Button.Label>Create Account</Button.Label>
+                  )}
+                </Button>
+              </View>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </Surface>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/server/base/_gitignore", `# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+`],
+  ["modules/auth/stack/better-auth/server/base/package.json.hbs", `{
+  "name": "@{{projectName}}/auth",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "type": "module",
+  "scripts": {
+    {{#if (eq api "orpc")}}
+    "build": "tsc -b",
+    "check-types": "tsc -b"
+    {{else}}
+    "check-types": "tsc --noEmit"
+    {{/if}}
+  },
+  "devDependencies": {}
+}`],
+  ["modules/auth/stack/better-auth/server/base/src/index.ts.hbs", `import { betterAuth } from "better-auth";
+{{#if (eq orm "prisma")}}
+import { prismaAdapter } from "better-auth/adapters/prisma";
+{{else if (eq orm "drizzle")}}
+import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
+import * as schema from "@{{projectName}}/db/schema/auth";
+{{else if (eq orm "mongoose")}}
+import { mongodbAdapter } from "better-auth/adapters/mongodb";
+{{/if}}
+{{#if (ne database "none")}}
+import type { Database } from "@{{projectName}}/db";
+{{/if}}
+
+export type AuthConfig = {
+  BETTER_AUTH_URL: string;
+  BETTER_AUTH_SECRET: string;
+{{#if (ne backend "self")}}
+  CORS_ORIGIN: string;
+{{/if}}
+};
+
+export function createAuth(env: AuthConfig{{#if (ne database "none")}}, database: Database{{/if}}{{#if (ne backend "self")}}, desktopOrigins: readonly string[] = []{{/if}}) {
+  return betterAuth({
+{{#if (eq orm "prisma")}}
+    database: prismaAdapter(database, {
+      provider: "{{#if (eq database "postgres")}}postgresql{{else}}{{database}}{{/if}}",
+    }),
+{{else if (eq orm "drizzle")}}
+    database: drizzleAdapter(database, {
+      provider: "{{#if (eq database "postgres")}}pg{{else}}{{database}}{{/if}}",
+      schema,
+    }),
+{{else if (eq orm "mongoose")}}
+    database: mongodbAdapter(database),
+{{/if}}
+    trustedOrigins: [
+      {{#if (eq backend "self")}}env.BETTER_AUTH_URL{{else}}env.CORS_ORIGIN,
+      ...desktopOrigins{{/if}},
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+      "{{projectName}}://",
+      "exp://",
+      "http://localhost:8081",
+{{/if}}
+    ],
+    emailAndPassword: { enabled: true },
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL,
+{{#if (ne backend "self")}}
+    advanced: {
+      defaultCookieAttributes: {
+        sameSite: "none",
+        secure: true,
+        httpOnly: true,
+      },
+    },
+{{/if}}
+    plugins: [
+    ],
+  });
+}
+
+export type Session = ReturnType<typeof createAuth>["$Infer"]["Session"];
+`],
+  ["modules/auth/stack/better-auth/server/base/tsconfig.json.hbs", `{
+  "extends": "@{{projectName}}/config/tsconfig.base.json",
+  {{#if (eq api "orpc")}}
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{{#if (ne database "none")}}{ "path": "../db" }{{/if}}]
+  {{else}}
+  "compilerOptions": {
+    "noEmit": true
+  }
+  {{/if}}
+}
+`],
+  ["modules/auth/stack/better-auth/server/db/drizzle/mysql/src/schema/auth.ts.hbs", `import { defineRelationsPart } from "drizzle-orm";
+import {
+  mysqlTable,
+  varchar,
+  text,
+  timestamp,
+  boolean,
+  index,
+} from "drizzle-orm/mysql-core";
+
+export const user = mysqlTable("user", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  image: text("image"),
+  createdAt: timestamp("created_at", { fsp: 3 }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { fsp: 3 })
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const session = mysqlTable(
+  "session",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    expiresAt: timestamp("expires_at", { fsp: 3 }).notNull(),
+    token: varchar("token", { length: 255 }).notNull().unique(),
+    createdAt: timestamp("created_at", { fsp: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { fsp: 3 })
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("session_userId_idx").on(table.userId)],
+);
+
+export const account = mysqlTable(
+  "account",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", { fsp: 3 }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { fsp: 3 }),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: timestamp("created_at", { fsp: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { fsp: 3 })
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("account_userId_idx").on(table.userId)],
+);
+
+export const verification = mysqlTable(
+  "verification",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    identifier: varchar("identifier", { length: 255 }).notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at", { fsp: 3 }).notNull(),
+    createdAt: timestamp("created_at", { fsp: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { fsp: 3 })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("verification_identifier_idx").on(table.identifier)],
+);
+
+export const authRelations = defineRelationsPart(
+  { user, session, account, verification },
+  (r) => ({
+    user: {
+      sessions: r.many.session({
+        from: r.user.id,
+        to: r.session.userId,
+      }),
+      accounts: r.many.account({
+        from: r.user.id,
+        to: r.account.userId,
+      }),
+    },
+    session: {
+      user: r.one.user({
+        from: r.session.userId,
+        to: r.user.id,
+      }),
+    },
+    account: {
+      user: r.one.user({
+        from: r.account.userId,
+        to: r.user.id,
+      }),
+    },
+  }),
+);
+`],
+  ["modules/auth/stack/better-auth/server/db/drizzle/postgres/src/schema/auth.ts.hbs", `import { defineRelationsPart } from "drizzle-orm";
+import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  image: text("image"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const session = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expires_at").notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("session_userId_idx").on(table.userId)],
+);
+
+export const account = pgTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at"),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("account_userId_idx").on(table.userId)],
+);
+
+export const verification = pgTable(
+  "verification",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("verification_identifier_idx").on(table.identifier)],
+);
+
+export const authRelations = defineRelationsPart(
+  { user, session, account, verification },
+  (r) => ({
+    user: {
+      sessions: r.many.session({
+        from: r.user.id,
+        to: r.session.userId,
+      }),
+      accounts: r.many.account({
+        from: r.user.id,
+        to: r.account.userId,
+      }),
+    },
+    session: {
+      user: r.one.user({
+        from: r.session.userId,
+        to: r.user.id,
+      }),
+    },
+    account: {
+      user: r.one.user({
+        from: r.account.userId,
+        to: r.user.id,
+      }),
+    },
+  }),
+);
+`],
+  ["modules/auth/stack/better-auth/server/db/drizzle/sqlite/src/schema/auth.ts.hbs", `import { defineRelationsPart, sql } from "drizzle-orm";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+
+export const user = sqliteTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: integer("email_verified", { mode: "boolean" })
+    .default(false)
+    .notNull(),
+  image: text("image"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const session = sqliteTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("session_userId_idx").on(table.userId)],
+);
+
+export const account = sqliteTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: integer("access_token_expires_at", {
+      mode: "timestamp_ms",
+    }),
+    refreshTokenExpiresAt: integer("refresh_token_expires_at", {
+      mode: "timestamp_ms",
+    }),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("account_userId_idx").on(table.userId)],
+);
+
+export const verification = sqliteTable(
+  "verification",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .default(sql\`(cast(unixepoch('subsecond') * 1000 as integer))\`)
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("verification_identifier_idx").on(table.identifier)],
+);
+
+export const authRelations = defineRelationsPart(
+  { user, session, account, verification },
+  (r) => ({
+    user: {
+      sessions: r.many.session({
+        from: r.user.id,
+        to: r.session.userId,
+      }),
+      accounts: r.many.account({
+        from: r.user.id,
+        to: r.account.userId,
+      }),
+    },
+    session: {
+      user: r.one.user({
+        from: r.session.userId,
+        to: r.user.id,
+      }),
+    },
+    account: {
+      user: r.one.user({
+        from: r.account.userId,
+        to: r.user.id,
+      }),
+    },
+  }),
+);
+`],
+  ["modules/auth/stack/better-auth/server/db/mongoose/mongodb/src/models/auth.model.ts.hbs", `import mongoose from 'mongoose';
+
+const { Schema, model } = mongoose;
+const { ObjectId } = Schema.Types;
+
+const userSchema = new Schema(
+    {
+        _id: { type: ObjectId, auto: true },
+        name: { type: String, required: true },
+        email: { type: String, required: true, unique: true },
+        emailVerified: { type: Boolean, required: true, default: false },
+        image: { type: String },
+        createdAt: { type: Date, required: true, default: Date.now },
+        updatedAt: { type: Date, required: true, default: Date.now },
+    },
+    { collection: 'user' }
+);
+
+const sessionSchema = new Schema(
+    {
+        _id: { type: ObjectId, auto: true },
+        expiresAt: { type: Date, required: true },
+        token: { type: String, required: true, unique: true },
+        createdAt: { type: Date, required: true, default: Date.now },
+        updatedAt: { type: Date, required: true, default: Date.now },
+        ipAddress: { type: String },
+        userAgent: { type: String },
+        userId: { type: ObjectId, ref: 'User', required: true },
+    },
+    { collection: 'session' }
+);
+sessionSchema.index({ userId: 1 });
+
+const accountSchema = new Schema(
+    {
+        _id: { type: ObjectId, auto: true },
+        accountId: { type: String, required: true },
+        providerId: { type: String, required: true },
+        userId: { type: ObjectId, ref: 'User', required: true },
+        accessToken: { type: String },
+        refreshToken: { type: String },
+        idToken: { type: String },
+        accessTokenExpiresAt: { type: Date },
+        refreshTokenExpiresAt: { type: Date },
+        scope: { type: String },
+        password: { type: String },
+        createdAt: { type: Date, required: true, default: Date.now },
+        updatedAt: { type: Date, required: true, default: Date.now },
+    },
+    { collection: 'account' }
+);
+accountSchema.index({ providerId: 1, accountId: 1 }, { unique: true });
+accountSchema.index({ userId: 1 });
+
+const verificationSchema = new Schema(
+    {
+        _id: { type: ObjectId, auto: true },
+        identifier: { type: String, required: true },
+        value: { type: String, required: true },
+        expiresAt: { type: Date, required: true },
+        createdAt: { type: Date, required: true, default: Date.now },
+        updatedAt: { type: Date, required: true, default: Date.now },
+    },
+    { collection: 'verification' }
+);
+verificationSchema.index({ identifier: 1 });
+
+const User = model('User', userSchema);
+const Session = model('Session', sessionSchema);
+const Account = model('Account', accountSchema);
+const Verification = model('Verification', verificationSchema);
+
+export { User, Session, Account, Verification };
+`],
+  ["modules/auth/stack/better-auth/server/db/prisma/mongodb/prisma/schema/auth.prisma.hbs", `model User {
+  id            String    @id @map("_id")
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @map("_id")
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @map("_id")
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @map("_id")
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+`],
+  ["modules/auth/stack/better-auth/server/db/prisma/mysql/prisma/schema/auth.prisma.hbs", `model User {
+  id            String    @id
+  name          String    @db.Text
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?  @db.Text
+  userAgent String?  @db.Text
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId(length: 191)])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String    @db.Text
+  providerId            String    @db.Text
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?   @db.Text
+  password              String?   @db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId(length: 191)])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String   @db.Text
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier(length: 191)])
+  @@map("verification")
+}
+`],
+  ["modules/auth/stack/better-auth/server/db/prisma/postgres/prisma/schema/auth.prisma.hbs", `model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+`],
+  ["modules/auth/stack/better-auth/server/db/prisma/sqlite/prisma/schema/auth.prisma.hbs", `model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+`],
+  ["modules/auth/stack/better-auth/web/astro/src/components/SignInForm.astro.hbs", `---
+import { authClient } from "../lib/auth-client";
+---
+
+<div class="mx-auto mt-10 w-full max-w-md p-6">
+  <h1 class="mb-6 text-center font-bold text-3xl text-white">Welcome Back</h1>
+
+  <form id="signin-form" class="space-y-4">
+    <div class="space-y-1">
+      <label for="email" class="block text-sm font-medium text-neutral-300">Email</label>
+      <input
+        id="email"
+        name="email"
+        type="email"
+        required
+        class="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        placeholder="you@example.com"
+      />
+      <p id="email-error" class="text-sm text-red-500 hidden"></p>
+    </div>
+
+    <div class="space-y-1">
+      <label for="password" class="block text-sm font-medium text-neutral-300">Password</label>
+      <input
+        id="password"
+        name="password"
+        type="password"
+        required
+        class="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        placeholder="••••••••"
+      />
+      <p id="password-error" class="text-sm text-red-500 hidden"></p>
+    </div>
+
+    <p id="form-error" class="text-sm text-red-500 hidden"></p>
+
+    <button
+      type="submit"
+      class="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+    >
+      Sign In
+    </button>
+  </form>
+
+  <div class="mt-4 text-center">
+    <a href="/signup" class="text-indigo-400 hover:text-indigo-300 text-sm">
+      Need an account? Sign Up
+    </a>
+  </div>
+</div>
+
+<script>
+  import { authClient } from "../lib/auth-client";
+
+  const form = document.getElementById("signin-form") as HTMLFormElement;
+  const emailInput = document.getElementById("email") as HTMLInputElement;
+  const passwordInput = document.getElementById("password") as HTMLInputElement;
+  const formError = document.getElementById("form-error") as HTMLParagraphElement;
+  const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    formError.classList.add("hidden");
+    submitButton.disabled = true;
+    submitButton.textContent = "Signing in...";
+
+    try {
+      await authClient.signIn.email(
+        {
+          email: emailInput.value,
+          password: passwordInput.value,
+        },
+        {
+          onSuccess: () => {
+            window.location.href = "/dashboard";
+          },
+          onError: (ctx) => {
+            formError.textContent = ctx.error.message || "Sign in failed. Please try again.";
+            formError.classList.remove("hidden");
+          },
+        }
+      );
+    } catch (error) {
+      formError.textContent = "An unexpected error occurred.";
+      formError.classList.remove("hidden");
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = "Sign In";
+    }
+  });
+</script>
+`],
+  ["modules/auth/stack/better-auth/web/astro/src/components/SignUpForm.astro.hbs", `---
+import { authClient } from "../lib/auth-client";
+---
+
+<div class="mx-auto mt-10 w-full max-w-md p-6">
+  <h1 class="mb-6 text-center font-bold text-3xl text-white">Create Account</h1>
+
+  <form id="signup-form" class="space-y-4">
+    <div class="space-y-1">
+      <label for="name" class="block text-sm font-medium text-neutral-300">Name</label>
+      <input
+        id="name"
+        name="name"
+        type="text"
+        required
+        class="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        placeholder="John Doe"
+      />
+    </div>
+
+    <div class="space-y-1">
+      <label for="email" class="block text-sm font-medium text-neutral-300">Email</label>
+      <input
+        id="email"
+        name="email"
+        type="email"
+        required
+        class="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        placeholder="you@example.com"
+      />
+    </div>
+
+    <div class="space-y-1">
+      <label for="password" class="block text-sm font-medium text-neutral-300">Password</label>
+      <input
+        id="password"
+        name="password"
+        type="password"
+        required
+        minlength="8"
+        class="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder-neutral-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        placeholder="••••••••"
+      />
+      <p class="text-xs text-neutral-500">Must be at least 8 characters</p>
+    </div>
+
+    <p id="form-error" class="text-sm text-red-500 hidden"></p>
+
+    <button
+      type="submit"
+      class="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+    >
+      Sign Up
+    </button>
+  </form>
+
+  <div class="mt-4 text-center">
+    <a href="/login" class="text-indigo-400 hover:text-indigo-300 text-sm">
+      Already have an account? Sign In
+    </a>
+  </div>
+</div>
+
+<script>
+  import { authClient } from "../lib/auth-client";
+
+  const form = document.getElementById("signup-form") as HTMLFormElement;
+  const nameInput = document.getElementById("name") as HTMLInputElement;
+  const emailInput = document.getElementById("email") as HTMLInputElement;
+  const passwordInput = document.getElementById("password") as HTMLInputElement;
+  const formError = document.getElementById("form-error") as HTMLParagraphElement;
+  const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    formError.classList.add("hidden");
+    submitButton.disabled = true;
+    submitButton.textContent = "Creating account...";
+
+    try {
+      await authClient.signUp.email(
+        {
+          name: nameInput.value,
+          email: emailInput.value,
+          password: passwordInput.value,
+        },
+        {
+          onSuccess: () => {
+            window.location.href = "/dashboard";
+          },
+          onError: (ctx) => {
+            formError.textContent = ctx.error.message || "Sign up failed. Please try again.";
+            formError.classList.remove("hidden");
+          },
+        }
+      );
+    } catch (error) {
+      formError.textContent = "An unexpected error occurred.";
+      formError.classList.remove("hidden");
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = "Sign Up";
+    }
+  });
+</script>
+`],
+  ["modules/auth/stack/better-auth/web/astro/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/client";
+{{#if (ne backend "self")}}
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{/if}}
+
+{{#if (ne backend "self")}}
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{> getServerUrlSpaces}}
+{{/if}}
+
+{{/if}}
+export const authClient = createAuthClient({
+{{#if (ne backend "self")}}
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+  baseURL: {{#if (eq webDeploy "vercel")}}\`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}/auth\`{{else}}new URL("/api/auth", getServerUrl(ENV.PUBLIC_SERVER_URL)).toString(){{/if}},
+{{else}}
+  baseURL: ENV.PUBLIC_SERVER_URL,
+{{/if}}
+{{/if}}
+});
+`],
+  ["modules/auth/stack/better-auth/web/astro/src/pages/dashboard.astro.hbs", `---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Dashboard - {{projectName}}">
+  <div id="dashboard-content" class="hidden">
+    <main class="mx-auto max-w-4xl px-4 py-8">
+      <div class="rounded-xl border border-neutral-800 bg-neutral-900/50 p-8">
+        <h1 class="text-3xl font-bold text-white mb-6">Dashboard</h1>
+        
+        <div class="space-y-4">
+          <div class="rounded-lg bg-neutral-800/50 p-4">
+            <p class="text-sm text-neutral-400">Welcome back,</p>
+            <p id="user-name" class="text-xl font-medium text-white">Loading...</p>
+          </div>
+          
+          <div class="rounded-lg bg-neutral-800/50 p-4">
+            <p class="text-sm text-neutral-400 mb-2">Email</p>
+            <p id="user-email" class="text-white">Loading...</p>
+          </div>
+
+          {{#if (eq api "orpc")}}
+          <div class="rounded-lg bg-neutral-800/50 p-4">
+            <p class="text-sm text-neutral-400 mb-2">Server Message</p>
+            <p id="api-message" class="text-white">Loading...</p>
+          </div>
+          {{/if}}
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="loading" class="flex h-[calc(100vh-4rem)] items-center justify-center">
+    <p class="text-neutral-400">Loading...</p>
+  </div>
+
+  <div id="redirect" class="hidden flex h-[calc(100vh-4rem)] items-center justify-center">
+    <p class="text-neutral-400">Redirecting to login...</p>
+  </div>
+</Layout>
+
+<script>
+  import { authClient } from "../lib/auth-client";
+  {{#if (eq api "orpc")}}
+  import { orpc } from "../lib/orpc";
+  {{/if}}
+
+  const dashboardContent = document.getElementById("dashboard-content")!;
+  const loading = document.getElementById("loading")!;
+  const redirect = document.getElementById("redirect")!;
+  const userName = document.getElementById("user-name")!;
+  const userEmail = document.getElementById("user-email")!;
+  {{#if (eq api "orpc")}}
+  const apiMessage = document.getElementById("api-message")!;
+  {{/if}}
+
+  async function init() {
+    try {
+      const { data: session } = await authClient.getSession();
+      
+      if (!session?.user) {
+        loading.classList.add("hidden");
+        redirect.classList.remove("hidden");
+        window.location.href = "/login";
+        return;
+      }
+
+      userName.textContent = session.user.name || "User";
+      userEmail.textContent = session.user.email || "";
+
+      {{#if (eq api "orpc")}}
+      try {
+        const data = await orpc.privateData();
+        apiMessage.textContent = data.message || "Connected to server";
+      } catch (e) {
+        apiMessage.textContent = "Failed to load server data";
+      }
+      {{/if}}
+
+
+      loading.classList.add("hidden");
+      dashboardContent.classList.remove("hidden");
+    } catch (error) {
+      loading.classList.add("hidden");
+      redirect.classList.remove("hidden");
+      window.location.href = "/login";
+    }
+  }
+
+  init();
+</script>
+`],
+  ["modules/auth/stack/better-auth/web/astro/src/pages/login.astro.hbs", `---
+import SignInForm from "../components/SignInForm.astro";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Sign In - {{projectName}}">
+  <div class="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+    <SignInForm />
+  </div>
+</Layout>
+`],
+  ["modules/auth/stack/better-auth/web/astro/src/pages/signup.astro.hbs", `---
+import SignUpForm from "../components/SignUpForm.astro";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Sign Up - {{projectName}}">
+  <div class="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+    <SignUpForm />
+  </div>
+</Layout>
+`],
+  ["modules/auth/stack/better-auth/web/nuxt/app/components/SignInForm.vue.hbs", `<script setup lang="ts">
+import * as z from 'zod'
+import type { FormSubmitEvent, AuthFormField } from '@nuxt/ui'
+
+const { $authClient } = useNuxtApp()
+
+const emit = defineEmits(['switchToSignUp'])
+
+const toast = useToast()
+const loading = ref(false)
+
+const fields: AuthFormField[] = [
+  {
+    name: 'email',
+    id: 'sign-in-email',
+    type: 'email',
+    label: 'Email',
+    placeholder: 'Enter your email',
+    required: true
+  },
+  {
+    name: 'password',
+    id: 'sign-in-password',
+    type: 'password',
+    label: 'Password',
+    placeholder: 'Enter your password',
+    required: true
+  }
+]
+
+const schema = z.object({
+  email: z.email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+})
+
+type Schema = z.output<typeof schema>
+
+async function onSubmit(event: FormSubmitEvent<Schema>) {
+  loading.value = true
+  try {
+    await $authClient.signIn.email(
+      {
+        email: event.data.email,
+        password: event.data.password,
+      },
+      {
+        onSuccess: () => {
+          toast.add({ title: 'Sign in successful' })
+          navigateTo('/dashboard', { replace: true })
+        },
+        onError: (error) => {
+          toast.add({ title: 'Sign in failed', description: error.error.message })
+        },
+      },
+    )
+  } catch (error) {
+    toast.add({ title: 'An unexpected error occurred', description: error instanceof Error ? error.message : 'Please try again.' })
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="flex flex-col items-center justify-center gap-4 p-4">
+    <UPageCard class="w-full max-w-md">
+      <UAuthForm
+        :schema="schema"
+        :fields="fields"
+        title="Welcome Back"
+        icon="i-lucide-log-in"
+        :submit="{ label: 'Sign In', loading }"
+        @submit="onSubmit"
+      >
+        <template #description>
+          Need an account?
+          <ULink class="text-primary font-medium" @click="$emit('switchToSignUp')">
+            Sign Up
+          </ULink>
+        </template>
+      </UAuthForm>
+    </UPageCard>
+  </div>
+</template>
+`],
+  ["modules/auth/stack/better-auth/web/nuxt/app/components/SignUpForm.vue.hbs", `<script setup lang="ts">
+import * as z from 'zod'
+import type { FormSubmitEvent, AuthFormField } from '@nuxt/ui'
+
+const { $authClient } = useNuxtApp()
+
+const emit = defineEmits(['switchToSignIn'])
+
+const toast = useToast()
+const loading = ref(false)
+
+const fields: AuthFormField[] = [
+  {
+    name: 'name',
+    id: 'sign-up-name',
+    type: 'text',
+    label: 'Name',
+    placeholder: 'Enter your name',
+    required: true
+  },
+  {
+    name: 'email',
+    id: 'sign-up-email',
+    type: 'email',
+    label: 'Email',
+    placeholder: 'Enter your email',
+    required: true
+  },
+  {
+    name: 'password',
+    id: 'sign-up-password',
+    type: 'password',
+    label: 'Password',
+    placeholder: 'Enter your password',
+    required: true
+  }
+]
+
+const schema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+})
+
+type Schema = z.output<typeof schema>
+
+async function onSubmit(event: FormSubmitEvent<Schema>) {
+  loading.value = true
+  try {
+    await $authClient.signUp.email(
+      {
+        name: event.data.name,
+        email: event.data.email,
+        password: event.data.password,
+      },
+      {
+        onSuccess: () => {
+          toast.add({ title: 'Sign up successful' })
+          navigateTo('/dashboard', { replace: true })
+        },
+        onError: (error) => {
+          toast.add({ title: 'Sign up failed', description: error.error.message })
+        },
+      },
+    )
+  } catch (error) {
+    toast.add({ title: 'An unexpected error occurred', description: error instanceof Error ? error.message : 'Please try again.' })
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="flex flex-col items-center justify-center gap-4 p-4">
+    <UPageCard class="w-full max-w-md">
+      <UAuthForm
+        :schema="schema"
+        :fields="fields"
+        title="Create Account"
+        icon="i-lucide-user-plus"
+        :submit="{ label: 'Sign Up', loading }"
+        @submit="onSubmit"
+      >
+        <template #description>
+          Already have an account?
+          <ULink class="text-primary font-medium" @click="$emit('switchToSignIn')">
+            Sign In
+          </ULink>
+        </template>
+      </UAuthForm>
+    </UPageCard>
+  </div>
+</template>
+`],
+  ["modules/auth/stack/better-auth/web/nuxt/app/components/UserMenu.vue.hbs", `<script setup lang="ts">
+
+const {$authClient} = useNuxtApp()
+const session = $authClient.useSession()
+const toast = useToast()
+
+const handleSignOut = async () => {
+  try {
+    await $authClient.signOut({
+      fetchOptions: {
+        onSuccess: async () => {
+          toast.add({ title: 'Signed out successfully' })
+          await navigateTo('/', { replace: true, external: true })
+        },
+        onError: (error) => {
+           toast.add({ title: 'Sign out failed', description: error?.error?.message || 'Unknown error'})
+        }
+      },
+    })
+  } catch (error) {
+     toast.add({ title: 'An unexpected error occurred during sign out', description: error instanceof Error ? error.message : 'Please try again.'})
+  }
+}
+</script>
+
+<template>
+  <div>
+    <USkeleton v-if="session.isPending" class="h-9 w-24" />
+
+    <UButton v-else-if="!session.data" variant="outline" to="/login">
+      Sign In
+    </UButton>
+
+    <UButton
+      v-else
+      variant="solid"
+      icon="i-lucide-log-out"
+      label="Sign out"
+      @click="handleSignOut()"
+    />
+  </div>
+</template>
+`],
+  ["modules/auth/stack/better-auth/web/nuxt/app/composables/useAuthFetch.ts.hbs", `export const useAuthFetch = createUseFetch({ credentials: "include" });
+`],
+  ["modules/auth/stack/better-auth/web/nuxt/app/composables/useAuthSession.ts.hbs", `export function useAuthSession() {
+  const { $authClient } = useNuxtApp();
+  return $authClient.useSession(useAuthFetch);
+}
+`],
+  ["modules/auth/stack/better-auth/web/nuxt/app/middleware/auth.ts.hbs", `export default defineNuxtRouteMiddleware(async () => {
+  const { data: session } = await useAuthSession();
+  if (!session.value) return navigateTo("/login");
+});
+`],
+  ["modules/auth/stack/better-auth/web/nuxt/app/pages/dashboard.vue.hbs", `<script setup lang="ts">
+
+{{#if (eq api "orpc")}}
+import { useQuery } from '@tanstack/vue-query'
+{{/if}}
+
+const { $authClient, $orpc } = useNuxtApp()
+
+definePageMeta({
+  middleware: ['auth']
+})
+
+const { data: session } = await useAuthSession()
+
+
+{{#if (eq api "orpc")}}
+const privateData = useQuery({
+  ...$orpc.privateData.queryOptions(),
+  enabled: computed(() => !!session.value?.user)
+})
+
+onServerPrefetch(async () => {
+  if (session.value?.user) await privateData.suspense()
+})
+{{/if}}
+
+</script>
+
+<template>
+  <UContainer class="py-8">
+    <UPageHeader
+      title="Dashboard"
+      :description="session?.user ? \`Welcome back, \${session.user.name}!\` : 'Loading...'"
+    />
+
+    <div class="mt-6 space-y-4">
+      {{#if (eq api "orpc")}}
+      <UCard>
+        <template #header>
+          <div class="font-medium">Private Data</div>
+        </template>
+
+        <USkeleton v-if="privateData.status.value === 'pending'" class="h-6 w-48" />
+
+        <UAlert
+          v-else-if="privateData.status.value === 'error'"
+          color="error"
+          icon="i-lucide-alert-circle"
+          title="Error loading data"
+          :description="privateData.error.value?.message || 'Failed to load private data'"
+        />
+
+        <div v-else-if="privateData.data.value" class="flex items-center gap-2">
+          <UIcon name="i-lucide-check-circle" class="text-success" />
+          <span>\\{{ privateData.data.value.message }}</span>
+        </div>
+      </UCard>
+      {{/if}}
+
+    </div>
+  </UContainer>
+</template>
+`],
+  ["modules/auth/stack/better-auth/web/nuxt/app/pages/login.vue.hbs", `<script setup lang="ts">
+import SignInForm from "~/components/SignInForm.vue";
+import SignUpForm from "~/components/SignUpForm.vue";
+
+const { data: session } = await useAuthSession();
+const showSignIn = ref(true);
+const hydrated = ref(false);
+onMounted(() => { hydrated.value = true; });
+
+watchEffect(() => {
+  if (session.value) {
+    navigateTo("/dashboard", { replace: true });
+  }
+});
+</script>
+
+<template>
+  <UContainer class="py-8">
+    <fieldset v-if="!session" :disabled="!hydrated">
+      <SignInForm v-if="showSignIn" @switch-to-sign-up="showSignIn = false" />
+      <SignUpForm v-else @switch-to-sign-in="showSignIn = true" />
+    </fieldset>
+  </UContainer>
+</template>
+`],
+  ["modules/auth/stack/better-auth/web/nuxt/app/plugins/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/vue";
+
+{{> getServerUrlSpaces}}
+
+export default defineNuxtPlugin(() => {
+  {{#if (ne backend "self")}}
+  const config = useRuntimeConfig();
+  const rawServerUrl = (import.meta.server && config.serverUrl) || config.public.serverUrl;
+  // Same-origin paths like /api need an absolute base, and better-auth derives
+  // its route matching from this URL's path, so it must be exactly /api/auth
+  const serverOrigin = {{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}getServerUrl(rawServerUrl);{{else}}rawServerUrl.startsWith("/")
+    ? (import.meta.server ? useRequestURL() : window.location).origin + rawServerUrl
+    : rawServerUrl;{{/if}}
+  {{/if}}
+
+  const authClient = createAuthClient({
+    fetchOptions: {
+      headers: import.meta.server ? useRequestHeaders(["cookie"]) : undefined,
+    },
+    {{#if (ne backend "self")}}
+    baseURL: {{#if (and (eq webDeploy "vercel") (eq serverDeploy "vercel"))}}\`\${serverOrigin}/auth\`{{else}}new URL("/api/auth", serverOrigin).toString(){{/if}},
+    {{/if}}
+  });
+
+  return {
+    provide: {
+      authClient: authClient,
+    },
+  };
+});
+`],
+  ["modules/auth/stack/better-auth/web/react/base/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+{{#unless (eq backend "self")}}
+{{#unless (includes frontend "next")}}
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{/unless}}
+
+{{> getServerUrl}}
+{{/unless}}
+
+export const authClient = createAuthClient({
+{{#unless (eq backend "self")}}
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+  baseURL: {{#if (eq webDeploy "vercel")}}\`\${getServerUrl({{#if (includes frontend "next")}}process.env.NEXT_PUBLIC_SERVER_URL!{{else}}ENV.VITE_SERVER_URL{{/if}})}/auth\`{{else}}new URL("/api/auth", getServerUrl({{#if (includes frontend "next")}}process.env.NEXT_PUBLIC_SERVER_URL!{{else}}ENV.VITE_SERVER_URL{{/if}})).toString(){{/if}},
+{{else}}
+  baseURL: {{#if (includes frontend "next")}}process.env.NEXT_PUBLIC_SERVER_URL!{{else}}ENV.VITE_SERVER_URL{{/if}},
+{{/if}}
+{{/unless}}
+});
+`],
+  ["modules/auth/stack/better-auth/web/react/next/src/app/dashboard/dashboard.tsx.hbs", `"use client";
+
+import { authClient } from "@/lib/auth-client";
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { trpc } from "@/utils/trpc";
+{{/if}}
+
+export default function Dashboard({
+	session
+}: {
+	session: typeof authClient.$Infer.Session;
+}) {
+	{{#if (eq api "orpc")}}
+	const privateData = useQuery(orpc.privateData.queryOptions());
+	{{/if}}
+	{{#if (eq api "trpc")}}
+	const privateData = useQuery(trpc.privateData.queryOptions());
+	{{/if}}
+
+
+	return (
+		<>
+			{{#if (eq api "orpc")}}
+			<p>API: {privateData.data?.message}</p>
+			{{/if}}
+			{{#if (eq api "trpc")}}
+			<p>API: {privateData.data?.message}</p>
+			{{/if}}
+		</>
+	);
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/next/src/app/dashboard/page.tsx.hbs", `{{#if (or (includes addons "tauri") (and (includes addons "electrobun") (or (ne backend "convex") (ne auth "better-auth"))))}}
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { authClient } from "@/lib/auth-client";
+import Dashboard from "./dashboard";
+
+// Desktop builds are statically exported, so the session is resolved in the browser.
+export default function DashboardPage() {
+	const router = useRouter();
+	const { data: session, isPending } = authClient.useSession();
+
+	useEffect(() => {
+		if (!isPending && !session?.user) {
+			router.replace("/login");
+		}
+	}, [isPending, router, session]);
+
+	if (isPending || !session?.user) {
+		return null;
+	}
+
+	return (
+		<div>
+			<h1>Dashboard</h1>
+			<p>Welcome {session.user.name}</p>
+			<Dashboard session={session}  />
+		</div>
+	);
+}
+{{else}}
+import { redirect } from "next/navigation";
+import Dashboard from "./dashboard";
+import { headers } from "next/headers";
+{{#if (eq backend "self")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+{{/if}}
+{{#if (ne backend "self")}}
+import { authClient } from "@/lib/auth-client";
+{{/if}}
+
+export default async function DashboardPage() {
+	{{#if (eq backend "self")}}
+	const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth()){{else}}auth{{/if}}.api.getSession({
+		headers: await headers(),
+	});
+	{{else}}
+	const session = await authClient.getSession({
+		fetchOptions: {
+			headers: await headers(),
+			throw: true
+		}
+	});
+	{{/if}}
+
+	if (!session?.user) {
+		redirect("/login");
+	}
+
+
+	return (
+		<div>
+			<h1>Dashboard</h1>
+			<p>Welcome {session.user.name}</p>
+			<Dashboard session={session}  />
+		</div>
+	);
+}
+{{/if}}
+`],
+  ["modules/auth/stack/better-auth/web/react/next/src/app/login/page.tsx.hbs", `"use client"
+
+import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import { useState } from "react";
+
+
+export default function LoginPage() {
+  const [showSignIn, setShowSignIn] = useState(false);
+
+  return showSignIn ? (
+    <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+  ) : (
+    <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/next/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { toast } from "sonner";
+import z from "zod";
+import Loader from "./loader";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+import { useRouter } from "next/navigation";
+
+export default function SignInForm({
+  onSwitchToSignUp,
+}: {
+  onSwitchToSignUp: () => void;
+}) {
+  const router = useRouter()
+  const { isPending } = authClient.useSession();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email,
+          password: value.password,
+        },
+        {
+          onSuccess: () => {
+            router.push("/dashboard")
+            toast.success("Sign in successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        },
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  if (isPending) {
+    return <Loader />;
+  }
+
+  return (
+    <div className="mx-auto w-full mt-10 max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!canSubmit || isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Sign In"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignUp}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Need an account? Sign Up
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/next/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { toast } from "sonner";
+import z from "zod";
+import Loader from "./loader";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+import { useRouter } from "next/navigation";
+
+export default function SignUpForm({
+  onSwitchToSignIn,
+}: {
+  onSwitchToSignIn: () => void;
+}) {
+  const router = useRouter();
+  const { isPending } = authClient.useSession();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+      name: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signUp.email(
+        {
+          email: value.email,
+          password: value.password,
+          name: value.name,
+        },
+        {
+          onSuccess: () => {
+            router.push("/dashboard");
+            toast.success("Sign up successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        },
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        name: z.string().min(2, "Name must be at least 2 characters"),
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  if (isPending) {
+    return <Loader />;
+  }
+
+  return (
+    <div className="mx-auto w-full mt-10 max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="name">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Name</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!canSubmit || isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Sign Up"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignIn}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Already have an account? Sign In
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/next/src/components/user-menu.tsx.hbs", `import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Skeleton } from "@{{projectName}}/ui/components/skeleton";
+
+export default function UserMenu() {
+  const router = useRouter();
+  const { data: session, isPending } = authClient.useSession();
+
+  if (isPending) {
+    return <Skeleton className="h-9 w-24" />;
+  }
+
+  if (!session) {
+    return (
+      <Link href="/login">
+        <Button variant="outline">Sign In</Button>
+      </Link>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" />}>
+        {session.user.name}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-card">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => {
+              authClient.signOut({
+                fetchOptions: {
+                  onSuccess: () => {
+                    router.push("/");
+                  },
+                },
+              });
+            }}
+          >
+            Sign Out
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/react-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import z from "zod";
+import Loader from "./loader";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignInForm({
+  onSwitchToSignUp,
+}: {
+  onSwitchToSignUp: () => void;
+}) {
+  const navigate = useNavigate();
+  const { isPending, refetch } = authClient.useSession();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email,
+          password: value.password,
+        },
+        {
+          onSuccess: async () => {
+            await refetch();
+            navigate("/dashboard");
+            toast.success("Sign in successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        }
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  if (isPending) {
+    return <Loader />;
+  }
+
+  return (
+    <div className="mx-auto w-full mt-10 max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!canSubmit || isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Sign In"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignUp}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Need an account? Sign Up
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/react-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import z from "zod";
+import Loader from "./loader";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignUpForm({
+  onSwitchToSignIn,
+}: {
+  onSwitchToSignIn: () => void;
+}) {
+  const navigate = useNavigate();
+  const { isPending, refetch } = authClient.useSession();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+      name: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signUp.email(
+        {
+          email: value.email,
+          password: value.password,
+          name: value.name,
+        },
+        {
+          onSuccess: async () => {
+            await refetch();
+            navigate("/dashboard");
+            toast.success("Sign up successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        }
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        name: z.string().min(2, "Name must be at least 2 characters"),
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  if (isPending) {
+    return <Loader />;
+  }
+
+  return (
+    <div className="mx-auto w-full mt-10 max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="name">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Name</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!canSubmit || isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Sign Up"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignIn}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Already have an account? Sign In
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/react-router/src/components/user-menu.tsx.hbs", `import { Link, useNavigate } from "react-router";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Skeleton } from "@{{projectName}}/ui/components/skeleton";
+
+export default function UserMenu() {
+  const navigate = useNavigate();
+  const { data: session, isPending } = authClient.useSession();
+
+  if (isPending) {
+    return <Skeleton className="h-9 w-24" />;
+  }
+
+  if (!session) {
+    return (
+      <Link to="/login">
+        <Button variant="outline">Sign In</Button>
+      </Link>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" />}>
+        {session.user.name}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-card">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => {
+              authClient.signOut({
+                fetchOptions: {
+                  onSuccess: () => {
+                    navigate("/");
+                  },
+                },
+              });
+            }}
+          >
+            Sign Out
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/react-router/src/routes/dashboard.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+{{#if (eq api "orpc")}}
+import { orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { trpc } from "@/utils/trpc";
+{{/if}}
+{{#if (or (eq api "orpc") (eq api "trpc"))}}
+import { useQuery } from "@tanstack/react-query";
+{{/if}}
+import type { BetterFetchOption } from "better-auth/client";
+import { redirect } from "react-router";
+import type { Route } from "./+types/dashboard";
+
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+export async function loader({ request }: Route.LoaderArgs) {
+{{else}}
+export async function clientLoader({ request }: Route.ClientLoaderArgs) {
+{{/if}}
+  const fetchOptions = {
+    signal: request.signal,
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+    headers: { cookie: request.headers.get("cookie") ?? "" },
+{{/if}}
+    throw: true,
+  } satisfies BetterFetchOption;
+  const session = await authClient.getSession({ fetchOptions });
+  if (!session) throw redirect("/login");
+  return { user: session.user };
+}
+
+{{#unless (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+export function HydrateFallback() {
+  return <div>Loading...</div>;
+}
+
+{{/unless}}
+export default function Dashboard({ loaderData }: Route.ComponentProps) {
+  const { user } = loaderData;
+{{#if (eq api "orpc")}}
+  const privateData = useQuery(orpc.privateData.queryOptions());
+{{/if}}
+{{#if (eq api "trpc")}}
+  const privateData = useQuery(trpc.privateData.queryOptions());
+{{/if}}
+
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Welcome {user.name}</p>
+      {{#if (or (eq api "orpc") (eq api "trpc"))}}
+      <p>API: {privateData.data?.message}</p>
+      {{/if}}
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/react-router/src/routes/login.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import { useState } from "react";
+
+export default function Login() {
+  const [showSignIn, setShowSignIn] = useState(false);
+
+  return showSignIn ? (
+    <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+  ) : (
+    <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import Loader from "./loader";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
+  const navigate = useNavigate({
+    from: "/",
+  });
+  const { isPending } = authClient.useSession();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email,
+          password: value.password,
+        },
+        {
+          onSuccess: () => {
+            navigate({
+              to: "/dashboard",
+            });
+            toast.success("Sign in successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        },
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  if (isPending) {
+    return <Loader />;
+  }
+
+  return (
+    <div className="mx-auto w-full mt-10 max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!canSubmit || isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Sign In"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignUp}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Need an account? Sign Up
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import Loader from "./loader";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
+  const navigate = useNavigate({
+    from: "/",
+  });
+  const { isPending } = authClient.useSession();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+      name: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signUp.email(
+        {
+          email: value.email,
+          password: value.password,
+          name: value.name,
+        },
+        {
+          onSuccess: () => {
+            navigate({
+              to: "/dashboard",
+            });
+            toast.success("Sign up successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        },
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        name: z.string().min(2, "Name must be at least 2 characters"),
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  if (isPending) {
+    return <Loader />;
+  }
+
+  return (
+    <div className="mx-auto w-full mt-10 max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="name">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Name</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!canSubmit || isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Sign Up"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignIn}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Already have an account? Sign In
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/components/user-menu.tsx.hbs", `import { Link, useNavigate } from "@tanstack/react-router";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Skeleton } from "@{{projectName}}/ui/components/skeleton";
+
+export default function UserMenu() {
+  const navigate = useNavigate();
+  const { data: session, isPending } = authClient.useSession();
+
+  if (isPending) {
+    return <Skeleton className="h-9 w-24" />;
+  }
+
+  if (!session) {
+    return (
+      <Link to="/login">
+        <Button variant="outline">Sign In</Button>
+      </Link>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" />}>
+        {session.user.name}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-card">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => {
+              authClient.signOut({
+                fetchOptions: {
+                  onSuccess: () => {
+                    navigate({
+                      to: "/",
+                    });
+                  },
+                },
+              });
+            }}
+          >
+            Sign Out
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "orpc")}}
+import { orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { trpc } from "@/utils/trpc";
+{{/if}}
+{{#if (or (eq api "orpc") (eq api "trpc"))}}
+import { useQuery } from "@tanstack/react-query";
+{{/if}}
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/_auth/dashboard")({
+	component: RouteComponent,
+});
+
+function RouteComponent() {
+	const { session } = Route.useRouteContext();
+
+	{{#if (eq api "orpc")}}
+	const privateData = useQuery(orpc.privateData.queryOptions());
+	{{/if}}
+	{{#if (eq api "trpc")}}
+	const privateData = useQuery(trpc.privateData.queryOptions());
+	{{/if}}
+
+
+	return (
+		<div>
+			<h1>Dashboard</h1>
+			<p>Welcome {session.data?.user.name}</p>
+			{{#if (or (eq api "orpc") (eq api "trpc"))}}
+			<p>API: {privateData.data?.message}</p>
+			{{/if}}
+		</div>
+	);
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/_auth")({
+	component: AuthLayout,
+	beforeLoad: async () => {
+		const session = await authClient.getSession();
+		if (!session.data) {
+			throw redirect({
+				to: "/login",
+			});
+		}
+		return { session };
+	},
+});
+
+function AuthLayout() {
+	return <Outlet />;
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/routes/login.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+
+export const Route = createFileRoute("/login")({
+  component: RouteComponent,
+});
+
+function RouteComponent() {
+  const [showSignIn, setShowSignIn] = useState(false);
+
+  return showSignIn ? (
+    <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+  ) : (
+    <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import Loader from "./loader";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
+  const navigate = useNavigate({
+    from: "/",
+  });
+  const { isPending } = authClient.useSession();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email,
+          password: value.password,
+        },
+        {
+          onSuccess: () => {
+            navigate({
+              to: "/dashboard",
+            });
+            toast.success("Sign in successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        },
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  if (isPending) {
+    return <Loader />;
+  }
+
+  return (
+    <div className="mx-auto w-full mt-10 max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!canSubmit || isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Sign In"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignUp}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Need an account? Sign Up
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import Loader from "./loader";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
+  const navigate = useNavigate({
+    from: "/",
+  });
+  const { isPending } = authClient.useSession();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+      name: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signUp.email(
+        {
+          email: value.email,
+          password: value.password,
+          name: value.name,
+        },
+        {
+          onSuccess: () => {
+            navigate({
+              to: "/dashboard",
+            });
+            toast.success("Sign up successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        },
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        name: z.string().min(2, "Name must be at least 2 characters"),
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  if (isPending) {
+    return <Loader />;
+  }
+
+  return (
+    <div className="mx-auto w-full mt-10 max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="name">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Name</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error) => (
+                  <p key={error?.message} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!canSubmit || isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Sign Up"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignIn}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Already have an account? Sign In
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/components/user-menu.tsx.hbs", `import { Link, useNavigate } from "@tanstack/react-router";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Skeleton } from "@{{projectName}}/ui/components/skeleton";
+
+export default function UserMenu() {
+  const navigate = useNavigate();
+  const { data: session, isPending } = authClient.useSession();
+
+  if (isPending) {
+    return <Skeleton className="h-9 w-24" />;
+  }
+
+  if (!session) {
+    return (
+      <Link to="/login">
+        <Button variant="outline">Sign In</Button>
+      </Link>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" />}>
+        {session.user.name}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-card">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => {
+              authClient.signOut({
+                fetchOptions: {
+                  onSuccess: () => {
+                    navigate({
+                      to: "/",
+                    });
+                  },
+                },
+              });
+            }}
+          >
+            Sign Out
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/functions/get-user.ts.hbs", `import { authMiddleware } from "@/middleware/auth";
+import { createServerFn } from "@tanstack/react-start";
+
+export const getUser = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
+    return context.session
+})`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/middleware/auth.ts.hbs", `{{#if (eq backend "self")}}
+{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+import { createAuth } from "@{{projectName}}/auth";
+{{else}}
+import { auth } from "@{{projectName}}/auth";
+{{/if}}
+import { createMiddleware } from "@tanstack/react-start";
+
+
+export const authMiddleware = createMiddleware().server(async ({ next, request }) => {
+    const session = await {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}(await createAuth()){{else}}auth{{/if}}.api.getSession({
+        headers: request.headers,
+    })
+    return next({
+        context: { session }
+    })
+})
+{{else}}
+import { authClient } from "@/lib/auth-client";
+import { createMiddleware } from "@tanstack/react-start";
+
+export const authMiddleware = createMiddleware().server(
+	async ({ next, request }) => {
+		const session = await authClient.getSession({
+			fetchOptions: {
+				headers: request.headers,
+				throw: true
+			}
+		})
+		return next({
+			context: { session },
+		});
+	},
+);
+{{/if}}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "trpc") }}
+import { useTRPC } from "@/utils/trpc";
+import { useQuery } from "@tanstack/react-query";
+{{/if}}
+{{#if (eq api "orpc") }}
+import { orpc } from "@/utils/orpc";
+import { useQuery } from "@tanstack/react-query";
+{{/if}}
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/_auth/dashboard")({
+  component: RouteComponent,
+});
+
+function RouteComponent() {
+  const { session } = Route.useRouteContext();
+
+  {{#if (eq api "trpc") }}
+  const trpc = useTRPC();
+  const privateData = useQuery(trpc.privateData.queryOptions());
+  {{/if}}
+  {{#if (eq api "orpc") }}
+  const privateData = useQuery(orpc.privateData.queryOptions());
+  {{/if}}
+
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      {{#if (eq backend "self")}}
+      <p>Welcome {session?.user.name}</p>
+      {{else}}
+      <p>Welcome {session.data?.user.name}</p>
+      {{/if}}
+      {{#if (eq api "trpc") }}
+      <p>API: {privateData.data?.message}</p>
+      {{else if (eq api "orpc") }}
+      <p>API: {privateData.data?.message}</p>
+      {{/if}}
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `{{#if (eq backend "self")}}
+import { getUser } from "@/functions/get-user";
+{{else}}
+import { authClient } from "@/lib/auth-client";
+{{/if}}
+import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/_auth")({
+  {{#unless (eq backend "self")}}
+  ssr: false,
+  {{/unless}}
+  component: AuthLayout,
+  beforeLoad: async () => {
+    {{#if (eq backend "self")}}
+    const session = await getUser();
+    if (!session) {
+      throw redirect({
+        to: "/login",
+      });
+    }
+    return { session };
+    {{else}}
+    const session = await authClient.getSession();
+    if (!session.data) {
+      throw redirect({
+        to: "/login",
+      });
+    }
+    return { session };
+    {{/if}}
+  },
+  {{#if (eq backend "self")}}
+  loader: async ({ context }) => {
+    if (!context.session) {
+      throw redirect({
+        to: "/login",
+      });
+    }
+  },
+  {{/if}}
+});
+
+function AuthLayout() {
+  return <Outlet />;
+}
+`],
+  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/routes/login.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+
+export const Route = createFileRoute("/login")({
+  component: RouteComponent,
+});
+
+function RouteComponent() {
+  const [showSignIn, setShowSignIn] = useState(false);
+
+  return showSignIn ? (
+    <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+  ) : (
+    <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/solid/src/components/sign-in-form.tsx.hbs", `import { useNavigate } from "@solidjs/router";
+import { createSignal, onSettled, Show } from "solid-js";
+import { authClient } from "~/lib/auth-client";
+import z from "zod";
+
+const signInSchema = z.object({
+  email: z.email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
+  const navigate = useNavigate();
+  const [error, setError] = createSignal<string>();
+  const [isSubmitting, setIsSubmitting] = createSignal(false);
+  const [hydrated, setHydrated] = createSignal(false);
+  onSettled(() => {
+    setHydrated(true);
+  });
+
+  const submit = async (event: SubmitEvent & { currentTarget: HTMLFormElement }) => {
+    event.preventDefault();
+    const result = signInSchema.safeParse(Object.fromEntries(new FormData(event.currentTarget)));
+    if (!result.success) {
+      setError(result.error.issues[0]?.message);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError();
+    try {
+      await authClient.signIn.email(result.data, {
+        onSuccess: async () => {
+          await authClient.useSession.get().refetch();
+          const session = authClient.useSession.get();
+          if (!session.data) {
+            setError(session.error?.message || "Unable to load your session. Please sign in again.");
+            return;
+          }
+          navigate("/dashboard");
+        },
+        onError: ({ error }) => {
+          setError(error.message);
+        },
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div class="mx-auto mt-10 w-full max-w-md p-6">
+      <h1 class="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+      <form method="post" onSubmit={submit} class="space-y-4">
+        <div class="space-y-2">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required class="w-full rounded border p-2" />
+        </div>
+        <div class="space-y-2">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            minlength="8"
+            required
+            class="w-full rounded border p-2"
+          />
+        </div>
+        <Show when={error()}>{(message) => <p class="text-sm text-red-600">{message()}</p>}</Show>
+        <button
+          type="submit"
+          class="w-full rounded bg-indigo-600 p-2 text-white hover:bg-indigo-700 disabled:opacity-50"
+          disabled={!hydrated() || isSubmitting()}
+        >
+          {isSubmitting() ? "Submitting..." : "Sign In"}
+        </button>
+      </form>
+      <div class="mt-4 text-center">
+        <button
+          type="button"
+          onClick={onSwitchToSignUp}
+          class="text-sm text-indigo-600 hover:text-indigo-800 hover:underline"
+        >
+          Need an account? Sign Up
+        </button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/solid/src/components/sign-up-form.tsx.hbs", `import { useNavigate } from "@solidjs/router";
+import { createSignal, onSettled, Show } from "solid-js";
+import { authClient } from "~/lib/auth-client";
+import z from "zod";
+
+const signUpSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
+  const navigate = useNavigate();
+  const [error, setError] = createSignal<string>();
+  const [isSubmitting, setIsSubmitting] = createSignal(false);
+  const [hydrated, setHydrated] = createSignal(false);
+  onSettled(() => {
+    setHydrated(true);
+  });
+
+  const submit = async (event: SubmitEvent & { currentTarget: HTMLFormElement }) => {
+    event.preventDefault();
+    const result = signUpSchema.safeParse(Object.fromEntries(new FormData(event.currentTarget)));
+    if (!result.success) {
+      setError(result.error.issues[0]?.message);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError();
+    try {
+      await authClient.signUp.email(result.data, {
+        onSuccess: async () => {
+          await authClient.useSession.get().refetch();
+          const session = authClient.useSession.get();
+          if (!session.data) {
+            setError(session.error?.message || "Unable to load your session. Please sign in again.");
+            return;
+          }
+          navigate("/dashboard");
+        },
+        onError: ({ error }) => {
+          setError(error.message);
+        },
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div class="mx-auto mt-10 w-full max-w-md p-6">
+      <h1 class="mb-6 text-center text-3xl font-bold">Create Account</h1>
+      <form method="post" onSubmit={submit} class="space-y-4">
+        <div class="space-y-2">
+          <label for="name">Name</label>
+          <input id="name" name="name" minlength="2" required class="w-full rounded border p-2" />
+        </div>
+        <div class="space-y-2">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required class="w-full rounded border p-2" />
+        </div>
+        <div class="space-y-2">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            minlength="8"
+            required
+            class="w-full rounded border p-2"
+          />
+        </div>
+        <Show when={error()}>{(message) => <p class="text-sm text-red-600">{message()}</p>}</Show>
+        <button
+          type="submit"
+          class="w-full rounded bg-indigo-600 p-2 text-white hover:bg-indigo-700 disabled:opacity-50"
+          disabled={!hydrated() || isSubmitting()}
+        >
+          {isSubmitting() ? "Submitting..." : "Sign Up"}
+        </button>
+      </form>
+      <div class="mt-4 text-center">
+        <button
+          type="button"
+          onClick={onSwitchToSignIn}
+          class="text-sm text-indigo-600 hover:text-indigo-800 hover:underline"
+        >
+          Already have an account? Sign In
+        </button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/solid/src/components/user-menu.tsx.hbs", `import { useNavigate } from "@solidjs/router";
+import { createSignal, Show } from "solid-js";
+import { authClient, useSession } from "~/lib/auth-client";
+
+export default function UserMenu() {
+  const navigate = useNavigate();
+  const session = useSession();
+  const [isMenuOpen, setIsMenuOpen] = createSignal(false);
+
+  return (
+    <div class="relative inline-block text-left">
+      <Show when={session().isPending}>
+        <div class="h-9 w-24 animate-pulse rounded" />
+      </Show>
+
+      <Show when={!session().isPending && !session().data}>
+        <a href="/login" class="inline-block border rounded px-4  text-sm">
+          Sign In
+        </a>
+      </Show>
+
+      <Show when={!session().isPending && session().data}>
+        <button
+          type="button"
+          class="inline-block border rounded px-4  text-sm"
+          onClick={() => setIsMenuOpen(!isMenuOpen())}
+        >
+          {session().data?.user.name}
+        </button>
+
+        <Show when={isMenuOpen()}>
+          <div class="absolute right-0 mt-2 w-56 rounded p-1 shadow-sm">
+            <div class="px-4  text-sm">{session().data?.user.email}</div>
+            <button
+              type="button"
+              class="mt-1 w-full border rounded px-4  text-center text-sm"
+              onClick={() => {
+                setIsMenuOpen(false);
+                authClient.signOut({
+                  fetchOptions: {
+                    onSuccess: () => {
+                      navigate("/", { replace: true });
+                    },
+                  },
+                });
+              }}
+            >
+              Sign Out
+            </button>
+          </div>
+        </Show>
+      </Show>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/solid/src/lib/auth-client.ts.hbs", `import { authClient } from "@{{projectName}}/auth/client";
+import { createSignal, onSettled } from "solid-js";
+
+export { authClient };
+
+export function useSession() {
+	// Start from the pending state the server rendered so hydration matches, then follow the store
+	const [session, setSession] = createSignal<ReturnType<typeof authClient.useSession.get>>({
+		...authClient.useSession.get(),
+		data: null,
+		isPending: true,
+	});
+	onSettled(() => authClient.useSession.subscribe(setSession));
+	return session;
+}
+`],
+  ["modules/auth/stack/better-auth/web/solid/src/routes/dashboard.tsx.hbs", `import { useNavigate } from "@solidjs/router";
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/solid-query";
+import { orpc } from "~/utils/orpc";
+{{/if}}
+import {
+	createEffect,
+	Show,
+} from "solid-js";
+import { useSession } from "~/lib/auth-client";
+
+export default function Dashboard() {
+	const navigate = useNavigate();
+	const session = useSession();
+
+	createEffect(
+		() => !session().isPending && !session().data,
+		(shouldRedirect) => {
+		if (shouldRedirect) {
+			navigate("/login", { replace: true });
+		}
+		},
+	);
+
+
+	return (
+		<Show when={!session().isPending && session().data} fallback={<p>Loading...</p>}>
+			<div>
+			<h1>Dashboard</h1>
+			<p>Welcome {session().data?.user.name}</p>
+			{{#if (eq api "orpc")}}
+			<PrivateData />
+			{{/if}}
+			</div>
+		</Show>
+	);
+}
+
+{{#if (eq api "orpc")}}
+function PrivateData() {
+  const privateData = useQuery(() => orpc.privateData.queryOptions());
+  return <p>API: {privateData.data?.message}</p>;
+}
+{{/if}}
+`],
+  ["modules/auth/stack/better-auth/web/solid/src/routes/login.tsx.hbs", `import { createSignal, Match, Switch } from "solid-js";
+import SignInForm from "~/components/sign-in-form";
+import SignUpForm from "~/components/sign-up-form";
+
+export default function Login() {
+  const [showSignIn, setShowSignIn] = createSignal(false);
+
+  return (
+    <Switch>
+      <Match when={showSignIn()}>
+        <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+      </Match>
+      <Match when={!showSignIn()}>
+        <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+      </Match>
+    </Switch>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/web/svelte/src/components/SignInForm.svelte.hbs", `<script lang="ts">
+	import { createForm } from '@tanstack/svelte-form';
+	import { z } from 'zod';
+	import { authClient } from '$lib/auth-client';
+	import { goto } from '$app/navigation';
+
+	const session = authClient.useSession();
+
+	let { switchToSignUp }: { switchToSignUp: () => void } = $props();
+
+	const validationSchema = z.object({
+		email: z.email('Invalid email address'),
+		password: z.string().min(1, 'Password is required'),
+	});
+
+	const form = createForm(() => ({
+		defaultValues: { email: '', password: '' },
+		onSubmit: async ({ value }) => {
+				await authClient.signIn.email(
+					{ email: value.email, password: value.password },
+					{
+						onSuccess: async () => {
+							await $session.refetch();
+							await goto('/dashboard');
+						},
+						onError: (error) => {
+							console.log(error.error.message || 'Sign in failed. Please try again.');
+						},
+					}
+				);
+
+		},
+		validators: {
+			onSubmit: validationSchema,
+		},
+	}));
+
+	type SubmitState = Pick<typeof form.state, 'canSubmit' | 'isSubmitting'>;
+</script>
+
+<div class="mx-auto mt-10 w-full max-w-md p-6">
+	<h1 class="mb-6 text-center font-bold text-3xl">Welcome Back</h1>
+
+	<form
+		class="space-y-4"
+		onsubmit={(e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			form.handleSubmit();
+		}}
+	>
+		<form.Field name="email">
+			{#snippet children(field)}
+				<div class="space-y-1">
+					<label for={field.name}>Email</label>
+					<input
+						id={field.name}
+						name={field.name}
+						type="email"
+						class="w-full border"
+						onblur={field.handleBlur}
+						value={field.state.value}
+						oninput={(e: Event) => {
+							const target = e.target as HTMLInputElement;
+							field.handleChange(target.value);
+						}}
+					/>
+					{#if field.state.meta.isTouched}
+						{#each field.state.meta.errors as error}
+							<p class="text-sm text-red-500" role="alert">{error}</p>
+						{/each}
+					{/if}
+				</div>
+			{/snippet}
+		</form.Field>
+
+		<form.Field name="password">
+			{#snippet children(field)}
+				<div class="space-y-1">
+					<label for={field.name}>Password</label>
+					<input
+						id={field.name}
+						name={field.name}
+						type="password"
+						class="w-full border"
+						onblur={field.handleBlur}
+						value={field.state.value}
+						oninput={(e: Event) => {
+							const target = e.target as HTMLInputElement;
+							field.handleChange(target.value);
+						}}
+					/>
+					{#if field.state.meta.isTouched}
+						{#each field.state.meta.errors as error}
+							<p class="text-sm text-red-500" role="alert">{error}</p>
+						{/each}
+					{/if}
+				</div>
+			{/snippet}
+		</form.Field>
+
+		<form.Subscribe selector={(state: typeof form.state): SubmitState => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+			{#snippet children(state: SubmitState)}
+				<button type="submit" class="w-full" disabled={!state.canSubmit || state.isSubmitting}>
+					{state.isSubmitting ? 'Submitting...' : 'Sign In'}
+				</button>
+			{/snippet}
+		</form.Subscribe>
+	</form>
+
+	<div class="mt-4 text-center">
+		<button type="button" class="text-indigo-600 hover:text-indigo-800" onclick={switchToSignUp}>
+			Need an account? Sign Up
+		</button>
+	</div>
+</div>
+`],
+  ["modules/auth/stack/better-auth/web/svelte/src/components/SignUpForm.svelte.hbs", `<script lang="ts">
+	import { createForm } from '@tanstack/svelte-form';
+	import { z } from 'zod';
+	import { authClient } from '$lib/auth-client';
+	import { goto } from '$app/navigation';
+
+	const session = authClient.useSession();
+
+	let { switchToSignIn }: { switchToSignIn: () => void } = $props();
+
+	const validationSchema = z.object({
+		name: z.string().min(2, 'Name must be at least 2 characters'),
+		email: z.email('Invalid email address'),
+		password: z.string().min(8, 'Password must be at least 8 characters'),
+	});
+
+
+	const form = createForm(() => ({
+		defaultValues: { name: '', email: '', password: '' },
+		onSubmit: async ({ value }) => {
+				await authClient.signUp.email(
+					{
+						email: value.email,
+						password: value.password,
+						name: value.name,
+					},
+					{
+						onSuccess: async () => {
+							await $session.refetch();
+							await goto('/dashboard');
+						},
+						onError: (error) => {
+							console.log(error.error.message || 'Sign up failed. Please try again.');
+						},
+					}
+				);
+
+		},
+		validators: {
+			onSubmit: validationSchema,
+		},
+	}));
+
+	type SubmitState = Pick<typeof form.state, 'canSubmit' | 'isSubmitting'>;
+</script>
+
+<div class="mx-auto mt-10 w-full max-w-md p-6">
+	<h1 class="mb-6 text-center font-bold text-3xl">Create Account</h1>
+
+	<form
+		id="form"
+		class="space-y-4"
+		onsubmit={(e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			form.handleSubmit();
+		}}
+	>
+		<form.Field name="name">
+			{#snippet children(field)}
+				<div class="space-y-1">
+					<label for={field.name}>Name</label>
+					<input
+						id={field.name}
+						name={field.name}
+						class="w-full border"
+						onblur={field.handleBlur}
+						value={field.state.value}
+						oninput={(e: Event) => {
+							const target = e.target as HTMLInputElement;
+							field.handleChange(target.value);
+						}}
+					/>
+					{#if field.state.meta.isTouched}
+						{#each field.state.meta.errors as error}
+							<p class="text-sm text-red-500" role="alert">{error}</p>
+						{/each}
+					{/if}
+				</div>
+			{/snippet}
+		</form.Field>
+
+		<form.Field name="email">
+			{#snippet children(field)}
+				<div class="space-y-1">
+					<label for={field.name}>Email</label>
+					<input
+						id={field.name}
+						name={field.name}
+						type="email"
+						class="w-full border"
+						onblur={field.handleBlur}
+						value={field.state.value}
+						oninput={(e: Event) => {
+							const target = e.target as HTMLInputElement;
+							field.handleChange(target.value);
+						}}
+					/>
+					{#if field.state.meta.isTouched}
+						{#each field.state.meta.errors as error}
+							<p class="text-sm text-red-500" role="alert">{error}</p>
+						{/each}
+					{/if}
+				</div>
+			{/snippet}
+		</form.Field>
+
+		<form.Field name="password">
+			{#snippet children(field)}
+				<div class="space-y-1">
+					<label for={field.name}>Password</label>
+					<input
+						id={field.name}
+						name={field.name}
+						type="password"
+						class="w-full border"
+						onblur={field.handleBlur}
+						value={field.state.value}
+						oninput={(e: Event) => {
+							const target = e.target as HTMLInputElement;
+							field.handleChange(target.value);
+						}}
+					/>
+					{#if field.state.meta.isTouched}
+						{#each field.state.meta.errors as error}
+							<p class="text-sm text-red-500" role="alert">{error}</p>
+						{/each}
+					{/if}
+				</div>
+			{/snippet}
+		</form.Field>
+
+		<form.Subscribe selector={(state: typeof form.state): SubmitState => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+			{#snippet children(state: SubmitState)}
+				<button type="submit" class="w-full" disabled={!state.canSubmit || state.isSubmitting}>
+					{state.isSubmitting ? 'Submitting...' : 'Sign Up'}
+				</button>
+			{/snippet}
+		</form.Subscribe>
+	</form>
+
+	<div class="mt-4 text-center">
+		<button type="button" class="text-indigo-600 hover:text-indigo-800" onclick={switchToSignIn}>
+			Already have an account? Sign In
+		</button>
+	</div>
+</div>
+`],
+  ["modules/auth/stack/better-auth/web/svelte/src/components/UserMenu.svelte.hbs", `<script lang="ts">
+	import { authClient } from '$lib/auth-client';
+	import { goto } from '$app/navigation';
+
+	const sessionQuery = authClient.useSession();
+
+	async function handleSignOut() {
+		await authClient.signOut({
+		fetchOptions: {
+			onSuccess: () => {
+				goto('/');
+			},
+			onError: (error) => {
+				console.error('Sign out failed:', error);
+			}
+		}
+		});
+	}
+
+	function goToLogin() {
+		goto('/login');
+	}
+
+</script>
+
+<div class="relative">
+	{#if $sessionQuery.isPending}
+		<div class="h-8 w-24 animate-pulse rounded bg-neutral-700"></div>
+	{:else if $sessionQuery.data?.user}
+		{@const user = $sessionQuery.data.user}
+		<div class="flex items-center gap-3">
+			<span class="text-sm text-neutral-300 hidden sm:inline" title={user.email}>
+				{user.name || user.email?.split('@')[0] || 'User'}
+			</span>
+			<button
+				onclick={handleSignOut}
+				class="rounded px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white transition-colors"
+			>
+				Sign Out
+			</button>
+		</div>
+	{:else}
+		<div class="flex items-center gap-2">
+			<button
+				onclick={goToLogin}
+				class="rounded px-3 py-1 text-sm bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+			>
+				Sign In
+			</button>
+		</div>
+	{/if}
+</div>
+`],
+  ["modules/auth/stack/better-auth/web/svelte/src/lib/auth-client.ts.hbs", `{{#unless (eq backend "self")}}
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{else}}.generated{{/if}}";
+{{/unless}}
+import { createAuthClient } from "better-auth/svelte";
+
+{{#unless (eq backend "self")}}
+{{> getServerUrl}}
+
+{{/unless}}
+export const authClient = createAuthClient({
+{{#unless (eq backend "self")}}
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+  baseURL: {{#if (eq webDeploy "vercel")}}\`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}/auth\`{{else}}new URL("/api/auth", getServerUrl(ENV.PUBLIC_SERVER_URL)).toString(){{/if}},
+{{else}}
+  baseURL: ENV.PUBLIC_SERVER_URL,
+{{/if}}
+{{/unless}}
+});
+`],
+  ["modules/auth/stack/better-auth/web/svelte/src/routes/dashboard/+page.svelte.hbs", `<script lang="ts">
+	import type { PageProps } from './$types';
+	{{#if (eq api "orpc")}}
+	import { orpc } from '$lib/orpc';
+	import { createQuery } from '@tanstack/svelte-query';
+	{{/if}}
+	let { data }: PageProps = $props();
+
+	{{#if (eq api "orpc")}}
+	const privateDataQuery = createQuery(() => orpc.privateData.queryOptions());
+	{{/if}}
+</script>
+
+	<div>
+		<h1>Dashboard</h1>
+		<p>Welcome {data.user.name}</p>
+		{{#if (eq api "orpc")}}
+		<p>API: {privateDataQuery.data?.message}</p>
+		{{/if}}
+	</div>
+`],
+  ["modules/auth/stack/better-auth/web/svelte/src/routes/login/+page.svelte.hbs", `<script lang="ts">
+	import SignInForm from '../../components/SignInForm.svelte';
+	import SignUpForm from '../../components/SignUpForm.svelte';
+
+	let showSignIn = $state(true);
+</script>
+
+{#if showSignIn}
+	<SignInForm switchToSignUp={() => showSignIn = false} />
+{:else}
+	<SignUpForm switchToSignIn={() => showSignIn = true} />
+{/if}
+`],
+  ["modules/auth/stack/clerk/convex/backend/convex/auth.config.ts.hbs", `import type { AuthConfig } from "convex/server";
+
+export default {
+	providers: [
+		{
+			// Clerk Frontend API URL from the Convex integration in the Clerk Dashboard.
+			// Set CLERK_JWT_ISSUER_DOMAIN on the Convex deployment (npx convex env set).
+			// See https://docs.convex.dev/auth/clerk#configuring-dev-and-prod-instances
+			domain: process.env.CLERK_JWT_ISSUER_DOMAIN!,
+			applicationID: "convex",
+		},
+	],
+} satisfies AuthConfig;
+`],
+  ["modules/auth/stack/clerk/convex/backend/convex/privateData.ts.hbs", `import { query } from "./_generated/server";
+
+export const get = query({
+	args: {},
+	handler: async (ctx) => {
+		const identity = await ctx.auth.getUserIdentity();
+		if (identity === null) {
+			return {
+				message: "Not authenticated",
+			};
+		}
+		return {
+			message: "This is private",
+		};
+	},
+});
+`],
+  ["modules/auth/stack/clerk/convex/native/base/app/(auth)/_layout.tsx.hbs", `import { Redirect, Stack } from "expo-router";
+import { useAuth } from "@clerk/expo";
+
+export default function AuthRoutesLayout() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (isSignedIn) {
+    return <Redirect href={"/"} />;
+  }
+
+  return <Stack />;
+}
+`],
+  ["modules/auth/stack/clerk/convex/native/base/app/(auth)/sign-in.tsx.hbs", `import { useSignIn } from "@clerk/expo";
+import { type Href, Link, useRouter } from "expo-router";
+import React from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
+  const url = decorateUrl(href);
+  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
+  router.push(nextHref as Href);
+}
+
+export default function Page() {
+  const { signIn, errors, fetchStatus } = useSignIn();
+  const router = useRouter();
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [code, setCode] = React.useState("");
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+
+  const emailCodeFactor = signIn.supportedSecondFactors.find(
+    (factor) => factor.strategy === "email_code",
+  );
+  const requiresEmailCode =
+    signIn.status === "needs_client_trust" ||
+    (signIn.status === "needs_second_factor" && !!emailCodeFactor);
+
+  const handleSubmit = async () => {
+    setStatusMessage(null);
+
+    const { error } = await signIn.password({
+      emailAddress,
+      password,
+    });
+
+    if (error) {
+      console.error(JSON.stringify(error, null, 2));
+      setStatusMessage(error.longMessage ?? "Unable to sign in. Please try again.");
+      return;
+    }
+
+    if (signIn.status === "complete") {
+      await signIn.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else if (signIn.status === "needs_second_factor" || signIn.status === "needs_client_trust") {
+      if (emailCodeFactor) {
+        await signIn.mfa.sendEmailCode();
+        setStatusMessage(\`We sent a verification code to \${emailCodeFactor.safeIdentifier}.\`);
+      } else {
+        console.error("Second factor is required, but email_code is not available:", signIn);
+        setStatusMessage("A second factor is required, but this screen only supports email codes right now.");
+      }
+    } else {
+      console.error("Sign-in attempt not complete:", signIn);
+      setStatusMessage("Sign-in could not be completed. Check the logs for more details.");
+    }
+  };
+
+  const handleVerify = async () => {
+    setStatusMessage(null);
+
+    await signIn.mfa.verifyEmailCode({ code });
+
+    if (signIn.status === "complete") {
+      await signIn.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else {
+      console.error("Sign-in attempt not complete:", signIn);
+      setStatusMessage("That code did not complete sign-in. Please try again.");
+    }
+  };
+
+  if (requiresEmailCode) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Verify your account</Text>
+        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+        <TextInput
+          style={styles.input}
+          value={code}
+          placeholder="Enter your verification code"
+          placeholderTextColor="#666666"
+          onChangeText={(value) => setCode(value)}
+          keyboardType="numeric"
+        />
+        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            fetchStatus === "fetching" && styles.buttonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={handleVerify}
+          disabled={fetchStatus === "fetching"}
+        >
+          <Text style={styles.buttonText}>Verify</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          onPress={() => signIn.mfa.sendEmailCode()}
+        >
+          <Text style={styles.secondaryButtonText}>I need a new code</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign in</Text>
+      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+      <Text style={styles.label}>Email address</Text>
+      <TextInput
+        style={styles.input}
+        autoCapitalize="none"
+        value={emailAddress}
+        placeholder="Enter email"
+        placeholderTextColor="#666666"
+        onChangeText={(value) => setEmailAddress(value)}
+        keyboardType="email-address"
+      />
+      {errors.fields.identifier && <Text style={styles.error}>{errors.fields.identifier.message}</Text>}
+      <Text style={styles.label}>Password</Text>
+      <TextInput
+        style={styles.input}
+        value={password}
+        placeholder="Enter password"
+        placeholderTextColor="#666666"
+        secureTextEntry={true}
+        onChangeText={(value) => setPassword(value)}
+      />
+      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
+          pressed && styles.buttonPressed,
+        ]}
+        onPress={handleSubmit}
+        disabled={!emailAddress || !password || fetchStatus === "fetching"}
+      >
+        <Text style={styles.buttonText}>Sign in</Text>
+      </Pressable>
+      <View style={styles.linkContainer}>
+        <Text>Don't have an account? </Text>
+        <Link href="/sign-up">
+          <Text style={styles.linkText}>Sign up</Text>
+        </Link>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    gap: 12,
+  },
+  title: {
+    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  label: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  button: {
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  secondaryButtonText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  linkContainer: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  linkText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  error: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginTop: -8,
+  },
+  helper: {
+    color: "#555555",
+    fontSize: 13,
+  },
+});
+`],
+  ["modules/auth/stack/clerk/convex/native/base/app/(auth)/sign-up.tsx.hbs", `import { useAuth, useSignUp } from "@clerk/expo";
+import { type Href, Link, useRouter } from "expo-router";
+import React from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
+  const url = decorateUrl(href);
+  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
+  router.push(nextHref as Href);
+}
+
+export default function Page() {
+  const { signUp, errors, fetchStatus } = useSignUp();
+  const { isSignedIn } = useAuth();
+  const router = useRouter();
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [code, setCode] = React.useState("");
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    setStatusMessage(null);
+
+    const { error } = await signUp.password({
+      emailAddress,
+      password,
+    });
+
+    if (error) {
+      console.error(JSON.stringify(error, null, 2));
+      setStatusMessage(error.longMessage ?? "Unable to sign up. Please try again.");
+      return;
+    }
+
+    await signUp.verifications.sendEmailCode();
+    setStatusMessage(\`We sent a verification code to \${emailAddress}.\`);
+  };
+
+  const handleVerify = async () => {
+    setStatusMessage(null);
+
+    await signUp.verifications.verifyEmailCode({
+      code,
+    });
+
+    if (signUp.status === "complete") {
+      await signUp.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else {
+      console.error("Sign-up attempt not complete:", signUp);
+      setStatusMessage("That code did not complete sign-up. Please try again.");
+    }
+  };
+
+  if (signUp.status === "complete" || isSignedIn) {
+    return null;
+  }
+
+  if (
+    signUp.status === "missing_requirements" &&
+    signUp.unverifiedFields.includes("email_address") &&
+    signUp.missingFields.length === 0
+  ) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Verify your account</Text>
+        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+        <TextInput
+          style={styles.input}
+          value={code}
+          placeholder="Enter your verification code"
+          placeholderTextColor="#666666"
+          onChangeText={(value) => setCode(value)}
+          keyboardType="numeric"
+        />
+        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            fetchStatus === "fetching" && styles.buttonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={handleVerify}
+          disabled={fetchStatus === "fetching"}
+        >
+          <Text style={styles.buttonText}>Verify</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          onPress={() => signUp.verifications.sendEmailCode()}
+        >
+          <Text style={styles.secondaryButtonText}>I need a new code</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign up</Text>
+      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+      <Text style={styles.label}>Email address</Text>
+      <TextInput
+        style={styles.input}
+        autoCapitalize="none"
+        value={emailAddress}
+        placeholder="Enter email"
+        placeholderTextColor="#666666"
+        onChangeText={(value) => setEmailAddress(value)}
+        keyboardType="email-address"
+      />
+      {errors.fields.emailAddress && (
+        <Text style={styles.error}>{errors.fields.emailAddress.message}</Text>
+      )}
+      <Text style={styles.label}>Password</Text>
+      <TextInput
+        style={styles.input}
+        value={password}
+        placeholder="Enter password"
+        placeholderTextColor="#666666"
+        secureTextEntry={true}
+        onChangeText={(value) => setPassword(value)}
+      />
+      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
+          pressed && styles.buttonPressed,
+        ]}
+        onPress={handleSubmit}
+        disabled={!emailAddress || !password || fetchStatus === "fetching"}
+      >
+        <Text style={styles.buttonText}>Sign up</Text>
+      </Pressable>
+      <View style={styles.linkContainer}>
+        <Text>Already have an account? </Text>
+        <Link href="/sign-in">
+          <Text style={styles.linkText}>Sign in</Text>
+        </Link>
+      </View>
+      <View nativeID="clerk-captcha" />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    gap: 12,
+  },
+  title: {
+    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  label: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  button: {
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  secondaryButtonText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  linkContainer: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  linkText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  error: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginTop: -8,
+  },
+  helper: {
+    color: "#555555",
+    fontSize: 13,
+  },
+});
+`],
+  ["modules/auth/stack/clerk/convex/native/base/components/sign-out-button.tsx.hbs", `import { useClerk } from "@clerk/expo";
+import { useRouter } from "expo-router";
+import { Text, TouchableOpacity } from "react-native";
+
+export const SignOutButton = () => {
+  // Use \`useClerk()\` to access the \`signOut()\` function
+  const { signOut } = useClerk();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      // Redirect to your desired page
+      router.replace("/");
+    } catch (err) {
+      // See https://clerk.com/docs/custom-flows/error-handling
+      // for more info on error handling
+      console.error(JSON.stringify(err, null, 2));
+    }
+  };
+
+  return (
+    <TouchableOpacity onPress={handleSignOut}>
+      <Text>Sign out</Text>
+    </TouchableOpacity>
+  );
+};
+`],
+  ["modules/auth/stack/clerk/convex/web/react/next/src/app/dashboard/page.tsx.hbs", `"use client";
+
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
+import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/react";
+
+export default function Dashboard() {
+  const user = useUser();
+  const privateData = useQuery(api.privateData.get);
+
+  return (
+    <>
+      <Authenticated>
+        <div>
+          <h1>Dashboard</h1>
+          <p>Welcome {user.user?.fullName}</p>
+          <p>privateData: {privateData?.message}</p>
+          <UserButton />
+        </div>
+      </Authenticated>
+      <Unauthenticated>
+        <SignInButton />
+      </Unauthenticated>
+      <AuthLoading>
+        <div>Loading...</div>
+      </AuthLoading>
+    </>
+  );
+}
+`],
+  ["modules/auth/stack/clerk/convex/web/react/next/src/proxy.ts.hbs", `import { clerkMiddleware } from "@clerk/nextjs/server";
+
+export default clerkMiddleware();
+
+export const config = {
+	matcher: [
+		// Skip Next.js internals and all static files, unless found in search params
+		"/((?!_next|[^?]*\\\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+		// Always run for API routes
+		"/(api|trpc)(.*)",
+		"/__clerk/(.*)",
+	],
+};
+`],
+  ["modules/auth/stack/clerk/convex/web/react/react-router/src/routes/dashboard.tsx.hbs", `import { SignInButton, UserButton, useUser } from "@clerk/react-router";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import {
+	Authenticated,
+	AuthLoading,
+	Unauthenticated,
+	useQuery,
+} from "convex/react";
+
+export default function Dashboard() {
+	const privateData = useQuery(api.privateData.get);
+	const user = useUser();
+
+	return (
+		<>
+			<Authenticated>
+				<div>
+					<h1>Dashboard</h1>
+					<p>Welcome {user.user?.fullName}</p>
+					<p>privateData: {privateData?.message}</p>
+					<UserButton />
+				</div>
+			</Authenticated>
+			<Unauthenticated>
+				<SignInButton />
+			</Unauthenticated>
+			<AuthLoading>
+				<div>Loading...</div>
+			</AuthLoading>
+		</>
+	);
+}
+`],
+  ["modules/auth/stack/clerk/convex/web/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `import { UserButton, useUser } from "@clerk/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
+
+export const Route = createFileRoute("/_auth/dashboard")({
+	component: RouteComponent,
+});
+
+function RouteComponent() {
+	const privateData = useQuery(api.privateData.get);
+	const user = useUser();
+
+	return (
+		<div>
+			<h1>Dashboard</h1>
+			<p>Welcome {user.user?.fullName}</p>
+			<p>privateData: {privateData?.message}</p>
+			<UserButton />
+		</div>
+	);
+}
+`],
+  ["modules/auth/stack/clerk/convex/web/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import { SignInButton } from "@clerk/react";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
+import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
+
+export const Route = createFileRoute("/_auth")({
+	component: AuthLayout,
+});
+
+function AuthLayout() {
+	return (
+		<>
+			<Authenticated>
+				<Outlet />
+			</Authenticated>
+			<Unauthenticated>
+				<SignInButton />
+			</Unauthenticated>
+			<AuthLoading>
+				<div>Loading...</div>
+			</AuthLoading>
+		</>
+	);
+}
+`],
+  ["modules/auth/stack/clerk/convex/web/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `import { UserButton, useUser } from "@clerk/tanstack-react-start";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
+
+export const Route = createFileRoute("/_auth/dashboard")({
+	component: RouteComponent,
+});
+
+function RouteComponent() {
+	const privateData = useQuery(api.privateData.get);
+	const user = useUser();
+
+	return (
+		<div>
+			<h1>Dashboard</h1>
+			<p>Welcome {user.user?.fullName}</p>
+			<p>privateData: {privateData?.message}</p>
+			<UserButton />
+		</div>
+	);
+}
+`],
+  ["modules/auth/stack/clerk/convex/web/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `import { SignInButton } from "@clerk/tanstack-react-start";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
+import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
+
+export const Route = createFileRoute("/_auth")({
+	component: AuthLayout,
+});
+
+function AuthLayout() {
+	return (
+		<>
+			<Authenticated>
+				<Outlet />
+			</Authenticated>
+			<Unauthenticated>
+				<SignInButton />
+			</Unauthenticated>
+			<AuthLoading>
+				<div>Loading...</div>
+			</AuthLoading>
+		</>
+	);
+}
+`],
+  ["modules/auth/stack/clerk/convex/web/react/tanstack-start/src/start.ts.hbs", `import { clerkMiddleware } from '@clerk/tanstack-react-start/server'
+import { createCsrfMiddleware, createStart } from '@tanstack/react-start'
+
+const csrfMiddleware = createCsrfMiddleware({
+	filter: (ctx) => ctx.handlerType === 'serverFn',
+})
+
+export const startInstance = createStart(() => {
+	return {
+		requestMiddleware: [csrfMiddleware, clerkMiddleware()],
+	}
+})
+`],
+  ["modules/auth/stack/clerk/native/base/app/(auth)/_layout.tsx.hbs", `import { Redirect, Stack } from "expo-router";
+import { useAuth } from "@clerk/expo";
+
+export default function AuthRoutesLayout() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (isSignedIn) {
+    return <Redirect href={"/"} />;
+  }
+
+  return <Stack />;
+}
+`],
+  ["modules/auth/stack/clerk/native/base/app/(auth)/sign-in.tsx.hbs", `import { useSignIn } from "@clerk/expo";
+import { type Href, Link, useRouter } from "expo-router";
+import React from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
+  const url = decorateUrl(href);
+  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
+  router.push(nextHref as Href);
+}
+
+export default function Page() {
+  const { signIn, errors, fetchStatus } = useSignIn();
+  const router = useRouter();
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [code, setCode] = React.useState("");
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+
+  const emailCodeFactor = signIn.supportedSecondFactors.find(
+    (factor) => factor.strategy === "email_code",
+  );
+  const requiresEmailCode =
+    signIn.status === "needs_client_trust" ||
+    (signIn.status === "needs_second_factor" && !!emailCodeFactor);
+
+  const handleSubmit = async () => {
+    setStatusMessage(null);
+
+    const { error } = await signIn.password({
+      emailAddress,
+      password,
+    });
+
+    if (error) {
+      console.error(JSON.stringify(error, null, 2));
+      setStatusMessage(error.longMessage ?? "Unable to sign in. Please try again.");
+      return;
+    }
+
+    if (signIn.status === "complete") {
+      await signIn.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else if (signIn.status === "needs_second_factor" || signIn.status === "needs_client_trust") {
+      if (emailCodeFactor) {
+        await signIn.mfa.sendEmailCode();
+        setStatusMessage(\`We sent a verification code to \${emailCodeFactor.safeIdentifier}.\`);
+      } else {
+        console.error("Second factor is required, but email_code is not available:", signIn);
+        setStatusMessage("A second factor is required, but this screen only supports email codes right now.");
+      }
+    } else {
+      console.error("Sign-in attempt not complete:", signIn);
+      setStatusMessage("Sign-in could not be completed. Check the logs for more details.");
+    }
+  };
+
+  const handleVerify = async () => {
+    setStatusMessage(null);
+
+    await signIn.mfa.verifyEmailCode({ code });
+
+    if (signIn.status === "complete") {
+      await signIn.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else {
+      console.error("Sign-in attempt not complete:", signIn);
+      setStatusMessage("That code did not complete sign-in. Please try again.");
+    }
+  };
+
+  if (requiresEmailCode) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Verify your account</Text>
+        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+        <TextInput
+          style={styles.input}
+          value={code}
+          placeholder="Enter your verification code"
+          placeholderTextColor="#666666"
+          onChangeText={(value) => setCode(value)}
+          keyboardType="numeric"
+        />
+        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            fetchStatus === "fetching" && styles.buttonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={handleVerify}
+          disabled={fetchStatus === "fetching"}
+        >
+          <Text style={styles.buttonText}>Verify</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          onPress={() => signIn.mfa.sendEmailCode()}
+        >
+          <Text style={styles.secondaryButtonText}>I need a new code</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign in</Text>
+      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+      <Text style={styles.label}>Email address</Text>
+      <TextInput
+        style={styles.input}
+        autoCapitalize="none"
+        value={emailAddress}
+        placeholder="Enter email"
+        placeholderTextColor="#666666"
+        onChangeText={(value) => setEmailAddress(value)}
+        keyboardType="email-address"
+      />
+      {errors.fields.identifier && <Text style={styles.error}>{errors.fields.identifier.message}</Text>}
+      <Text style={styles.label}>Password</Text>
+      <TextInput
+        style={styles.input}
+        value={password}
+        placeholder="Enter password"
+        placeholderTextColor="#666666"
+        secureTextEntry={true}
+        onChangeText={(value) => setPassword(value)}
+      />
+      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
+          pressed && styles.buttonPressed,
+        ]}
+        onPress={handleSubmit}
+        disabled={!emailAddress || !password || fetchStatus === "fetching"}
+      >
+        <Text style={styles.buttonText}>Sign in</Text>
+      </Pressable>
+      <View style={styles.linkContainer}>
+        <Text>Don't have an account? </Text>
+        <Link href="/sign-up">
+          <Text style={styles.linkText}>Sign up</Text>
+        </Link>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    gap: 12,
+  },
+  title: {
+    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  label: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  button: {
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  secondaryButtonText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  linkContainer: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  linkText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  error: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginTop: -8,
+  },
+  helper: {
+    color: "#555555",
+    fontSize: 13,
+  },
+});
+`],
+  ["modules/auth/stack/clerk/native/base/app/(auth)/sign-up.tsx.hbs", `import { useAuth, useSignUp } from "@clerk/expo";
+import { type Href, Link, useRouter } from "expo-router";
+import React from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
+  const url = decorateUrl(href);
+  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
+  router.push(nextHref as Href);
+}
+
+export default function Page() {
+  const { signUp, errors, fetchStatus } = useSignUp();
+  const { isSignedIn } = useAuth();
+  const router = useRouter();
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [code, setCode] = React.useState("");
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    setStatusMessage(null);
+
+    const { error } = await signUp.password({
+      emailAddress,
+      password,
+    });
+
+    if (error) {
+      console.error(JSON.stringify(error, null, 2));
+      setStatusMessage(error.longMessage ?? "Unable to sign up. Please try again.");
+      return;
+    }
+
+    await signUp.verifications.sendEmailCode();
+    setStatusMessage(\`We sent a verification code to \${emailAddress}.\`);
+  };
+
+  const handleVerify = async () => {
+    setStatusMessage(null);
+
+    await signUp.verifications.verifyEmailCode({
+      code,
+    });
+
+    if (signUp.status === "complete") {
+      await signUp.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else {
+      console.error("Sign-up attempt not complete:", signUp);
+      setStatusMessage("That code did not complete sign-up. Please try again.");
+    }
+  };
+
+  if (signUp.status === "complete" || isSignedIn) {
+    return null;
+  }
+
+  if (
+    signUp.status === "missing_requirements" &&
+    signUp.unverifiedFields.includes("email_address") &&
+    signUp.missingFields.length === 0
+  ) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Verify your account</Text>
+        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+        <TextInput
+          style={styles.input}
+          value={code}
+          placeholder="Enter your verification code"
+          placeholderTextColor="#666666"
+          onChangeText={(value) => setCode(value)}
+          keyboardType="numeric"
+        />
+        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            fetchStatus === "fetching" && styles.buttonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={handleVerify}
+          disabled={fetchStatus === "fetching"}
+        >
+          <Text style={styles.buttonText}>Verify</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          onPress={() => signUp.verifications.sendEmailCode()}
+        >
+          <Text style={styles.secondaryButtonText}>I need a new code</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign up</Text>
+      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+      <Text style={styles.label}>Email address</Text>
+      <TextInput
+        style={styles.input}
+        autoCapitalize="none"
+        value={emailAddress}
+        placeholder="Enter email"
+        placeholderTextColor="#666666"
+        onChangeText={(value) => setEmailAddress(value)}
+        keyboardType="email-address"
+      />
+      {errors.fields.emailAddress && (
+        <Text style={styles.error}>{errors.fields.emailAddress.message}</Text>
+      )}
+      <Text style={styles.label}>Password</Text>
+      <TextInput
+        style={styles.input}
+        value={password}
+        placeholder="Enter password"
+        placeholderTextColor="#666666"
+        secureTextEntry={true}
+        onChangeText={(value) => setPassword(value)}
+      />
+      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
+          pressed && styles.buttonPressed,
+        ]}
+        onPress={handleSubmit}
+        disabled={!emailAddress || !password || fetchStatus === "fetching"}
+      >
+        <Text style={styles.buttonText}>Sign up</Text>
+      </Pressable>
+      <View style={styles.linkContainer}>
+        <Text>Already have an account? </Text>
+        <Link href="/sign-in">
+          <Text style={styles.linkText}>Sign in</Text>
+        </Link>
+      </View>
+      <View nativeID="clerk-captcha" />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    gap: 12,
+  },
+  title: {
+    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  label: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  button: {
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  secondaryButtonText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  linkContainer: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  linkText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  error: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginTop: -8,
+  },
+  helper: {
+    color: "#555555",
+    fontSize: 13,
+  },
+});
+`],
+  ["modules/auth/stack/clerk/native/base/components/sign-out-button.tsx.hbs", `import { useClerk } from "@clerk/expo";
+import { useRouter } from "expo-router";
+import { Text, TouchableOpacity } from "react-native";
+
+export const SignOutButton = () => {
+  const { signOut } = useClerk();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.replace("/");
+    } catch (err) {
+      console.error(JSON.stringify(err, null, 2));
+    }
+  };
+
+  return (
+    <TouchableOpacity onPress={handleSignOut}>
+      <Text>Sign out</Text>
+    </TouchableOpacity>
+  );
+};
+`],
+  ["modules/auth/stack/clerk/native/base/utils/clerk-auth.ts.hbs", `type ClerkTokenGetter = () => Promise<string | null>;
+
+let clerkTokenGetter: ClerkTokenGetter | null = null;
+
+export function setClerkAuthTokenGetter(getToken: ClerkTokenGetter | null) {
+	clerkTokenGetter = getToken;
+}
+
+export async function getClerkAuthToken() {
+	return (await clerkTokenGetter?.()) ?? null;
+}
+`],
+  ["modules/auth/stack/clerk/web/react/base/src/utils/clerk-auth.ts.hbs", `type ClerkTokenGetter = () => Promise<string | null>;
+
+let clerkTokenGetter: ClerkTokenGetter | null = null;
+
+export function setClerkAuthTokenGetter(getToken: ClerkTokenGetter | null) {
+	clerkTokenGetter = getToken;
+}
+
+export async function getClerkAuthToken() {
+	return (await clerkTokenGetter?.()) ?? null;
+}
+`],
+  ["modules/auth/stack/clerk/web/react/next/src/app/dashboard/page.tsx.hbs", `"use client";
+
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { trpc } from "@/utils/trpc";
+{{/if}}
+import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
+
+export default function Dashboard() {
+  const user = useUser();
+  const nameFromParts = [user.user?.firstName, user.user?.lastName].filter(Boolean).join(" ");
+  const displayName =
+    user.user?.fullName ||
+    nameFromParts ||
+    user.user?.username ||
+    user.user?.primaryEmailAddress?.emailAddress ||
+    user.user?.primaryPhoneNumber?.phoneNumber ||
+    "User";
+  {{#if (eq api "orpc")}}
+  const privateData = useQuery({
+    ...orpc.privateData.queryOptions(),
+    enabled: user.isLoaded && !!user.user,
+  });
+  {{/if}}
+  {{#if (eq api "trpc")}}
+  const privateData = useQuery({
+    ...trpc.privateData.queryOptions(),
+    enabled: user.isLoaded && !!user.user,
+  });
+  {{/if}}
+
+  if (!user.isLoaded) {
+    return <div className="p-6">Loading...</div>;
+  }
+
+  if (!user.user) {
+    return (
+      <div className="p-6">
+        <SignInButton />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 p-6">
+      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <p>Welcome {displayName}</p>
+      {{#if (or (eq api "orpc") (eq api "trpc"))}}
+      <p>API: {privateData.data?.message}</p>
+      {{/if}}
+      <UserButton />
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/clerk/web/react/next/src/proxy.ts.hbs", `import { clerkMiddleware } from "@clerk/nextjs/server";
+
+export default clerkMiddleware();
+
+export const config = {
+	matcher: [
+		// Skip Next.js internals and all static files, unless found in search params
+		"/((?!_next|[^?]*\\\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+		// Always run for API routes
+		"/(api|trpc)(.*)",
+		"/__clerk/(.*)",
+	],
+};
+`],
+  ["modules/auth/stack/clerk/web/react/react-router/src/routes/dashboard.tsx.hbs", `{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { trpc } from "@/utils/trpc";
+{{/if}}
+import { SignInButton, UserButton, useUser } from "@clerk/react-router";
+
+export default function Dashboard() {
+  const user = useUser();
+  const nameFromParts = [user.user?.firstName, user.user?.lastName].filter(Boolean).join(" ");
+  const displayName =
+    user.user?.fullName ||
+    nameFromParts ||
+    user.user?.username ||
+    user.user?.primaryEmailAddress?.emailAddress ||
+    user.user?.primaryPhoneNumber?.phoneNumber ||
+    "User";
+  {{#if (eq api "orpc")}}
+  const privateData = useQuery({
+    ...orpc.privateData.queryOptions(),
+    enabled: user.isLoaded && !!user.user,
+  });
+  {{/if}}
+  {{#if (eq api "trpc")}}
+  const privateData = useQuery({
+    ...trpc.privateData.queryOptions(),
+    enabled: user.isLoaded && !!user.user,
+  });
+  {{/if}}
+
+  if (!user.isLoaded) {
+    return <div className="p-6">Loading...</div>;
+  }
+
+  if (!user.user) {
+    return (
+      <div className="p-6">
+        <SignInButton />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 p-6">
+      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <p>Welcome {displayName}</p>
+      {{#if (or (eq api "orpc") (eq api "trpc"))}}
+      <p>API: {privateData.data?.message}</p>
+      {{/if}}
+      <UserButton />
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/clerk/web/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { orpc } from "@/utils/orpc";
+{{/if}}
+{{#if (eq api "trpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { trpc } from "@/utils/trpc";
+{{/if}}
+import { UserButton, useUser } from "@clerk/react";
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/_auth/dashboard")({
+	component: RouteComponent,
+});
+
+function RouteComponent() {
+	const user = useUser();
+	const nameFromParts = [user.user?.firstName, user.user?.lastName].filter(Boolean).join(" ");
+	const displayName =
+		user.user?.fullName ||
+		nameFromParts ||
+		user.user?.username ||
+		user.user?.primaryEmailAddress?.emailAddress ||
+		user.user?.primaryPhoneNumber?.phoneNumber ||
+		"User";
+	{{#if (eq api "orpc")}}
+	const privateData = useQuery({
+		...orpc.privateData.queryOptions(),
+		enabled: user.isLoaded && !!user.user,
+	});
+	{{/if}}
+	{{#if (eq api "trpc")}}
+	const privateData = useQuery({
+		...trpc.privateData.queryOptions(),
+		enabled: user.isLoaded && !!user.user,
+	});
+	{{/if}}
+
+	return (
+		<div className="space-y-4 p-6">
+			<h1 className="text-2xl font-semibold">Dashboard</h1>
+			<p>Welcome {displayName}</p>
+			{{#if (or (eq api "orpc") (eq api "trpc"))}}
+			<p>API: {privateData.data?.message}</p>
+			{{/if}}
+			<UserButton />
+		</div>
+	);
+}
+`],
+  ["modules/auth/stack/clerk/web/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import { SignInButton, useUser } from "@clerk/react";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/_auth")({
+	component: AuthLayout,
+});
+
+function AuthLayout() {
+	const user = useUser();
+
+	if (!user.isLoaded) {
+		return <div className="p-6">Loading...</div>;
+	}
+
+	if (!user.user) {
+		return (
+			<div className="p-6">
+				<SignInButton />
+			</div>
+		);
+	}
+
+	return <Outlet />;
+}
+`],
+  ["modules/auth/stack/clerk/web/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "trpc")}}
+import { useTRPC } from "@/utils/trpc";
+import { useQuery } from "@tanstack/react-query";
+{{/if}}
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/react-query";
+import { orpc } from "@/utils/orpc";
+{{/if}}
+import { UserButton, useUser } from "@clerk/tanstack-react-start";
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/_auth/dashboard")({
+	component: RouteComponent,
+});
+
+function RouteComponent() {
+	const user = useUser();
+	const nameFromParts = [user.user?.firstName, user.user?.lastName].filter(Boolean).join(" ");
+	const displayName =
+		user.user?.fullName ||
+		nameFromParts ||
+		user.user?.username ||
+		user.user?.primaryEmailAddress?.emailAddress ||
+		user.user?.primaryPhoneNumber?.phoneNumber ||
+		"User";
+	{{#if (eq api "trpc")}}
+	const trpc = useTRPC();
+	const privateData = useQuery({
+		...trpc.privateData.queryOptions(),
+		enabled: user.isLoaded && !!user.user,
+	});
+	{{/if}}
+	{{#if (eq api "orpc")}}
+	const privateData = useQuery({
+		...orpc.privateData.queryOptions(),
+		enabled: user.isLoaded && !!user.user,
+	});
+	{{/if}}
+
+	return (
+		<div className="space-y-4 p-6">
+			<h1 className="text-2xl font-semibold">Dashboard</h1>
+			<p>Welcome {displayName}</p>
+			{{#if (or (eq api "orpc") (eq api "trpc"))}}
+			<p>API: {privateData.data?.message}</p>
+			{{/if}}
+			<UserButton />
+		</div>
+	);
+}
+`],
+  ["modules/auth/stack/clerk/web/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `import { SignInButton, useUser } from "@clerk/tanstack-react-start";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/_auth")({
+	component: AuthLayout,
+});
+
+function AuthLayout() {
+	const user = useUser();
+
+	if (!user.isLoaded) {
+		return <div className="p-6">Loading...</div>;
+	}
+
+	if (!user.user) {
+		return (
+			<div className="p-6">
+				<SignInButton />
+			</div>
+		);
+	}
+
+	return <Outlet />;
+}
+`],
+  ["modules/auth/stack/clerk/web/react/tanstack-start/src/start.ts.hbs", `import { clerkMiddleware } from '@clerk/tanstack-react-start/server'
+import { createCsrfMiddleware, createStart } from '@tanstack/react-start'
+
+const csrfMiddleware = createCsrfMiddleware({
+	filter: (ctx) => ctx.handlerType === 'serverFn',
+})
+
+export const startInstance = createStart(() => {
+	return {
+		requestMiddleware: [csrfMiddleware, clerkMiddleware()],
+	}
+})
+`],
+  ["modules/core/files/docs/modules/core.md", `# Product shell
+
+The shell every feature module plugs into.
+
+## Layout
+
+- \`apps/web/src/app/[lang]/\` holds all pages. The \`[lang]\` segment comes from the i18n module.
+- \`apps/web/src/config/site.ts\` holds the product name.
+- \`apps/web/src/config/navigation.ts\` is generated from the modules you picked. Edit it freely; it is plain data.
+- \`apps/web/src/services.ts\` is the composition root: every package exports a factory, and this file wires them with environment variables and each other.
+
+## Domain events
+
+\`packages/events\` is a small in-process event bus. Modules never import each other's internals. Instead:
+
+1. The emitting module declares its events by extending \`EventMap\`:
+
+   \`\`\`ts
+   declare module "@your-app/events" {
+     interface EventMap {
+       "order.paid": { orderId: string; userId: string };
+     }
+   }
+   \`\`\`
+
+2. It emits them: \`await events.emit("order.paid", { orderId, userId })\`.
+3. Code that connects two modules lives in \`apps/web/src/integrations/*.ts\` and subscribes with \`events.on(...)\`.
+
+Handlers run in order and an error rejects \`emit\`, so a failed side effect surfaces to the caller. Replace \`createEventBus\` with a queue-backed implementation if you need retries; the interface stays the same.
+
+## Removing a module
+
+Delete its package under \`packages/\`, its pages under \`apps/web/src/app/[lang]/\`, its entries in \`config/navigation.ts\` and \`services.ts\`, and its integration files. Nothing else references it.
+`],
+  ["modules/core/files/packages/events/src/index.ts", `/**
+ * Domain events shared between feature modules.
+ *
+ * Modules add their events through declaration merging:
+ *
+ *   declare module "@app/events" {
+ *     interface EventMap {
+ *       "order.paid": { orderId: string; userId: string };
+ *     }
+ *   }
+ */
+// oxlint-disable-next-line no-empty-interface
+export interface EventMap {}
+
+export type EventName = keyof EventMap;
+
+export type EventHandler<K extends EventName> = (payload: EventMap[K]) => void | Promise<void>;
+
+export type EventBus = {
+  on<K extends EventName>(event: K, handler: EventHandler<K>): () => void;
+  /** Runs handlers in registration order; a failing handler rejects the emit. */
+  emit<K extends EventName>(event: K, payload: EventMap[K]): Promise<void>;
+};
+
+export function createEventBus(): EventBus {
+  const handlers = new Map<EventName, Set<EventHandler<never>>>();
+
+  return {
+    on(event, handler) {
+      const set = handlers.get(event) ?? new Set();
+      set.add(handler as EventHandler<never>);
+      handlers.set(event, set);
+      return () => {
+        set.delete(handler as EventHandler<never>);
+      };
+    },
+    async emit(event, payload) {
+      for (const handler of handlers.get(event) ?? []) {
+        await (handler as EventHandler<typeof event>)(payload);
+      }
+    },
+  };
+}
+`],
+  ["modules/core/files/packages/i18n/src/messages/en/core.ts", `export default {
+  site: {
+    description: "Ship your product faster.",
+  },
+  nav: {
+    home: "Home",
+  },
+  landing: {
+    title: "Build and launch your product in days",
+    subtitle:
+      "A production-ready foundation: authentication, payments, emails and more, composed from the modules you picked.",
+    cta: "Get started",
+    secondary: "Go to dashboard",
+    features: {
+      title: "What's inside",
+      modular: {
+        title: "Modular by design",
+        body: "Every feature lives in its own package and talks to others through typed events.",
+      },
+      portable: {
+        title: "No vendor lock-in",
+        body: "Providers sit behind small interfaces. Swap them through configuration.",
+      },
+      deploy: {
+        title: "Deploy anywhere",
+        body: "Run it on Vercel, in Docker or on your own servers.",
+      },
+    },
+  },
+  footer: {
+    rights: "© {year} {name}. All rights reserved.",
+  },
+} as const;
+`],
+  ["modules/core/files/packages/i18n/src/messages/zh-CN/core.ts", `export default {
+  site: {
+    description: "更快地发布你的产品。",
+  },
+  nav: {
+    home: "首页",
+  },
+  landing: {
+    title: "几天内构建并上线你的产品",
+    subtitle: "开箱即用的产品级基础：认证、支付、邮件等能力，由你选择的模块组合而成。",
+    cta: "立即开始",
+    secondary: "进入控制台",
+    features: {
+      title: "包含什么",
+      modular: {
+        title: "模块化设计",
+        body: "每个功能都是独立的包，模块之间通过类型安全的事件协作。",
+      },
+      portable: {
+        title: "不绑定服务商",
+        body: "服务商藏在精简的接口后面，通过配置即可切换。",
+      },
+      deploy: {
+        title: "随处部署",
+        body: "可以部署到 Vercel、Docker 或你自己的服务器。",
+      },
+    },
+  },
+  footer: {
+    rights: "© {year} {name}。保留所有权利。",
+  },
+};
+`],
+  ["modules/core/frameworks/next/apps/web/src/app/[lang]/layout.tsx.hbs", `import { getMessages, locales } from "@{{projectName}}/i18n";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+
+import "../../index.css";
+import { I18nProvider } from "@/components/i18n-provider";
+import Providers from "@/components/providers";
+import SiteFooter from "@/components/site-footer";
+import SiteHeader from "@/components/site-header";
+import { site } from "@/config/site";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+type Props = {
+  children: React.ReactNode;
+  params: Promise<{ lang: string }>;
+};
+
+export function generateStaticParams() {
+  return locales.map((lang) => ({ lang }));
+}
+
+export async function generateMetadata({ params }: Omit<Props, "children">): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return {
+    title: { default: site.name, template: \`%s | \${site.name}\` },
+    description: t("core.site.description"),
+  };
+}
+
+export default async function LocaleLayout({ children, params }: Props) {
+  const locale = resolveLocale((await params).lang);
+
+  return (
+    <html lang={locale} suppressHydrationWarning>
+      <body className={\`\${geistSans.variable} \${geistMono.variable} antialiased\`}>
+        <I18nProvider locale={locale} messages={getMessages(locale)}>
+          <Providers>
+            <div className="flex min-h-svh flex-col">
+              <SiteHeader />
+              <main className="flex flex-1 flex-col">{children}</main>
+              <SiteFooter />
+            </div>
+          </Providers>
+        </I18nProvider>
+      </body>
+    </html>
+  );
+}
+`],
+  ["modules/core/frameworks/next/apps/web/src/app/[lang]/page.tsx.hbs", `{{#if (includes product.features "auth")}}
+import { buttonVariants } from "@{{projectName}}/ui/components/button";
+import Link from "next/link";
+
+import { localePath } from "@/lib/i18n/paths";
+{{/if}}
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+const features = ["modular", "portable", "deploy"] as const;
+
+export default async function HomePage({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+
+  return (
+    <div className="container mx-auto max-w-6xl px-4">
+      <section className="flex flex-col items-center gap-6 py-24 text-center">
+        <h1 className="max-w-3xl text-balance font-semibold text-4xl tracking-tight sm:text-5xl">
+          {t("core.landing.title")}
+        </h1>
+        <p className="max-w-2xl text-balance text-muted-foreground">
+          {t("core.landing.subtitle")}
+        </p>
+{{#if (includes product.features "auth")}}
+        <div className="flex gap-3">
+          <Link href={localePath(locale, "/login")} className={buttonVariants({ size: "lg" })}>
+            {t("core.landing.cta")}
+          </Link>
+          <Link
+            href={localePath(locale, "/dashboard")}
+            className={buttonVariants({ size: "lg", variant: "outline" })}
+          >
+            {t("core.landing.secondary")}
+          </Link>
+        </div>
+{{/if}}
+      </section>
+      <section className="pb-24">
+        <h2 className="mb-8 text-center font-medium text-2xl">
+          {t("core.landing.features.title")}
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {features.map((feature) => (
+            <div key={feature} className="border p-6">
+              <h3 className="mb-2 font-medium">{t(\`core.landing.features.\${feature}.title\`)}</h3>
+              <p className="text-muted-foreground text-sm">
+                {t(\`core.landing.features.\${feature}.body\`)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+`],
+  ["modules/core/frameworks/next/apps/web/src/components/side-nav.tsx", `"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { type NavArea, navigation } from "@/config/navigation";
+import { localePath } from "@/lib/i18n/paths";
+
+import { useLocale, useT } from "./i18n-provider";
+
+export default function SideNav({ area }: { area: Exclude<NavArea, "main" | "footer"> }) {
+  const locale = useLocale();
+  const t = useT();
+  const pathname = usePathname();
+
+  return (
+    <nav className="flex gap-1 overflow-x-auto md:flex-col">
+      {navigation[area].map((item) => {
+        const href = localePath(locale, item.href);
+        const active = pathname === href;
+        return (
+          <Link
+            key={item.href}
+            href={href}
+            className={\`px-3 py-2 text-sm transition-colors \${active ? "bg-muted font-medium" : "text-muted-foreground hover:text-foreground"}\`}
+          >
+            {t(item.labelKey)}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+`],
+  ["modules/core/frameworks/next/apps/web/src/components/site-footer.tsx", `"use client";
+
+import Link from "next/link";
+
+import { navigation } from "@/config/navigation";
+import { site } from "@/config/site";
+import { localePath } from "@/lib/i18n/paths";
+
+import { useLocale, useT } from "./i18n-provider";
+
+export default function SiteFooter() {
+  const locale = useLocale();
+  const t = useT();
+
+  return (
+    <footer className="border-t">
+      <div className="container mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 text-muted-foreground text-xs sm:flex-row sm:items-center sm:justify-between">
+        <p>{t("core.footer.rights", { year: new Date().getFullYear(), name: site.name })}</p>
+        {navigation.footer.length > 0 && (
+          <nav className="flex flex-wrap gap-4">
+            {navigation.footer.map((item) => (
+              <Link
+                key={item.href}
+                href={localePath(locale, item.href)}
+                className="hover:text-foreground"
+              >
+                {t(item.labelKey)}
+              </Link>
+            ))}
+          </nav>
+        )}
+      </div>
+    </footer>
+  );
+}
+`],
+  ["modules/core/frameworks/next/apps/web/src/components/site-header.tsx.hbs", `"use client";
+
+import Link from "next/link";
+
+import { canSee, navigation } from "@/config/navigation";
+import { site } from "@/config/site";
+{{#if (includes product.features "auth")}}
+import { authClient } from "@/lib/auth-client";
+{{/if}}
+import { localePath } from "@/lib/i18n/paths";
+
+import { useLocale, useT } from "./i18n-provider";
+import LocaleSwitcher from "./locale-switcher";
+import { ModeToggle } from "./mode-toggle";
+{{#if (includes product.features "auth")}}
+import UserMenu from "./user-menu";
+{{/if}}
+
+export default function SiteHeader() {
+  const locale = useLocale();
+  const t = useT();
+{{#if (includes product.features "auth")}}
+  const { data: session } = authClient.useSession();
+  const links = navigation.main.filter((item) => canSee(item, session?.user));
+{{else}}
+  const links = navigation.main.filter((item) => canSee(item, null));
+{{/if}}
+
+  return (
+    <header className="border-b">
+      <div className="container mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
+        <div className="flex items-center gap-6">
+          <Link href={localePath(locale, "/")} className="font-semibold">
+            {site.name}
+          </Link>
+          <nav className="hidden items-center gap-4 text-sm sm:flex">
+            {links.map((item) => (
+              <Link
+                key={item.href}
+                href={localePath(locale, item.href)}
+                className="text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {t(item.labelKey)}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <div className="flex items-center gap-1">
+          <LocaleSwitcher />
+          <ModeToggle />
+{{#if (includes product.features "auth")}}
+          <UserMenu />
+{{/if}}
+        </div>
+      </div>
+    </header>
+  );
+}
+`],
+  ["modules/core/frameworks/next/apps/web/src/config/site.ts.hbs", `export const site = {
+  name: "{{projectName}}",
+};
+`],
+  ["modules/credits/dialects/postgres/packages/db/src/schema/credits.ts", `import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+
+import { user } from "./auth";
+
+export const creditTransactionTypes = [
+  "purchase",
+  "subscription",
+  "signup",
+  "grant",
+  "consume",
+  "refund",
+  "adjust",
+] as const;
+
+export const creditBalance = pgTable("credit_balance", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  balance: integer("balance").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const creditTransaction = pgTable(
+  "credit_transaction",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** Positive for grants, negative for consumption. */
+    amount: integer("amount").notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    type: text("type", { enum: creditTransactionTypes }).notNull(),
+    reason: text("reason"),
+    /** Idempotency key, e.g. \`order:<id>\`; a reference is applied at most once. */
+    referenceId: text("reference_id").unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("credit_transaction_user_idx").on(table.userId, table.createdAt)],
+);
+`],
+  ["modules/credits/dialects/sqlite/packages/db/src/schema/credits.ts", `import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+
+import { user } from "./auth";
+
+export const creditTransactionTypes = [
+  "purchase",
+  "subscription",
+  "signup",
+  "grant",
+  "consume",
+  "refund",
+  "adjust",
+] as const;
+
+export const creditBalance = sqliteTable("credit_balance", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  balance: integer("balance").notNull().default(0),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export const creditTransaction = sqliteTable(
+  "credit_transaction",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** Positive for grants, negative for consumption. */
+    amount: integer("amount").notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    type: text("type", { enum: creditTransactionTypes }).notNull(),
+    reason: text("reason"),
+    /** Idempotency key, e.g. \`order:<id>\`; a reference is applied at most once. */
+    referenceId: text("reference_id").unique(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [index("credit_transaction_user_idx").on(table.userId, table.createdAt)],
+);
+`],
+  ["modules/credits/files/apps/web/src/integrations/credits-signup.ts.hbs", `import type { Services } from "../services";
+
+{{#if module.options.signupBonus}}
+const SIGNUP_BONUS = {{module.options.signupBonus}};
+
+/** Grants the sign-up bonus once per account. */
+export default function registerCreditsSignup({ events, credits }: Services) {
+  events.on("auth.user_created", async ({ userId }) => {
+    await credits.grant(userId, SIGNUP_BONUS, {
+      type: "signup",
+      referenceId: \`signup:\${userId}\`,
+    });
+  });
+}
+{{else}}
+/** Sign-up bonus is disabled; set the credits \`signupBonus\` option to enable it. */
+export default function registerCreditsSignup(_services: Services) {}
+{{/if}}
+`],
+  ["modules/credits/files/docs/modules/credits.md.hbs", `# Credits
+
+\`packages/credits\` keeps a balance per user (\`credit_balance\`) and an append-only ledger (\`credit_transaction\`). Every change goes through one transaction that updates the balance and records the entry together.
+
+## API
+
+\`\`\`ts
+import { credits } from "@{{projectName}}/app-services";
+
+await credits.getBalance(userId);
+await credits.grant(userId, 100, { type: "grant", reason: "beta tester", referenceId: "beta:2026" });
+await credits.consume(userId, 5, { reason: "image generation", referenceId: \`job:\${jobId}\` });
+await credits.adjust(userId, -20, "manual correction");
+\`\`\`
+
+- \`consume\` throws \`InsufficientCreditsError\` and changes nothing if the balance is too low.
+- A \`referenceId\` is applied at most once. Pass one whenever the caller can retry.
+- Every applied change emits \`credits.changed\`.
+
+## Sources
+
+{{#if module.options.signupBonus}}
+- **Sign-up bonus:** {{module.options.signupBonus}} credits for each new account (\`apps/web/src/integrations/credits-signup.ts\`).
+{{else}}
+- **Sign-up bonus:** disabled. Set the credits \`signupBonus\` option, or edit \`apps/web/src/integrations/credits-signup.ts\`.
+{{/if}}
+{{#if (includes module.integrations "payment")}}
+- **Purchases:** each paid order grants its plan's \`credits\` (\`packages/payment/src/plans.ts\`), keyed by \`order:<orderId>\`. Subscription renewals grant them again every period.
+{{/if}}
+{{#if (includes module.integrations "admin")}}
+- **Admin:** \`/admin/credits\` lists all transactions and lets admins adjust a user's balance by email.
+{{/if}}
+`],
+  ["modules/credits/files/packages/credits/src/events.ts.hbs", `import type { creditTransactionTypes } from "@{{projectName}}/db/schema/credits";
+
+declare module "@{{projectName}}/events" {
+  interface EventMap {
+    "credits.changed": {
+      userId: string;
+      amount: number;
+      balance: number;
+      type: (typeof creditTransactionTypes)[number];
+    };
+  }
+}
+`],
+  ["modules/credits/files/packages/credits/src/index.ts.hbs", `import type { Database } from "@{{projectName}}/db";
+import { user } from "@{{projectName}}/db/schema/auth";
+import {
+  creditBalance,
+  creditTransaction,
+  type creditTransactionTypes,
+} from "@{{projectName}}/db/schema/credits";
+import type { EventBus } from "@{{projectName}}/events";
+import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+
+import "./events";
+
+export type CreditTransactionType = (typeof creditTransactionTypes)[number];
+
+export type CreditTransaction = typeof creditTransaction.$inferSelect;
+
+export type CreditEntry = {
+  type: CreditTransactionType;
+  reason?: string;
+  /** Applying the same reference twice is a no-op, which makes retries safe. */
+  referenceId?: string;
+};
+
+export class InsufficientCreditsError extends Error {
+  constructor(
+    readonly balance: number,
+    readonly required: number,
+  ) {
+    super(\`Insufficient credits: \${balance} available, \${required} required\`);
+  }
+}
+
+export function createCredits(db: Database, events: EventBus) {
+  async function getBalance(userId: string): Promise<number> {
+    const [row] = await db
+      .select({ balance: creditBalance.balance })
+      .from(creditBalance)
+      .where(eq(creditBalance.userId, userId));
+    return row?.balance ?? 0;
+  }
+
+  /** Applies a signed change to the balance and records it, atomically. */
+  async function apply(userId: string, amount: number, entry: CreditEntry) {
+    if (!Number.isInteger(amount) || amount === 0) {
+      throw new RangeError("Credit amounts must be non-zero integers");
+    }
+
+    const result = await db.transaction(async (tx) => {
+      if (entry.referenceId) {
+        const [existing] = await tx
+          .select()
+          .from(creditTransaction)
+          .where(eq(creditTransaction.referenceId, entry.referenceId));
+        if (existing) return { transaction: existing, applied: false };
+      }
+
+      const [row] =
+        amount > 0
+          ? await tx
+              .insert(creditBalance)
+              .values({ userId, balance: amount })
+              .onConflictDoUpdate({
+                target: creditBalance.userId,
+                set: { balance: sql\`\${creditBalance.balance} + \${amount}\`, updatedAt: new Date() },
+              })
+              .returning()
+          : await tx
+              .update(creditBalance)
+              .set({ balance: sql\`\${creditBalance.balance} - \${-amount}\`, updatedAt: new Date() })
+              .where(and(eq(creditBalance.userId, userId), gte(creditBalance.balance, -amount)))
+              .returning();
+      if (!row) throw new InsufficientCreditsError(await getBalance(userId), -amount);
+
+      const [transaction] = await tx
+        .insert(creditTransaction)
+        .values({
+          id: crypto.randomUUID(),
+          userId,
+          amount,
+          balanceAfter: row.balance,
+          type: entry.type,
+          reason: entry.reason,
+          referenceId: entry.referenceId,
+        })
+        .returning();
+      return { transaction: transaction!, applied: true };
+    });
+
+    if (result.applied) {
+      await events.emit("credits.changed", {
+        userId,
+        amount,
+        balance: result.transaction.balanceAfter,
+        type: entry.type,
+      });
+    }
+    return result.transaction;
+  }
+
+  return {
+    getBalance,
+
+    grant(userId: string, amount: number, entry: CreditEntry) {
+      return apply(userId, Math.abs(amount), entry);
+    },
+
+    /** Deducts credits or throws \`InsufficientCreditsError\` without changing anything. */
+    consume(userId: string, amount: number, entry: Omit<CreditEntry, "type">) {
+      return apply(userId, -Math.abs(amount), { ...entry, type: "consume" });
+    },
+
+    /** Signed manual correction, e.g. from the admin console. */
+    adjust(userId: string, amount: number, reason: string) {
+      return apply(userId, amount, { type: "adjust", reason });
+    },
+
+    async listTransactions(userId: string, limit = 50): Promise<CreditTransaction[]> {
+      return db
+        .select()
+        .from(creditTransaction)
+        .where(eq(creditTransaction.userId, userId))
+        .orderBy(desc(creditTransaction.createdAt))
+        .limit(limit);
+    },
+
+    /** All transactions with the account email, newest first. */
+    async listAllTransactions({ limit, offset }: { limit: number; offset: number }) {
+      const [rows, [total]] = await Promise.all([
+        db
+          .select({ transaction: creditTransaction, email: user.email })
+          .from(creditTransaction)
+          .innerJoin(user, eq(creditTransaction.userId, user.id))
+          .orderBy(desc(creditTransaction.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db.select({ value: count() }).from(creditTransaction),
+      ]);
+      return { rows, total: total?.value ?? 0 };
+    },
+  };
+}
+
+export type Credits = ReturnType<typeof createCredits>;
+`],
+  ["modules/credits/files/packages/i18n/src/messages/en/credits.ts", `export default {
+  nav: {
+    credits: "Credits",
+  },
+  page: {
+    title: "Credits",
+    balance: "Available credits",
+    buyMore: "Get more credits",
+    history: "History",
+    empty: "No credit activity yet.",
+  },
+  types: {
+    purchase: "Purchase",
+    subscription: "Subscription",
+    signup: "Sign-up bonus",
+    grant: "Grant",
+    consume: "Usage",
+    refund: "Refund",
+    adjust: "Adjustment",
+  },
+  admin: {
+    title: "Credits",
+    adjust: "Adjust balance",
+    email: "User email",
+    amount: "Amount",
+    amountHint: "Use a negative amount to deduct credits.",
+    reason: "Reason (optional)",
+    submit: "Apply",
+    done: "Balance updated.",
+    empty: "No transactions yet.",
+    errors: {
+      invalid: "Enter an email and a non-zero whole number.",
+      user: "No user with that email.",
+      balance: "The user doesn't have enough credits for that deduction.",
+    },
+    columns: {
+      date: "Date",
+      user: "User",
+      type: "Type",
+      reason: "Reason",
+      amount: "Amount",
+      balance: "Balance",
+    },
+  },
+} as const;
+`],
+  ["modules/credits/files/packages/i18n/src/messages/zh-CN/credits.ts", `export default {
+  nav: {
+    credits: "积分",
+  },
+  page: {
+    title: "积分",
+    balance: "可用积分",
+    buyMore: "获取更多积分",
+    history: "积分明细",
+    empty: "暂无积分记录。",
+  },
+  types: {
+    purchase: "购买",
+    subscription: "订阅",
+    signup: "注册赠送",
+    grant: "赠送",
+    consume: "消耗",
+    refund: "退款",
+    adjust: "人工调整",
+  },
+  admin: {
+    title: "积分",
+    adjust: "调整余额",
+    email: "用户邮箱",
+    amount: "数量",
+    amountHint: "输入负数即可扣减积分。",
+    reason: "原因（可选）",
+    submit: "确认",
+    done: "余额已更新。",
+    empty: "暂无积分流水。",
+    errors: {
+      invalid: "请输入邮箱和非零整数。",
+      user: "找不到该邮箱对应的用户。",
+      balance: "该用户积分不足，无法扣减。",
+    },
+    columns: {
+      date: "时间",
+      user: "用户",
+      type: "类型",
+      reason: "原因",
+      amount: "数量",
+      balance: "余额",
+    },
+  },
+} as const;
+`],
+  ["modules/credits/frameworks/next/apps/web/src/app/[lang]/dashboard/credits/page.tsx.hbs", `import { credits } from "@{{projectName}}/app-services";
+{{#if (includes product.features "payment")}}
+import { buttonVariants } from "@{{projectName}}/ui/components/button";
+{{/if}}
+import type { Metadata } from "next";
+{{#if (includes product.features "payment")}}
+import Link from "next/link";
+{{/if}}
+
+{{#if (includes product.features "payment")}}
+import { localePath } from "@/lib/i18n/paths";
+{{/if}}
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = { params: Promise<{ lang: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("credits.page.title") };
+}
+
+export default async function CreditsPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const user = await requireUser(locale, "/dashboard/credits");
+
+  const [balance, transactions] = await Promise.all([
+    credits.getBalance(user.id),
+    credits.listTransactions(user.id),
+  ]);
+  const number = new Intl.NumberFormat(locale, { signDisplay: "exceptZero" });
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+
+  return (
+    <div className="flex flex-col gap-8">
+      <h1 className="font-semibold text-2xl">{t("credits.page.title")}</h1>
+
+      <section className="flex flex-wrap items-end justify-between gap-4 border p-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-muted-foreground text-sm">{t("credits.page.balance")}</span>
+          <span className="font-semibold text-3xl tabular-nums">
+            {new Intl.NumberFormat(locale).format(balance)}
+          </span>
+        </div>
+{{#if (includes product.features "payment")}}
+        <Link href={localePath(locale, "/pricing")} className={buttonVariants({ variant: "outline" })}>
+          {t("credits.page.buyMore")}
+        </Link>
+{{/if}}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium">{t("credits.page.history")}</h2>
+        {transactions.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("credits.page.empty")}</p>
+        ) : (
+          <ul className="divide-y border">
+            {transactions.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+                <span>{t(\`credits.types.\${entry.type}\`)}</span>
+                <span className="text-muted-foreground">{date.format(entry.createdAt)}</span>
+                <span className="tabular-nums">{number.format(entry.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+`],
+  ["modules/credits/integrations/admin/apps/web/src/app/[lang]/admin/credits/actions.ts.hbs", `"use server";
+
+import { auth, credits } from "@{{projectName}}/app-services";
+import { InsufficientCreditsError } from "@{{projectName}}/credits";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
+import { requireAdmin } from "@/lib/admin";
+import { localePath } from "@/lib/i18n/paths";
+import { resolveLocale } from "@/lib/i18n/server";
+
+export async function adjustCredits(formData: FormData) {
+  const locale = resolveLocale(String(formData.get("locale")));
+  const { user: admin } = await requireAdmin(locale);
+  const back = localePath(locale, "/admin/credits");
+
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const amount = Number(formData.get("amount"));
+  const note = String(formData.get("reason") ?? "").trim();
+  if (!email || !Number.isInteger(amount) || amount === 0) redirect(\`\${back}?error=invalid\`);
+
+  const { users } = await auth.api.listUsers({
+    headers: await headers(),
+    query: { filterField: "email", filterValue: email, filterOperator: "eq", limit: 1 },
+  });
+  const target = users[0];
+  if (!target) redirect(\`\${back}?error=user\`);
+
+  try {
+    await credits.adjust(target.id, amount, note ? \`\${note} (\${admin.email})\` : admin.email);
+  } catch (error) {
+    if (!(error instanceof InsufficientCreditsError)) throw error;
+    redirect(\`\${back}?error=balance\`);
+  }
+  redirect(\`\${back}?done=1\`);
+}
+`],
+  ["modules/credits/integrations/admin/apps/web/src/app/[lang]/admin/credits/page.tsx.hbs", `import { credits } from "@{{projectName}}/app-services";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import type { Metadata } from "next";
+
+import { Pagination } from "@/components/admin/pagination";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+import { adjustCredits } from "./actions";
+
+const PAGE_SIZE = 20;
+const ERRORS = ["invalid", "user", "balance"] as const;
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ page?: string; error?: string; done?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("credits.admin.title") };
+}
+
+export default async function AdminCreditsPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  await requireAdmin(locale);
+  const { page: pageParam, error, done } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const errorCode = ERRORS.find((code) => code === error);
+
+  const { rows, total } = await credits.listAllTransactions({
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  });
+  const number = new Intl.NumberFormat(locale, { signDisplay: "exceptZero" });
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="font-semibold text-2xl">{t("credits.admin.title")}</h1>
+
+      <form action={adjustCredits} className="flex flex-col gap-3 border p-4">
+        <h2 className="font-medium">{t("credits.admin.adjust")}</h2>
+        <input type="hidden" name="locale" value={locale} />
+        <div className="flex flex-wrap gap-2">
+          <Input
+            name="email"
+            type="email"
+            required
+            placeholder={t("credits.admin.email")}
+            className="max-w-xs"
+          />
+          <Input
+            name="amount"
+            type="number"
+            step={1}
+            required
+            placeholder={t("credits.admin.amount")}
+            className="max-w-32"
+          />
+          <Input name="reason" placeholder={t("credits.admin.reason")} className="max-w-xs" />
+          <Button type="submit">{t("credits.admin.submit")}</Button>
+        </div>
+        <p className="text-muted-foreground text-xs">{t("credits.admin.amountHint")}</p>
+        {errorCode && <p className="text-destructive text-sm">{t(\`credits.admin.errors.\${errorCode}\`)}</p>}
+        {done && <p className="text-primary text-sm">{t("credits.admin.done")}</p>}
+      </form>
+
+      <div className="overflow-x-auto border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-muted-foreground text-xs">
+            <tr>
+              <th className="px-4 py-2 font-medium">{t("credits.admin.columns.date")}</th>
+              <th className="px-4 py-2 font-medium">{t("credits.admin.columns.user")}</th>
+              <th className="px-4 py-2 font-medium">{t("credits.admin.columns.type")}</th>
+              <th className="px-4 py-2 font-medium">{t("credits.admin.columns.reason")}</th>
+              <th className="px-4 py-2 text-right font-medium">{t("credits.admin.columns.amount")}</th>
+              <th className="px-4 py-2 text-right font-medium">{t("credits.admin.columns.balance")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.map(({ transaction, email }) => (
+              <tr key={transaction.id}>
+                <td className="px-4 py-2 text-muted-foreground">{date.format(transaction.createdAt)}</td>
+                <td className="px-4 py-2">{email}</td>
+                <td className="px-4 py-2">{t(\`credits.types.\${transaction.type}\`)}</td>
+                <td className="px-4 py-2 text-muted-foreground">{transaction.reason}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{number.format(transaction.amount)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{transaction.balanceAfter}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && (
+          <p className="px-4 py-6 text-center text-muted-foreground text-sm">{t("credits.admin.empty")}</p>
+        )}
+      </div>
+      <Pagination
+        locale={locale}
+        page={page}
+        pages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        query={ {} }
+      />
+    </div>
+  );
+}
+`],
+  ["modules/credits/integrations/payment/apps/web/src/integrations/payment-credits.ts.hbs", `import type { Services } from "../services";
+
+/** Grants each paid order's plan credits; keyed by order id so webhook retries are safe. */
+export default function registerPaymentCredits({ events, credits }: Services) {
+  events.on("payment.order_paid", async ({ orderId, userId, plan }) => {
+    if (!plan.credits) return;
+    await credits.grant(userId, plan.credits, {
+      type: plan.mode === "subscription" ? "subscription" : "purchase",
+      reason: plan.id,
+      referenceId: \`order:\${orderId}\`,
+    });
+  });
+}
+`],
+  ["modules/email/files/docs/modules/email.md.hbs", `# Email
+
+\`packages/email\` exposes a provider-neutral \`Mailer\`:
+
+\`\`\`ts
+import { mailer } from "@/services";
+import { renderEmail } from "@{{projectName}}/email";
+
+await mailer.send({
+  to: "user@example.com",
+  subject: "Welcome",
+  ...renderEmail({ brand: "Acme", heading: "Welcome", paragraphs: ["Thanks for joining."] }),
+});
+\`\`\`
+
+Provider: **{{module.providers.[0]}}** (\`packages/email/src/providers/{{module.providers.[0]}}.ts\`).
+
+## Configuration
+
+| Variable | Purpose |
+| --- | --- |
+| \`EMAIL_FROM\` | Sender, e.g. \`"Acme <noreply@acme.com>"\` |
+{{#if (eq module.providers.[0] "resend")}}
+| \`RESEND_API_KEY\` | API key from [resend.com](https://resend.com); verify your sending domain there |
+{{/if}}
+{{#if (eq module.providers.[0] "smtp")}}
+| \`SMTP_HOST\`, \`SMTP_PORT\`, \`SMTP_SECURE\` | SMTP server (Aliyun DirectMail, Tencent SES, Amazon SES, Mailgun, Postfix…) |
+| \`SMTP_USER\`, \`SMTP_PASSWORD\` | SMTP credentials |
+{{/if}}
+
+Without credentials, development prints emails (including verification links) to the server console; production refuses to send.
+
+## Switching providers
+
+A provider is one file implementing \`createTransport(env): Transport | undefined\`. To switch, add a file under \`src/providers/\`, point the import in \`src/index.ts\` at it and update the env variables.
+{{#if (includes module.integrations "auth")}}
+
+## Auth emails
+
+\`apps/web/src/integrations/auth-email.ts\` subscribes to \`auth.verification_requested\` and \`auth.password_reset_requested\` and sends localized emails. The copy lives in \`packages/i18n/src/messages/*/auth.ts\` under \`emails\`.
+{{/if}}
+`],
+  ["modules/email/files/packages/email/src/index.ts.hbs", `import { createTransport, type ProviderConfig } from "./providers/{{module.providers.[0]}}";
+import type { Mailer } from "./types";
+
+export { renderEmail, type EmailContent } from "./render";
+export type { EmailMessage, Mailer, Transport } from "./types";
+
+export type MailerConfig = ProviderConfig & {
+  EMAIL_FROM: string;
+  NODE_ENV: string;
+};
+
+/**
+ * Without provider credentials, emails are printed to the console in development
+ * and rejected in production.
+ */
+export function createMailer(env: MailerConfig): Mailer {
+  const transport = createTransport(env);
+
+  return {
+    async send(message) {
+      if (transport) {
+        await transport.send({ from: env.EMAIL_FROM, ...message });
+        return;
+      }
+      if (env.NODE_ENV === "production") {
+        throw new Error("Email provider is not configured; see docs/modules/email.md");
+      }
+      console.info(\`[email] to=\${message.to} subject=\${message.subject}\\n\${message.text}\`);
+    },
+  };
+}
+`],
+  ["modules/email/files/packages/email/src/render.ts", `export type EmailContent = {
+  brand: string;
+  heading: string;
+  paragraphs: string[];
+  action?: { label: string; url: string };
+  footer?: string;
+};
+
+export type RenderedEmail = { html: string; text: string };
+
+function escape(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/** Renders a simple, client-safe transactional layout as HTML and plain text. */
+export function renderEmail(content: EmailContent): RenderedEmail {
+  const paragraphs = content.paragraphs
+    .map((p) => \`<p style="margin:0 0 16px;line-height:1.6">\${escape(p)}</p>\`)
+    .join("");
+  const action = content.action
+    ? \`<p style="margin:24px 0"><a href="\${escape(content.action.url)}" style="display:inline-block;padding:10px 18px;background:#111;color:#fff;text-decoration:none;font-weight:600">\${escape(content.action.label)}</a></p>\`
+    : "";
+  const footer = content.footer
+    ? \`<p style="margin:24px 0 0;color:#666;font-size:12px">\${escape(content.footer)}</p>\`
+    : "";
+
+  const html = \`<!doctype html><html><body style="margin:0;padding:24px;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center"><table role="presentation" width="100%" style="max-width:520px;background:#fff;padding:32px" cellpadding="0" cellspacing="0"><tr><td><p style="margin:0 0 24px;font-weight:700">\${escape(content.brand)}</p><h1 style="margin:0 0 16px;font-size:20px">\${escape(content.heading)}</h1>\${paragraphs}\${action}\${footer}</td></tr></table></td></tr></table></body></html>\`;
+
+  const text = [
+    content.heading,
+    "",
+    ...content.paragraphs,
+    ...(content.action ? ["", \`\${content.action.label}: \${content.action.url}\`] : []),
+    ...(content.footer ? ["", content.footer] : []),
+  ].join("\\n");
+
+  return { html, text };
+}
+`],
+  ["modules/email/files/packages/email/src/types.ts", `export type EmailMessage = {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  replyTo?: string;
+};
+
+export type Mailer = {
+  send(message: EmailMessage): Promise<void>;
+};
+
+/** Implemented once per provider in \`providers/\`. */
+export type Transport = {
+  send(message: EmailMessage & { from: string }): Promise<void>;
+};
+`],
+  ["modules/email/integrations/auth/apps/web/src/integrations/auth-email.ts.hbs", `import { renderEmail } from "@{{projectName}}/email";
+import { createTranslator, getMessages, type Locale } from "@{{projectName}}/i18n";
+
+import { site } from "@/config/site";
+
+import type { Services } from "../services";
+
+type AuthEmail = { email: string; name: string; url: string; locale: Locale };
+
+/** Sends the emails requested by the auth module. */
+export default function registerAuthEmail({ events, mailer }: Services) {
+  const send = (kind: "verify" | "reset") => async (data: AuthEmail) => {
+    const t = createTranslator(getMessages(data.locale));
+    await mailer.send({
+      to: data.email,
+      subject: t(\`auth.emails.\${kind}.subject\`),
+      ...renderEmail({
+        brand: site.name,
+        heading: t(\`auth.emails.\${kind}.heading\`),
+        paragraphs: [t(\`auth.emails.\${kind}.body\`, { name: data.name })],
+        action: { label: t(\`auth.emails.\${kind}.action\`), url: data.url },
+        footer: t("auth.emails.ignore"),
+      }),
+    });
+  };
+
+  events.on("auth.verification_requested", send("verify"));
+  events.on("auth.password_reset_requested", send("reset"));
+}
+`],
+  ["modules/email/providers/resend/packages/email/src/providers/resend.ts", `import { Resend } from "resend";
+
+import type { Transport } from "../types";
+
+export type ProviderConfig = {
+  RESEND_API_KEY?: string;
+};
+
+export function createTransport(env: ProviderConfig): Transport | undefined {
+  if (!env.RESEND_API_KEY) return undefined;
+  const resend = new Resend(env.RESEND_API_KEY);
+
+  return {
+    async send(message) {
+      const { error } = await resend.emails.send(message);
+      if (error) throw new Error(\`Resend: \${error.message}\`);
+    },
+  };
+}
+`],
+  ["modules/email/providers/smtp/packages/email/src/providers/smtp.ts", `import nodemailer from "nodemailer";
+
+import type { Transport } from "../types";
+
+export type ProviderConfig = {
+  SMTP_HOST?: string;
+  SMTP_PORT?: number;
+  SMTP_SECURE?: boolean;
+  SMTP_USER?: string;
+  SMTP_PASSWORD?: string;
+};
+
+export function createTransport(env: ProviderConfig): Transport | undefined {
+  if (!env.SMTP_HOST) return undefined;
+  const transporter = nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT ?? 587,
+    secure: env.SMTP_SECURE ?? false,
+    auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASSWORD } : undefined,
+  });
+
+  return {
+    async send(message) {
+      await transporter.sendMail(message);
+    },
+  };
+}
+`],
+  ["modules/i18n/files/docs/modules/i18n.md", `# Internationalization
+
+- Locales and the default locale: \`packages/i18n/src/config.ts\`.
+- Messages: \`packages/i18n/src/messages/<locale>/<namespace>.ts\`, one namespace per module. \`en\` is the source of truth for keys; other locales are type-checked against it.
+- Server components: \`getTranslator(resolveLocale(lang))\` from \`@/lib/i18n/server\`.
+- Client components: \`useT()\` and \`useLocale()\` from \`@/components/i18n-provider\`.
+- Links: always build hrefs with \`localePath(locale, "/path")\`.
+- \`src/proxy.ts\` redirects paths without a locale prefix, using the \`NEXT_LOCALE\` cookie first and \`Accept-Language\` second.
+
+## Adding a locale
+
+1. Add \`packages/i18n/src/messages/<locale>/\` with the same namespaces as \`en\`, plus an \`index.ts\` like the existing ones.
+2. Add the locale to \`locales\` in \`config.ts\`, to \`catalog\` in \`messages/index.ts\`, and a display name to \`localeNames\` in \`index.ts\`.
+`],
+  ["modules/i18n/files/packages/i18n/src/index.ts", `import { defaultLocale, type Locale, locales } from "./config";
+import { catalog } from "./messages";
+import type { MessageKey, MessageParams, Messages } from "./types";
+
+export { defaultLocale, locales };
+export type { Locale, MessageKey, MessageParams, Messages };
+
+export const LOCALE_COOKIE = "NEXT_LOCALE";
+
+export const localeNames = {
+  en: "English",
+  "zh-CN": "简体中文",
+} as const satisfies Record<string, string>;
+
+export function isLocale(value: string | undefined): value is Locale {
+  return locales.some((locale) => locale === value);
+}
+
+export function getMessages(locale: Locale): Messages {
+  return catalog[locale];
+}
+
+export type Translator = (key: MessageKey, params?: MessageParams) => string;
+
+type MessageTree = { readonly [key: string]: string | MessageTree };
+
+function flatten(tree: MessageTree, prefix: string, out: Map<string, string>) {
+  for (const [key, value] of Object.entries(tree)) {
+    if (value instanceof Object) flatten(value, \`\${prefix}\${key}.\`, out);
+    else out.set(\`\${prefix}\${key}\`, value);
+  }
+  return out;
+}
+
+export function createTranslator(messages: Messages): Translator {
+  const table = flatten(messages, "", new Map());
+  return (key, params) => {
+    const message = table.get(key) ?? key;
+    if (!params) return message;
+    return message.replace(/\\{(\\w+)\\}/g, (match, name: string) =>
+      name in params ? String(params[name]) : match,
+    );
+  };
+}
+
+/** Picks the best supported locale from an \`Accept-Language\` header. */
+export function matchLocale(acceptLanguage: string | null | undefined): Locale {
+  if (!acceptLanguage) return defaultLocale;
+  const requested = acceptLanguage
+    .split(",")
+    .map((part) => {
+      const [tag = "", q] = part.trim().split(";q=");
+      return { tag: tag.toLowerCase(), q: q ? Number(q) : 1 };
+    })
+    .sort((a, b) => b.q - a.q);
+  for (const { tag } of requested) {
+    const exact = locales.find((locale) => locale.toLowerCase() === tag);
+    if (exact) return exact;
+    const base = locales.find((locale) => locale.toLowerCase().split("-")[0] === tag.split("-")[0]);
+    if (base) return base;
+  }
+  return defaultLocale;
+}
+
+/** Resolves the visitor's locale from the locale cookie, then \`Accept-Language\`. */
+export function localeFromHeaders(headers: Headers | undefined): Locale {
+  const cookie = headers
+    ?.get("cookie")
+    ?.split(";")
+    .map((part) => part.trim().split("="))
+    .find(([name]) => name === LOCALE_COOKIE)?.[1];
+  return isLocale(cookie) ? cookie : matchLocale(headers?.get("accept-language"));
+}
+`],
+  ["modules/i18n/files/packages/i18n/src/messages/en/i18n.ts", `export default {
+  switcher: {
+    label: "Language",
+  },
+} as const;
+`],
+  ["modules/i18n/files/packages/i18n/src/messages/zh-CN/i18n.ts", `export default {
+  switcher: {
+    label: "语言",
+  },
+};
+`],
+  ["modules/i18n/files/packages/i18n/src/types.ts", `import type source from "./messages/en";
+
+type Widen<T> = { [K in keyof T]: T[K] extends string ? string : Widen<T[K]> };
+
+/** Message tree shape; \`en\` is the source of truth for keys. */
+export type Messages = Widen<typeof source>;
+
+type Leaves<T, Prefix extends string = ""> = {
+  [K in keyof T & string]: T[K] extends string ? \`\${Prefix}\${K}\` : Leaves<T[K], \`\${Prefix}\${K}.\`>;
+}[keyof T & string];
+
+/** Dot-separated path to a message, e.g. \`core.nav.home\`. */
+export type MessageKey = Leaves<Messages>;
+
+export type MessageParams = Record<string, string | number>;
+`],
+  ["modules/i18n/frameworks/next/apps/web/src/components/i18n-provider.tsx.hbs", `"use client";
+
+import {
+  createTranslator,
+  type Locale,
+  type Messages,
+  type Translator,
+} from "@{{projectName}}/i18n";
+import { createContext, useContext, useMemo } from "react";
+
+const I18nContext = createContext<{ locale: Locale; t: Translator } | null>(null);
+
+export function I18nProvider({
+  locale,
+  messages,
+  children,
+}: {
+  locale: Locale;
+  messages: Messages;
+  children: React.ReactNode;
+}) {
+  const value = useMemo(() => ({ locale, t: createTranslator(messages) }), [locale, messages]);
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+function useI18n() {
+  const context = useContext(I18nContext);
+  if (!context) throw new Error("useI18n must be used inside <I18nProvider>");
+  return context;
+}
+
+export function useLocale(): Locale {
+  return useI18n().locale;
+}
+
+export function useT(): Translator {
+  return useI18n().t;
+}
+`],
+  ["modules/i18n/frameworks/next/apps/web/src/components/locale-switcher.tsx.hbs", `"use client";
+
+import { LOCALE_COOKIE, localeNames, locales } from "@{{projectName}}/i18n";
+import { Button } from "@{{projectName}}/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { Languages } from "lucide-react";
+import type { Route } from "next";
+import { usePathname, useRouter } from "next/navigation";
+
+import { useLocale, useT } from "./i18n-provider";
+
+export default function LocaleSwitcher() {
+  const locale = useLocale();
+  const t = useT();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  if (locales.length < 2) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button variant="ghost" size="icon" aria-label={t("i18n.switcher.label")} />}
+      >
+        <Languages />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {locales.map((value) => (
+          <DropdownMenuItem
+            key={value}
+            disabled={value === locale}
+            onClick={() => {
+              document.cookie = \`\${LOCALE_COOKIE}=\${value}; path=/; max-age=31536000\`;
+              const rest = pathname.split("/").slice(2).join("/");
+              router.push(\`/\${value}\${rest ? \`/\${rest}\` : ""}\` as Route);
+            }}
+          >
+            {localeNames[value]}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["modules/i18n/frameworks/next/apps/web/src/lib/i18n/paths.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+import type { Route } from "next";
+
+/** Prefixes an app path with the locale segment. */
+export function localePath(locale: Locale, href: \`/\${string}\`): Route {
+  return \`/\${locale}\${href === "/" ? "" : href}\` as Route;
+}
+`],
+  ["modules/i18n/frameworks/next/apps/web/src/lib/i18n/proxy.ts.hbs", `import { isLocale, LOCALE_COOKIE, matchLocale } from "@{{projectName}}/i18n";
+import { NextResponse } from "next/server";
+
+import type { ProxyStep } from "../proxy";
+
+/** Redirects paths without a locale prefix to the preferred locale. */
+export const localeStep: ProxyStep = (request) => {
+  const { pathname } = request.nextUrl;
+  if (isLocale(pathname.split("/")[1])) return undefined;
+
+  const cookie = request.cookies.get(LOCALE_COOKIE)?.value;
+  const locale = isLocale(cookie) ? cookie : matchLocale(request.headers.get("accept-language"));
+  const url = request.nextUrl.clone();
+  url.pathname = \`/\${locale}\${pathname === "/" ? "" : pathname}\`;
+  return NextResponse.redirect(url);
+};
+`],
+  ["modules/i18n/frameworks/next/apps/web/src/lib/i18n/server.ts.hbs", `import { createTranslator, getMessages, isLocale, type Locale } from "@{{projectName}}/i18n";
+import { notFound } from "next/navigation";
+
+/** Validates the \`[lang]\` route segment. */
+export function resolveLocale(value: string): Locale {
+  if (!isLocale(value)) notFound();
+  return value;
+}
+
+export function getTranslator(locale: Locale) {
+  return createTranslator(getMessages(locale));
+}
+`],
+  ["modules/payment/dialects/postgres/packages/db/src/schema/payment.ts", `import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+
+import { user } from "./auth";
+
+export const paymentOrder = pgTable(
+  "payment_order",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    planId: text("plan_id").notNull(),
+    provider: text("provider").notNull(),
+    /** Checkout session or invoice ID at the provider. */
+    providerRef: text("provider_ref"),
+    status: text("status", { enum: ["pending", "paid", "failed", "refunded"] })
+      .notNull()
+      .default("pending"),
+    amount: integer("amount").notNull(),
+    currency: text("currency").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("payment_order_user_idx").on(table.userId),
+    uniqueIndex("payment_order_provider_ref_idx").on(table.provider, table.providerRef),
+  ],
+);
+
+export const paymentSubscription = pgTable(
+  "payment_subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    planId: text("plan_id").notNull(),
+    provider: text("provider").notNull(),
+    providerRef: text("provider_ref").notNull(),
+    customerRef: text("customer_ref"),
+    status: text("status", {
+      enum: ["active", "trialing", "past_due", "canceled", "incomplete", "unpaid"],
+    }).notNull(),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("payment_subscription_user_idx").on(table.userId),
+    uniqueIndex("payment_subscription_provider_ref_idx").on(table.provider, table.providerRef),
+  ],
+);
+`],
+  ["modules/payment/dialects/sqlite/packages/db/src/schema/payment.ts", `import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+
+import { user } from "./auth";
+
+const timestamp = (name: string) => integer(name, { mode: "timestamp_ms" });
+
+export const paymentOrder = sqliteTable(
+  "payment_order",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    planId: text("plan_id").notNull(),
+    provider: text("provider").notNull(),
+    /** Checkout session or invoice ID at the provider. */
+    providerRef: text("provider_ref"),
+    status: text("status", { enum: ["pending", "paid", "failed", "refunded"] })
+      .notNull()
+      .default("pending"),
+    amount: integer("amount").notNull(),
+    currency: text("currency").notNull(),
+    createdAt: timestamp("created_at")
+      .notNull()
+      .$defaultFn(() => new Date()),
+    paidAt: timestamp("paid_at"),
+  },
+  (table) => [
+    index("payment_order_user_idx").on(table.userId),
+    uniqueIndex("payment_order_provider_ref_idx").on(table.provider, table.providerRef),
+  ],
+);
+
+export const paymentSubscription = sqliteTable(
+  "payment_subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    planId: text("plan_id").notNull(),
+    provider: text("provider").notNull(),
+    providerRef: text("provider_ref").notNull(),
+    customerRef: text("customer_ref"),
+    status: text("status", {
+      enum: ["active", "trialing", "past_due", "canceled", "incomplete", "unpaid"],
+    }).notNull(),
+    currentPeriodEnd: timestamp("current_period_end"),
+    cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    createdAt: timestamp("created_at")
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("payment_subscription_user_idx").on(table.userId),
+    uniqueIndex("payment_subscription_provider_ref_idx").on(table.provider, table.providerRef),
+  ],
+);
+`],
+  ["modules/payment/files/docs/modules/payment.md.hbs", `# Payments
+
+\`packages/payment\` keeps orders and subscriptions in your database and talks to providers through a small \`PaymentProvider\` interface. Enabled providers: {{#each module.providers}}\`{{this}}\`{{#unless @last}}, {{/unless}}{{/each}}.
+
+## Plans
+
+Edit \`packages/payment/src/plans.ts\`. Amounts are in the currency's minor unit (\`1900\` = $19.00). Translate names and descriptions in \`packages/i18n/src/messages/<locale>/payment.ts\` under \`plans.<id>\`.
+
+Checkout uses inline prices by default. To use prices managed in your provider dashboard, set \`providerRefs\`, e.g. \`providerRefs: { stripe: "price_123" }\`.{{#if (includes module.providers "polar")}} Polar has no inline prices: every plan needs \`providerRefs.polar\` set to a Polar product ID.{{/if}}
+
+## Flow
+
+1. \`/pricing\` posts to the \`startCheckout\` server action, which creates a \`pending\` order and redirects to the provider.
+2. The provider calls \`/api/payment/webhook/<provider>\`.
+3. The order becomes \`paid\` and \`payment.order_paid\` is emitted. Renewals create a new paid order and emit the same event with \`renewal: true\`.
+
+Orders change state at most once. \`payment.order_paid\` is delivered at least once: if a handler throws, the webhook fails, the provider retries and the event is emitted again. Make handlers idempotent on \`orderId\`, as the credits integration does.
+{{#if (includes module.providers "stripe")}}
+
+## Stripe
+
+| Variable | Purpose |
+| --- | --- |
+| \`STRIPE_SECRET_KEY\` | Secret key from the Stripe dashboard |
+| \`STRIPE_WEBHOOK_SECRET\` | Signing secret of your webhook endpoint |
+
+Webhook endpoint: \`<BETTER_AUTH_URL>/api/payment/webhook/stripe\`, with the events \`checkout.session.completed\`, \`checkout.session.async_payment_succeeded\`, \`invoice.paid\`, \`customer.subscription.created\`, \`customer.subscription.updated\` and \`customer.subscription.deleted\`.
+
+Local testing:
+
+\`\`\`bash
+stripe listen --forward-to localhost:3001/api/payment/webhook/stripe
+\`\`\`
+
+Enable the customer portal in the Stripe dashboard for the "Manage subscription" button.
+{{/if}}
+{{#if (includes module.providers "polar")}}
+
+## Polar
+
+| Variable | Purpose |
+| --- | --- |
+| \`POLAR_ACCESS_TOKEN\` | Organization access token |
+| \`POLAR_WEBHOOK_SECRET\` | Secret of your webhook endpoint |
+| \`POLAR_SERVER\` | \`sandbox\` (default) or \`production\`; tokens differ per environment |
+
+Create one product per plan in the Polar dashboard and set its ID as \`providerRefs.polar\` in \`plans.ts\`. The product's price and billing interval are what customers pay; keep \`amount\`, \`currency\` and \`interval\` in \`plans.ts\` in sync, since the pricing page shows those.
+
+Webhook endpoint: \`<BETTER_AUTH_URL>/api/payment/webhook/polar\`, format "Raw", with the events \`order.paid\`, \`subscription.created\` and \`subscription.updated\`.
+
+"Manage subscription" opens the Polar customer portal.
+{{/if}}
+{{#if (includes module.providers "mock")}}
+
+## Mock provider
+
+\`mock\` completes checkouts locally through \`/api/payment/mock\` without any account. Checkout uses the first configured provider, so \`mock\` takes over in development until real credentials are set. It is disabled in production; remove it from \`packages/payment/src/providers/index.ts\` before launch.
+{{/if}}
+
+## Adding a provider
+
+Create \`packages/payment/src/providers/<id>.ts\` exporting \`createProvider({ env, baseUrl })\` and \`ProviderConfig\`, then register it in \`providers/index.ts\`. Map the provider's webhooks to the three normalized events in \`types.ts\`.
+`],
+  ["modules/payment/files/packages/i18n/src/messages/en/payment.ts", `export default {
+  nav: {
+    pricing: "Pricing",
+    billing: "Billing",
+    orders: "Orders",
+  },
+  plans: {
+    starter: {
+      name: "Starter pack",
+      description: "A one-time purchase to get going.",
+    },
+    pro: {
+      name: "Pro",
+      description: "For teams shipping every week.",
+    },
+  },
+  pricing: {
+    title: "Simple, transparent pricing",
+    subtitle: "Start small and upgrade when you need more.",
+    per: {
+      month: "/ month",
+      year: "/ year",
+    },
+    oneTime: "one-time",
+    credits: "Includes {credits} credits",
+    subscribe: "Subscribe",
+    buy: "Buy now",
+  },
+  errors: {
+    alreadySubscribed: "You already have an active subscription. Manage it from Billing.",
+    checkout: "Checkout is unavailable right now. Please try again later.",
+  },
+  billing: {
+    title: "Billing",
+    success: "Payment received. Thank you!",
+    subscription: "Subscription",
+    none: "You don't have an active subscription.",
+    viewPlans: "View plans",
+    manage: "Manage subscription",
+    renewsOn: "Renews on {date}",
+    endsOn: "Ends on {date}",
+    history: "Payment history",
+    noOrders: "No payments yet.",
+    status: {
+      active: "Active",
+      trialing: "Trial",
+      past_due: "Past due",
+      canceled: "Canceled",
+      incomplete: "Incomplete",
+      unpaid: "Unpaid",
+    },
+  },
+  admin: {
+    title: "Orders",
+    empty: "No orders yet.",
+    columns: {
+      date: "Date",
+      customer: "Customer",
+      plan: "Plan",
+      provider: "Provider",
+      status: "Status",
+      amount: "Amount",
+    },
+    status: {
+      pending: "Pending",
+      paid: "Paid",
+      failed: "Failed",
+      refunded: "Refunded",
+    },
+  },
+} as const;
+`],
+  ["modules/payment/files/packages/i18n/src/messages/zh-CN/payment.ts", `export default {
+  nav: {
+    pricing: "定价",
+    billing: "账单",
+    orders: "订单",
+  },
+  plans: {
+    starter: {
+      name: "入门包",
+      description: "一次性购买，快速上手。",
+    },
+    pro: {
+      name: "专业版",
+      description: "适合每周都在交付的团队。",
+    },
+  },
+  pricing: {
+    title: "简单透明的价格",
+    subtitle: "从小规模开始，需要时再升级。",
+    per: {
+      month: "/ 月",
+      year: "/ 年",
+    },
+    oneTime: "一次性",
+    credits: "包含 {credits} 积分",
+    subscribe: "订阅",
+    buy: "立即购买",
+  },
+  errors: {
+    alreadySubscribed: "你已有生效中的订阅，可在账单页管理。",
+    checkout: "暂时无法结账，请稍后再试。",
+  },
+  billing: {
+    title: "账单",
+    success: "支付成功，感谢你的支持！",
+    subscription: "订阅",
+    none: "你还没有生效中的订阅。",
+    viewPlans: "查看套餐",
+    manage: "管理订阅",
+    renewsOn: "将于 {date} 续费",
+    endsOn: "将于 {date} 结束",
+    history: "支付记录",
+    noOrders: "还没有支付记录。",
+    status: {
+      active: "生效中",
+      trialing: "试用中",
+      past_due: "逾期",
+      canceled: "已取消",
+      incomplete: "未完成",
+      unpaid: "未支付",
+    },
+  },
+  admin: {
+    title: "订单",
+    empty: "还没有订单。",
+    columns: {
+      date: "时间",
+      customer: "客户",
+      plan: "套餐",
+      provider: "渠道",
+      status: "状态",
+      amount: "金额",
+    },
+    status: {
+      pending: "待支付",
+      paid: "已支付",
+      failed: "失败",
+      refunded: "已退款",
+    },
+  },
+} as const;
+`],
+  ["modules/payment/files/packages/payment/src/events.ts.hbs", `import type { Plan, SubscriptionStatus } from "./types";
+
+declare module "@{{projectName}}/events" {
+  interface EventMap {
+    /**
+     * Fired for every successful payment, including subscription renewals. Delivered at
+     * least once: webhook retries re-emit it, so handlers must be idempotent on \`orderId\`.
+     */
+    "payment.order_paid": {
+      orderId: string;
+      userId: string;
+      plan: Plan;
+      amount: number;
+      currency: string;
+      renewal: boolean;
+    };
+    "payment.subscription_updated": {
+      userId: string;
+      planId: string;
+      status: SubscriptionStatus;
+      currentPeriodEnd?: Date;
+    };
+  }
+}
+`],
+  ["modules/payment/files/packages/payment/src/index.ts.hbs", `import type { Database } from "@{{projectName}}/db";
+import { user } from "@{{projectName}}/db/schema/auth";
+import { paymentOrder, paymentSubscription } from "@{{projectName}}/db/schema/payment";
+import type { EventBus } from "@{{projectName}}/events";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
+
+import "./events";
+import { getPlan, plans } from "./plans";
+import { createProviders, type ProvidersConfig } from "./providers";
+import type { PaymentProvider, WebhookEvent } from "./types";
+
+export { getPlan, plans, type AppPlan, type PlanId } from "./plans";
+export type * from "./types";
+
+export class PaymentError extends Error {
+  constructor(
+    readonly code:
+      | "unknown_plan"
+      | "unknown_provider"
+      | "provider_error"
+      | "already_subscribed"
+      | "no_customer",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const LIVE_SUBSCRIPTION = ["active", "trialing", "past_due"] as const;
+
+export type PaymentOptions = {
+  env: ProvidersConfig;
+  db: Database;
+  events: EventBus;
+  /** Public app URL used to build absolute redirect URLs. */
+  baseUrl: string;
+};
+
+export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
+  const providers = createProviders(env, baseUrl);
+  const defaultProvider = providers.find((p) => p.configured);
+
+  function provider(id: string): PaymentProvider {
+    const found = providers.find((p) => p.id === id);
+    if (!found) throw new PaymentError("unknown_provider", \`Unknown payment provider "\${id}"\`);
+    return found;
+  }
+
+  async function activeSubscription(userId: string) {
+    const [row] = await db
+      .select()
+      .from(paymentSubscription)
+      .where(
+        and(
+          eq(paymentSubscription.userId, userId),
+          inArray(paymentSubscription.status, LIVE_SUBSCRIPTION),
+        ),
+      )
+      .orderBy(desc(paymentSubscription.updatedAt))
+      .limit(1);
+    return row;
+  }
+
+  /** Marks the order paid; returns it when it is (or already was) paid. */
+  async function markPaid(
+    orderId: string,
+    providerRef: string,
+  ): Promise<typeof paymentOrder.$inferSelect | undefined> {
+    const [updated] = await db
+      .update(paymentOrder)
+      .set({ status: "paid", providerRef, paidAt: new Date() })
+      .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "pending")))
+      .returning();
+    if (updated) return updated;
+    const [existing] = await db
+      .select()
+      .from(paymentOrder)
+      .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "paid")));
+    return existing;
+  }
+
+  async function emitPaid(order: typeof paymentOrder.$inferSelect, renewal: boolean) {
+    const plan = getPlan(order.planId);
+    if (!plan) return;
+    await events.emit("payment.order_paid", {
+      orderId: order.id,
+      userId: order.userId,
+      plan,
+      amount: order.amount,
+      currency: order.currency,
+      renewal,
+    });
+  }
+
+  async function apply(providerId: string, event: WebhookEvent) {
+    switch (event.type) {
+      case "checkout.completed": {
+        const order = await markPaid(event.orderId, event.providerRef);
+        if (order) await emitPaid(order, false);
+        return;
+      }
+      case "subscription.renewed": {
+        const [subscription] = await db
+          .select()
+          .from(paymentSubscription)
+          .where(
+            and(
+              eq(paymentSubscription.provider, providerId),
+              eq(paymentSubscription.providerRef, event.subscriptionRef),
+            ),
+          );
+        if (!subscription) return;
+        await db
+          .insert(paymentOrder)
+          .values({
+            id: crypto.randomUUID(),
+            userId: subscription.userId,
+            planId: subscription.planId,
+            provider: providerId,
+            providerRef: event.invoiceRef,
+            status: "paid",
+            amount: event.amount,
+            currency: event.currency,
+            paidAt: new Date(),
+          })
+          .onConflictDoNothing();
+        const [order] = await db
+          .select()
+          .from(paymentOrder)
+          .where(
+            and(eq(paymentOrder.provider, providerId), eq(paymentOrder.providerRef, event.invoiceRef)),
+          );
+        if (order) await emitPaid(order, true);
+        return;
+      }
+      case "subscription.updated": {
+        const values = {
+          status: event.status,
+          customerRef: event.customerRef,
+          currentPeriodEnd: event.currentPeriodEnd,
+          cancelAtPeriodEnd: event.cancelAtPeriodEnd,
+        };
+        let [row] = await db
+          .update(paymentSubscription)
+          .set(values)
+          .where(
+            and(
+              eq(paymentSubscription.provider, providerId),
+              eq(paymentSubscription.providerRef, event.subscriptionRef),
+            ),
+          )
+          .returning();
+        if (!row && event.userId && event.planId) {
+          [row] = await db
+            .insert(paymentSubscription)
+            .values({
+              id: crypto.randomUUID(),
+              userId: event.userId,
+              planId: event.planId,
+              provider: providerId,
+              providerRef: event.subscriptionRef,
+              ...values,
+            })
+            .onConflictDoNothing()
+            .returning();
+        }
+        if (row) {
+          await events.emit("payment.subscription_updated", {
+            userId: row.userId,
+            planId: row.planId,
+            status: row.status,
+            currentPeriodEnd: row.currentPeriodEnd ?? undefined,
+          });
+        }
+        return;
+      }
+    }
+  }
+
+  return {
+    plans,
+    providers: providers.map((p) => p.id),
+
+    /** Creates a pending order and returns the provider's checkout URL. */
+    async checkout(input: {
+      user: { id: string; email: string };
+      planId: string;
+      provider?: string;
+      /** App paths, e.g. \`/en/dashboard/billing\`. */
+      successPath: string;
+      cancelPath: string;
+    }): Promise<string> {
+      const plan = getPlan(input.planId);
+      if (!plan) throw new PaymentError("unknown_plan", \`Unknown plan "\${input.planId}"\`);
+      const gateway = input.provider ? provider(input.provider) : defaultProvider;
+      if (!gateway) throw new PaymentError("unknown_provider", "No payment provider configured");
+
+      const current = await activeSubscription(input.user.id);
+      if (plan.mode === "subscription" && current) {
+        throw new PaymentError("already_subscribed", "You already have an active subscription");
+      }
+
+      const orderId = crypto.randomUUID();
+      await db.insert(paymentOrder).values({
+        id: orderId,
+        userId: input.user.id,
+        planId: plan.id,
+        provider: gateway.id,
+        amount: plan.amount,
+        currency: plan.currency,
+      });
+
+      const session = await gateway
+        .createCheckout({
+          orderId,
+          plan,
+          customer: {
+            id: input.user.id,
+            email: input.user.email,
+            providerRef: current?.provider === gateway.id ? (current.customerRef ?? undefined) : undefined,
+          },
+          successUrl: new URL(input.successPath, baseUrl).toString(),
+          cancelUrl: new URL(input.cancelPath, baseUrl).toString(),
+        })
+        .catch((cause: unknown) => {
+          console.error(\`[payment] \${gateway.id} checkout failed\`, cause);
+          throw new PaymentError("provider_error", "The payment provider rejected the checkout");
+        });
+      await db
+        .update(paymentOrder)
+        .set({ providerRef: session.providerRef })
+        .where(eq(paymentOrder.id, orderId));
+      return session.url;
+    },
+
+    /** Verifies and applies a provider webhook. Safe to call repeatedly with the same event. */
+    async handleWebhook(providerId: string, request: Request): Promise<void> {
+      for (const event of await provider(providerId).parseWebhook(request)) {
+        await apply(providerId, event);
+      }
+    },
+
+    getSubscription: activeSubscription,
+
+    async portalUrl(userId: string, returnPath: string): Promise<string> {
+      const subscription = await activeSubscription(userId);
+      const gateway = subscription && provider(subscription.provider);
+      if (!subscription?.customerRef || !gateway?.createPortalUrl) {
+        throw new PaymentError("no_customer", "No billing portal available for this account");
+      }
+      return gateway.createPortalUrl(
+        subscription.customerRef,
+        new URL(returnPath, baseUrl).toString(),
+      );
+    },
+
+    async listOrders(userId: string, limit = 20) {
+      return db
+        .select()
+        .from(paymentOrder)
+        .where(and(eq(paymentOrder.userId, userId), eq(paymentOrder.status, "paid")))
+        .orderBy(desc(paymentOrder.createdAt))
+        .limit(limit);
+    },
+
+    /** All orders with the buyer's email, newest first. */
+    async listAllOrders({ limit, offset }: { limit: number; offset: number }) {
+      const [rows, [total]] = await Promise.all([
+        db
+          .select({ order: paymentOrder, email: user.email })
+          .from(paymentOrder)
+          .innerJoin(user, eq(paymentOrder.userId, user.id))
+          .orderBy(desc(paymentOrder.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db.select({ value: count() }).from(paymentOrder),
+      ]);
+      return { rows, total: total?.value ?? 0 };
+    },
+  };
+}
+
+export type Payment = ReturnType<typeof createPayment>;
+`],
+  ["modules/payment/files/packages/payment/src/plans.ts", `import type { Plan } from "./types";
+
+/**
+ * Your pricing. Names and descriptions are translated in
+ * \`packages/i18n/src/messages/<locale>/payment.ts\` under \`plans.<id>\`.
+ */
+export const plans = [
+  {
+    id: "starter",
+    mode: "payment",
+    amount: 900,
+    currency: "usd",
+    credits: 500,
+  },
+  {
+    id: "pro",
+    mode: "subscription",
+    interval: "month",
+    amount: 1900,
+    currency: "usd",
+    credits: 3000,
+    highlighted: true,
+  },
+] as const satisfies readonly Plan[];
+
+export type AppPlan = (typeof plans)[number];
+
+export type PlanId = AppPlan["id"];
+
+export function getPlan(id: string): AppPlan | undefined {
+  return plans.find((plan) => plan.id === id);
+}
+`],
+  ["modules/payment/files/packages/payment/src/providers/index.ts.hbs", `import type { PaymentProvider } from "../types";
+{{#each module.providers}}
+import { createProvider as {{this}}, type ProviderConfig as {{this}}Config } from "./{{this}}";
+{{/each}}
+
+export type ProvidersConfig = {{#each module.providers}}{{this}}Config{{#unless @last}} & {{/unless}}{{/each}};
+
+/** Enabled providers; the first is used when checkout does not name one. */
+export function createProviders(env: ProvidersConfig, baseUrl: string): PaymentProvider[] {
+  return [{{#each module.providers}}{{this}}({ env, baseUrl }){{#unless @last}}, {{/unless}}{{/each}}];
+}
+`],
+  ["modules/payment/files/packages/payment/src/types.ts", `export type PlanInterval = "month" | "year";
+
+export type Plan = {
+  id: string;
+  mode: "payment" | "subscription";
+  /** Price in the currency's minor unit (cents). */
+  amount: number;
+  currency: string;
+  interval?: PlanInterval;
+  /** Credits granted on every successful payment when the credits module is installed. */
+  credits?: number;
+  /** Provider price identifiers such as a Stripe price ID; inline prices are used when absent. */
+  providerRefs?: Record<string, string>;
+  highlighted?: boolean;
+};
+
+export type OrderStatus = "pending" | "paid" | "failed" | "refunded";
+
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "incomplete"
+  | "unpaid";
+
+export type CheckoutRequest = {
+  orderId: string;
+  plan: Plan;
+  customer: { id: string; email: string; providerRef?: string };
+  successUrl: string;
+  cancelUrl: string;
+};
+
+export type CheckoutSession = { url: string; providerRef: string };
+
+/** Provider webhooks normalized into the events the payment service understands. */
+export type WebhookEvent =
+  | {
+      type: "checkout.completed";
+      orderId: string;
+      providerRef: string;
+      customerRef?: string;
+      subscriptionRef?: string;
+    }
+  | {
+      type: "subscription.renewed";
+      subscriptionRef: string;
+      invoiceRef: string;
+      amount: number;
+      currency: string;
+    }
+  | {
+      type: "subscription.updated";
+      subscriptionRef: string;
+      userId?: string;
+      planId?: string;
+      customerRef?: string;
+      status: SubscriptionStatus;
+      currentPeriodEnd?: Date;
+      cancelAtPeriodEnd: boolean;
+    };
+
+/** What \`providers/index.ts\` passes to every provider's \`createProvider\`. */
+export type ProviderOptions<Config> = { env: Config; baseUrl: string };
+
+export interface PaymentProvider {
+  readonly id: string;
+  /** False when credentials are missing; checkout then defaults to the next configured provider. */
+  readonly configured: boolean;
+  createCheckout(request: CheckoutRequest): Promise<CheckoutSession>;
+  /** Verifies the request signature and returns the events it carries (possibly none). */
+  parseWebhook(request: Request): Promise<WebhookEvent[]>;
+  createPortalUrl?(customerRef: string, returnUrl: string): Promise<string>;
+}
+`],
+  ["modules/payment/frameworks/next/apps/web/src/app/[lang]/dashboard/billing/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
+import { getPlan } from "@{{projectName}}/payment";
+import { Button, buttonVariants } from "@{{projectName}}/ui/components/button";
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { openBillingPortal } from "@/app/[lang]/pricing/actions";
+import { formatMoney } from "@/lib/format";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ status?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("payment.billing.title") };
+}
+
+export default async function BillingPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const user = await requireUser(locale, "/dashboard/billing");
+  const { status } = await searchParams;
+
+  const [subscription, orders] = await Promise.all([
+    payment.getSubscription(user.id),
+    payment.listOrders(user.id),
+  ]);
+  const plan = subscription && getPlan(subscription.planId);
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+
+  return (
+    <div className="flex flex-col gap-8">
+      <h1 className="font-semibold text-2xl">{t("payment.billing.title")}</h1>
+      {status === "success" && (
+        <p className="border border-primary/40 bg-primary/5 px-4 py-3 text-sm">
+          {t("payment.billing.success")}
+        </p>
+      )}
+
+      <section className="flex flex-col gap-3 border p-4">
+        <h2 className="font-medium">{t("payment.billing.subscription")}</h2>
+        {subscription && plan ? (
+          <>
+            <p className="text-sm">
+              {t(\`payment.plans.\${plan.id}.name\`)} · {t(\`payment.billing.status.\${subscription.status}\`)}
+            </p>
+            {subscription.currentPeriodEnd && (
+              <p className="text-muted-foreground text-sm">
+                {t(
+                  subscription.cancelAtPeriodEnd ? "payment.billing.endsOn" : "payment.billing.renewsOn",
+                  { date: date.format(subscription.currentPeriodEnd) },
+                )}
+              </p>
+            )}
+            {subscription.customerRef && (
+              <form action={openBillingPortal}>
+                <input type="hidden" name="locale" value={locale} />
+                <Button type="submit" variant="outline">
+                  {t("payment.billing.manage")}
+                </Button>
+              </form>
+            )}
+          </>
+        ) : (
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-muted-foreground text-sm">{t("payment.billing.none")}</p>
+            <Link href={localePath(locale, "/pricing")} className={buttonVariants()}>
+              {t("payment.billing.viewPlans")}
+            </Link>
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium">{t("payment.billing.history")}</h2>
+        {orders.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("payment.billing.noOrders")}</p>
+        ) : (
+          <ul className="divide-y border">
+            {orders.map((order) => {
+              const orderPlan = getPlan(order.planId);
+              return (
+                <li key={order.id} className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+                  <span>{orderPlan ? t(\`payment.plans.\${orderPlan.id}.name\`) : order.planId}</span>
+                  <span className="text-muted-foreground">
+                    {date.format(order.paidAt ?? order.createdAt)}
+                  </span>
+                  <span className="tabular-nums">{formatMoney(order.amount, order.currency, locale)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+`],
+  ["modules/payment/frameworks/next/apps/web/src/app/[lang]/pricing/actions.ts.hbs", `"use server";
+
+import { payment } from "@{{projectName}}/app-services";
+import { PaymentError } from "@{{projectName}}/payment";
+import type { Route } from "next";
+import { redirect } from "next/navigation";
+
+import { localePath } from "@/lib/i18n/paths";
+import { resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+export async function startCheckout(formData: FormData) {
+  const locale = resolveLocale(String(formData.get("locale")));
+  const user = await requireUser(locale, "/pricing");
+
+  let url: string;
+  try {
+    url = await payment.checkout({
+      user,
+      planId: String(formData.get("planId")),
+      successPath: \`\${localePath(locale, "/dashboard/billing")}?status=success\`,
+      cancelPath: localePath(locale, "/pricing"),
+    });
+  } catch (error) {
+    if (!(error instanceof PaymentError)) throw error;
+    redirect(\`\${localePath(locale, "/pricing")}?error=\${error.code}\`);
+  }
+  redirect(url as Route);
+}
+
+export async function openBillingPortal(formData: FormData) {
+  const locale = resolveLocale(String(formData.get("locale")));
+  const user = await requireUser(locale, "/dashboard/billing");
+  redirect((await payment.portalUrl(user.id, localePath(locale, "/dashboard/billing"))) as Route);
+}
+`],
+  ["modules/payment/frameworks/next/apps/web/src/app/[lang]/pricing/page.tsx.hbs", `import { plans } from "@{{projectName}}/payment";
+import { Button } from "@{{projectName}}/ui/components/button";
+import type { Metadata } from "next";
+
+import { formatMoney } from "@/lib/format";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+import { startCheckout } from "./actions";
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ error?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("payment.pricing.title") };
+}
+
+export default async function PricingPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const { error } = await searchParams;
+
+  return (
+    <div className="container mx-auto flex max-w-5xl flex-col gap-10 px-4 py-16">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <h1 className="font-semibold text-3xl tracking-tight">{t("payment.pricing.title")}</h1>
+        <p className="text-muted-foreground">{t("payment.pricing.subtitle")}</p>
+        {error && (
+          <p className="text-destructive text-sm">
+            {error === "already_subscribed"
+              ? t("payment.errors.alreadySubscribed")
+              : t("payment.errors.checkout")}
+          </p>
+        )}
+      </div>
+      <div className="mx-auto grid w-full max-w-3xl gap-6 md:grid-cols-2">
+        {plans.map((plan) => (
+          <div
+            key={plan.id}
+            className={\`flex flex-col gap-6 border p-6 \${"highlighted" in plan ? "border-primary" : ""}\`}
+          >
+            <div className="flex flex-col gap-2">
+              <h2 className="font-medium">{t(\`payment.plans.\${plan.id}.name\`)}</h2>
+              <p className="text-muted-foreground text-sm">
+                {t(\`payment.plans.\${plan.id}.description\`)}
+              </p>
+            </div>
+            <p className="flex items-baseline gap-1">
+              <span className="font-semibold text-3xl">
+                {formatMoney(plan.amount, plan.currency, locale)}
+              </span>
+              <span className="text-muted-foreground text-sm">
+                {"interval" in plan
+                  ? t(\`payment.pricing.per.\${plan.interval}\`)
+                  : t("payment.pricing.oneTime")}
+              </span>
+            </p>
+{{#if (includes product.features "credits")}}
+            {"credits" in plan && (
+              <p className="text-sm">{t("payment.pricing.credits", { credits: plan.credits })}</p>
+            )}
+{{/if}}
+            <form action={startCheckout} className="mt-auto">
+              <input type="hidden" name="planId" value={plan.id} />
+              <input type="hidden" name="locale" value={locale} />
+              <Button type="submit" className="w-full" variant={"highlighted" in plan ? "default" : "outline"}>
+                {plan.mode === "subscription" ? t("payment.pricing.subscribe") : t("payment.pricing.buy")}
+              </Button>
+            </form>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/payment/frameworks/next/apps/web/src/app/api/payment/webhook/[provider]/route.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
+
+/** Point your provider's webhook at \`/api/payment/webhook/<provider>\`, e.g. \`/api/payment/webhook/stripe\`. */
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ provider: string }> },
+) {
+  const { provider } = await params;
+  try {
+    await payment.handleWebhook(provider, request);
+    return Response.json({ received: true });
+  } catch (error) {
+    console.error(\`[payment] \${provider} webhook failed\`, error);
+    return Response.json({ error: "Webhook handling failed" }, { status: 400 });
+  }
+}
+`],
+  ["modules/payment/frameworks/next/apps/web/src/lib/format.ts", `/** Formats an amount in the currency's minor unit, e.g. \`1900\` USD as \`$19.00\`. */
+export function formatMoney(amount: number, currency: string, locale: string): string {
+  const format = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  });
+  const digits = format.resolvedOptions().maximumFractionDigits ?? 2;
+  return format.format(amount / 10 ** digits);
+}
+`],
+  ["modules/payment/integrations/admin/apps/web/src/app/[lang]/admin/orders/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+
+import { Pagination } from "@/components/admin/pagination";
+import { requireAdmin } from "@/lib/admin";
+import { formatMoney } from "@/lib/format";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+const PAGE_SIZE = 20;
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ page?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("payment.admin.title") };
+}
+
+export default async function AdminOrdersPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  await requireAdmin(locale);
+  const page = Math.max(1, Number((await searchParams).page) || 1);
+
+  const { rows, total } = await payment.listAllOrders({
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  });
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="font-semibold text-2xl">{t("payment.admin.title")}</h1>
+      <div className="overflow-x-auto border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-muted-foreground text-xs">
+            <tr>
+              <th className="px-4 py-2 font-medium">{t("payment.admin.columns.date")}</th>
+              <th className="px-4 py-2 font-medium">{t("payment.admin.columns.customer")}</th>
+              <th className="px-4 py-2 font-medium">{t("payment.admin.columns.plan")}</th>
+              <th className="px-4 py-2 font-medium">{t("payment.admin.columns.provider")}</th>
+              <th className="px-4 py-2 font-medium">{t("payment.admin.columns.status")}</th>
+              <th className="px-4 py-2 text-right font-medium">{t("payment.admin.columns.amount")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.map(({ order, email }) => (
+              <tr key={order.id}>
+                <td className="px-4 py-2 text-muted-foreground">{date.format(order.createdAt)}</td>
+                <td className="px-4 py-2">{email}</td>
+                <td className="px-4 py-2">{order.planId}</td>
+                <td className="px-4 py-2">{order.provider}</td>
+                <td className="px-4 py-2">{t(\`payment.admin.status.\${order.status}\`)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {formatMoney(order.amount, order.currency, locale)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && (
+          <p className="px-4 py-6 text-center text-muted-foreground text-sm">
+            {t("payment.admin.empty")}
+          </p>
+        )}
+      </div>
+      <Pagination
+        locale={locale}
+        page={page}
+        pages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        query={ {} }
+      />
+    </div>
+  );
+}
+`],
+  ["modules/payment/providers/mock/apps/web/src/app/api/payment/mock/route.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
+
+function notFound() {
+  return new Response("Not found", { status: 404 });
+}
+
+/** A stand-in checkout page for local development. */
+export function GET(request: Request) {
+  if (process.env.NODE_ENV === "production") return notFound();
+  const params = new URL(request.url).searchParams;
+  const hidden = [...params]
+    .map(([name, value]) => \`<input type="hidden" name="\${name}" value="\${encodeURI(value)}">\`)
+    .join("");
+
+  return new Response(
+    \`<!doctype html><html><body style="font-family:system-ui;max-width:420px;margin:15vh auto;padding:0 16px">
+<h1 style="font-size:20px">Mock checkout</h1>
+<p>Plan <strong>\${encodeURI(params.get("planId") ?? "")}</strong>. No real payment is made.</p>
+<form method="post">\${hidden}<button style="padding:8px 16px">Pay</button>
+<a href="\${encodeURI(params.get("cancel") ?? "/")}" style="margin-left:12px">Cancel</a></form>
+</body></html>\`,
+    { headers: { "content-type": "text/html; charset=utf-8" } },
+  );
+}
+
+export async function POST(request: Request) {
+  if (process.env.NODE_ENV === "production") return notFound();
+  const body = await request.text();
+  await payment.handleWebhook("mock", new Request(request.url, { method: "POST", body }));
+  const success = new URLSearchParams(body).get("success");
+  return Response.redirect(success ?? new URL("/", request.url), 303);
+}
+`],
+  ["modules/payment/providers/mock/packages/payment/src/providers/mock.ts", `import type { PaymentProvider, ProviderOptions, WebhookEvent } from "../types";
+
+export type ProviderConfig = {
+  NODE_ENV: string;
+};
+
+const PERIOD_DAYS = { month: 30, year: 365 } as const;
+
+/**
+ * Simulates checkout locally: the "checkout page" is \`/api/payment/mock\`, which posts
+ * back a fake webhook. Refuses to run in production.
+ */
+export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>): PaymentProvider {
+  const guard = () => {
+    if (env.NODE_ENV === "production") {
+      throw new Error("The mock payment provider is disabled in production");
+    }
+  };
+
+  return {
+    id: "mock",
+    configured: env.NODE_ENV !== "production",
+
+    async createCheckout({ orderId, plan, customer, successUrl, cancelUrl }) {
+      guard();
+      const url = new URL("/api/payment/mock", baseUrl);
+      url.search = new URLSearchParams({
+        orderId,
+        userId: customer.id,
+        planId: plan.id,
+        interval: plan.mode === "subscription" ? (plan.interval ?? "month") : "",
+        success: successUrl,
+        cancel: cancelUrl,
+      }).toString();
+      return { url: url.toString(), providerRef: \`mock_\${orderId}\` };
+    },
+
+    async parseWebhook(request) {
+      guard();
+      const form = new URLSearchParams(await request.text());
+      const orderId = form.get("orderId");
+      if (!orderId) return [];
+      const interval = form.get("interval");
+      const subscriptionRef = interval ? \`mock_sub_\${orderId}\` : undefined;
+
+      const events: WebhookEvent[] = [];
+      if (subscriptionRef && (interval === "month" || interval === "year")) {
+        events.push({
+          type: "subscription.updated",
+          subscriptionRef,
+          userId: form.get("userId") ?? undefined,
+          planId: form.get("planId") ?? undefined,
+          status: "active",
+          currentPeriodEnd: new Date(Date.now() + PERIOD_DAYS[interval] * 86_400_000),
+          cancelAtPeriodEnd: false,
+        });
+      }
+      events.push({
+        type: "checkout.completed",
+        orderId,
+        providerRef: \`mock_\${orderId}\`,
+        subscriptionRef,
+      });
+      return events;
+    },
+  };
+}
+`],
+  ["modules/payment/providers/polar/packages/payment/src/providers/polar.ts", `import { createPolar, webhooks } from "@polar-sh/sdk/2026-10";
+
+import type { PaymentProvider, ProviderOptions, SubscriptionStatus, WebhookEvent } from "../types";
+
+export type ProviderConfig = {
+  POLAR_ACCESS_TOKEN?: string;
+  POLAR_WEBHOOK_SECRET?: string;
+  POLAR_SERVER?: "sandbox" | "production";
+};
+
+type Metadata = Record<string, string | number | boolean>;
+
+function text(metadata: Metadata, key: string): string | undefined {
+  const value = metadata[key];
+  return value === undefined ? undefined : String(value);
+}
+
+const STATUSES = new Map<string, SubscriptionStatus>([
+  ["active", "active"],
+  ["trialing", "trialing"],
+  ["past_due", "past_due"],
+  ["canceled", "canceled"],
+  ["unpaid", "unpaid"],
+  ["incomplete_expired", "canceled"],
+  ["paused", "unpaid"],
+]);
+
+export function createProvider({ env }: ProviderOptions<ProviderConfig>): PaymentProvider {
+  let client: ReturnType<typeof createPolar> | undefined;
+  const polar = () => {
+    if (!env.POLAR_ACCESS_TOKEN) {
+      throw new Error("POLAR_ACCESS_TOKEN is not set; see docs/modules/payment.md");
+    }
+    client ??= createPolar({
+      accessToken: env.POLAR_ACCESS_TOKEN,
+      environment: env.POLAR_SERVER ?? "sandbox",
+    });
+    return client;
+  };
+
+  return {
+    id: "polar",
+    configured: Boolean(env.POLAR_ACCESS_TOKEN),
+
+    async createCheckout({ orderId, plan, customer, successUrl, cancelUrl }) {
+      const productId = plan.providerRefs?.polar;
+      if (!productId) {
+        throw new Error(
+          \`Plan "\${plan.id}" has no Polar product; set providerRefs.polar in plans.ts\`,
+        );
+      }
+      const checkout = await polar().checkouts.create({
+        products: [productId],
+        metadata: { orderId, userId: customer.id, planId: plan.id },
+        customer_id: customer.providerRef,
+        external_customer_id: customer.providerRef ? undefined : customer.id,
+        customer_email: customer.email,
+        success_url: successUrl,
+        return_url: cancelUrl,
+      });
+      return { url: checkout.url, providerRef: checkout.id };
+    },
+
+    async parseWebhook(request): Promise<WebhookEvent[]> {
+      if (!env.POLAR_WEBHOOK_SECRET) throw new Error("POLAR_WEBHOOK_SECRET is not set");
+      const headers = Object.fromEntries(
+        ["webhook-id", "webhook-timestamp", "webhook-signature"].map((name) => [
+          name,
+          request.headers.get(name) ?? "",
+        ]),
+      );
+      let event: webhooks.WebhookPayload;
+      try {
+        event = await webhooks.validateEvent(
+          await request.text(),
+          headers,
+          env.POLAR_WEBHOOK_SECRET,
+        );
+      } catch (error) {
+        if (error instanceof webhooks.PolarWebhookUnknownTypeError) return [];
+        throw error;
+      }
+
+      switch (event.type) {
+        case "order.paid": {
+          const order = event.data;
+          if (order.billing_reason === "subscription_cycle") {
+            if (!order.subscription_id) return [];
+            return [
+              {
+                type: "subscription.renewed",
+                subscriptionRef: order.subscription_id,
+                invoiceRef: order.id,
+                amount: order.total_amount,
+                currency: order.currency,
+              },
+            ];
+          }
+          const orderId = text(order.metadata, "orderId");
+          if (!orderId || !["purchase", "subscription_create"].includes(order.billing_reason)) {
+            return [];
+          }
+          return [
+            {
+              type: "checkout.completed",
+              orderId,
+              providerRef: order.checkout_id ?? order.id,
+              customerRef: order.customer_id,
+              subscriptionRef: order.subscription_id ?? undefined,
+            },
+          ];
+        }
+        case "subscription.created":
+        case "subscription.updated": {
+          const subscription = event.data;
+          return [
+            {
+              type: "subscription.updated",
+              subscriptionRef: subscription.id,
+              userId:
+                text(subscription.metadata, "userId") ??
+                subscription.customer.external_id ??
+                undefined,
+              planId: text(subscription.metadata, "planId"),
+              customerRef: subscription.customer_id,
+              status: STATUSES.get(subscription.status) ?? "incomplete",
+              currentPeriodEnd: new Date(subscription.current_period_end),
+              cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            },
+          ];
+        }
+        default:
+          return [];
+      }
+    },
+
+    async createPortalUrl(customerRef, returnUrl) {
+      const session = await polar().customerSessions.create({
+        customer_id: customerRef,
+        return_url: returnUrl,
+      });
+      return session.customer_portal_url;
+    },
+  };
+}
+`],
+  ["modules/payment/providers/stripe/packages/payment/src/providers/stripe.ts", `import Stripe from "stripe";
+
+import type { PaymentProvider, ProviderOptions, SubscriptionStatus, WebhookEvent } from "../types";
+
+export type ProviderConfig = {
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+};
+
+function ref(value: string | { id: string } | null | undefined): string | undefined {
+  return value instanceof Object ? value.id : (value ?? undefined);
+}
+
+const STATUSES = new Map<string, SubscriptionStatus>([
+  ["active", "active"],
+  ["trialing", "trialing"],
+  ["past_due", "past_due"],
+  ["canceled", "canceled"],
+  ["unpaid", "unpaid"],
+  ["incomplete_expired", "canceled"],
+  ["paused", "unpaid"],
+]);
+
+export function createProvider({ env }: ProviderOptions<ProviderConfig>): PaymentProvider {
+  let client: Stripe | undefined;
+  const stripe = () => {
+    if (!env.STRIPE_SECRET_KEY) {
+      throw new Error("STRIPE_SECRET_KEY is not set; see docs/modules/payment.md");
+    }
+    client ??= new Stripe(env.STRIPE_SECRET_KEY);
+    return client;
+  };
+
+  return {
+    id: "stripe",
+    configured: Boolean(env.STRIPE_SECRET_KEY),
+
+    async createCheckout({ orderId, plan, customer, successUrl, cancelUrl }) {
+      const metadata = { orderId, userId: customer.id, planId: plan.id };
+      const priceId = plan.providerRefs?.stripe;
+      const recurring =
+        plan.mode === "subscription" ? { interval: plan.interval ?? "month" } : undefined;
+
+      const session = await stripe().checkout.sessions.create({
+        mode: plan.mode,
+        client_reference_id: orderId,
+        customer: customer.providerRef,
+        customer_email: customer.providerRef ? undefined : customer.email,
+        line_items: [
+          priceId
+            ? { price: priceId, quantity: 1 }
+            : {
+                quantity: 1,
+                price_data: {
+                  currency: plan.currency,
+                  unit_amount: plan.amount,
+                  product_data: { name: plan.id },
+                  recurring,
+                },
+              },
+        ],
+        metadata,
+        subscription_data: plan.mode === "subscription" ? { metadata } : undefined,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      });
+      if (!session.url) throw new Error("Stripe did not return a checkout URL");
+      return { url: session.url, providerRef: session.id };
+    },
+
+    async parseWebhook(request): Promise<WebhookEvent[]> {
+      if (!env.STRIPE_WEBHOOK_SECRET) throw new Error("STRIPE_WEBHOOK_SECRET is not set");
+      const signature = request.headers.get("stripe-signature");
+      if (!signature) throw new Error("Missing stripe-signature header");
+      const event = await stripe().webhooks.constructEventAsync(
+        await request.text(),
+        signature,
+        env.STRIPE_WEBHOOK_SECRET,
+      );
+
+      switch (event.type) {
+        case "checkout.session.completed":
+        case "checkout.session.async_payment_succeeded": {
+          const session = event.data.object;
+          const orderId = session.client_reference_id ?? session.metadata?.orderId;
+          if (!orderId || session.payment_status === "unpaid") return [];
+          return [
+            {
+              type: "checkout.completed",
+              orderId,
+              providerRef: session.id,
+              customerRef: ref(session.customer),
+              subscriptionRef: ref(session.subscription),
+            },
+          ];
+        }
+        case "invoice.paid": {
+          const invoice = event.data.object;
+          const subscriptionRef = ref(invoice.parent?.subscription_details?.subscription);
+          if (invoice.billing_reason !== "subscription_cycle" || !subscriptionRef || !invoice.id) {
+            return [];
+          }
+          return [
+            {
+              type: "subscription.renewed",
+              subscriptionRef,
+              invoiceRef: invoice.id,
+              amount: invoice.amount_paid,
+              currency: invoice.currency,
+            },
+          ];
+        }
+        case "customer.subscription.created":
+        case "customer.subscription.updated":
+        case "customer.subscription.deleted": {
+          const subscription = event.data.object;
+          const periodEnd = subscription.items.data[0]?.current_period_end;
+          return [
+            {
+              type: "subscription.updated",
+              subscriptionRef: subscription.id,
+              userId: subscription.metadata.userId,
+              planId: subscription.metadata.planId,
+              customerRef: ref(subscription.customer),
+              status: STATUSES.get(subscription.status) ?? "incomplete",
+              currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : undefined,
+              cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            },
+          ];
+        }
+        default:
+          return [];
+      }
+    },
+
+    async createPortalUrl(customerRef, returnUrl) {
+      const session = await stripe().billingPortal.sessions.create({
+        customer: customerRef,
+        return_url: returnUrl,
+      });
+      return session.url;
+    },
+  };
+}
+`],
+  ["packages/config/package.json.hbs", `{
+  "name": "@{{projectName}}/config",
+  "version": "0.0.0",
+  "private": true
+}
+`],
+  ["packages/config/tsconfig.base.json.hbs", `{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": [
+      {{#if (eq runtime "node")}}
+        "node"
+      {{else if (eq runtime "bun")}}
+        "bun"
+      {{else if (eq runtime "workers")}}
+        "node"
+      {{else}}
+        "node"
+      {{/if}}{{#if (or (eq serverDeploy "cloudflare") (eq webDeploy "cloudflare"))}},
+      "@cloudflare/workers-types"{{/if}}
+    ]
+  }
+}`],
+  ["packages/infra/package.json.hbs", `{
+  "name": "@{{projectName}}/infra",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "dev": "alchemy dev",
+    "deploy": "alchemy deploy",
+    "destroy": "alchemy destroy"
+  }
+}
+`],
+  ["packages/infra/tsconfig.json.hbs", `{
+  "extends": "@{{projectName}}/config/tsconfig.base.json",
+  "include": ["alchemy.run.ts"]
+}
+`],
+  ["packages/ui/components.json.hbs", `{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-lyra",
+  "rsc": {{#if (includes frontend "next")}}true{{else}}false{{/if}},
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@{{projectName}}/ui/components",
+    "utils": "@{{projectName}}/ui/lib/utils",
+    "hooks": "@{{projectName}}/ui/hooks",
+    "lib": "@{{projectName}}/ui/lib",
+    "ui": "@{{projectName}}/ui/components"
+  },
+  "menuColor": "default",
+  "menuAccent": "subtle",
+  "registries": {}
+}
+`],
+  ["packages/ui/package.json.hbs", `{
+  "name": "@{{projectName}}/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./globals.css": "./src/styles/globals.css",
+    "./lib/*": "./src/lib/*.ts",
+    "./components/*": "./src/components/*.tsx",
+    "./hooks/*": "./src/hooks/*.ts",
+    "./postcss.config": "./postcss.config.mjs"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@shadcn/react": "^0.3.1",
+    "shadcn": "^4.21.0",
+    "class-variance-authority": "^0.7.1",
+    "cn": "^0.2.5",
+    "lucide-react": "^1.41.0",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sonner": "^2.0.8",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.3"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  }
+}
+`],
+  ["packages/ui/postcss.config.mjs.hbs", `export default {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+`],
+  ["packages/ui/src/components/attachment.tsx.hbs", `import * as React from "react"
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+import { Button } from "@{{projectName}}/ui/components/button"
+
+const attachmentVariants = cva(
+  "group/attachment relative flex w-fit max-w-full min-w-0 shrink-0 flex-wrap rounded-none border bg-card text-card-foreground transition-colors focus-within:ring-1 focus-within:ring-ring/50 has-[>a,>button]:hover:bg-muted/50 data-[state=error]:border-destructive/30 data-[state=idle]:border-dashed",
+  {
+    variants: {
+      size: {
+        default:
+          "gap-2 text-xs has-data-[slot=attachment-content]:px-2 has-data-[slot=attachment-content]:py-1.5 has-data-[slot=attachment-media]:p-1.5",
+        sm: "gap-2.5 text-xs has-data-[slot=attachment-content]:px-1.5 has-data-[slot=attachment-content]:py-1 has-data-[slot=attachment-media]:p-1",
+        xs: "gap-1.5 rounded-none text-xs has-data-[slot=attachment-content]:px-1.5 has-data-[slot=attachment-content]:py-1 has-data-[slot=attachment-media]:p-1",
+      },
+      orientation: {
+        horizontal: "min-w-40 items-center",
+        vertical: "w-24 flex-col has-data-[slot=attachment-content]:w-30",
+      },
+    },
+  }
+)
+
+function Attachment({
+  className,
+  state = "done",
+  size = "default",
+  orientation = "horizontal",
+  ...props
+}: React.ComponentProps<"div"> &
+  VariantProps<typeof attachmentVariants> & {
+    state?: "idle" | "uploading" | "processing" | "error" | "done"
+  }) {
+  const resolvedOrientation = orientation ?? "horizontal"
+
+  return (
+    <div
+      data-slot="attachment"
+      data-state={state}
+      data-size={size}
+      data-orientation={resolvedOrientation}
+      className={cn(attachmentVariants({ size, orientation }), className)}
+      {...props}
+    />
+  )
+}
+
+const attachmentMediaVariants = cva(
+  "relative flex aspect-square w-10 shrink-0 items-center justify-center overflow-hidden rounded-none bg-muted text-foreground group-data-[orientation=vertical]/attachment:w-full group-data-[size=sm]/attachment:w-8 group-data-[size=xs]/attachment:w-7 group-data-[size=xs]/attachment:rounded-none group-data-[state=error]/attachment:bg-destructive/10 group-data-[state=error]/attachment:text-destructive group-data-[orientation=vertical]/attachment:*:data-[slot=spinner]:size-6! [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 group-data-[orientation=vertical]/attachment:[&_svg:not([class*='size-'])]:size-6 group-data-[size=xs]/attachment:[&_svg:not([class*='size-'])]:size-3.5",
+  {
+    variants: {
+      variant: {
+        icon: "",
+        image:
+          "opacity-60 group-data-[state=done]/attachment:opacity-100 group-data-[state=idle]/attachment:opacity-100 *:[img]:aspect-square *:[img]:w-full *:[img]:object-cover",
+      },
+    },
+    defaultVariants: {
+      variant: "icon",
+    },
+  }
+)
+
+function AttachmentMedia({
+  className,
+  variant = "icon",
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof attachmentMediaVariants>) {
+  return (
+    <div
+      data-slot="attachment-media"
+      data-variant={variant}
+      className={cn(attachmentMediaVariants({ variant }), className)}
+      {...props}
+    />
+  )
+}
+
+function AttachmentContent({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="attachment-content"
+      className={cn(
+        "max-w-full min-w-0 flex-1 leading-tight group-data-[orientation=vertical]/attachment:px-1",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AttachmentTitle({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="attachment-title"
+      className={cn(
+        "block max-w-full min-w-0 truncate font-medium group-data-[state=processing]/attachment:shimmer group-data-[state=uploading]/attachment:shimmer",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AttachmentDescription({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="attachment-description"
+      className={cn(
+        "mt-0.5 block min-w-0 truncate text-xs text-muted-foreground group-data-[state=error]/attachment:text-destructive/80",
+        "max-w-full",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AttachmentActions({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="attachment-actions"
+      className={cn(
+        "relative z-20 flex shrink-0 items-center group-data-[orientation=vertical]/attachment:absolute group-data-[orientation=vertical]/attachment:top-3 group-data-[orientation=vertical]/attachment:right-3 group-data-[orientation=vertical]/attachment:gap-1",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AttachmentAction({
+  className,
+  variant,
+  size = "icon-xs",
+  type = "button",
+  ...props
+}: React.ComponentProps<typeof Button>) {
+  return (
+    <Button
+      data-slot="attachment-action"
+      type={type}
+      variant={variant ?? "ghost"}
+      size={size}
+      className={cn(className)}
+      {...props}
+    />
+  )
+}
+
+function AttachmentTrigger({
+  className,
+  render,
+  type,
+  ...props
+}: useRender.ComponentProps<"button">) {
+  return useRender({
+    defaultTagName: "button",
+    props: mergeProps<"button">(
+      {
+        type: render ? type : (type ?? "button"),
+        className: cn("absolute inset-0 z-10 outline-none", className),
+      },
+      props
+    ),
+    render,
+    state: {
+      slot: "attachment-trigger",
+    },
+  })
+}
+
+function AttachmentGroup({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="attachment-group"
+      className={cn(
+        "flex min-w-0 scroll-fade-x snap-x snap-mandatory scroll-px-1 scrollbar-none gap-3 overflow-x-auto overscroll-x-contain py-1 *:data-[slot=attachment]:flex-none *:data-[slot=attachment]:snap-start",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  Attachment,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentContent,
+  AttachmentTitle,
+  AttachmentDescription,
+  AttachmentActions,
+  AttachmentAction,
+  AttachmentTrigger,
+}
+`],
+  ["packages/ui/src/components/bubble.tsx.hbs", `import * as React from "react"
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+
+function BubbleGroup({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="bubble-group"
+      className={cn("flex min-w-0 flex-col gap-2", className)}
+      {...props}
+    />
+  )
+}
+
+const bubbleVariants = cva(
+  "group/bubble relative flex w-fit max-w-[80%] min-w-0 flex-col gap-1 group-data-[align=end]/message:self-end data-[align=end]:self-end data-[variant=ghost]:max-w-full",
+  {
+    variants: {
+      variant: {
+        default:
+          "*:data-[slot=bubble-content]:bg-primary *:data-[slot=bubble-content]:text-primary-foreground [&>[data-slot=bubble-content]:is(button,a):hover]:bg-primary/80",
+        secondary:
+          "*:data-[slot=bubble-content]:bg-secondary *:data-[slot=bubble-content]:text-secondary-foreground [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]",
+        muted:
+          "*:data-[slot=bubble-content]:bg-muted [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[color-mix(in_oklch,var(--muted),var(--foreground)_5%)]",
+        tinted:
+          "*:data-[slot=bubble-content]:bg-[oklch(from_var(--primary)_0.93_calc(c*0.4)_h)] *:data-[slot=bubble-content]:text-foreground dark:*:data-[slot=bubble-content]:bg-[oklch(from_var(--primary)_0.3_calc(c*0.4)_h)] [&>[data-slot=bubble-content]:is(button,a):hover]:bg-[oklch(from_var(--primary)_0.88_calc(c*0.5)_h)] dark:[&>[data-slot=bubble-content]:is(button,a):hover]:bg-[oklch(from_var(--primary)_0.35_calc(c*0.5)_h)]",
+        outline:
+          "*:data-[slot=bubble-content]:border-border *:data-[slot=bubble-content]:bg-background [&>[data-slot=bubble-content]:is(button,a):hover]:bg-muted [&>[data-slot=bubble-content]:is(button,a):hover]:text-foreground dark:[&>[data-slot=bubble-content]:is(button,a):hover]:bg-input/30",
+        ghost:
+          "border-none *:data-[slot=bubble-content]:rounded-none *:data-[slot=bubble-content]:bg-transparent *:data-[slot=bubble-content]:p-0 [&>[data-slot=bubble-content]:is(button,a):hover]:bg-muted [&>[data-slot=bubble-content]:is(button,a):hover]:text-foreground dark:[&>[data-slot=bubble-content]:is(button,a):hover]:bg-muted/50",
+        destructive:
+          "*:data-[slot=bubble-content]:bg-destructive/10 *:data-[slot=bubble-content]:text-destructive dark:*:data-[slot=bubble-content]:bg-destructive/20 [&>[data-slot=bubble-content]:is(button,a):hover]:bg-destructive/20 dark:[&>[data-slot=bubble-content]:is(button,a):hover]:bg-destructive/30",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+function Bubble({
+  variant = "default",
+  align = "start",
+  className,
+  ...props
+}: React.ComponentProps<"div"> &
+  VariantProps<typeof bubbleVariants> & {
+    align?: "start" | "end"
+  }) {
+  return (
+    <div
+      data-slot="bubble"
+      data-variant={variant}
+      data-align={align}
+      className={cn(bubbleVariants({ variant }), className)}
+      {...props}
+    />
+  )
+}
+
+function BubbleContent({
+  className,
+  render,
+  ...props
+}: useRender.ComponentProps<"div">) {
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(
+      {
+        className: cn(
+          "w-fit max-w-full min-w-0 overflow-hidden rounded-none border border-transparent px-2.5 py-2 text-xs leading-relaxed wrap-break-word group-data-[align=end]/bubble:self-end [button]:text-left [button,a]:transition-colors [button,a]:outline-none [button,a]:focus-visible:border-ring [button,a]:focus-visible:ring-1 [button,a]:focus-visible:ring-ring/50",
+          className
+        ),
+      },
+      props
+    ),
+    render,
+    state: {
+      slot: "bubble-content",
+    },
+  })
+}
+
+const bubbleReactionsVariants = cva(
+  "absolute z-10 flex w-fit shrink-0 items-center justify-center gap-1 rounded-none bg-muted px-1.5 py-0.5 text-xs ring-2 ring-card has-[button]:p-0",
+  {
+    variants: {
+      side: {
+        top: "top-0 -translate-y-3/4",
+        bottom: "bottom-0 translate-y-3/4",
+      },
+      align: {
+        start: "left-3",
+        end: "right-3",
+      },
+    },
+    defaultVariants: {
+      side: "bottom",
+      align: "end",
+    },
+  }
+)
+
+function BubbleReactions({
+  side = "bottom",
+  align = "end",
+  className,
+  ...props
+}: React.ComponentProps<"div"> & {
+  align?: "start" | "end"
+  side?: "top" | "bottom"
+}) {
+  return (
+    <div
+      data-slot="bubble-reactions"
+      data-align={align}
+      data-side={side}
+      className={cn(bubbleReactionsVariants({ side, align }), className)}
+      {...props}
+    />
+  )
+}
+
+export { BubbleGroup, Bubble, BubbleContent, BubbleReactions }
+`],
+  ["packages/ui/src/components/button.tsx.hbs", `import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+
+const buttonVariants = cva(
+  "group/button inline-flex shrink-0 items-center justify-center rounded-none border border-transparent bg-clip-padding text-xs font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        outline:
+          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+        ghost:
+          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+        destructive:
+          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default:
+          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        xs: "h-6 gap-1 rounded-none px-2 text-xs has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-7 gap-1 rounded-none px-2.5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
+        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        icon: "size-8",
+        "icon-xs": "size-6 rounded-none [&_svg:not([class*='size-'])]:size-3",
+        "icon-sm": "size-7 rounded-none",
+        "icon-lg": "size-9",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
+function Button({
+  className,
+  variant = "default",
+  size = "default",
+  ...props
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  return (
+    <ButtonPrimitive
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  )
+}
+
+export { Button, buttonVariants }
+`],
+  ["packages/ui/src/components/card.tsx.hbs", `import * as React from "react"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+
+function Card({
+  className,
+  size = "default",
+  ...props
+}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+  return (
+    <div
+      data-slot="card"
+      data-size={size}
+      className={cn(
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-none bg-card py-(--card-spacing) text-xs/relaxed text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-header"
+      className={cn(
+        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-none px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-title"
+      className={cn(
+        "cn-font-heading text-sm font-medium group-data-[size=sm]/card:text-sm",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-description"
+      className={cn("text-xs/relaxed text-muted-foreground", className)}
+      {...props}
+    />
+  )
+}
+
+function CardAction({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-action"
+      className={cn(
+        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardContent({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-content"
+      className={cn("px-(--card-spacing)", className)}
+      {...props}
+    />
+  )
+}
+
+function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-footer"
+      className={cn(
+        "flex items-center rounded-none border-t p-(--card-spacing)",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardAction,
+  CardDescription,
+  CardContent,
+}
+`],
+  ["packages/ui/src/components/checkbox.tsx.hbs", `"use client"
+
+import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+import { CheckIcon } from "lucide-react"
+
+function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
+  return (
+    <CheckboxPrimitive.Root
+      data-slot="checkbox"
+      className={cn(
+        "peer relative flex size-4 shrink-0 items-center justify-center rounded-none border border-input transition-colors outline-none group-has-disabled/field:opacity-50 after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground dark:data-checked:bg-primary",
+        className
+      )}
+      {...props}
+    >
+      <CheckboxPrimitive.Indicator
+        data-slot="checkbox-indicator"
+        className="grid place-content-center text-current transition-none [&>svg]:size-3.5"
+      >
+        <CheckIcon />
+      </CheckboxPrimitive.Indicator>
+    </CheckboxPrimitive.Root>
+  )
+}
+
+export { Checkbox }
+`],
+  ["packages/ui/src/components/dropdown-menu.tsx.hbs", `"use client"
+
+import * as React from "react"
+import { Menu as MenuPrimitive } from "@base-ui/react/menu"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+import { ChevronRightIcon, CheckIcon } from "lucide-react"
+
+function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
+  return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+}
+
+function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
+  return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
+}
+
+function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
+  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
+}
+
+function DropdownMenuContent({
+  align = "start",
+  alignOffset = 0,
+  side = "bottom",
+  sideOffset = 4,
+  className,
+  ...props
+}: MenuPrimitive.Popup.Props &
+  Pick<
+    MenuPrimitive.Positioner.Props,
+    "align" | "alignOffset" | "side" | "sideOffset"
+  >) {
+  return (
+    <MenuPrimitive.Portal>
+      <MenuPrimitive.Positioner
+        className="isolate z-50 outline-none"
+        align={align}
+        alignOffset={alignOffset}
+        side={side}
+        sideOffset={sideOffset}
+      >
+        <MenuPrimitive.Popup
+          data-slot="dropdown-menu-content"
+          className={cn(
+            "cn-menu-target cn-menu-translucent z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-none bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95",
+            className
+          )}
+          {...props}
+        />
+      </MenuPrimitive.Positioner>
+    </MenuPrimitive.Portal>
+  )
+}
+
+function DropdownMenuGroup({ ...props }: MenuPrimitive.Group.Props) {
+  return <MenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
+}
+
+function DropdownMenuLabel({
+  className,
+  inset,
+  ...props
+}: MenuPrimitive.GroupLabel.Props & {
+  inset?: boolean
+}) {
+  return (
+    <MenuPrimitive.GroupLabel
+      data-slot="dropdown-menu-label"
+      data-inset={inset}
+      className={cn(
+        "px-2 py-2 text-xs text-muted-foreground data-inset:pl-7",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function DropdownMenuItem({
+  className,
+  inset,
+  variant = "default",
+  ...props
+}: MenuPrimitive.Item.Props & {
+  inset?: boolean
+  variant?: "default" | "destructive"
+}) {
+  return (
+    <MenuPrimitive.Item
+      data-slot="dropdown-menu-item"
+      data-inset={inset}
+      data-variant={variant}
+      className={cn(
+        "group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-none px-2 py-2 text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function DropdownMenuSub({ ...props }: MenuPrimitive.SubmenuRoot.Props) {
+  return <MenuPrimitive.SubmenuRoot data-slot="dropdown-menu-sub" {...props} />
+}
+
+function DropdownMenuSubTrigger({
+  className,
+  inset,
+  children,
+  ...props
+}: MenuPrimitive.SubmenuTrigger.Props & {
+  inset?: boolean
+}) {
+  return (
+    <MenuPrimitive.SubmenuTrigger
+      data-slot="dropdown-menu-sub-trigger"
+      data-inset={inset}
+      className={cn(
+        "flex cursor-default items-center gap-2 rounded-none px-2 py-2 text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-popup-open:bg-accent data-popup-open:text-accent-foreground data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <ChevronRightIcon className="cn-rtl-flip ml-auto" />
+    </MenuPrimitive.SubmenuTrigger>
+  )
+}
+
+function DropdownMenuSubContent({
+  align = "start",
+  alignOffset = -3,
+  side = "right",
+  sideOffset = 0,
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuContent>) {
+  return (
+    <DropdownMenuContent
+      data-slot="dropdown-menu-sub-content"
+      className={cn(
+        "cn-menu-target cn-menu-translucent w-auto min-w-[96px] rounded-none bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+        className
+      )}
+      align={align}
+      alignOffset={alignOffset}
+      side={side}
+      sideOffset={sideOffset}
+      {...props}
+    />
+  )
+}
+
+function DropdownMenuCheckboxItem({
+  className,
+  children,
+  checked,
+  inset,
+  ...props
+}: MenuPrimitive.CheckboxItem.Props & {
+  inset?: boolean
+}) {
+  return (
+    <MenuPrimitive.CheckboxItem
+      data-slot="dropdown-menu-checkbox-item"
+      data-inset={inset}
+      className={cn(
+        "relative flex cursor-default items-center gap-2 rounded-none py-2 pr-8 pl-2 text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      checked={checked}
+      {...props}
+    >
+      <span
+        className="pointer-events-none absolute right-2 flex items-center justify-center"
+        data-slot="dropdown-menu-checkbox-item-indicator"
+      >
+        <MenuPrimitive.CheckboxItemIndicator>
+          <CheckIcon />
+        </MenuPrimitive.CheckboxItemIndicator>
+      </span>
+      {children}
+    </MenuPrimitive.CheckboxItem>
+  )
+}
+
+function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
+  return (
+    <MenuPrimitive.RadioGroup
+      data-slot="dropdown-menu-radio-group"
+      {...props}
+    />
+  )
+}
+
+function DropdownMenuRadioItem({
+  className,
+  children,
+  inset,
+  ...props
+}: MenuPrimitive.RadioItem.Props & {
+  inset?: boolean
+}) {
+  return (
+    <MenuPrimitive.RadioItem
+      data-slot="dropdown-menu-radio-item"
+      data-inset={inset}
+      className={cn(
+        "relative flex cursor-default items-center gap-2 rounded-none py-2 pr-8 pl-2 text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      <span
+        className="pointer-events-none absolute right-2 flex items-center justify-center"
+        data-slot="dropdown-menu-radio-item-indicator"
+      >
+        <MenuPrimitive.RadioItemIndicator>
+          <CheckIcon />
+        </MenuPrimitive.RadioItemIndicator>
+      </span>
+      {children}
+    </MenuPrimitive.RadioItem>
+  )
+}
+
+function DropdownMenuSeparator({
+  className,
+  ...props
+}: MenuPrimitive.Separator.Props) {
+  return (
+    <MenuPrimitive.Separator
+      data-slot="dropdown-menu-separator"
+      className={cn("-mx-1 h-px bg-border", className)}
+      {...props}
+    />
+  )
+}
+
+function DropdownMenuShortcut({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="dropdown-menu-shortcut"
+      className={cn(
+        "ml-auto text-xs tracking-widest text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  DropdownMenu,
+  DropdownMenuPortal,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+}
+`],
+  ["packages/ui/src/components/empty.tsx.hbs", `import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+
+function Empty({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="empty"
+      className={cn(
+        "flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-none border-dashed p-6 text-center text-balance md:p-12",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="empty-header"
+      className={cn("flex max-w-sm flex-col items-center gap-2", className)}
+      {...props}
+    />
+  )
+}
+
+const emptyMediaVariants = cva(
+  "mb-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default: "bg-transparent",
+        icon: "flex size-10 shrink-0 items-center justify-center rounded-none bg-muted text-foreground [&_svg:not([class*='size-'])]:size-5",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+function EmptyMedia({
+  className,
+  variant = "default",
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof emptyMediaVariants>) {
+  return (
+    <div
+      data-slot="empty-icon"
+      data-variant={variant}
+      className={cn(emptyMediaVariants({ variant, className }))}
+      {...props}
+    />
+  )
+}
+
+function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="empty-title"
+      className={cn("cn-font-heading text-sm font-medium tracking-tight", className)}
+      {...props}
+    />
+  )
+}
+
+function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <div
+      data-slot="empty-description"
+      className={cn(
+        "text-sm/relaxed text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function EmptyContent({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="empty-content"
+      className={cn(
+        "flex w-full max-w-sm min-w-0 flex-col items-center gap-4 text-sm text-balance",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  Empty,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+  EmptyMedia,
+}
+`],
+  ["packages/ui/src/components/input-group.tsx.hbs", `"use client"
+
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+import { Button } from "@{{projectName}}/ui/components/button"
+import { Input } from "@{{projectName}}/ui/components/input"
+import { Textarea } from "@{{projectName}}/ui/components/textarea"
+
+function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="input-group"
+      role="group"
+      className={cn(
+        "group/input-group relative flex h-8 w-full min-w-0 items-center rounded-none border border-input bg-background shadow-xs transition-[color,box-shadow] outline-none has-[>textarea]:h-auto dark:bg-input/30",
+        "has-[>[data-align=inline-start]]:[&>input]:pl-2 has-[>[data-align=inline-end]]:[&>input]:pr-2",
+        "has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-start]]:[&>input]:pb-3",
+        "has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3",
+        "has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-1 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50",
+        "has-[[data-slot][aria-invalid=true]]:border-destructive has-[[data-slot][aria-invalid=true]]:ring-1 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+const inputGroupAddonVariants = cva(
+  "flex h-auto cursor-text select-none items-center justify-center gap-2 py-1.5 text-xs font-medium text-muted-foreground group-data-[disabled=true]/input-group:opacity-50 [&>kbd]:rounded-none [&>svg:not([class*='size-'])]:size-4",
+  {
+    variants: {
+      align: {
+        "inline-start":
+          "order-first pl-2 has-[>button]:ml-[-0.3rem] has-[>kbd]:ml-[-0.15rem]",
+        "inline-end":
+          "order-last pr-2 has-[>button]:mr-[-0.3rem] has-[>kbd]:mr-[-0.15rem]",
+        "block-start":
+          "order-first w-full justify-start px-2.5 pt-2 group-has-[>input]/input-group:pt-2 [.border-b]:pb-2",
+        "block-end":
+          "order-last w-full justify-start px-2.5 pb-2 group-has-[>input]/input-group:pb-2 [.border-t]:pt-2",
+      },
+    },
+    defaultVariants: {
+      align: "inline-start",
+    },
+  }
+)
+
+function InputGroupAddon({
+  className,
+  align = "inline-start",
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
+  return (
+    <div
+      role="group"
+      data-slot="input-group-addon"
+      data-align={align}
+      className={cn(inputGroupAddonVariants({ align }), className)}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("button")) {
+          return
+        }
+        e.currentTarget.parentElement
+          ?.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea")
+          ?.focus()
+      }}
+      {...props}
+    />
+  )
+}
+
+const inputGroupButtonVariants = cva(
+  "flex items-center gap-2 text-xs shadow-none",
+  {
+    variants: {
+      size: {
+        xs: "h-6 gap-1 rounded-none px-1.5 [&>svg:not([class*='size-'])]:size-3.5",
+        sm: "h-7 gap-1 rounded-none px-2",
+        "icon-xs": "size-6 rounded-none p-0 has-[>svg]:p-0",
+        "icon-sm": "size-7 rounded-none p-0 has-[>svg]:p-0",
+      },
+    },
+    defaultVariants: {
+      size: "xs",
+    },
+  }
+)
+
+function InputGroupButton({
+  className,
+  type = "button",
+  variant = "ghost",
+  size = "xs",
+  ...props
+}: Omit<React.ComponentProps<typeof Button>, "size" | "type"> &
+  VariantProps<typeof inputGroupButtonVariants> & {
+    type?: "button" | "submit" | "reset"
+  }) {
+  return (
+    <Button
+      type={type}
+      data-size={size}
+      variant={variant}
+      className={cn(inputGroupButtonVariants({ size }), className)}
+      {...props}
+    />
+  )
+}
+
+function InputGroupText({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      className={cn(
+        "flex items-center gap-2 text-xs text-muted-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function InputGroupInput({
+  className,
+  ...props
+}: React.ComponentProps<"input">) {
+  return (
+    <Input
+      data-slot="input-group-control"
+      className={cn(
+        "flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0 disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function InputGroupTextarea({
+  className,
+  ...props
+}: React.ComponentProps<"textarea">) {
+  return (
+    <Textarea
+      data-slot="input-group-control"
+      className={cn(
+        "flex-1 resize-none rounded-none border-0 bg-transparent py-2 shadow-none ring-0 focus-visible:ring-0 disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupText,
+  InputGroupInput,
+  InputGroupTextarea,
+}
+`],
+  ["packages/ui/src/components/input.tsx.hbs", `import * as React from "react"
+import { Input as InputPrimitive } from "@base-ui/react/input"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+
+function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  return (
+    <InputPrimitive
+      type={type}
+      data-slot="input"
+      className={cn(
+        "h-8 w-full min-w-0 rounded-none border border-input bg-transparent px-2.5 py-1 text-xs transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-xs file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 md:text-xs dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Input }
+`],
+  ["packages/ui/src/components/label.tsx.hbs", `"use client"
+
+import * as React from "react"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+
+function Label({ className, ...props }: React.ComponentProps<"label">) {
+  return (
+    <label
+      data-slot="label"
+      className={cn(
+        "flex items-center gap-2 text-xs leading-none select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Label }
+`],
+  ["packages/ui/src/components/marker.tsx.hbs", `import * as React from "react"
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+
+const markerVariants = cva(
+  "group/marker relative flex min-h-4 w-full items-center gap-2 text-left text-xs text-muted-foreground [&_svg:not([class*='size-'])]:size-3.5 [a]:underline [a]:underline-offset-3 [a]:hover:text-foreground",
+  {
+    variants: {
+      variant: {
+        default: "",
+        separator:
+          "before:mr-1 before:h-px before:min-w-0 before:flex-1 before:bg-border after:ml-1 after:h-px after:min-w-0 after:flex-1 after:bg-border",
+        border: "border-b border-border pb-2",
+      },
+    },
+  }
+)
+
+function Marker({
+  className,
+  variant = "default",
+  render,
+  ...props
+}: useRender.ComponentProps<"div"> & VariantProps<typeof markerVariants>) {
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">(
+      {
+        className: cn(markerVariants({ variant, className })),
+      },
+      props
+    ),
+    render,
+    state: {
+      slot: "marker",
+      variant,
+    },
+  })
+}
+
+function MarkerIcon({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="marker-icon"
+      aria-hidden="true"
+      className={cn(
+        "size-3.5 shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function MarkerContent({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="marker-content"
+      className={cn(
+        "min-w-0 wrap-break-word group-data-[variant=separator]/marker:flex-none group-data-[variant=separator]/marker:text-center *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Marker, MarkerIcon, MarkerContent, markerVariants }
+`],
+  ["packages/ui/src/components/message-scroller.tsx.hbs", `"use client"
+
+import * as React from "react"
+import {
+  MessageScroller as MessageScrollerPrimitive,
+  useMessageScroller,
+  useMessageScrollerScrollable,
+  useMessageScrollerVisibility,
+} from "@shadcn/react/message-scroller"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+import { Button } from "@{{projectName}}/ui/components/button"
+import { ArrowDownIcon } from "lucide-react"
+
+function MessageScrollerProvider(
+  props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>
+) {
+  return <MessageScrollerPrimitive.Provider {...props} />
+}
+
+function MessageScroller({
+  className,
+  ...props
+}: React.ComponentProps<typeof MessageScrollerPrimitive.Root>) {
+  return (
+    <MessageScrollerPrimitive.Root
+      data-slot="message-scroller"
+      className={cn(
+        "cn-message-scroller group/message-scroller relative flex size-full min-h-0 flex-col overflow-hidden",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function MessageScrollerViewport({
+  className,
+  ...props
+}: React.ComponentProps<typeof MessageScrollerPrimitive.Viewport>) {
+  return (
+    <MessageScrollerPrimitive.Viewport
+      data-slot="message-scroller-viewport"
+      className={cn(
+        "cn-message-scroller-viewport size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-none",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function MessageScrollerContent({
+  className,
+  ...props
+}: React.ComponentProps<typeof MessageScrollerPrimitive.Content>) {
+  return (
+    <MessageScrollerPrimitive.Content
+      data-slot="message-scroller-content"
+      className={cn(
+        "cn-message-scroller-content flex h-max min-h-full flex-col gap-6",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function MessageScrollerItem({
+  className,
+  scrollAnchor = false,
+  ...props
+}: React.ComponentProps<typeof MessageScrollerPrimitive.Item>) {
+  return (
+    <MessageScrollerPrimitive.Item
+      data-slot="message-scroller-item"
+      scrollAnchor={scrollAnchor}
+      className={cn(
+        "cn-message-scroller-item min-w-0 shrink-0 [contain-intrinsic-size:auto_10rem] [content-visibility:auto]",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function MessageScrollerButton({
+  direction = "end",
+  className,
+  children,
+  render,
+  variant = "secondary",
+  size = "icon-sm",
+  ...props
+}: React.ComponentProps<typeof MessageScrollerPrimitive.Button> &
+  Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
+  return (
+    <MessageScrollerPrimitive.Button
+      data-slot="message-scroller-button"
+      data-direction={direction}
+      data-variant={variant}
+      data-size={size}
+      direction={direction}
+      className={cn(
+        "cn-message-scroller-button absolute inset-s-1/2 -translate-x-1/2 border-border bg-background text-foreground transition-[translate,scale,opacity] duration-200 hover:bg-muted hover:text-foreground data-[active=false]:pointer-events-none data-[active=false]:scale-95 data-[active=false]:opacity-0 data-[active=false]:duration-400 data-[active=false]:ease-[cubic-bezier(0.7,0,0.84,0)] data-[active=true]:translate-y-0 data-[active=true]:scale-100 data-[active=true]:opacity-100 data-[active=true]:ease-[cubic-bezier(0.23,1,0.32,1)] data-[direction=end]:bottom-4 data-[direction=end]:data-[active=false]:translate-y-full data-[direction=start]:top-4 data-[direction=start]:data-[active=false]:-translate-y-full rtl:translate-x-1/2 data-[direction=start]:[&_svg]:rotate-180",
+        className
+      )}
+      render={render ?? <Button variant={variant} size={size} />}
+      {...props}
+    >
+      {children ?? (
+        <>
+          <ArrowDownIcon />
+          <span className="sr-only">
+            {direction === "end" ? "Scroll to end" : "Scroll to start"}
+          </span>
+        </>
+      )}
+    </MessageScrollerPrimitive.Button>
+  )
+}
+
+export {
+  MessageScrollerProvider,
+  MessageScroller,
+  MessageScrollerViewport,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerButton,
+  useMessageScroller,
+  useMessageScrollerScrollable,
+  useMessageScrollerVisibility,
+}
+`],
+  ["packages/ui/src/components/message.tsx.hbs", `import * as React from "react"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+
+function MessageGroup({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="message-group"
+      className={cn("flex min-w-0 flex-col gap-1.5", className)}
+      {...props}
+    />
+  )
+}
+
+function Message({
+  className,
+  align = "start",
+  ...props
+}: React.ComponentProps<"div"> & { align?: "start" | "end" }) {
+  return (
+    <div
+      data-slot="message"
+      data-align={align}
+      className={cn(
+        "group/message relative flex w-full min-w-0 gap-1.5 text-xs data-[align=end]:flex-row-reverse",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function MessageAvatar({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="message-avatar"
+      className={cn(
+        "flex w-fit min-w-8 shrink-0 items-center justify-center self-end overflow-hidden rounded-full bg-muted group-has-data-[slot=message-footer]/message:-translate-y-8",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function MessageContent({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="message-content"
+      className={cn(
+        "flex w-full min-w-0 flex-col gap-2 wrap-break-word group-data-[align=end]/message:*:data-slot:self-end",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function MessageHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="message-header"
+      className={cn(
+        "flex max-w-full min-w-0 items-center px-2.5 text-xs font-medium text-muted-foreground group-has-data-[variant=ghost]/message:px-0",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function MessageFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="message-footer"
+      className={cn(
+        "flex max-w-full min-w-0 items-center px-2.5 text-xs font-medium text-muted-foreground group-has-data-[variant=ghost]/message:px-0 group-data-[align=end]/message:justify-end",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export {
+  MessageGroup,
+  Message,
+  MessageAvatar,
+  MessageContent,
+  MessageFooter,
+  MessageHeader,
+}
+`],
+  ["packages/ui/src/components/skeleton.tsx.hbs", `import { cn } from "@{{projectName}}/ui/lib/utils"
+
+function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="skeleton"
+      className={cn("animate-pulse rounded-none bg-muted", className)}
+      {...props}
+    />
+  )
+}
+
+export { Skeleton }
+`],
+  ["packages/ui/src/components/sonner.tsx.hbs", `"use client"
+
+import { useTheme } from "next-themes"
+import { Toaster as Sonner, type ToasterProps } from "sonner"
+
+import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon } from "lucide-react"
+
+const Toaster = ({ ...props }: ToasterProps) => {
+  const { theme = "system" } = useTheme()
+
+  return (
+    <Sonner
+      theme={theme as ToasterProps["theme"]}
+      className="toaster group"
+      icons=\\{{
+        success: (
+          <CircleCheckIcon className="size-4" />
+        ),
+        info: (
+          <InfoIcon className="size-4" />
+        ),
+        warning: (
+          <TriangleAlertIcon className="size-4" />
+        ),
+        error: (
+          <OctagonXIcon className="size-4" />
+        ),
+        loading: (
+          <Loader2Icon className="size-4 animate-spin" />
+        ),
+      }}
+      style={
+        {
+          "--normal-bg": "var(--popover)",
+          "--normal-text": "var(--popover-foreground)",
+          "--normal-border": "var(--border)",
+          "--border-radius": "var(--radius)",
+        } as React.CSSProperties
+      }
+      toastOptions=\\{{
+        classNames: {
+          toast: "cn-toast",
+        },
+      }}
+      {...props}
+    />
+  )
+}
+
+export { Toaster }
+`],
+  ["packages/ui/src/components/textarea.tsx.hbs", `import * as React from "react"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+
+function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
+  return (
+    <textarea
+      data-slot="textarea"
+      className={cn(
+        "flex field-sizing-content min-h-16 w-full resize-none rounded-none border border-input bg-transparent px-2.5 py-2 text-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 md:text-xs dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Textarea }
+`],
+  ["packages/ui/src/components/tooltip.tsx.hbs", `"use client"
+
+import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
+
+import { cn } from "@{{projectName}}/ui/lib/utils"
+
+function TooltipProvider({
+  delay = 0,
+  ...props
+}: TooltipPrimitive.Provider.Props) {
+  return (
+    <TooltipPrimitive.Provider
+      data-slot="tooltip-provider"
+      delay={delay}
+      {...props}
+    />
+  )
+}
+
+function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
+  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+}
+
+function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
+  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
+}
+
+function TooltipContent({
+  className,
+  side = "top",
+  sideOffset = 4,
+  align = "center",
+  alignOffset = 0,
+  children,
+  ...props
+}: TooltipPrimitive.Popup.Props &
+  Pick<
+    TooltipPrimitive.Positioner.Props,
+    "align" | "alignOffset" | "side" | "sideOffset"
+  >) {
+  return (
+    <TooltipPrimitive.Portal>
+      <TooltipPrimitive.Positioner
+        align={align}
+        alignOffset={alignOffset}
+        side={side}
+        sideOffset={sideOffset}
+        className="isolate z-50"
+      >
+        <TooltipPrimitive.Popup
+          data-slot="tooltip-content"
+          className={cn(
+            "z-50 inline-flex w-fit max-w-xs origin-(--transform-origin) items-center gap-1.5 rounded-none bg-foreground px-3 py-1.5 text-xs text-background has-data-[slot=kbd]:pr-1.5 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            className
+          )}
+          {...props}
+        >
+          {children}
+          <TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%-2px)] rotate-45 rounded-none bg-foreground fill-foreground data-[side=bottom]:top-1 data-[side=inline-end]:top-1/2! data-[side=inline-end]:-left-1 data-[side=inline-end]:-translate-y-1/2 data-[side=inline-start]:top-1/2! data-[side=inline-start]:-right-1 data-[side=inline-start]:-translate-y-1/2 data-[side=left]:top-1/2! data-[side=left]:-right-1 data-[side=left]:-translate-y-1/2 data-[side=right]:top-1/2! data-[side=right]:-left-1 data-[side=right]:-translate-y-1/2 data-[side=top]:-bottom-2.5" />
+        </TooltipPrimitive.Popup>
+      </TooltipPrimitive.Positioner>
+    </TooltipPrimitive.Portal>
+  )
+}
+
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
+`],
+  ["packages/ui/src/hooks/.gitkeep", ``],
+  ["packages/ui/src/lib/utils.ts.hbs", `export { cn } from "cn";
+`],
+  ["packages/ui/src/styles/globals.css.hbs", `@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@source "../../../apps/**/*.{ts,tsx}";
+@source "../**/*.{ts,tsx}";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.58 0.22 27);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.87 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.371 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply font-sans bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+`],
+  ["packages/ui/tsconfig.json.hbs", `{
+  "extends": "@{{projectName}}/config/tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": [],
+    "paths": {
+      "@{{projectName}}/ui/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules"]
+}
+`]
+]);
+
+export const TEMPLATE_COUNT = 578;

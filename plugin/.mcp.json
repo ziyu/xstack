@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "xstack": {
+      "command": "npx",
+      "args": ["-y", "xstack@latest", "mcp"],
+      "note": "Official xstack MCP server (stdio). Exposes xstack_get_stack_guidance, xstack_get_schema, xstack_plan_project, xstack_create_project, xstack_plan_addons, and xstack_add_addons. Runs via npx; no API key or auth required."
+    }
+  }
+}

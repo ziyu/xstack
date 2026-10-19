@@ -1,0 +1,8 @@
+import { auth } from "@{{projectName}}/app-services";
+
+import { isSocialProvider, type SocialProvider } from "./social-providers";
+
+/** OAuth providers whose credentials are configured. */
+export function enabledSocialProviders(): SocialProvider[] {
+  return Object.keys(auth.options.socialProviders).filter(isSocialProvider);
+}

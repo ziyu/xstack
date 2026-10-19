@@ -1,0 +1,36 @@
+"use server";
+
+import { auth, credits } from "@{{projectName}}/app-services";
+import { InsufficientCreditsError } from "@{{projectName}}/credits";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
+import { requireAdmin } from "@/lib/admin";
+import { localePath } from "@/lib/i18n/paths";
+import { resolveLocale } from "@/lib/i18n/server";
+
+export async function adjustCredits(formData: FormData) {
+  const locale = resolveLocale(String(formData.get("locale")));
+  const { user: admin } = await requireAdmin(locale);
+  const back = localePath(locale, "/admin/credits");
+
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const amount = Number(formData.get("amount"));
+  const note = String(formData.get("reason") ?? "").trim();
+  if (!email || !Number.isInteger(amount) || amount === 0) redirect(`${back}?error=invalid`);
+
+  const { users } = await auth.api.listUsers({
+    headers: await headers(),
+    query: { filterField: "email", filterValue: email, filterOperator: "eq", limit: 1 },
+  });
+  const target = users[0];
+  if (!target) redirect(`${back}?error=user`);
+
+  try {
+    await credits.adjust(target.id, amount, note ? `${note} (${admin.email})` : admin.email);
+  } catch (error) {
+    if (!(error instanceof InsufficientCreditsError)) throw error;
+    redirect(`${back}?error=balance`);
+  }
+  redirect(`${back}?done=1`);
+}

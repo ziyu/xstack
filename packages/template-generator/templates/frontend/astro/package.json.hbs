@@ -1,0 +1,26 @@
+{
+  "name": "web",
+  "type": "module",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+{{#unless (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}astro build",
+
+{{/unless}}
+		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}astro check",
+{{#unless (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
+    "preview": "astro preview",
+{{/unless}}
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^7.3.1"
+  },
+  "devDependencies": {
+		"@astrojs/check": "^0.9.10",
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}

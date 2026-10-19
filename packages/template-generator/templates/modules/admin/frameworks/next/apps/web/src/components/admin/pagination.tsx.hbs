@@ -1,0 +1,28 @@
+import type { Locale } from "@{{projectName}}/i18n";
+
+import { getTranslator } from "@/lib/i18n/server";
+
+/** Previous/next links that keep the current query string. */
+export function Pagination({
+  locale,
+  page,
+  pages,
+  query,
+}: {
+  locale: Locale;
+  page: number;
+  pages: number;
+  query: Record<string, string>;
+}) {
+  if (pages <= 1) return null;
+  const t = getTranslator(locale);
+  const href = (target: number) => `?${new URLSearchParams({ ...query, page: String(target) })}`;
+
+  return (
+    <nav className="flex items-center gap-4 text-sm">
+      {page > 1 && <a href={href(page - 1)}>{t("admin.pagination.previous")}</a>}
+      <span className="text-muted-foreground">{t("admin.pagination.page", { page, pages })}</span>
+      {page < pages && <a href={href(page + 1)}>{t("admin.pagination.next")}</a>}
+    </nav>
+  );
+}

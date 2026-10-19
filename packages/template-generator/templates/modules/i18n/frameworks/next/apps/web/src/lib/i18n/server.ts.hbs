@@ -1,0 +1,12 @@
+import { createTranslator, getMessages, isLocale, type Locale } from "@{{projectName}}/i18n";
+import { notFound } from "next/navigation";
+
+/** Validates the `[lang]` route segment. */
+export function resolveLocale(value: string): Locale {
+  if (!isLocale(value)) notFound();
+  return value;
+}
+
+export function getTranslator(locale: Locale) {
+  return createTranslator(getMessages(locale));
+}

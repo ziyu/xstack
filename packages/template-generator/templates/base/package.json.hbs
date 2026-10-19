@@ -1,0 +1,18 @@
+{
+  "name": "xstack",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+{{#if (and (includes frontend "solid") (ne packageManager "pnpm"))}}
+  "overrides": {
+    "solid-js": "2.0.0-rc.14",
+    "@solidjs/signals": "2.0.0-rc.14",
+    "@solidjs/compiler": "2.0.0-rc.14",
+    "@solidjs/babel-plugin": "2.0.0-rc.14"
+  },
+{{/if}}
+  "scripts": {}
+}

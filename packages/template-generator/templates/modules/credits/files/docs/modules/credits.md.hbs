@@ -1,0 +1,32 @@
+# Credits
+
+`packages/credits` keeps a balance per user (`credit_balance`) and an append-only ledger (`credit_transaction`). Every change goes through one transaction that updates the balance and records the entry together.
+
+## API
+
+```ts
+import { credits } from "@{{projectName}}/app-services";
+
+await credits.getBalance(userId);
+await credits.grant(userId, 100, { type: "grant", reason: "beta tester", referenceId: "beta:2026" });
+await credits.consume(userId, 5, { reason: "image generation", referenceId: `job:${jobId}` });
+await credits.adjust(userId, -20, "manual correction");
+```
+
+- `consume` throws `InsufficientCreditsError` and changes nothing if the balance is too low.
+- A `referenceId` is applied at most once. Pass one whenever the caller can retry.
+- Every applied change emits `credits.changed`.
+
+## Sources
+
+{{#if module.options.signupBonus}}
+- **Sign-up bonus:** {{module.options.signupBonus}} credits for each new account (`apps/web/src/integrations/credits-signup.ts`).
+{{else}}
+- **Sign-up bonus:** disabled. Set the credits `signupBonus` option, or edit `apps/web/src/integrations/credits-signup.ts`.
+{{/if}}
+{{#if (includes module.integrations "payment")}}
+- **Purchases:** each paid order grants its plan's `credits` (`packages/payment/src/plans.ts`), keyed by `order:<orderId>`. Subscription renewals grant them again every period.
+{{/if}}
+{{#if (includes module.integrations "admin")}}
+- **Admin:** `/admin/credits` lists all transactions and lets admins adjust a user's balance by email.
+{{/if}}

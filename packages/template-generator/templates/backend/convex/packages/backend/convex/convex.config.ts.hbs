@@ -1,0 +1,11 @@
+import { defineApp } from "convex/server";
+{{#if (eq auth "better-auth")}}
+import betterAuth from "@convex-dev/better-auth/convex.config";
+{{/if}}
+
+const app = defineApp();
+{{#if (eq auth "better-auth")}}
+app.use(betterAuth);
+{{/if}}
+
+export default app;

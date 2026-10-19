@@ -1,0 +1,283 @@
+import type { Database } from "@{{projectName}}/db";
+import { user } from "@{{projectName}}/db/schema/auth";
+import { paymentOrder, paymentSubscription } from "@{{projectName}}/db/schema/payment";
+import type { EventBus } from "@{{projectName}}/events";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
+
+import "./events";
+import { getPlan, plans } from "./plans";
+import { createProviders, type ProvidersConfig } from "./providers";
+import type { PaymentProvider, WebhookEvent } from "./types";
+
+export { getPlan, plans, type AppPlan, type PlanId } from "./plans";
+export type * from "./types";
+
+export class PaymentError extends Error {
+  constructor(
+    readonly code:
+      | "unknown_plan"
+      | "unknown_provider"
+      | "provider_error"
+      | "already_subscribed"
+      | "no_customer",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const LIVE_SUBSCRIPTION = ["active", "trialing", "past_due"] as const;
+
+export type PaymentOptions = {
+  env: ProvidersConfig;
+  db: Database;
+  events: EventBus;
+  /** Public app URL used to build absolute redirect URLs. */
+  baseUrl: string;
+};
+
+export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
+  const providers = createProviders(env, baseUrl);
+  const defaultProvider = providers.find((p) => p.configured);
+
+  function provider(id: string): PaymentProvider {
+    const found = providers.find((p) => p.id === id);
+    if (!found) throw new PaymentError("unknown_provider", `Unknown payment provider "${id}"`);
+    return found;
+  }
+
+  async function activeSubscription(userId: string) {
+    const [row] = await db
+      .select()
+      .from(paymentSubscription)
+      .where(
+        and(
+          eq(paymentSubscription.userId, userId),
+          inArray(paymentSubscription.status, LIVE_SUBSCRIPTION),
+        ),
+      )
+      .orderBy(desc(paymentSubscription.updatedAt))
+      .limit(1);
+    return row;
+  }
+
+  /** Marks the order paid; returns it when it is (or already was) paid. */
+  async function markPaid(
+    orderId: string,
+    providerRef: string,
+  ): Promise<typeof paymentOrder.$inferSelect | undefined> {
+    const [updated] = await db
+      .update(paymentOrder)
+      .set({ status: "paid", providerRef, paidAt: new Date() })
+      .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "pending")))
+      .returning();
+    if (updated) return updated;
+    const [existing] = await db
+      .select()
+      .from(paymentOrder)
+      .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "paid")));
+    return existing;
+  }
+
+  async function emitPaid(order: typeof paymentOrder.$inferSelect, renewal: boolean) {
+    const plan = getPlan(order.planId);
+    if (!plan) return;
+    await events.emit("payment.order_paid", {
+      orderId: order.id,
+      userId: order.userId,
+      plan,
+      amount: order.amount,
+      currency: order.currency,
+      renewal,
+    });
+  }
+
+  async function apply(providerId: string, event: WebhookEvent) {
+    switch (event.type) {
+      case "checkout.completed": {
+        const order = await markPaid(event.orderId, event.providerRef);
+        if (order) await emitPaid(order, false);
+        return;
+      }
+      case "subscription.renewed": {
+        const [subscription] = await db
+          .select()
+          .from(paymentSubscription)
+          .where(
+            and(
+              eq(paymentSubscription.provider, providerId),
+              eq(paymentSubscription.providerRef, event.subscriptionRef),
+            ),
+          );
+        if (!subscription) return;
+        await db
+          .insert(paymentOrder)
+          .values({
+            id: crypto.randomUUID(),
+            userId: subscription.userId,
+            planId: subscription.planId,
+            provider: providerId,
+            providerRef: event.invoiceRef,
+            status: "paid",
+            amount: event.amount,
+            currency: event.currency,
+            paidAt: new Date(),
+          })
+          .onConflictDoNothing();
+        const [order] = await db
+          .select()
+          .from(paymentOrder)
+          .where(
+            and(eq(paymentOrder.provider, providerId), eq(paymentOrder.providerRef, event.invoiceRef)),
+          );
+        if (order) await emitPaid(order, true);
+        return;
+      }
+      case "subscription.updated": {
+        const values = {
+          status: event.status,
+          customerRef: event.customerRef,
+          currentPeriodEnd: event.currentPeriodEnd,
+          cancelAtPeriodEnd: event.cancelAtPeriodEnd,
+        };
+        let [row] = await db
+          .update(paymentSubscription)
+          .set(values)
+          .where(
+            and(
+              eq(paymentSubscription.provider, providerId),
+              eq(paymentSubscription.providerRef, event.subscriptionRef),
+            ),
+          )
+          .returning();
+        if (!row && event.userId && event.planId) {
+          [row] = await db
+            .insert(paymentSubscription)
+            .values({
+              id: crypto.randomUUID(),
+              userId: event.userId,
+              planId: event.planId,
+              provider: providerId,
+              providerRef: event.subscriptionRef,
+              ...values,
+            })
+            .onConflictDoNothing()
+            .returning();
+        }
+        if (row) {
+          await events.emit("payment.subscription_updated", {
+            userId: row.userId,
+            planId: row.planId,
+            status: row.status,
+            currentPeriodEnd: row.currentPeriodEnd ?? undefined,
+          });
+        }
+        return;
+      }
+    }
+  }
+
+  return {
+    plans,
+    providers: providers.map((p) => p.id),
+
+    /** Creates a pending order and returns the provider's checkout URL. */
+    async checkout(input: {
+      user: { id: string; email: string };
+      planId: string;
+      provider?: string;
+      /** App paths, e.g. `/en/dashboard/billing`. */
+      successPath: string;
+      cancelPath: string;
+    }): Promise<string> {
+      const plan = getPlan(input.planId);
+      if (!plan) throw new PaymentError("unknown_plan", `Unknown plan "${input.planId}"`);
+      const gateway = input.provider ? provider(input.provider) : defaultProvider;
+      if (!gateway) throw new PaymentError("unknown_provider", "No payment provider configured");
+
+      const current = await activeSubscription(input.user.id);
+      if (plan.mode === "subscription" && current) {
+        throw new PaymentError("already_subscribed", "You already have an active subscription");
+      }
+
+      const orderId = crypto.randomUUID();
+      await db.insert(paymentOrder).values({
+        id: orderId,
+        userId: input.user.id,
+        planId: plan.id,
+        provider: gateway.id,
+        amount: plan.amount,
+        currency: plan.currency,
+      });
+
+      const session = await gateway
+        .createCheckout({
+          orderId,
+          plan,
+          customer: {
+            id: input.user.id,
+            email: input.user.email,
+            providerRef: current?.provider === gateway.id ? (current.customerRef ?? undefined) : undefined,
+          },
+          successUrl: new URL(input.successPath, baseUrl).toString(),
+          cancelUrl: new URL(input.cancelPath, baseUrl).toString(),
+        })
+        .catch((cause: unknown) => {
+          console.error(`[payment] ${gateway.id} checkout failed`, cause);
+          throw new PaymentError("provider_error", "The payment provider rejected the checkout");
+        });
+      await db
+        .update(paymentOrder)
+        .set({ providerRef: session.providerRef })
+        .where(eq(paymentOrder.id, orderId));
+      return session.url;
+    },
+
+    /** Verifies and applies a provider webhook. Safe to call repeatedly with the same event. */
+    async handleWebhook(providerId: string, request: Request): Promise<void> {
+      for (const event of await provider(providerId).parseWebhook(request)) {
+        await apply(providerId, event);
+      }
+    },
+
+    getSubscription: activeSubscription,
+
+    async portalUrl(userId: string, returnPath: string): Promise<string> {
+      const subscription = await activeSubscription(userId);
+      const gateway = subscription && provider(subscription.provider);
+      if (!subscription?.customerRef || !gateway?.createPortalUrl) {
+        throw new PaymentError("no_customer", "No billing portal available for this account");
+      }
+      return gateway.createPortalUrl(
+        subscription.customerRef,
+        new URL(returnPath, baseUrl).toString(),
+      );
+    },
+
+    async listOrders(userId: string, limit = 20) {
+      return db
+        .select()
+        .from(paymentOrder)
+        .where(and(eq(paymentOrder.userId, userId), eq(paymentOrder.status, "paid")))
+        .orderBy(desc(paymentOrder.createdAt))
+        .limit(limit);
+    },
+
+    /** All orders with the buyer's email, newest first. */
+    async listAllOrders({ limit, offset }: { limit: number; offset: number }) {
+      const [rows, [total]] = await Promise.all([
+        db
+          .select({ order: paymentOrder, email: user.email })
+          .from(paymentOrder)
+          .innerJoin(user, eq(paymentOrder.userId, user.id))
+          .orderBy(desc(paymentOrder.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db.select({ value: count() }).from(paymentOrder),
+      ]);
+      return { rows, total: total?.value ?? 0 };
+    },
+  };
+}
+
+export type Payment = ReturnType<typeof createPayment>;

@@ -1,0 +1,55 @@
+# Authentication
+
+Built on [Better Auth](https://better-auth.com). The `packages/auth` package exports `createAuth(env, db, events)`; `apps/web/src/services.ts` creates the instance.
+
+## What you get
+
+- Email and password sign-up and sign-in (`/login`, `/signup`)
+{{#if (includes module.integrations "email")}}
+- Email verification on sign-up and password reset (`/forgot-password`, `/reset-password`), sent by the email module
+{{/if}}
+{{#each module.providers}}
+- {{this}} OAuth
+{{/each}}
+- Roles (`user`, `admin`) through the Better Auth admin plugin
+- Account settings at `/dashboard/settings`
+
+## Configuration
+
+| Variable | Purpose |
+| --- | --- |
+| `BETTER_AUTH_SECRET` | Session signing secret, at least 32 characters |
+| `BETTER_AUTH_URL` | Public URL of the app |
+| `ADMIN_EMAILS` | Comma-separated emails that get the `admin` role when they sign up |
+{{#if (includes module.providers "google")}}
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth app. Redirect URI: `<BETTER_AUTH_URL>/api/auth/callback/google` |
+{{/if}}
+{{#if (includes module.providers "github")}}
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub OAuth app. Callback URL: `<BETTER_AUTH_URL>/api/auth/callback/github` |
+{{/if}}
+
+OAuth buttons appear only when both the client ID and secret are set.
+
+## Events
+
+| Event | When |
+| --- | --- |
+| `auth.user_created` | A user record was created |
+| `auth.verification_requested` | A verification email should be sent |
+| `auth.password_reset_requested` | A password reset email should be sent |
+
+Subscribe in `apps/web/src/integrations/*.ts`.
+
+## Protecting pages
+
+```ts
+import { requireUser } from "@/lib/session";
+
+const user = await requireUser(locale, "/dashboard/billing");
+```
+
+`requireUser` redirects anonymous visitors to `/login?next=…`.
+
+## Schema changes
+
+After adding Better Auth plugins, regenerate the schema with `bun run auth:generate` in `apps/web`, then `bun run db:push`.

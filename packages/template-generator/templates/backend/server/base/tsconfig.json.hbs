@@ -1,0 +1,14 @@
+{
+  "extends": "@{{projectName}}/config/tsconfig.base.json",
+  {{#if (eq api "orpc")}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "compilerOptions": {
+    "noEmit": true,
+		"paths": {
+      "@/*": ["./src/*"]
+    },
+    "jsx": "react-jsx"{{#if (eq backend "hono")}},
+    "jsxImportSource": "hono/jsx"{{/if}}
+  }
+}

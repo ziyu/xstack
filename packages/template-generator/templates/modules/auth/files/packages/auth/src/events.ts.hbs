@@ -1,0 +1,11 @@
+import type { Locale } from "@{{projectName}}/i18n";
+
+type AuthEmail = { email: string; name: string; url: string; locale: Locale };
+
+declare module "@{{projectName}}/events" {
+  interface EventMap {
+    "auth.user_created": { userId: string; email: string; name: string };
+    "auth.verification_requested": AuthEmail;
+    "auth.password_reset_requested": AuthEmail;
+  }
+}

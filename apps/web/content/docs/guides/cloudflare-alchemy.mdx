@@ -1,0 +1,133 @@
+---
+title: Deploying with Alchemy
+description: Deploy xstack projects to Cloudflare or Prisma and manage hosted databases in the same typed stack
+---
+
+## Overview
+
+[Alchemy](https://alchemy.run) is the infrastructure-as-code layer generated when you choose **Cloudflare** or **Prisma** as a deployment target. The CLI writes a `packages/infra` workspace containing:
+
+- one `alchemy.run.ts` for applications, managed databases, and migrations
+- root `dev`, `deploy`, and `destroy` commands
+
+## Supported deployment shapes
+
+Cloudflare supports a separate Hono server on the Workers runtime and supported web frameworks. Full-stack `backend: self` projects deploy as one web application.
+
+Prisma supports:
+
+- web: TanStack Router, Next.js, Nuxt, Astro, React Router, TanStack Start, SvelteKit, and Solid
+- server: Hono, Express, Fastify, and Elysia on Bun or Node
+- mixed stacks, such as Cloudflare web + Prisma server or Prisma web + Cloudflare server
+
+The CLI rejects unsupported framework/runtime combinations before writing files.
+
+With Next.js on Cloudflare, Prisma ORM supports Neon and Prisma Postgres. Generic PostgreSQL connections, including Supabase and PlanetScale Postgres, are not supported for that combination.
+
+```bash
+# Full-stack Solid on Prisma with PlanetScale MySQL
+bunx xstack@latest my-app \
+  --frontend solid \
+  --backend self \
+  --database mysql \
+  --orm prisma \
+  --db-setup planetscale \
+  --web-deploy prisma
+
+# Next.js on Cloudflare and a Hono/Bun server on Prisma
+bunx xstack@latest my-app \
+  --frontend next \
+  --backend hono \
+  --runtime bun \
+  --database postgres \
+  --orm prisma \
+  --db-setup neon \
+  --web-deploy cloudflare \
+  --server-deploy prisma
+```
+
+## Provider login
+
+Install dependencies, then let Alchemy configure every provider used by the stack:
+
+```bash
+bun install
+cd packages/infra
+bunx alchemy profile edit
+```
+
+Alchemy stores provider profiles under `~/.alchemy`. For Alchemy-managed databases, it creates the database and supplies the connection details to your application.
+
+## Managed databases
+
+Alchemy can create and manage Neon, PlanetScale, and Prisma Postgres databases when the backend deploys to Cloudflare or Prisma:
+
+- `backend: self`: the web deployment owns the database
+- separate backend: the server deployment owns the database
+
+If the backend deploys elsewhere, configure its database separately.
+
+| Setup                | What Alchemy creates                   |
+| -------------------- | -------------------------------------- |
+| Neon                 | A project and database connection      |
+| PlanetScale Postgres | A database and application credentials |
+| PlanetScale MySQL    | A database and application credentials |
+| Prisma Postgres      | A project, database, and connection    |
+| Cloudflare D1        | A database bound to your Worker        |
+
+<Callout type="warn">
+  PlanetScale can charge for `PS_DEV` databases. Review `clusterSize` in
+  `packages/infra/alchemy.run.ts` before deploying.
+</Callout>
+
+## Migration workflow
+
+After changing your database schema, generate a migration:
+
+```bash
+# Drizzle: generate SQL from the current schema
+bun run db:generate
+
+# Prisma: create a migration, then regenerate the client
+bun run db:migrate
+bun run db:generate
+```
+
+Review and commit the generated migration files. Alchemy applies migrations for managed databases during deployment.
+
+## Develop and deploy
+
+Run these commands from the project root:
+
+```bash
+bun run dev
+bun run deploy
+bun run destroy
+```
+
+- `dev` starts local development.
+- `deploy` builds and deploys your applications and managed resources.
+- `destroy` removes the resources in the selected stage, including managed databases.
+
+Deployments are staged. For an explicit production stage:
+
+```bash
+cd packages/infra
+bunx alchemy deploy --stage production
+```
+
+Use the same stage when destroying it:
+
+```bash
+bunx alchemy destroy --stage production
+```
+
+## Environment variables
+
+Set infrastructure configuration in `packages/infra/.env` and application configuration in the relevant app's `.env` file. Alchemy supplies managed database connections and deployed application URLs automatically.
+
+Keep secrets out of version control. Run `bun run deploy` after changing deployment configuration.
+
+## Customize your infrastructure
+
+Edit `packages/infra/alchemy.run.ts` to change regions, database sizes, or add resources. See the [Alchemy documentation](https://alchemy.run) for the available resources and options.

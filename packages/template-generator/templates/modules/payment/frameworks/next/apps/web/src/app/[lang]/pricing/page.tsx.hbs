@@ -1,0 +1,77 @@
+import { plans } from "@{{projectName}}/payment";
+import { Button } from "@{{projectName}}/ui/components/button";
+import type { Metadata } from "next";
+
+import { formatMoney } from "@/lib/format";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+import { startCheckout } from "./actions";
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ error?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("payment.pricing.title") };
+}
+
+export default async function PricingPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const { error } = await searchParams;
+
+  return (
+    <div className="container mx-auto flex max-w-5xl flex-col gap-10 px-4 py-16">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <h1 className="font-semibold text-3xl tracking-tight">{t("payment.pricing.title")}</h1>
+        <p className="text-muted-foreground">{t("payment.pricing.subtitle")}</p>
+        {error && (
+          <p className="text-destructive text-sm">
+            {error === "already_subscribed"
+              ? t("payment.errors.alreadySubscribed")
+              : t("payment.errors.checkout")}
+          </p>
+        )}
+      </div>
+      <div className="mx-auto grid w-full max-w-3xl gap-6 md:grid-cols-2">
+        {plans.map((plan) => (
+          <div
+            key={plan.id}
+            className={`flex flex-col gap-6 border p-6 ${"highlighted" in plan ? "border-primary" : ""}`}
+          >
+            <div className="flex flex-col gap-2">
+              <h2 className="font-medium">{t(`payment.plans.${plan.id}.name`)}</h2>
+              <p className="text-muted-foreground text-sm">
+                {t(`payment.plans.${plan.id}.description`)}
+              </p>
+            </div>
+            <p className="flex items-baseline gap-1">
+              <span className="font-semibold text-3xl">
+                {formatMoney(plan.amount, plan.currency, locale)}
+              </span>
+              <span className="text-muted-foreground text-sm">
+                {"interval" in plan
+                  ? t(`payment.pricing.per.${plan.interval}`)
+                  : t("payment.pricing.oneTime")}
+              </span>
+            </p>
+{{#if (includes product.features "credits")}}
+            {"credits" in plan && (
+              <p className="text-sm">{t("payment.pricing.credits", { credits: plan.credits })}</p>
+            )}
+{{/if}}
+            <form action={startCheckout} className="mt-auto">
+              <input type="hidden" name="planId" value={plan.id} />
+              <input type="hidden" name="locale" value={locale} />
+              <Button type="submit" className="w-full" variant={"highlighted" in plan ? "default" : "outline"}>
+                {plan.mode === "subscription" ? t("payment.pricing.subscribe") : t("payment.pricing.buy")}
+              </Button>
+            </form>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

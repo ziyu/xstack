@@ -1,0 +1,71 @@
+"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+import type { SocialProvider } from "@/lib/social-providers";
+
+import { useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+import { SocialButtons } from "./social-buttons";
+
+export default function SignUpForm({
+  next,
+  providers,
+  verifyEmail,
+}: {
+  next: string;
+  providers: SocialProvider[];
+  /** Accounts must confirm their email before they can sign in. */
+  verifyEmail: boolean;
+}) {
+  const t = useT();
+  const [pending, setPending] = useState(false);
+  const [sentTo, setSentTo] = useState<string>();
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const email = formValue(form, "email");
+    setPending(true);
+    const { error } = await authClient.signUp.email({
+      name: formValue(form, "name"),
+      email,
+      password: formValue(form, "password"),
+      callbackURL: next,
+    });
+    setPending(false);
+    if (error) {
+      toast.error(error.message ?? t("auth.errors.generic"));
+      return;
+    }
+    if (verifyEmail) setSentTo(email);
+    else window.location.assign(next);
+  }
+
+  if (sentTo) {
+    return <p className="text-sm">{t("auth.signUp.checkEmail", { email: sentTo })}</p>;
+  }
+
+  return (
+    <>
+      <SocialButtons providers={providers} callbackURL={next} />
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field label={t("auth.fields.name")} name="name" autoComplete="name" />
+        <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+        <Field
+          label={t("auth.fields.password")}
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          minLength={8}
+        />
+        <Button type="submit" disabled={pending}>
+          {t("auth.signUp.submit")}
+        </Button>
+      </form>
+    </>
+  );
+}

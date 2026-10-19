@@ -1,0 +1,31 @@
+import { createTransport, type ProviderConfig } from "./providers/{{module.providers.[0]}}";
+import type { Mailer } from "./types";
+
+export { renderEmail, type EmailContent } from "./render";
+export type { EmailMessage, Mailer, Transport } from "./types";
+
+export type MailerConfig = ProviderConfig & {
+  EMAIL_FROM: string;
+  NODE_ENV: string;
+};
+
+/**
+ * Without provider credentials, emails are printed to the console in development
+ * and rejected in production.
+ */
+export function createMailer(env: MailerConfig): Mailer {
+  const transport = createTransport(env);
+
+  return {
+    async send(message) {
+      if (transport) {
+        await transport.send({ from: env.EMAIL_FROM, ...message });
+        return;
+      }
+      if (env.NODE_ENV === "production") {
+        throw new Error("Email provider is not configured; see docs/modules/email.md");
+      }
+      console.info(`[email] to=${message.to} subject=${message.subject}\n${message.text}`);
+    },
+  };
+}

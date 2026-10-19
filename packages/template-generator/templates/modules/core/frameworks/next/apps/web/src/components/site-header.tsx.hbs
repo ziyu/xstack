@@ -1,0 +1,58 @@
+"use client";
+
+import Link from "next/link";
+
+import { canSee, navigation } from "@/config/navigation";
+import { site } from "@/config/site";
+{{#if (includes product.features "auth")}}
+import { authClient } from "@/lib/auth-client";
+{{/if}}
+import { localePath } from "@/lib/i18n/paths";
+
+import { useLocale, useT } from "./i18n-provider";
+import LocaleSwitcher from "./locale-switcher";
+import { ModeToggle } from "./mode-toggle";
+{{#if (includes product.features "auth")}}
+import UserMenu from "./user-menu";
+{{/if}}
+
+export default function SiteHeader() {
+  const locale = useLocale();
+  const t = useT();
+{{#if (includes product.features "auth")}}
+  const { data: session } = authClient.useSession();
+  const links = navigation.main.filter((item) => canSee(item, session?.user));
+{{else}}
+  const links = navigation.main.filter((item) => canSee(item, null));
+{{/if}}
+
+  return (
+    <header className="border-b">
+      <div className="container mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
+        <div className="flex items-center gap-6">
+          <Link href={localePath(locale, "/")} className="font-semibold">
+            {site.name}
+          </Link>
+          <nav className="hidden items-center gap-4 text-sm sm:flex">
+            {links.map((item) => (
+              <Link
+                key={item.href}
+                href={localePath(locale, item.href)}
+                className="text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {t(item.labelKey)}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <div className="flex items-center gap-1">
+          <LocaleSwitcher />
+          <ModeToggle />
+{{#if (includes product.features "auth")}}
+          <UserMenu />
+{{/if}}
+        </div>
+      </div>
+    </header>
+  );
+}

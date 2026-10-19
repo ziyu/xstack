@@ -1,0 +1,572 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import path from "node:path";
+
+import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import fs from "fs-extra";
+
+import { create } from "../src/index";
+import { createXStackMcpServer } from "../src/mcp";
+import { readXStackConfig } from "../src/utils/xstack-config";
+import { SMOKE_DIR } from "./setup";
+
+interface JsonSchemaView {
+  type?: string;
+  properties?: Record<string, JsonSchemaView>;
+}
+
+async function connectInMemoryClient() {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createXStackMcpServer();
+  await server.connect(serverTransport);
+
+  const client = new Client({ name: "mcp-test-client", version: "0.0.0" }, { capabilities: {} });
+  await client.connect(clientTransport);
+
+  return {
+    client,
+    cleanup: async () => {
+      await client.close();
+      await server.close();
+    },
+  };
+}
+
+function getExplicitCreateInput(projectPath: string) {
+  return {
+    projectName: projectPath,
+    frontend: ["next"] as const,
+    backend: "hono" as const,
+    runtime: "bun" as const,
+    database: "sqlite" as const,
+    orm: "drizzle" as const,
+    api: "trpc" as const,
+    addons: ["turborepo"] as const,
+    product: { features: ["auth"] },
+    git: true,
+    packageManager: "bun" as const,
+    install: false,
+    dbSetup: "none" as const,
+    webDeploy: "none" as const,
+    serverDeploy: "none" as const,
+  };
+}
+
+function getToolText(result: { content: Array<{ type: string; text?: string }> }) {
+  return result.content
+    .filter((item): item is { type: "text"; text: string } => item.type === "text")
+    .map((item) => item.text)
+    .join("\n");
+}
+
+describe("MCP server", () => {
+  let cleanups: Array<() => Promise<void>> = [];
+
+  beforeEach(async () => {
+    process.env.XSTACK_SKIP_EXTERNAL_COMMANDS = "1";
+    process.env.XSTACK_TEST_MODE = "1";
+  });
+
+  afterEach(async () => {
+    for (const cleanup of cleanups.reverse()) {
+      await Promise.race([
+        cleanup(),
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, 1000);
+        }),
+      ]);
+    }
+    cleanups = [];
+  });
+
+  it("registers the expected MCP tools", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const result = await client.listTools();
+    const toolNames = result.tools.map((tool) => tool.name).sort();
+
+    expect(toolNames).toEqual([
+      "xstack_add_addons",
+      "xstack_create_project",
+      "xstack_get_schema",
+      "xstack_get_stack_guidance",
+      "xstack_plan_addons",
+      "xstack_plan_project",
+    ]);
+  });
+
+  it("exposes MCP safety annotations for read-only and mutating tools", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const result = await client.listTools();
+    const toolsByName = new Map(result.tools.map((tool) => [tool.name, tool]));
+
+    expect(toolsByName.get("xstack_get_schema")?.annotations).toMatchObject({
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    });
+    expect(toolsByName.get("xstack_plan_project")?.annotations).toMatchObject({
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    });
+    expect(toolsByName.get("xstack_create_project")?.annotations).toMatchObject({
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: true,
+    });
+    expect(toolsByName.get("xstack_add_addons")?.annotations).toMatchObject({
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: true,
+    });
+  });
+
+  it("returns explicit create-contract guidance", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const result = await client.callTool({
+      name: "xstack_get_stack_guidance",
+      arguments: {},
+    });
+
+    const payload = result.structuredContent as {
+      ok: boolean;
+      data?: {
+        createContract?: {
+          requiresExplicitFields?: string[];
+          rule?: string;
+        };
+      };
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.data?.createContract?.requiresExplicitFields).toEqual(
+      expect.arrayContaining([
+        "projectName",
+        "frontend",
+        "backend",
+        "runtime",
+        "database",
+        "orm",
+        "api",
+        "addons",
+        "git",
+        "packageManager",
+        "install",
+        "dbSetup",
+        "webDeploy",
+        "serverDeploy",
+      ]),
+    );
+    expect(payload.data?.createContract?.rule).toContain("full explicit stack config");
+  });
+
+  it("returns all MCP planning schemas by default", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const result = await client.callTool({
+      name: "xstack_get_schema",
+      arguments: {},
+    });
+
+    const payload = result.structuredContent as {
+      ok: boolean;
+      data?: { cli?: JsonSchemaView; schemas?: Record<string, JsonSchemaView> };
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.data?.cli).toBeDefined();
+    expect(payload.data?.schemas).toHaveProperty("createInput");
+    expect(payload.data?.schemas).toHaveProperty("addInput");
+    expect(payload.data?.schemas).toHaveProperty("projectConfig");
+  });
+
+  it("returns CLI and input schemas through MCP", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const result = await client.callTool({
+      name: "xstack_get_schema",
+      arguments: { name: "createInput" },
+    });
+
+    const payload = result.structuredContent as {
+      ok: boolean;
+      data?: JsonSchemaView;
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.data?.type).toBe("object");
+    expect(payload.data?.properties).toHaveProperty("frontend");
+    expect(payload.data?.properties).toHaveProperty("backend");
+  });
+
+  it("rejects partial project payloads before planning", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const result = await client.callTool({
+      name: "xstack_plan_project",
+      arguments: {
+        projectName: "partial-app",
+        frontend: ["next"],
+        git: true,
+        install: true,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const text = getToolText(result);
+
+    expect(text).toContain("Input validation error");
+    expect(text).toContain("database");
+    expect(text).toContain("backend");
+    expect(text).toContain("packageManager");
+  });
+
+  it("rejects create inputs that violate full schema refinements", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const result = await client.callTool({
+      name: "xstack_plan_project",
+      arguments: {
+        ...getExplicitCreateInput(path.join(SMOKE_DIR, "mcp-conflicting-db-mode")),
+        manualDb: true,
+        dbSetupOptions: { mode: "manual" },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(getToolText(result)).toContain(
+      "`manualDb` and `dbSetupOptions.mode` are mutually exclusive",
+    );
+  });
+
+  it("surfaces CLI compatibility errors through MCP planning", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const result = await client.callTool({
+      name: "xstack_plan_project",
+      arguments: {
+        ...getExplicitCreateInput(path.join(SMOKE_DIR, "mcp-svelte-clerk")),
+        frontend: ["svelte"],
+        api: "orpc",
+        product: { features: ["auth"], options: { auth: { engine: "clerk" } } },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(getToolText(result)).toContain(
+      "Clerk authentication is not compatible with the following frontends: svelte",
+    );
+  });
+
+  it("rejects unknown create input keys through MCP", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const result = await client.callTool({
+      name: "xstack_plan_project",
+      arguments: {
+        ...getExplicitCreateInput(path.join(SMOKE_DIR, "mcp-extra-key")),
+        pakageManager: "bun",
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(getToolText(result)).toContain("Unrecognized key");
+  });
+
+  it("rejects unknown addon input keys through MCP", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const result = await client.callTool({
+      name: "xstack_plan_addons",
+      arguments: {
+        projectDir: path.join(SMOKE_DIR, "mcp-addon-extra-key"),
+        addons: ["biome"],
+        packageManager: "bun",
+        install: false,
+        projectDr: SMOKE_DIR,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(getToolText(result)).toContain("Unrecognized key");
+  });
+
+  it("plans projects without writing files", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const projectPath = path.join(SMOKE_DIR, "mcp-plan-project");
+    await fs.remove(projectPath);
+
+    const result = await client.callTool({
+      name: "xstack_plan_project",
+      arguments: getExplicitCreateInput(projectPath),
+    });
+
+    const payload = result.structuredContent as {
+      ok: boolean;
+      data?: { projectDirectory?: string; success?: boolean };
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.data?.success).toBe(true);
+    expect(payload.data?.projectDirectory).toBe(projectPath);
+    expect(await fs.pathExists(projectPath)).toBe(false);
+  });
+
+  it("warns during planning when install=true would be slow for MCP execution", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const projectPath = path.join(SMOKE_DIR, "mcp-plan-install-warning");
+    await fs.remove(projectPath);
+
+    const result = await client.callTool({
+      name: "xstack_plan_project",
+      arguments: {
+        ...getExplicitCreateInput(projectPath),
+        install: true,
+      },
+    });
+
+    const payload = result.structuredContent as {
+      ok: boolean;
+      data?: {
+        warnings?: string[];
+        recommendedMcpExecution?: { install?: boolean };
+      };
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.data?.warnings?.[0]).toContain("install: false");
+    expect(payload.data?.recommendedMcpExecution?.install).toBe(false);
+  });
+
+  it("creates projects on disk from explicit MCP input", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const projectPath = path.join(SMOKE_DIR, "mcp-create-project");
+    await fs.remove(projectPath);
+
+    const result = await client.callTool({
+      name: "xstack_create_project",
+      arguments: getExplicitCreateInput(projectPath),
+    });
+
+    const payload = result.structuredContent as {
+      ok: boolean;
+      data?: { success?: boolean; projectDirectory?: string };
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.data?.success).toBe(true);
+    expect(payload.data?.projectDirectory).toBe(projectPath);
+    expect(await fs.pathExists(projectPath)).toBe(true);
+
+    const xstackConfig = await readXStackConfig(projectPath);
+    expect(xstackConfig?.frontend).toEqual(["next"]);
+  });
+
+  it("rejects install=true during MCP project creation with an actionable error", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const projectPath = path.join(SMOKE_DIR, "mcp-create-install-rejected");
+    await fs.remove(projectPath);
+
+    const result = await client.callTool({
+      name: "xstack_create_project",
+      arguments: {
+        ...getExplicitCreateInput(projectPath),
+        install: true,
+      },
+    });
+
+    const payload = result.structuredContent as { ok: boolean; error?: string };
+
+    expect(result.isError).toBe(true);
+    expect(payload.ok).toBe(false);
+    expect(payload.error).toContain("install: false");
+    expect(await fs.pathExists(projectPath)).toBe(false);
+  });
+
+  it("returns an MCP tool error when creating into a non-empty directory", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const projectPath = path.join(SMOKE_DIR, "mcp-existing-directory");
+    await fs.ensureDir(projectPath);
+    await fs.writeFile(path.join(projectPath, "existing.txt"), "hello");
+
+    const result = await client.callTool({
+      name: "xstack_create_project",
+      arguments: getExplicitCreateInput(projectPath),
+    });
+
+    const payload = result.structuredContent as { ok: boolean; error?: string };
+    expect(result.isError).toBe(true);
+    expect(payload.ok).toBe(false);
+    expect(payload.error).toContain("already exists and is not empty");
+  });
+
+  it("plans addons and workspace packages without writing files", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const projectPath = path.join(SMOKE_DIR, "mcp-plan-addons");
+    await fs.remove(projectPath);
+    const createResult = await create(projectPath, {
+      frontend: ["tanstack-router"],
+      backend: "hono",
+      runtime: "bun",
+      database: "sqlite",
+      orm: "drizzle",
+      api: "trpc",
+      addons: ["turborepo"],
+      dbSetup: "none",
+      webDeploy: "none",
+      serverDeploy: "none",
+      install: false,
+      git: true,
+      packageManager: "bun",
+      disableAnalytics: true,
+    });
+    expect(createResult.isOk()).toBe(true);
+
+    const before = await readXStackConfig(projectPath);
+
+    const result = await client.callTool({
+      name: "xstack_plan_addons",
+      arguments: {
+        projectDir: projectPath,
+        addons: ["biome"],
+        package: "planned-utils",
+        packageManager: "bun",
+        install: false,
+      },
+    });
+
+    const payload = result.structuredContent as {
+      ok: boolean;
+      data?: {
+        success?: boolean;
+        dryRun?: boolean;
+        addedAddons?: string[];
+        addedPackage?: string;
+      };
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.data?.success).toBe(true);
+    expect(payload.data?.dryRun).toBe(true);
+    expect(payload.data?.addedAddons).toEqual(["biome"]);
+    expect(payload.data?.addedPackage).toBe("planned-utils");
+    expect(await fs.pathExists(path.join(projectPath, "packages", "planned-utils"))).toBe(false);
+
+    const after = await readXStackConfig(projectPath);
+    expect(after).toEqual(before);
+  });
+
+  it("adds addons and workspace packages through MCP", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+
+    const projectPath = path.join(SMOKE_DIR, "mcp-add-addons");
+    await fs.remove(projectPath);
+    const createResult = await create(projectPath, {
+      frontend: ["tanstack-router"],
+      backend: "hono",
+      runtime: "bun",
+      database: "sqlite",
+      orm: "drizzle",
+      api: "trpc",
+      addons: ["turborepo"],
+      dbSetup: "none",
+      webDeploy: "none",
+      serverDeploy: "none",
+      install: false,
+      git: true,
+      packageManager: "bun",
+      disableAnalytics: true,
+    });
+    expect(createResult.isOk()).toBe(true);
+
+    const result = await client.callTool({
+      name: "xstack_add_addons",
+      arguments: {
+        projectDir: projectPath,
+        addons: ["biome"],
+        package: "shared-utils",
+        packageManager: "bun",
+        install: false,
+      },
+    });
+
+    const payload = result.structuredContent as {
+      ok: boolean;
+      data?: { success?: boolean; addedAddons?: string[]; addedPackage?: string };
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.data?.success).toBe(true);
+    expect(payload.data?.addedAddons).toEqual(["biome"]);
+    expect(payload.data?.addedPackage).toBe("shared-utils");
+    expect(
+      await fs.readJson(path.join(projectPath, "packages", "shared-utils", "package.json")),
+    ).toMatchObject({ name: "@mcp-add-addons/shared-utils", private: true });
+
+    const after = await readXStackConfig(projectPath);
+    expect(after?.addons).toEqual(expect.arrayContaining(["turborepo", "biome"]));
+  });
+
+  it("starts over stdio through the CLI entrypoint", async () => {
+    const cliRoot = path.join(import.meta.dir, "..");
+    const cliEntrypoint = path.join(cliRoot, "src", "cli.ts");
+    const client = new Client({ name: "mcp-stdio-test", version: "0.0.0" }, { capabilities: {} });
+
+    const transport = new StdioClientTransport({
+      command: "bun",
+      args: [cliEntrypoint, "mcp"],
+      cwd: cliRoot,
+      env: {
+        XSTACK_SKIP_EXTERNAL_COMMANDS: "1",
+        XSTACK_TEST_MODE: "1",
+      },
+    });
+
+    await client.connect(transport);
+    cleanups.push(async () => {
+      await transport.close();
+      await client.close();
+    });
+
+    const tools = await client.listTools();
+    expect(tools.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(["xstack_get_stack_guidance", "xstack_plan_project", "xstack_add_addons"]),
+    );
+
+    const guidance = await client.callTool({
+      name: "xstack_get_stack_guidance",
+      arguments: {},
+    });
+
+    const payload = guidance.structuredContent as { ok: boolean };
+    expect(payload.ok).toBe(true);
+  });
+});

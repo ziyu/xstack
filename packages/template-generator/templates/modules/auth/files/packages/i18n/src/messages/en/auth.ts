@@ -1,0 +1,85 @@
+export default {
+  dashboard: {
+    title: "Dashboard",
+    welcome: "Welcome back, {name}",
+    empty: "Your product starts here. Feature modules add their pages to this dashboard.",
+  },
+  user: {
+    signIn: "Sign in",
+    signOut: "Sign out",
+    account: "My account",
+  },
+  nav: {
+    dashboard: "Dashboard",
+    overview: "Overview",
+    settings: "Settings",
+  },
+  fields: {
+    name: "Name",
+    email: "Email",
+    password: "Password",
+    currentPassword: "Current password",
+    newPassword: "New password",
+  },
+  errors: {
+    invalidEmail: "Enter a valid email address",
+    passwordLength: "Use at least 8 characters",
+    nameRequired: "Enter your name",
+    generic: "Something went wrong. Please try again.",
+  },
+  signIn: {
+    title: "Welcome back",
+    subtitle: "Sign in to your account",
+    submit: "Sign in",
+    noAccount: "Don't have an account?",
+    signUpLink: "Sign up",
+    forgot: "Forgot password?",
+  },
+  signUp: {
+    title: "Create an account",
+    subtitle: "Start in less than a minute",
+    submit: "Create account",
+    hasAccount: "Already have an account?",
+    signInLink: "Sign in",
+    checkEmail: "Check your inbox for {email} to verify your account.",
+  },
+  social: {
+    divider: "or",
+    continueWith: "Continue with {provider}",
+  },
+  forgot: {
+    title: "Reset your password",
+    subtitle: "We'll email you a link to choose a new one.",
+    submit: "Send reset link",
+    sent: "If an account exists for {email}, a reset link is on its way.",
+    back: "Back to sign in",
+  },
+  reset: {
+    title: "Choose a new password",
+    submit: "Update password",
+    success: "Password updated. Sign in with your new password.",
+    invalidToken: "This reset link is invalid or has expired.",
+  },
+  settings: {
+    title: "Account settings",
+    profile: "Profile",
+    password: "Password",
+    save: "Save",
+    saved: "Saved",
+  },
+  emails: {
+    verify: {
+      subject: "Verify your email",
+      heading: "Confirm your email address",
+      body: "Hi {name}, click the button below to verify your email and finish signing up.",
+      action: "Verify email",
+    },
+    reset: {
+      subject: "Reset your password",
+      heading: "Reset your password",
+      body: "Hi {name}, we received a request to reset your password. The link expires in one hour.",
+      action: "Choose a new password",
+    },
+    ignore: "If you didn't request this, you can safely ignore this email.",
+  },
+} as const;

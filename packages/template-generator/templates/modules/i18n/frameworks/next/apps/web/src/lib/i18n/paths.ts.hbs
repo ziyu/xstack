@@ -1,0 +1,7 @@
+import type { Locale } from "@{{projectName}}/i18n";
+import type { Route } from "next";
+
+/** Prefixes an app path with the locale segment. */
+export function localePath(locale: Locale, href: `/${string}`): Route {
+  return `/${locale}${href === "/" ? "" : href}` as Route;
+}

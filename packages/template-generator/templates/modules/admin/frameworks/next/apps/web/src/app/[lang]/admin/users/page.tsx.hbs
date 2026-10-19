@@ -1,0 +1,101 @@
+import { auth } from "@{{projectName}}/app-services";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+
+import { Pagination } from "@/components/admin/pagination";
+import { UserActions } from "@/components/admin/user-actions";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+const PAGE_SIZE = 20;
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("admin.users.title") };
+}
+
+export default async function AdminUsersPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const { user: me } = await requireAdmin(locale);
+  const { q = "", page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
+
+  const { users, total } = await auth.api.listUsers({
+    headers: await headers(),
+    query: {
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+      sortBy: "createdAt",
+      sortDirection: "desc",
+      ...(q ? { searchValue: q, searchField: "email", searchOperator: "contains" } : {}),
+    },
+  });
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="font-semibold text-2xl">{t("admin.users.title")}</h1>
+      <form className="flex max-w-sm gap-2">
+        <Input name="q" defaultValue={q} placeholder={t("admin.users.searchPlaceholder")} />
+        <Button type="submit" variant="outline">
+          {t("admin.users.search")}
+        </Button>
+      </form>
+      <div className="overflow-x-auto border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-muted-foreground text-xs">
+            <tr>
+              <th className="px-4 py-2 font-medium">{t("admin.users.columns.name")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.users.columns.email")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.users.columns.role")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.users.columns.status")}</th>
+              <th className="px-4 py-2 font-medium">{t("admin.users.columns.joined")}</th>
+              <th className="px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td className="px-4 py-2">{user.name}</td>
+                <td className="px-4 py-2">{user.email}</td>
+                <td className="px-4 py-2">{user.role}</td>
+                <td className="px-4 py-2">
+                  {user.banned ? t("admin.users.status.banned") : t("admin.users.status.active")}
+                </td>
+                <td className="px-4 py-2 text-muted-foreground">{date.format(user.createdAt)}</td>
+                <td className="px-4 py-2 text-right">
+                  {user.id !== me.id && (
+                    <UserActions
+                      userId={user.id}
+                      isAdmin={user.role === "admin"}
+                      banned={Boolean(user.banned)}
+                    />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {users.length === 0 && (
+          <p className="px-4 py-6 text-center text-muted-foreground text-sm">
+            {t("admin.users.empty")}
+          </p>
+        )}
+      </div>
+      <Pagination
+        locale={locale}
+        page={page}
+        pages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        query={ { q } }
+      />
+    </div>
+  );
+}

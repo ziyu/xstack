@@ -1,0 +1,50 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { AuthCard } from "@/components/auth/auth-card";
+import SignInForm from "@/components/auth/sign-in-form";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { safeNext } from "@/lib/session";
+import { enabledSocialProviders } from "@/lib/social-providers.server";
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ next?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("auth.signIn.submit") };
+}
+
+export default async function LoginPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const { next } = await searchParams;
+  const target = safeNext(next, localePath(locale, "/dashboard"));
+
+  return (
+    <AuthCard
+      title={t("auth.signIn.title")}
+      description={t("auth.signIn.subtitle")}
+      footer={
+        <>
+          {t("auth.signIn.noAccount")}&nbsp;
+          <Link
+            href={ { pathname: localePath(locale, "/signup"), query: next ? { next: target } : {} } }
+            className="text-foreground underline-offset-4 hover:underline"
+          >
+            {t("auth.signIn.signUpLink")}
+          </Link>
+        </>
+      }
+    >
+      <SignInForm
+        next={target}
+        providers={enabledSocialProviders()}
+        canResetPassword={ {{#if (includes module.integrations "email")}}true{{else}}false{{/if}} }
+      />
+    </AuthCard>
+  );
+}

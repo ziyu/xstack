@@ -1,0 +1,11 @@
+import type { PaymentProvider } from "../types";
+{{#each module.providers}}
+import { createProvider as {{this}}, type ProviderConfig as {{this}}Config } from "./{{this}}";
+{{/each}}
+
+export type ProvidersConfig = {{#each module.providers}}{{this}}Config{{#unless @last}} & {{/unless}}{{/each}};
+
+/** Enabled providers; the first is used when checkout does not name one. */
+export function createProviders(env: ProvidersConfig, baseUrl: string): PaymentProvider[] {
+  return [{{#each module.providers}}{{this}}({ env, baseUrl }){{#unless @last}}, {{/unless}}{{/each}}];
+}

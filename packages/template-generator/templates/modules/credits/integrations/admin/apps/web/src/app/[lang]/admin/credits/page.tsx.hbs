@@ -1,0 +1,108 @@
+import { credits } from "@{{projectName}}/app-services";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import type { Metadata } from "next";
+
+import { Pagination } from "@/components/admin/pagination";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+import { adjustCredits } from "./actions";
+
+const PAGE_SIZE = 20;
+const ERRORS = ["invalid", "user", "balance"] as const;
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ page?: string; error?: string; done?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("credits.admin.title") };
+}
+
+export default async function AdminCreditsPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  await requireAdmin(locale);
+  const { page: pageParam, error, done } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const errorCode = ERRORS.find((code) => code === error);
+
+  const { rows, total } = await credits.listAllTransactions({
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  });
+  const number = new Intl.NumberFormat(locale, { signDisplay: "exceptZero" });
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="font-semibold text-2xl">{t("credits.admin.title")}</h1>
+
+      <form action={adjustCredits} className="flex flex-col gap-3 border p-4">
+        <h2 className="font-medium">{t("credits.admin.adjust")}</h2>
+        <input type="hidden" name="locale" value={locale} />
+        <div className="flex flex-wrap gap-2">
+          <Input
+            name="email"
+            type="email"
+            required
+            placeholder={t("credits.admin.email")}
+            className="max-w-xs"
+          />
+          <Input
+            name="amount"
+            type="number"
+            step={1}
+            required
+            placeholder={t("credits.admin.amount")}
+            className="max-w-32"
+          />
+          <Input name="reason" placeholder={t("credits.admin.reason")} className="max-w-xs" />
+          <Button type="submit">{t("credits.admin.submit")}</Button>
+        </div>
+        <p className="text-muted-foreground text-xs">{t("credits.admin.amountHint")}</p>
+        {errorCode && <p className="text-destructive text-sm">{t(`credits.admin.errors.${errorCode}`)}</p>}
+        {done && <p className="text-primary text-sm">{t("credits.admin.done")}</p>}
+      </form>
+
+      <div className="overflow-x-auto border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-muted-foreground text-xs">
+            <tr>
+              <th className="px-4 py-2 font-medium">{t("credits.admin.columns.date")}</th>
+              <th className="px-4 py-2 font-medium">{t("credits.admin.columns.user")}</th>
+              <th className="px-4 py-2 font-medium">{t("credits.admin.columns.type")}</th>
+              <th className="px-4 py-2 font-medium">{t("credits.admin.columns.reason")}</th>
+              <th className="px-4 py-2 text-right font-medium">{t("credits.admin.columns.amount")}</th>
+              <th className="px-4 py-2 text-right font-medium">{t("credits.admin.columns.balance")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.map(({ transaction, email }) => (
+              <tr key={transaction.id}>
+                <td className="px-4 py-2 text-muted-foreground">{date.format(transaction.createdAt)}</td>
+                <td className="px-4 py-2">{email}</td>
+                <td className="px-4 py-2">{t(`credits.types.${transaction.type}`)}</td>
+                <td className="px-4 py-2 text-muted-foreground">{transaction.reason}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{number.format(transaction.amount)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{transaction.balanceAfter}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && (
+          <p className="px-4 py-6 text-center text-muted-foreground text-sm">{t("credits.admin.empty")}</p>
+        )}
+      </div>
+      <Pagination
+        locale={locale}
+        page={page}
+        pages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        query={ {} }
+      />
+    </div>
+  );
+}

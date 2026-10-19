@@ -1,0 +1,41 @@
+"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+
+import { authClient } from "@/lib/auth-client";
+import { type SocialProvider, socialProviderLabels } from "@/lib/social-providers";
+
+import { useT } from "../i18n-provider";
+
+export function SocialButtons({
+  providers,
+  callbackURL,
+}: {
+  providers: SocialProvider[];
+  callbackURL: string;
+}) {
+  const t = useT();
+  if (providers.length === 0) return null;
+
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        {providers.map((provider) => (
+          <Button
+            key={provider}
+            variant="outline"
+            type="button"
+            onClick={() => authClient.signIn.social({ provider, callbackURL })}
+          >
+            {t("auth.social.continueWith", { provider: socialProviderLabels[provider] })}
+          </Button>
+        ))}
+      </div>
+      <div className="flex items-center gap-3 text-muted-foreground text-xs">
+        <span className="h-px flex-1 bg-border" />
+        {t("auth.social.divider")}
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    </>
+  );
+}

@@ -1,0 +1,68 @@
+"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { Skeleton } from "@{{projectName}}/ui/components/skeleton";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { authClient } from "@/lib/auth-client";
+import { localePath } from "@/lib/i18n/paths";
+
+import { useLocale, useT } from "./i18n-provider";
+
+export default function UserMenu() {
+  const router = useRouter();
+  const locale = useLocale();
+  const t = useT();
+  const { data: session, isPending } = authClient.useSession();
+
+  if (isPending) {
+    return <Skeleton className="h-8 w-20" />;
+  }
+
+  if (!session) {
+    return (
+      <Link href={localePath(locale, "/login")}>
+        <Button variant="outline">{t("auth.user.signIn")}</Button>
+      </Link>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" />}>
+        {session.user.name}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-card" align="end">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{t("auth.user.account")}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => {
+              authClient.signOut({
+                fetchOptions: {
+                  onSuccess: () => {
+                    router.push(localePath(locale, "/"));
+                  },
+                },
+              });
+            }}
+          >
+            {t("auth.user.signOut")}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

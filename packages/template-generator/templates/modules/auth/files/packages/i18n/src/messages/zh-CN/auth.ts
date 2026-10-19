@@ -1,0 +1,85 @@
+export default {
+  dashboard: {
+    title: "控制台",
+    welcome: "欢迎回来，{name}",
+    empty: "你的产品从这里开始。功能模块会把各自的页面加到控制台中。",
+  },
+  user: {
+    signIn: "登录",
+    signOut: "退出登录",
+    account: "我的账户",
+  },
+  nav: {
+    dashboard: "控制台",
+    overview: "概览",
+    settings: "设置",
+  },
+  fields: {
+    name: "姓名",
+    email: "邮箱",
+    password: "密码",
+    currentPassword: "当前密码",
+    newPassword: "新密码",
+  },
+  errors: {
+    invalidEmail: "请输入有效的邮箱地址",
+    passwordLength: "密码至少 8 位",
+    nameRequired: "请输入姓名",
+    generic: "出错了，请重试。",
+  },
+  signIn: {
+    title: "欢迎回来",
+    subtitle: "登录你的账户",
+    submit: "登录",
+    noAccount: "还没有账户？",
+    signUpLink: "注册",
+    forgot: "忘记密码？",
+  },
+  signUp: {
+    title: "创建账户",
+    subtitle: "不到一分钟即可开始",
+    submit: "创建账户",
+    hasAccount: "已有账户？",
+    signInLink: "登录",
+    checkEmail: "验证邮件已发送至 {email}，请查收并完成验证。",
+  },
+  social: {
+    divider: "或",
+    continueWith: "使用 {provider} 继续",
+  },
+  forgot: {
+    title: "重置密码",
+    subtitle: "我们会发送一封邮件，帮你设置新密码。",
+    submit: "发送重置链接",
+    sent: "如果 {email} 已注册，重置链接已发出。",
+    back: "返回登录",
+  },
+  reset: {
+    title: "设置新密码",
+    submit: "更新密码",
+    success: "密码已更新，请使用新密码登录。",
+    invalidToken: "重置链接无效或已过期。",
+  },
+  settings: {
+    title: "账户设置",
+    profile: "个人资料",
+    password: "密码",
+    save: "保存",
+    saved: "已保存",
+  },
+  emails: {
+    verify: {
+      subject: "验证你的邮箱",
+      heading: "确认你的邮箱地址",
+      body: "{name}，你好！点击下方按钮验证邮箱，完成注册。",
+      action: "验证邮箱",
+    },
+    reset: {
+      subject: "重置密码",
+      heading: "重置你的密码",
+      body: "{name}，你好！我们收到了重置密码的请求，链接一小时内有效。",
+      action: "设置新密码",
+    },
+    ignore: "如果这不是你本人的操作，请忽略这封邮件。",
+  },
+} as const;

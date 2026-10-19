@@ -1,0 +1,610 @@
+import { getAllJsonSchemas } from "@xstack/types/json-schema";
+import { os } from "@orpc/server";
+import { Result } from "better-result";
+import { createCli, type TrpcCli, type TrpcCliMeta } from "trpc-cli";
+import z from "zod";
+
+import { historyHandler } from "./commands/history";
+import { openBuilderCommand, openDocsCommand, showSponsorsCommand } from "./commands/meta";
+import { addHandler, type AddResult } from "./helpers/core/add-handler";
+import { createProjectHandler, createProjectHandlerResult } from "./helpers/core/command-handlers";
+import { productFromFlags } from "./helpers/core/product-mode";
+import {
+  type AddInput,
+  type Addons,
+  AddonsSchema,
+  type AddonOptions,
+  type DbSetupOptions,
+  DbSetupOptionsSchema,
+  AddInputSchema,
+  type API,
+  APISchema,
+  type Auth,
+  type Backend,
+  BackendSchema,
+  type XStackConfig,
+  type CreateInput,
+  CreateInputSchema,
+  type Database,
+  DatabaseSchema,
+  type DatabaseSetup,
+  DatabaseSetupSchema,
+  type DirectoryConflict,
+  DirectoryConflictSchema,
+  type Frontend,
+  FrontendSchema,
+  type InitResult,
+  type ORM,
+  ORMSchema,
+  type PackageManager,
+  PackageManagerSchema,
+  ProductPresetSchema,
+  type ProjectConfig,
+  ProjectConfigSchema,
+  ProjectNameSchema,
+  type Runtime,
+  RuntimeSchema,
+  type ServerDeploy,
+  ServerDeploySchema,
+  type Template,
+  TemplateSchema,
+  type WebDeploy,
+  WebDeploySchema,
+  WorkspacePackageNameSchema,
+} from "./types";
+import { getProcessMode } from "./utils/context";
+import {
+  CLIError,
+  DirectoryConflictError,
+  ProjectCreationError,
+  UserCancelledError,
+} from "./utils/errors";
+import { getLatestCLIVersion } from "./utils/get-latest-cli-version";
+import { type ProjectLauncher, ProjectLauncherSchema } from "./utils/project-launcher";
+import { validateResolvedConfigCompatibility } from "./validation";
+
+export const SchemaNameSchema = z
+  .enum([
+    "all",
+    "cli",
+    "database",
+    "orm",
+    "backend",
+    "runtime",
+    "frontend",
+    "addons",
+    "packageManager",
+    "databaseSetup",
+    "api",
+    "webDeploy",
+    "serverDeploy",
+    "directoryConflict",
+    "template",
+    "addonOptions",
+    "dbSetupOptions",
+    "createInput",
+    "addInput",
+    "projectConfig",
+    "xstackConfig",
+    "xstackConfigFile",
+    "initResult",
+  ])
+  .default("all");
+
+const CreateVirtualInputSchema = ProjectConfigSchema.omit({
+  projectDir: true,
+  relativePath: true,
+})
+  .partial()
+  .strict();
+
+export type SchemaName = z.infer<typeof SchemaNameSchema>;
+
+const command = os.$meta<TrpcCliMeta>({});
+
+function getCliSchemaJson(): unknown {
+  return createCli({
+    router,
+    name: "xstack",
+    version: getLatestCLIVersion(),
+  }).toJSON();
+}
+
+export function getSchemaResult(name: SchemaName) {
+  const schemas = getAllJsonSchemas();
+  if (name === "all") {
+    return {
+      cli: getCliSchemaJson(),
+      schemas,
+    };
+  }
+  if (name === "cli") {
+    return getCliSchemaJson();
+  }
+  return schemas[name];
+}
+
+export const router = os.router({
+  create: command
+    .meta({
+      description: "Create a new xstack project",
+      default: true,
+      negateBooleans: true,
+    })
+    .input(
+      z.tuple([
+        ProjectNameSchema.optional(),
+        z.object({
+          template: TemplateSchema.optional().describe("Use a predefined template"),
+          yes: z.boolean().optional().default(false).describe("Use default configuration"),
+          yolo: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("(WARNING - NOT RECOMMENDED) Bypass validations and compatibility checks"),
+          dryRun: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("Validate setup without writing files"),
+          verbose: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("Show detailed result information"),
+          database: DatabaseSchema.optional(),
+          orm: ORMSchema.optional(),
+          frontend: z.array(FrontendSchema).optional(),
+          addons: z.array(AddonsSchema).optional(),
+          git: z.boolean().optional(),
+          packageManager: PackageManagerSchema.optional(),
+          install: z.boolean().optional(),
+          open: ProjectLauncherSchema.optional(),
+          dbSetup: DatabaseSetupSchema.optional(),
+          backend: BackendSchema.optional(),
+          runtime: RuntimeSchema.optional(),
+          api: APISchema.optional(),
+          webDeploy: WebDeploySchema.optional(),
+          serverDeploy: ServerDeploySchema.optional(),
+          directoryConflict: DirectoryConflictSchema.optional(),
+          renderTitle: z.boolean().optional(),
+          disableAnalytics: z.boolean().optional().default(false).describe("Disable analytics"),
+          manualDb: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("Skip automatic/manual database setup prompt and use manual setup"),
+          dbSetupOptions: DbSetupOptionsSchema.optional().describe(
+            "Structured database setup options",
+          ),
+          preset: ProductPresetSchema.optional(),
+          features: z
+            .array(z.string())
+            .optional()
+            .describe("Feature modules to include (enables product mode)"),
+          providers: z
+            .array(z.string())
+            .optional()
+            .describe("Feature providers as feature:provider, e.g. payment:stripe"),
+          moduleOptions: z
+            .array(z.string())
+            .optional()
+            .describe("Module options as module.key=value, e.g. i18n.locales=zh-CN,en"),
+        }),
+      ]),
+    )
+    .handler(async ({ input }) => {
+      const [projectName, { features, providers, moduleOptions, ...options }] = input;
+      const product = productFromFlags({ features, providers, moduleOptions });
+      if (product.isErr()) throw product.error;
+      const combinedInput = {
+        projectName,
+        ...options,
+        product: product.value,
+      };
+      const result = await createProjectHandler(combinedInput);
+
+      if (options.verbose) {
+        return result;
+      }
+    }),
+  createJson: command
+    .meta({
+      description: "Create a project from a raw JSON payload (agent-friendly)",
+      jsonInput: "always",
+    })
+    .input(CreateInputSchema)
+    .handler(async ({ input }) => {
+      const result = await createProjectHandler(input, { silent: true, mode: "json" });
+      if (!result) {
+        throw new UserCancelledError({ message: "Operation cancelled" });
+      }
+      if (!result.success) {
+        throw new CLIError({
+          message: result.error || "Unknown error occurred",
+        });
+      }
+      return result;
+    }),
+  schema: command
+    .meta({ description: "Show runtime CLI and input schemas as JSON" })
+    .input(
+      z.object({
+        name: SchemaNameSchema.describe("Schema name to inspect"),
+      }),
+    )
+    .handler(({ input }) => getSchemaResult(input.name)),
+  sponsors: command
+    .meta({ description: "Show xstack sponsors" })
+    .handler(() => showSponsorsCommand()),
+  docs: command
+    .meta({ description: "Open xstack documentation" })
+    .handler(() => openDocsCommand()),
+  builder: command
+    .meta({ description: "Open the web-based stack builder" })
+    .handler(() => openBuilderCommand()),
+  add: command
+    .meta({
+      description: "Add addons or a workspace package to an existing xstack project",
+    })
+    .input(
+      z.object({
+        addons: z.array(AddonsSchema).optional().describe("Addons to add"),
+        package: WorkspacePackageNameSchema.optional(),
+        install: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Install dependencies after adding"),
+        packageManager: PackageManagerSchema.optional().describe("Package manager to use"),
+        projectDir: z.string().optional().describe("Project directory (defaults to current)"),
+        dryRun: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Preview addon changes without writing files"),
+        disableAnalytics: z.boolean().optional().default(false).describe("Disable analytics"),
+      }),
+    )
+    .handler(async ({ input }) => {
+      await addHandler(input);
+    }),
+  addJson: command
+    .meta({
+      description: "Add addons or a workspace package from a raw JSON payload (agent-friendly)",
+      jsonInput: "always",
+    })
+    .input(AddInputSchema)
+    .handler(async ({ input }) => {
+      const result = await addHandler(input, { silent: true, mode: "json" });
+      if (!result) {
+        throw new UserCancelledError({ message: "Operation cancelled" });
+      }
+      if (!result.success) {
+        throw new CLIError({
+          message: result.error || "Unknown error occurred",
+        });
+      }
+      return result;
+    }),
+  history: command
+    .meta({ description: "Show project creation history" })
+    .input(
+      z.object({
+        limit: z.number().optional().default(10).describe("Number of entries to show"),
+        clear: z.boolean().optional().default(false).describe("Clear all history"),
+        json: z.boolean().optional().default(false).describe("Output as JSON"),
+      }),
+    )
+    .handler(async ({ input }) => {
+      await historyHandler(input);
+    }),
+});
+
+export function createXStackCli(): TrpcCli {
+  return createCli({
+    router,
+    name: "xstack",
+    version: getLatestCLIVersion(),
+  });
+}
+
+// Re-export Result type from better-result for programmatic API consumers
+export { Result } from "better-result";
+
+/**
+ * Error types that can be returned from create/createVirtual
+ */
+export type CreateError =
+  | UserCancelledError
+  | CLIError
+  | DirectoryConflictError
+  | ProjectCreationError;
+
+function formatInputValidationError(label: string, error: z.ZodError): string {
+  const details = error.issues
+    .map((issue) => {
+      const field = issue.path.join(".");
+      return field ? `${field}: ${issue.message}` : issue.message;
+    })
+    .join("; ");
+
+  return `Invalid ${label} input: ${details}`;
+}
+
+/**
+ * Programmatic API to create a new xstack project.
+ * Returns a Result type - no console output, no interactive prompts.
+ *
+ * @example
+ * ```typescript
+ * import { create, Result } from "xstack";
+ *
+ * const result = await create("my-app", {
+ *   frontend: ["tanstack-router"],
+ *   backend: "hono",
+ *   runtime: "bun",
+ *   database: "sqlite",
+ *   orm: "drizzle",
+ * });
+ *
+ * result.match({
+ *   ok: (data) => console.log(`Project created at: ${data.projectDirectory}`),
+ *   err: (error) => console.error(`Failed: ${error.message}`),
+ * });
+ *
+ * // Or use unwrapOr for a default value
+ * const data = result.unwrapOr(null);
+ * ```
+ */
+export async function create(
+  projectName?: string,
+  options?: Partial<CreateInput>,
+): Promise<Result<InitResult, CreateError>> {
+  const rawInput = { ...options, projectName };
+  const parsedInput = CreateInputSchema.safeParse(rawInput);
+
+  if (!parsedInput.success) {
+    return Result.err(
+      new CLIError({
+        message: formatInputValidationError("create", parsedInput.error),
+        cause: parsedInput.error,
+      }),
+    );
+  }
+
+  const input = {
+    ...parsedInput.data,
+    renderTitle: false,
+    verbose: true,
+    disableAnalytics: parsedInput.data.disableAnalytics ?? true,
+    directoryConflict: parsedInput.data.directoryConflict ?? "error",
+  } as CreateInput & { projectName?: string };
+
+  return Result.tryPromise({
+    try: async () => {
+      const result = await createProjectHandlerResult(input, {
+        silent: true,
+        mode: getProcessMode() ?? "api",
+      });
+      if (result.isErr()) {
+        throw result.error;
+      }
+      return result.value as InitResult;
+    },
+    catch: (cause: unknown) => {
+      if (UserCancelledError.is(cause)) return cause;
+      if (CLIError.is(cause)) return cause;
+      if (DirectoryConflictError.is(cause)) return cause;
+      if (ProjectCreationError.is(cause)) return cause;
+      return new CLIError({
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause: cause,
+      });
+    },
+  });
+}
+
+export async function sponsors() {
+  return showSponsorsCommand();
+}
+
+export async function docs() {
+  return openDocsCommand();
+}
+
+export async function builder() {
+  return openBuilderCommand();
+}
+
+// Re-export virtual filesystem types for programmatic usage
+export {
+  VirtualFileSystem,
+  type VirtualFileTree,
+  type VirtualFile,
+  type VirtualDirectory,
+  type VirtualNode,
+  type GeneratorOptions,
+  GeneratorError,
+  generate,
+  EMBEDDED_TEMPLATES,
+  TEMPLATE_COUNT,
+} from "@xstack/template-generator";
+
+// Import for createVirtual
+import {
+  generate,
+  GeneratorError,
+  type VirtualFileTree,
+  EMBEDDED_TEMPLATES,
+} from "@xstack/template-generator";
+
+/**
+ * Programmatic API to generate a project in-memory (virtual filesystem).
+ * Returns a Result with a VirtualFileTree without writing to disk.
+ * Useful for web previews and testing.
+ *
+ * @example
+ * ```typescript
+ * import { createVirtual, EMBEDDED_TEMPLATES, Result } from "xstack";
+ *
+ * const result = await createVirtual({
+ *   frontend: ["tanstack-router"],
+ *   backend: "hono",
+ *   runtime: "bun",
+ *   database: "sqlite",
+ *   orm: "drizzle",
+ * });
+ *
+ * result.match({
+ *   ok: (tree) => console.log(`Generated ${tree.fileCount} files`),
+ *   err: (error) => console.error(`Failed: ${error.message}`),
+ * });
+ * ```
+ */
+export async function createVirtual(
+  options: Partial<Omit<ProjectConfig, "projectDir" | "relativePath">>,
+): Promise<Result<VirtualFileTree, GeneratorError>> {
+  const parsedInput = CreateVirtualInputSchema.safeParse(options);
+  if (!parsedInput.success) {
+    return Result.err(
+      new GeneratorError({
+        message: formatInputValidationError("virtual create", parsedInput.error),
+        phase: "validation",
+        cause: parsedInput.error,
+      }),
+    );
+  }
+
+  const virtualOptions = parsedInput.data;
+  const config: ProjectConfig = {
+    projectName: virtualOptions.projectName || "my-project",
+    projectDir: "/virtual",
+    relativePath: "./virtual",
+    addonOptions: virtualOptions.addonOptions,
+    dbSetupOptions: virtualOptions.dbSetupOptions,
+    database: virtualOptions.database || "none",
+    orm: virtualOptions.orm || "none",
+    backend: virtualOptions.backend || "hono",
+    runtime: virtualOptions.runtime || (virtualOptions.serverDeploy === "vercel" ? "node" : "bun"),
+    frontend: virtualOptions.frontend || ["tanstack-router"],
+    addons: virtualOptions.addons || [],
+    product: virtualOptions.product,
+    git: virtualOptions.git ?? false,
+    packageManager: virtualOptions.packageManager || "bun",
+    install: false,
+    dbSetup: virtualOptions.dbSetup || "none",
+    api: virtualOptions.api || "trpc",
+    webDeploy: virtualOptions.webDeploy || "none",
+    serverDeploy: virtualOptions.serverDeploy || "none",
+  };
+
+  const validationResult = validateResolvedConfigCompatibility(config);
+  if (validationResult.isErr()) {
+    return Result.err(
+      new GeneratorError({
+        message: validationResult.error.message,
+        phase: "validation",
+        cause: validationResult.error,
+      }),
+    );
+  }
+
+  return generate({
+    config,
+    templates: EMBEDDED_TEMPLATES,
+  });
+}
+
+export type {
+  CreateInput,
+  InitResult,
+  ProjectConfig,
+  XStackConfig,
+  Database,
+  ORM,
+  Backend,
+  Runtime,
+  Frontend,
+  Addons,
+  AddonOptions,
+  DbSetupOptions,
+  PackageManager,
+  DatabaseSetup,
+  API,
+  Auth,
+  WebDeploy,
+  ServerDeploy,
+  Template,
+  DirectoryConflict,
+  ProjectLauncher,
+};
+
+export { ProjectLauncherSchema };
+
+export type { AddResult };
+
+export type AddOptions = Pick<
+  AddInput,
+  | "addons"
+  | "addonOptions"
+  | "package"
+  | "install"
+  | "packageManager"
+  | "projectDir"
+  | "dryRun"
+  | "disableAnalytics"
+>;
+
+/**
+ * Programmatic API to add addons or a workspace package to an existing xstack project.
+ *
+ * @example
+ * ```typescript
+ * import { add } from "xstack";
+ *
+ * const result = await add({
+ *   addons: ["biome", "husky"],
+ *   install: true,
+ * });
+ *
+ * if (result.success) {
+ *   console.log(`Added: ${result.addedAddons.join(", ")}`);
+ * }
+ * ```
+ */
+export async function add(options: AddOptions = {}): Promise<AddResult> {
+  const parsedInput = AddInputSchema.safeParse(options);
+  if (!parsedInput.success) {
+    return {
+      success: false,
+      addedAddons: [],
+      projectDir: "",
+      error: formatInputValidationError("add", parsedInput.error),
+    };
+  }
+
+  const result = await addHandler(parsedInput.data, {
+    silent: true,
+    mode: getProcessMode() ?? "api",
+  });
+  return (
+    result ?? {
+      success: false,
+      addedAddons: [],
+      projectDir: parsedInput.data.projectDir ?? "",
+      error: "Operation cancelled",
+    }
+  );
+}
+
+// Re-export error types for consumers
+export {
+  UserCancelledError,
+  CLIError,
+  ProjectCreationError,
+  ValidationError,
+  CompatibilityError,
+  DirectoryConflictError,
+  DatabaseSetupError,
+} from "./utils/errors";

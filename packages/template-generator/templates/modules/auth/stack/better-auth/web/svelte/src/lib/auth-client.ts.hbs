@@ -1,0 +1,18 @@
+{{#unless (eq backend "self")}}
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{else}}.generated{{/if}}";
+{{/unless}}
+import { createAuthClient } from "better-auth/svelte";
+
+{{#unless (eq backend "self")}}
+{{> getServerUrl}}
+
+{{/unless}}
+export const authClient = createAuthClient({
+{{#unless (eq backend "self")}}
+{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+  baseURL: {{#if (eq webDeploy "vercel")}}`${getServerUrl(ENV.PUBLIC_SERVER_URL)}/auth`{{else}}new URL("/api/auth", getServerUrl(ENV.PUBLIC_SERVER_URL)).toString(){{/if}},
+{{else}}
+  baseURL: ENV.PUBLIC_SERVER_URL,
+{{/if}}
+{{/unless}}
+});

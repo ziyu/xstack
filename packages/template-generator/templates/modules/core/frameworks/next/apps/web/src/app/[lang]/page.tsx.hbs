@@ -1,0 +1,55 @@
+{{#if (includes product.features "auth")}}
+import { buttonVariants } from "@{{projectName}}/ui/components/button";
+import Link from "next/link";
+
+import { localePath } from "@/lib/i18n/paths";
+{{/if}}
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+const features = ["modular", "portable", "deploy"] as const;
+
+export default async function HomePage({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+
+  return (
+    <div className="container mx-auto max-w-6xl px-4">
+      <section className="flex flex-col items-center gap-6 py-24 text-center">
+        <h1 className="max-w-3xl text-balance font-semibold text-4xl tracking-tight sm:text-5xl">
+          {t("core.landing.title")}
+        </h1>
+        <p className="max-w-2xl text-balance text-muted-foreground">
+          {t("core.landing.subtitle")}
+        </p>
+{{#if (includes product.features "auth")}}
+        <div className="flex gap-3">
+          <Link href={localePath(locale, "/login")} className={buttonVariants({ size: "lg" })}>
+            {t("core.landing.cta")}
+          </Link>
+          <Link
+            href={localePath(locale, "/dashboard")}
+            className={buttonVariants({ size: "lg", variant: "outline" })}
+          >
+            {t("core.landing.secondary")}
+          </Link>
+        </div>
+{{/if}}
+      </section>
+      <section className="pb-24">
+        <h2 className="mb-8 text-center font-medium text-2xl">
+          {t("core.landing.features.title")}
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {features.map((feature) => (
+            <div key={feature} className="border p-6">
+              <h3 className="mb-2 font-medium">{t(`core.landing.features.${feature}.title`)}</h3>
+              <p className="text-muted-foreground text-sm">
+                {t(`core.landing.features.${feature}.body`)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}

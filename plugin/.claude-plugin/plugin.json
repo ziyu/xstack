@@ -1,0 +1,33 @@
+{
+  "name": "xstack",
+  "version": "3.47.0",
+  "description": "Let your AI scaffold and extend projects with xstack. Bundles the xstack MCP server plus skills, commands, and an agent so the assistant plans a valid stack and generates it instead of hand-rolling boilerplate.",
+  "author": {
+    "name": "Aman Varshney",
+    "url": "https://github.com/AmanVarshney01"
+  },
+  "homepage": "https://xstack.dev",
+  "repository": "https://github.com/ziyu/xstack",
+  "license": "MIT",
+  "keywords": [
+    "xstack",
+    "xstack",
+    "scaffold",
+    "starter",
+    "boilerplate",
+    "typescript",
+    "fullstack",
+    "monorepo",
+    "turborepo",
+    "nx",
+    "nextjs",
+    "react",
+    "hono",
+    "trpc",
+    "better-auth",
+    "drizzle",
+    "tanstack",
+    "ai-agent",
+    "mcp"
+  ]
+}

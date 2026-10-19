@@ -1,0 +1,18 @@
+import type { Services } from "../services";
+
+{{#if module.options.signupBonus}}
+const SIGNUP_BONUS = {{module.options.signupBonus}};
+
+/** Grants the sign-up bonus once per account. */
+export default function registerCreditsSignup({ events, credits }: Services) {
+  events.on("auth.user_created", async ({ userId }) => {
+    await credits.grant(userId, SIGNUP_BONUS, {
+      type: "signup",
+      referenceId: `signup:${userId}`,
+    });
+  });
+}
+{{else}}
+/** Sign-up bonus is disabled; set the credits `signupBonus` option to enable it. */
+export default function registerCreditsSignup(_services: Services) {}
+{{/if}}

@@ -1,0 +1,35 @@
+import type { VirtualFileSystem } from "../core/virtual-fs";
+import { getPrismaWebsiteFramework } from "../generators/alchemy/plan";
+import type { RenderConfig } from "../types";
+import { addPackageDependency } from "../utils/add-deps";
+
+export function processInfraDeps(vfs: VirtualFileSystem, config: RenderConfig): void {
+  const infraPath = "packages/infra/package.json";
+  if (!vfs.exists(infraPath)) return;
+
+  const { serverDeploy, webDeploy } = config;
+  if (getPrismaWebsiteFramework(config)) {
+    addPackageDependency({
+      vfs,
+      packagePath: infraPath,
+      devDependencies: ["@alchemy.run/frontend-frameworks", "@vercel/nft"],
+    });
+  }
+  if (
+    ["cloudflare", "prisma"].includes(serverDeploy) ||
+    ["cloudflare", "prisma"].includes(webDeploy) ||
+    config.addons.includes("axiom")
+  ) {
+    addPackageDependency({
+      vfs,
+      packagePath: infraPath,
+      devDependencies: [
+        "alchemy",
+        "effect",
+        "@effect/platform-node",
+        "@effect/platform-bun",
+        "varlock",
+      ],
+    });
+  }
+}

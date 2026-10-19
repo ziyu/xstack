@@ -1,0 +1,45 @@
+export default {
+  nav: {
+    credits: "积分",
+  },
+  page: {
+    title: "积分",
+    balance: "可用积分",
+    buyMore: "获取更多积分",
+    history: "积分明细",
+    empty: "暂无积分记录。",
+  },
+  types: {
+    purchase: "购买",
+    subscription: "订阅",
+    signup: "注册赠送",
+    grant: "赠送",
+    consume: "消耗",
+    refund: "退款",
+    adjust: "人工调整",
+  },
+  admin: {
+    title: "积分",
+    adjust: "调整余额",
+    email: "用户邮箱",
+    amount: "数量",
+    amountHint: "输入负数即可扣减积分。",
+    reason: "原因（可选）",
+    submit: "确认",
+    done: "余额已更新。",
+    empty: "暂无积分流水。",
+    errors: {
+      invalid: "请输入邮箱和非零整数。",
+      user: "找不到该邮箱对应的用户。",
+      balance: "该用户积分不足，无法扣减。",
+    },
+    columns: {
+      date: "时间",
+      user: "用户",
+      type: "类型",
+      reason: "原因",
+      amount: "数量",
+      balance: "余额",
+    },
+  },
+} as const;

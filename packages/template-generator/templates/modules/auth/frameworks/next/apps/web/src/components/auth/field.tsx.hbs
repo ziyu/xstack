@@ -1,0 +1,20 @@
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export function Field({
+  label,
+  name,
+  ...props
+}: { label: string; name: string } & React.ComponentProps<"input">) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={name}>{label}</Label>
+      <Input id={name} name={name} required {...props} />
+    </div>
+  );
+}
+
+export function formValue(form: FormData, name: string): string {
+  const value = form.get(name);
+  return value instanceof File ? "" : (value ?? "");
+}

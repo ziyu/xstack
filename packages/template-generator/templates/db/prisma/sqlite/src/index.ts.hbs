@@ -1,0 +1,28 @@
+import type { DatabaseConfig } from "./config";
+import { PrismaClient } from "../prisma/generated/client";
+
+{{#if (eq dbSetup "d1")}}
+import { PrismaD1 } from "@prisma/adapter-d1";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaD1(env.DB);
+	return new PrismaClient({ adapter });
+}
+
+{{else}}
+import { PrismaLibSql } from "@prisma/adapter-libsql";
+
+export function createPrismaClient(env: DatabaseConfig) {
+	const adapter = new PrismaLibSql({
+		url: env.DATABASE_URL,
+{{#if (eq dbSetup "turso")}}
+		authToken: env.DATABASE_AUTH_TOKEN || "",
+{{/if}}
+	});
+
+	return new PrismaClient({ adapter });
+}
+
+{{/if}}
+
+export type Database = ReturnType<typeof createPrismaClient>;

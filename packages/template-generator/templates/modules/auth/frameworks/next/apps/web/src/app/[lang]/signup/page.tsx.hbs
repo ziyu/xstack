@@ -1,0 +1,49 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { AuthCard } from "@/components/auth/auth-card";
+import SignUpForm from "@/components/auth/sign-up-form";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { safeNext } from "@/lib/session";
+import { enabledSocialProviders } from "@/lib/social-providers.server";
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ next?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("auth.signUp.submit") };
+}
+
+export default async function SignUpPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const { next } = await searchParams;
+
+  return (
+    <AuthCard
+      title={t("auth.signUp.title")}
+      description={t("auth.signUp.subtitle")}
+      footer={
+        <>
+          {t("auth.signUp.hasAccount")}&nbsp;
+          <Link
+            href={localePath(locale, "/login")}
+            className="text-foreground underline-offset-4 hover:underline"
+          >
+            {t("auth.signUp.signInLink")}
+          </Link>
+        </>
+      }
+    >
+      <SignUpForm
+        next={safeNext(next, localePath(locale, "/dashboard"))}
+        providers={enabledSocialProviders()}
+        verifyEmail={ {{#if (includes module.integrations "email")}}true{{else}}false{{/if}} }
+      />
+    </AuthCard>
+  );
+}

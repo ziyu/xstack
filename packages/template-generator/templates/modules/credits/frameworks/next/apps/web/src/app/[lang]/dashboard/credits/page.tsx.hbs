@@ -1,0 +1,71 @@
+import { credits } from "@{{projectName}}/app-services";
+{{#if (includes product.features "payment")}}
+import { buttonVariants } from "@{{projectName}}/ui/components/button";
+{{/if}}
+import type { Metadata } from "next";
+{{#if (includes product.features "payment")}}
+import Link from "next/link";
+{{/if}}
+
+{{#if (includes product.features "payment")}}
+import { localePath } from "@/lib/i18n/paths";
+{{/if}}
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = { params: Promise<{ lang: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("credits.page.title") };
+}
+
+export default async function CreditsPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const user = await requireUser(locale, "/dashboard/credits");
+
+  const [balance, transactions] = await Promise.all([
+    credits.getBalance(user.id),
+    credits.listTransactions(user.id),
+  ]);
+  const number = new Intl.NumberFormat(locale, { signDisplay: "exceptZero" });
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+
+  return (
+    <div className="flex flex-col gap-8">
+      <h1 className="font-semibold text-2xl">{t("credits.page.title")}</h1>
+
+      <section className="flex flex-wrap items-end justify-between gap-4 border p-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-muted-foreground text-sm">{t("credits.page.balance")}</span>
+          <span className="font-semibold text-3xl tabular-nums">
+            {new Intl.NumberFormat(locale).format(balance)}
+          </span>
+        </div>
+{{#if (includes product.features "payment")}}
+        <Link href={localePath(locale, "/pricing")} className={buttonVariants({ variant: "outline" })}>
+          {t("credits.page.buyMore")}
+        </Link>
+{{/if}}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium">{t("credits.page.history")}</h2>
+        {transactions.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("credits.page.empty")}</p>
+        ) : (
+          <ul className="divide-y border">
+            {transactions.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+                <span>{t(`credits.types.${entry.type}`)}</span>
+                <span className="text-muted-foreground">{date.format(entry.createdAt)}</span>
+                <span className="tabular-nums">{number.format(entry.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}

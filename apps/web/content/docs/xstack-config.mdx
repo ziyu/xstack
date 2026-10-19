@@ -1,0 +1,74 @@
+---
+title: xstack.jsonc
+description: What xstack.jsonc does and why it matters
+---
+
+## What is it?
+
+`xstack.jsonc` is a small config file written to your project root when you create a project. It captures the stack choices you selected (frontend, backend, API, DB/ORM, auth, addons, etc.). The file uses JSONC (JSON with comments) and includes a schema for editor hints.
+
+Where: `./xstack.jsonc`
+
+## Why it exists
+
+- Required for the `add` command to detect your current stack
+- Helps validate compatibility and pre‑fill sensible defaults
+
+If `xstack.jsonc` is missing, the `add` command cannot run because the project cannot be detected.
+
+## Safe to delete (with a caveat)
+
+It’s safe to delete for normal development; the generated code in `apps/*` and `packages/*` remains the source of truth. However, if you plan to use the `add` command later, you must keep `xstack.jsonc` so the CLI can detect your project.
+
+## Format
+
+The file is JSONC with comments enabled and includes a `$schema` URL for tooling.
+
+```jsonc
+// xstack project metadata
+//
+// Keep this file to use the `add` command.
+// Add addons: bunx xstack@latest add
+//
+// Docs: https://www.xstack.dev/docs
+// Stack Builder: https://www.xstack.dev/new
+{
+  "$schema": "https://r2.xstack.dev/schema.json",
+  "version": "x.y.z",
+  "createdAt": "2025-01-01T00:00:00.000Z",
+  "reproducibleCommand": "bun create xstack@latest my-app --frontend tanstack-router ...",
+  "frontend": ["tanstack-router"],
+  "backend": "hono",
+  "runtime": "bun",
+  "database": "sqlite",
+  "orm": "drizzle",
+  "api": "trpc",
+  "addons": ["turborepo"],
+  "addonOptions": {
+    "wxt": {
+      "template": "react",
+    },
+  },
+  "product": {
+    "features": ["auth"],
+  },
+  "dbSetup": "none",
+  "dbSetupOptions": {
+    "mode": "manual",
+  },
+  "webDeploy": "none",
+  "serverDeploy": "none",
+  "packageManager": "bun",
+}
+```
+
+Notes:
+
+- Values mirror what you selected during project creation
+- `reproducibleCommand` contains the normal CLI command generated when the project was created
+- Deeply nested structured options remain in `addonOptions` or `dbSetupOptions` and may not be fully represented in the one-line command
+- `addonOptions` stores nested configuration for prompt-driven addons
+- `dbSetupOptions` stores structured database setup behavior for automation
+- The file may be updated when you run `add` (addons and addon-specific config)
+
+See also: [`add` command](/docs/cli#add)

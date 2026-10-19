@@ -1,0 +1,62 @@
+# Payments
+
+`packages/payment` keeps orders and subscriptions in your database and talks to providers through a small `PaymentProvider` interface. Enabled providers: {{#each module.providers}}`{{this}}`{{#unless @last}}, {{/unless}}{{/each}}.
+
+## Plans
+
+Edit `packages/payment/src/plans.ts`. Amounts are in the currency's minor unit (`1900` = $19.00). Translate names and descriptions in `packages/i18n/src/messages/<locale>/payment.ts` under `plans.<id>`.
+
+Checkout uses inline prices by default. To use prices managed in your provider dashboard, set `providerRefs`, e.g. `providerRefs: { stripe: "price_123" }`.{{#if (includes module.providers "polar")}} Polar has no inline prices: every plan needs `providerRefs.polar` set to a Polar product ID.{{/if}}
+
+## Flow
+
+1. `/pricing` posts to the `startCheckout` server action, which creates a `pending` order and redirects to the provider.
+2. The provider calls `/api/payment/webhook/<provider>`.
+3. The order becomes `paid` and `payment.order_paid` is emitted. Renewals create a new paid order and emit the same event with `renewal: true`.
+
+Orders change state at most once. `payment.order_paid` is delivered at least once: if a handler throws, the webhook fails, the provider retries and the event is emitted again. Make handlers idempotent on `orderId`, as the credits integration does.
+{{#if (includes module.providers "stripe")}}
+
+## Stripe
+
+| Variable | Purpose |
+| --- | --- |
+| `STRIPE_SECRET_KEY` | Secret key from the Stripe dashboard |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret of your webhook endpoint |
+
+Webhook endpoint: `<BETTER_AUTH_URL>/api/payment/webhook/stripe`, with the events `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `invoice.paid`, `customer.subscription.created`, `customer.subscription.updated` and `customer.subscription.deleted`.
+
+Local testing:
+
+```bash
+stripe listen --forward-to localhost:3001/api/payment/webhook/stripe
+```
+
+Enable the customer portal in the Stripe dashboard for the "Manage subscription" button.
+{{/if}}
+{{#if (includes module.providers "polar")}}
+
+## Polar
+
+| Variable | Purpose |
+| --- | --- |
+| `POLAR_ACCESS_TOKEN` | Organization access token |
+| `POLAR_WEBHOOK_SECRET` | Secret of your webhook endpoint |
+| `POLAR_SERVER` | `sandbox` (default) or `production`; tokens differ per environment |
+
+Create one product per plan in the Polar dashboard and set its ID as `providerRefs.polar` in `plans.ts`. The product's price and billing interval are what customers pay; keep `amount`, `currency` and `interval` in `plans.ts` in sync, since the pricing page shows those.
+
+Webhook endpoint: `<BETTER_AUTH_URL>/api/payment/webhook/polar`, format "Raw", with the events `order.paid`, `subscription.created` and `subscription.updated`.
+
+"Manage subscription" opens the Polar customer portal.
+{{/if}}
+{{#if (includes module.providers "mock")}}
+
+## Mock provider
+
+`mock` completes checkouts locally through `/api/payment/mock` without any account. Checkout uses the first configured provider, so `mock` takes over in development until real credentials are set. It is disabled in production; remove it from `packages/payment/src/providers/index.ts` before launch.
+{{/if}}
+
+## Adding a provider
+
+Create `packages/payment/src/providers/<id>.ts` exporting `createProvider({ env, baseUrl })` and `ProviderConfig`, then register it in `providers/index.ts`. Map the provider's webhooks to the three normalized events in `types.ts`.

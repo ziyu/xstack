@@ -1,0 +1,533 @@
+# xstack 设计规划
+
+> 状态：草案 v0.1（2026-10-17）
+> 基线：fork 自 [xstack](https://github.com/ziyu/xstack)（下称 XSTACK）
+
+## 1. 定位
+
+
+|      | XSTACK              | 商业SaaS 模板             | xstack                  |
+| ---- | ------------------- | --------------------- | ----------------------- |
+| 组合单位 | 技术栈（框架/ORM/DB/Auth） | 无，一整套                 | 技术栈 + 功能模块 + 服务商 + 部署目标 |
+| 产出   | 能跑的空项目              | 产品级完整项目               | 产品级、只含所选功能的项目           |
+| 锁死问题 | 无功能                 | 栈锁死、功能锁死（删功能靠手工）、发布锁死 | 三者都可选、可替换               |
+
+
+一句话：**把大模板拆成边界清晰的模块，用 XSTACK 的生成器把用户选中的模块组装成一个产品级项目，生成后的代码不依赖本工具，也不绑定任何服务商。**
+
+### 1.1 目标
+
+1. **功能可组合**：认证、支付订阅、积分、邮件/短信、存储、AI、后台、i18n/SEO/博客、分销，按需勾选，未选的功能不留任何残余代码、依赖、环境变量和数据表。
+2. **服务商可替换（no vendor lock-in）**：每个功能对外是一个稳定接口，服务商是接口的一个实现。生成时可多选，生成后可通过配置切换，新增服务商只需实现接口。
+3. **发布可选**：Vercel / Docker / Cloudflare Workers / 传统 Node 主机，生成对应配置、CI 和上线清单。
+4. **生成即产品级**：类型检查、构建、迁移、种子数据、测试、文档、AGENTS.md 齐全，`install → env → dev` 三步跑起来。
+5. **生成后可演进**：项目里记录所选配置，支持之后 `add` 新模块或新服务商。
+
+### 1.2 非目标（MVP 阶段）
+
+- 不支持 Next.js 以外的前端（Nuxt / TanStack Start 留到后续阶段，但模块协议从第一天就为多框架设计）。
+- 不支持 Convex、独立后端（Hono/Express 等）与功能模块组合；功能模块只在"Next.js 全栈"模式下可用。
+- 不支持 Prisma / Mongoose；功能模块的数据层只用 Drizzle。
+- 不做"生成后自动升级模块代码"（生成的代码归用户所有，升级靠文档和 `diff`）。
+
+## 2. 从 XSTACK 继承什么、改什么
+
+XSTACK 现有结构：
+
+```
+apps/cli                     # CLI 交互、校验、安装、git
+apps/web                     # 网页版 stack builder
+packages/types               # zod schema、兼容规则
+packages/template-generator  # 虚拟文件系统 + handlebars 模板 + 各类 processor
+```
+
+它的生成流程是一条**按类别写死的流水线**：`generator.ts` 依次调用 `processFrontendTemplates`、`processAuthTemplates`、`processPaymentsTemplates`……每个类别一个 handler，模板目录按 `类别/选项/目标框架` 组织，兼容规则写在 `compatibility.ts` 的常量和 if 里。这对十几个技术选项够用，但功能模块 × 服务商 × 框架 × 部署目标的组合数会让它失控。
+
+
+| 保留                                          | 改造                                           | 新增                     |
+| ------------------------------------------- | -------------------------------------------- | ---------------------- |
+| 虚拟文件系统（VFS）、浏览器可运行的生成器                      | 写死的 handler 流水线 → **模块清单驱动**的通用流水线           | 功能模块（Feature Module）协议 |
+| handlebars 模板、`templates.generated.ts` 打包方式 | 兼容规则常量 → **由模块清单声明、统一求解**                    | 服务商（Provider）协议        |
+| 依赖/脚本/catalog/README 后处理                    | `xstack.jsonc` → `cbt.jsonc`，记录模块与服务商        | 挂载点（Slot）聚合机制          |
+| CLI 交互、包管理器、git、安装流程                        | 现有 `payments: polar`、`examples: ai` 等迁移为功能模块 | 预设（Preset）、`add` 命令    |
+| 网页版 builder                                 | builder 增加"功能"与"服务商"两栏                       | 组合矩阵测试                 |
+
+
+**原则（已由第 17 节取代）：~~XSTACK 现有技术栈选项保持可用，功能模块是新增的一层；选了功能模块时技术栈收敛到"产品模式"。~~ 现行原则：与上游分家，技术栈只描述基础设施，业务领域（auth、支付、示例）一律是模块，见第 17 节。**
+
+## 3. 核心概念
+
+```
+Project
+├── Stack       技术栈层（XSTACK 原有）：框架、DB、ORM、包管理器、工具链插件
+├── Features    功能模块：auth、payment、credits、email、sms、storage、ai、admin、i18n、seo、blog、affiliate …
+│   └── Providers   每个功能下的服务商实现：stripe、wechat-pay、resend、aliyun-sms、s3、oss …
+├── Integrations   两个模块同时存在时才生成的连接代码：payment×credits、affiliate×payment …
+└── Targets     部署目标：vercel、docker、cloudflare、node
+```
+
+- **功能模块（Feature）**：一个领域能力。有领域逻辑、数据表、页面/API、配置、i18n 文案、测试、文档。
+- **服务商（Provider）**：功能接口的一个实现。只包含 SDK 调用和对应环境变量，**不包含业务逻辑**。
+- **集成（Integration）**：模块间的可选协作。例：选了支付和积分，才生成"购买积分包"的履约逻辑。
+- **挂载点（Slot）**：共享文件中的扩展位置，例如导航菜单、后台菜单、数据库 schema 索引、配置索引、权限表、i18n 词条。模块往挂载点**贡献条目**，由生成器聚合，而不是在共享文件里写一堆 `{{#if}}`。
+
+## 4. 生成产物的结构（用户拿到什么）
+
+这是整个设计的落脚点，模块化和去锁死都体现在产物上。以"全选"为例：
+
+```
+my-app/
+├── apps/web/                         # Next.js App Router，只放薄适配层
+│   ├── app/[lang]/(auth)/...         # ← auth 模块贡献
+│   ├── app/[lang]/(root)/pricing/    # ← payment 模块贡献
+│   ├── app/[lang]/admin/...          # ← admin 外壳 + 各模块贡献的后台页
+│   ├── app/api/payment/webhook/[provider]/route.ts   # 单一动态路由，按 provider 分发
+│   └── middleware.ts                 # 由 middleware 挂载点聚合生成
+├── packages/
+│   ├── config/                       # 单一配置入口，按模块拆文件，env 读取集中在这里
+│   ├── db/                           # Drizzle client、驱动（pg/sqlite/d1）、schema 聚合
+│   ├── events/                       # 进程内领域事件总线（见 §6.3）
+│   ├── ui/                           # shadcn 组件、主题
+│   ├── i18n/
+│   ├── auth/
+│   ├── payment/
+│   │   ├── src/core/                 # 接口 + 订单/订阅领域逻辑（与服务商无关）
+│   │   ├── src/providers/stripe.ts   # 只生成用户勾选的服务商
+│   │   ├── src/providers/wechat.ts
+│   │   ├── src/registry.ts           # 生成：已启用 provider 的注册表
+│   │   └── src/schema/{pg,sqlite}.ts
+│   ├── credits/ email/ sms/ storage/ ai/ affiliate/ blog/ seo/
+├── env.example                       # 只含已选模块/服务商的变量，带注释和申请链接
+├── deploy/                           # 只含所选部署目标
+├── docs/                             # 只含所选模块的使用文档
+├── AGENTS.md                         # 按所选模块生成的 AI 协作说明
+└── cbt.jsonc                         # 生成配置，可复现、可 add
+```
+
+### 4.1 产物层面的去锁死约定
+
+1. **功能包之间只通过公开接口和领域事件交互**，不直接 import 对方内部文件。删掉一个功能包 + 它在挂载点里的条目，项目仍能编译。
+2. **服务商只在 `providers/` 下出现**。业务代码依赖 `PaymentProvider` / `StorageProvider` / `EmailProvider` 等接口，从 `registry` 取实例。
+3. **服务商选择是运行时配置**：多个已生成的服务商通过 `config` 或环境变量切换，不需要改代码。
+4. **数据库方言可切**：每个模块同时提供 pg 和 sqlite schema，`DB_DIALECT` 切换；D1 走 sqlite schema。
+5. **部署无关**：业务代码不 import 任何平台 SDK（`@vercel/*`、`cloudflare:*`），平台差异收敛在 `packages/db/drivers`、`packages/storage/providers/r2-binding` 这类适配器里。
+6. **生成的项目不依赖 xstack 任何运行时包**。
+
+## 5. 模块清单协议（Module Manifest）
+
+每个模块在本仓库里是一个目录，带一份 TypeScript 清单。生成器、CLI、网页 builder、兼容求解、文档都从清单读取信息。
+
+### 5.1 模块源码目录
+
+```
+packages/modules/payment/
+├── module.ts                 # 清单
+├── templates/
+│   ├── package/              # → packages/payment/（框架无关的领域逻辑）
+│   ├── providers/
+│   │   ├── stripe/           # → packages/payment/src/providers/stripe.ts 等
+│   │   ├── wechat/
+│   │   └── ...
+│   ├── frameworks/
+│   │   └── next/             # → apps/web/ 下的页面、API 路由、组件
+│   ├── schema/{pg,sqlite}/
+│   ├── i18n/{en,zh-CN}.ts    # 词条片段
+│   ├── docs/
+│   └── tests/{unit,e2e}/
+└── integrations/
+    └── credits/              # payment × credits 时才生成
+```
+
+`frameworks/next` 之后可以平行加 `frameworks/nuxt`、`frameworks/tanstack-start`，领域包和服务商代码不需要改。
+
+### 5.2 清单示意
+
+```ts
+export default defineModule({
+  id: "payment",
+  name: { en: "Payments & Subscriptions", "zh-CN": "支付与订阅" },
+  category: "monetization",
+
+  requires: ["auth", "db"],              // 硬依赖，求解时自动加入
+  enhances: ["credits", "affiliate"],    // 软依赖，同时存在时启用 integrations
+  conflicts: [],
+
+  supports: {
+    frameworks: ["next"],
+    dialects: ["pg", "sqlite", "d1"],
+    targets: ["vercel", "docker", "node", "cloudflare"],
+  },
+
+  providers: {
+    min: 1,
+    multiple: true,
+    options: {
+      stripe:  { market: "global", env: ["STRIPE_SECRET_KEY", "STRIPE_PUBLIC_KEY", "STRIPE_WEBHOOK_SECRET"], deps: { stripe: "^18" } },
+      creem:   { market: "global", ... },
+      paypal:  { market: "global", ... },
+      dodo:    { market: "global", ... },
+      wechat:  { market: "cn", requires: { capabilities: ["public-webhook-url"] }, ... },
+      alipay:  { market: "cn", ... },
+    },
+  },
+
+  options: {
+    pricingMode: { type: "enum", values: ["static", "dynamic"], default: "static" },
+  },
+
+  slots: {
+    "nav.main":        [{ href: "/pricing", label: "nav.pricing" }],
+    "nav.dashboard":   [{ href: "/dashboard/billing", label: "nav.billing" }],
+    "admin.pages":     ["orders", "subscriptions", "pricing-plans"],
+    "db.schema":       ["order", "subscription", "pricing-plan"],
+    "permissions":     ["order:read", "subscription:manage"],
+    "middleware":      [{ id: "subscription", order: 30 }],
+    "events.emits":    ["order.paid", "subscription.changed", "order.refunded"],
+  },
+
+  env: [
+    { key: "PRICING_MODE", default: "static", comment: "static | dynamic" },
+  ],
+});
+```
+
+### 5.3 挂载点（Slots）清单
+
+
+| 挂载点                          | 聚合产物                                          | 贡献者示例                               |
+| ---------------------------- | --------------------------------------------- | ----------------------------------- |
+| `config`                     | `packages/config/src/index.ts`                | 每个模块                                |
+| `db.schema`                  | `packages/db/src/schema/{pg,sqlite}/index.ts` | auth、payment、credits、blog、affiliate |
+| `nav.main` / `nav.dashboard` | `apps/web/config/navigation.ts`               | payment、ai、blog                     |
+| `admin.pages`                | 后台侧边栏 + 路由                                    | 各模块                                 |
+| `dashboard.widgets`          | 用户仪表盘卡片                                       | credits、affiliate、payment           |
+| `middleware`                 | `apps/web/middleware.ts`（按 order 串联）          | i18n、auth、payment                   |
+| `permissions`                | `packages/auth/src/permissions.ts`（CASL）      | 各模块                                 |
+| `i18n`                       | `packages/i18n/locales/*.ts`（按命名空间合并）         | 各模块                                 |
+| `events`                     | `packages/events/src/handlers.ts`             | integrations                        |
+| `env`                        | `env.example`                                 | 各模块、各服务商                            |
+| `seed`                       | `packages/db/src/seed.ts`                     | auth（管理员）、payment（套餐）               |
+| `sitemap`                    | `app/sitemap.ts`                              | seo、blog                            |
+| `docs` / `agents`            | `docs/`、`AGENTS.md`                           | 各模块                                 |
+
+
+**规则：共享文件一律由挂载点生成，模块模板里禁止出现"判断别的模块是否存在"的 handlebars 条件。** 需要跨模块的代码放到 `integrations/`。这是避免模板变成条件迷宫的关键约束。
+
+## 6. 组合机制
+
+### 6.1 求解流程
+
+```
+用户输入（CLI 参数 / 交互 / 预设 / 网页 builder / cbt.jsonc）
+  → 解析为 Selection { stack, features, providers, targets, options }
+  → Resolver
+      1. 加入 requires 的传递闭包（如选 affiliate 自动加入 payment、credits、auth、db）
+      2. 收敛技术栈：有功能模块 ⇒ 产品模式约束
+      3. 校验 supports（框架、方言、部署目标）、conflicts、provider.min
+      4. 校验服务商能力约束（如 wechat 需要公网回调地址 → 提示 Cloudflare/Vercel 预览域名或内网穿透）
+      5. 计算启用的 integrations（enhances 双方都在）
+      6. 输出 ResolvedPlan + 人类可读的变更说明（"已自动加入 credits，因为 affiliate 依赖它"）
+  → Generator（通用流水线）
+      1. Stack 层：沿用 XSTACK handler 生成基础项目
+      2. 按拓扑序渲染每个模块：package → providers(仅选中) → frameworks/<fw> → schema → tests → docs
+      3. 渲染 integrations
+      4. 聚合所有 slots → 生成共享文件
+      5. 后处理：依赖合并、env.example、scripts、catalog、README、AGENTS.md、cbt.jsonc
+  → VFS → 写盘 / 浏览器预览 / zip 下载
+```
+
+Resolver 是纯函数，CLI、网页 builder、测试共用一份实现，替代 XSTACK 里 CLI 与 web 各一份的兼容判断。
+
+### 6.2 依赖图（MVP）
+
+根据 原有模板项目中现有 import 关系整理，`→` 表示硬依赖，`⇢` 表示软依赖（触发集成）：
+
+```
+db
+auth        → db, i18n           ⇢ email（邮箱验证/重置）, sms（手机号登录）
+email       → i18n
+sms
+storage
+i18n
+seo         ⇢ blog
+blog        → db, auth(admin)
+credits     → db, auth
+payment     → db, auth           ⇢ credits（积分包/订阅送积分）, affiliate
+affiliate   → payment, credits, auth
+ai          → auth               ⇢ credits（按次扣费/失败退款）, storage（图像/视频结果存储）
+admin       → auth               （外壳；各模块经 admin.pages 挂入）
+```
+
+其中 `auth` 直接 import `sms`、`email`，`payment` 直接 import `credits`。拆分时要把这些硬连接改成"软依赖 + 集成"，否则用户无法只选认证不选短信。
+
+### 6.3 领域事件：解开模块间的硬连接
+
+生成的项目里有一个极简的进程内事件总线 `packages/events`（无外部依赖，类型安全）：
+
+```ts
+// 发出方：payment 的 webhook 处理
+await events.emit("order.paid", { orderId, userId, plan });
+
+// 集成：integrations/payment-credits 生成的处理器
+events.on("order.paid", async ({ userId, plan }) => {
+  if (plan.credits) await credits.grant(userId, plan.credits, "PURCHASE");
+});
+```
+
+- 事件名、载荷类型由各模块清单的 `events.emits` 声明，类型自动生成。
+- 同步执行、在同一个数据库事务上下文里（`withTransaction` 传入），保证履约一致性；需要异步时，用户可自行替换为队列，接口不变。
+- 好处：删掉 credits，只是少了一个 handler，payment 代码一行不改。
+
+### 6.4 服务商接口
+
+每个功能定义最小接口，扩展能力用可选方法 + capability 声明，不搞"Stripe 专属字段"污染公共类型（ 原`PaymentPlan` 的 `stripePriceId`/`creemProductId` 等改为 `providerRefs: Record<ProviderId, string>`）。
+
+```ts
+interface PaymentProvider {
+  id: string;
+  capabilities: { subscription: boolean; refund: boolean; portal: boolean; qrcode: boolean };
+  createPayment(p: PaymentParams): Promise<PaymentResult>;
+  verifyWebhook(req: Request): Promise<WebhookEvent>; // 统一成领域事件
+  refund?(orderId: string, amount?: number): Promise<RefundResult>;
+  createPortalSession?(customerId: string, returnUrl: string): Promise<{ url: string }>;
+  closeOrder?(orderId: string): Promise<boolean>;
+}
+```
+
+UI 根据 `capabilities` 决定是否展示"管理订阅"、"扫码支付"等入口，而不是判断 provider 名字。
+
+MVP 服务商
+
+
+| 功能        | 海外                              | 国内                          |
+| --------- | ------------------------------- | --------------------------- |
+| auth 登录方式 | 邮箱密码、Google、GitHub              | 手机号验证码、微信扫码                 |
+| payment   | Stripe、Creem、PayPal、Dodo        | 微信支付、支付宝                    |
+| email     | Resend、SMTP                     | 阿里云邮件推送（后续）                 |
+| sms       | Twilio                          | 阿里云、腾讯云                     |
+| storage   | S3、R2（S3 API / Workers binding） | 阿里云 OSS、腾讯云 COS             |
+| ai        | OpenAI、Google、OpenAI 兼容端点       | DeepSeek、通义/豆包（经 OpenAI 兼容） |
+| captcha   | Turnstile                       | 阿里云验证码（后续）                  |
+
+
+## 7. 数据库
+
+- 只用 Drizzle；方言 `pg`、`sqlite`（本地/Turso）、`d1`（Cloudflare）。
+- 每个模块提供 pg 与 sqlite 两份 schema，字段语义一致；生成器聚合到 `schema/{pg,sqlite}/index.ts`。
+- **不预生成迁移文件**（组合不同则迁移不同），生成后由 `db:generate` 产生；`postinstall` 提示或 CLI 可选自动执行。
+- 每个模块可贡献 seed（管理员账号、默认套餐）。
+- 模块间外键只允许指向 `auth` 的 `user` 表和自身模块的表；跨功能关联（如分销佣金关联订单）放在集成层的表里或用非外键 id 字段，保证删模块不破坏 schema。
+
+## 8. 部署目标
+
+
+| 目标         | 生成内容                                             | 约束                                                                          |
+| ---------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
+| Vercel     | `vercel.json`、环境变量清单、Cron（关闭超时订单）                | 不支持 sqlite 文件库，需 pg/Turso                                                   |
+| Docker     | 多阶段 `Dockerfile`、`docker-compose.yml`（含 pg）、健康检查 | —                                                                           |
+| Cloudflare | OpenNext 配置、`wrangler.jsonc`、D1/R2 binding       | DB 用 d1；部分 Node SDK（如 `ali-oss`、`alipay-sdk`）不兼容 Workers，需在 Resolver 里声明并拦截 |
+| Node 主机    | `ecosystem.config.js`（pm2）、Nginx 示例              | —                                                                           |
+
+
+每个目标附带 GitHub Actions 工作流和"上线清单"文档（域名、回调地址、webhook 配置、各服务商后台需要填的 URL），解决"发布锁死"。服务商与部署目标的兼容性在清单的 `supports.targets` 声明，由 Resolver 统一拦截。
+
+## 9. CLI 与配置
+
+### 9.1 命令
+
+```bash
+# 交互式
+npx xstack my-app
+
+# 预设
+npx xstack my-app --preset saas-global
+npx xstack my-app --preset saas-cn
+
+# 精确指定
+npx xstack my-app \
+  --features auth,payment,credits,ai,admin,i18n \
+  --providers payment=stripe,wechat email=resend sms=aliyun storage=r2 ai=openai,deepseek \
+  --db pg --deploy vercel
+
+# 生成后追加
+npx xstack add affiliate
+npx xstack add payment.provider=alipay
+```
+
+交互流程：项目名 → 预设或自定义 → 功能多选 → 每个功能选服务商（按市场分组） → 数据库 → 部署目标 → 确认变更说明 → 生成。
+
+### 9.2 预设
+
+
+| 预设            | 内容                                                                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `starter`     | auth(邮箱) + i18n + seo                                                                                                  |
+| `saas-global` | auth(邮箱+Google+GitHub) + payment(Stripe) + credits + email(Resend) + storage(R2) + admin + i18n + seo + blog，部署 Vercel |
+| `saas-cn`     | auth(手机号+微信) + payment(微信+支付宝) + credits + sms(阿里云) + storage(OSS) + admin + i18n(zh-CN 默认)，部署 Docker                  |
+| `ai-saas`     | `saas-global` + ai(OpenAI 兼容) + credits 扣费集成                                                                           |
+| `full`        | 全部模块                                                                                                                   |
+
+
+### 9.3 `cbt.jsonc`
+
+在 XSTACK 的 `xstack.jsonc` 基础上增加 `features`、`providers`、`targets`、`moduleVersions`。`add` 命令读取它，跑同一个 Resolver，**只渲染增量模块并重新聚合挂载点文件**；用户改过的挂载点文件用三方合并（生成基线保存在 `.cbt/baseline/`），冲突时输出补丁让用户手工处理。
+
+## 10. 本仓库结构（fork 后）
+
+```
+apps/
+  cli/                          # XSTACK CLI + 功能/服务商交互 + add 命令
+  web/                          # XSTACK builder + 功能/服务商面板 + 产物预览
+packages/
+  types/                        # XSTACK schema + Feature/Provider/Target schema
+  template-generator/           # XSTACK 生成器 + 通用模块流水线 + slot 聚合
+  module-sdk/                   # defineModule、slot 类型、resolver（纯函数）
+  modules/
+    db/ auth/ i18n/ email/ sms/ storage/ payment/ credits/
+    ai/ admin/ seo/ blog/ affiliate/ captcha/
+  presets/
+tools/
+  matrix/                       # 组合矩阵测试
+  extract/                      
+docs/
+```
+
+## 11. 从原模板项目抽取模块的方法
+
+原模板项目已经做到"领域逻辑在 `libs/*`，app 路由是薄适配"，这是能拆的前提。每个模块的抽取步骤：
+
+1. **领域包**：`libs/<x>` → `modules/<x>/templates/package`。
+2. **去掉全局配置耦合**： 所有 lib 都 `import { config } from '@config'`，改为各模块自己的 `packages/config/src/<x>.ts`，经 config 挂载点聚合。
+3. **切断跨模块 import**：`payment → credits`、`auth → sms/email`、`affiliate → credits` 改为领域事件 + 集成。
+4. **服务商拆文件**：`providers/*.ts` 一一对应清单里的 provider；`switch` 工厂改为生成的 `registry.ts`。
+5. **公共类型去服务商化**：如 `PaymentPlan.stripePriceId` 等 → `providerRefs`。
+6. **Next 适配层**：`apps/next-app/app/**` 中该功能的页面和 API → `frameworks/next`；7 个 webhook 路由合并为 `api/payment/webhook/[provider]`。
+7. **schema、i18n、测试、文档** 按模块切开。
+8. 为模块写"单独生成能编译"的测试，再写与其他模块组合的测试。
+
+## 12. 质量保障
+
+组合数是这个项目的最大风险，测试策略分层：
+
+1. **模块单测**：领域逻辑、服务商（mock SDK）——生成到产物里，也在本仓库跑。
+2. **Resolver 单测**：依赖闭包、冲突、兼容拦截、集成激活，全部纯函数。
+3. **快照测试**：每个预设的产物文件树与关键文件快照。
+4. **组合矩阵**（CI）：
+   - 每个模块"单独 + 最小依赖"生成，跑 `typecheck + build`；
+   - 两两组合（pairwise）覆盖所有 integrations；
+   - 所有预设 × 两种方言；
+   - 每次 PR 跑抽样，nightly 跑全量。
+5. **E2E**：每个预设用 Playwright 跑核心路径（注册登录、支付走 Stripe test mode / mock、积分扣减、上传、后台）。
+6. **"删除测试"**：对全量产物逐个删除模块目录 + 重新聚合挂载点，验证仍可编译——直接检验去锁死约定。
+
+## 13. 路线图
+
+
+| 阶段               | 内容                                                                                                                                            | 验收               |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| **P0 基础**（2–3 周） | fork XSTACK、改名；`module-sdk`（清单、slot、resolver）；生成器接入模块流水线；`db`、`i18n`、`config`、`events`、`ui` 基础模块；`cbt.jsonc`                                  | 空功能的产品模式项目可生成、构建 |
+| **P1 核心**        | `auth`（邮箱+OAuth）、`email`（Resend/SMTP）、`admin` 外壳、`payment`（Stripe）、`credits` 及 payment×credits 集成；Vercel、Docker 目标；`starter`、`saas-global` 预设 | 预设 E2E 通过；删除测试通过 |
+| **P2 国内**        | 手机号/微信登录、`sms`（阿里云/腾讯云/Twilio）、微信支付/支付宝、OSS/COS、`saas-cn` 预设；Node 主机目标                                                                        | `saas-cn` E2E 通过 |
+| **P3 扩展**        | `storage`（S3/R2）、`ai`（对话/图像/视频）+ ai×credits、`seo`、`blog`、`affiliate`、`captcha`；Cloudflare 目标（D1/R2）；`full` 预设                                 | `full` 预设功能      |
+| **P4 体验**        | `add` 命令与三方合并；网页 builder 功能面板与产物预览；生成 AGENTS.md / skills                                                                                      | 生成后追加模块可用        |
+| **P5 多框架**       | 模块的 `frameworks/tanstack-start`、`frameworks/nuxt`；React 共享 UI 抽取                                                                              | 同一组合可生成三种框架      |
+
+
+## 14. 决策记录
+
+1.  **代码许可证**：已购买许可证。搬运代码前仍需确认许可是否允许在本仓库（MIT 开源）中再分发；若不允许，只参考设计、自行重写。
+2. **与 XSTACK 上游的同步策略**：最小改动面 + 挑选性合并。改动集中在 `packages/template-generator/src/modules`、`templates/modules` 与少量挂钩点。
+3. **API 层**：MVP 功能模块只用 Route Handlers + Server Actions，不依赖 oRPC。
+4. **UI 组件来源**：shadcn 风格，组件落在 `packages/ui`，用户可继续 `shadcn add`。
+5. **后台权限模型**：沿用 CASL。
+6. **多租户/组织**、**`cbt diff`**：推迟到 P4 之后。
+
+## 15. P0 实现现状（与上文设计的偏差）
+
+已实现：产品模式可通过 CLI 生成空功能项目，`install + check-types + next build` 通过（sqlite / postgres，Vercel / Docker / none）。
+
+
+| 设计                                                    | 实际实现                                                                                                                            | 原因                                                |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| 独立 `module-sdk`、`packages/modules`                    | 清单协议、resolver、流水线在 `packages/template-generator/src/modules/`；模块模板在 `packages/template-generator/templates/modules/<id>/`       | 复用 XSTACK 模板打包（`generate-templates`）与 VFS，减少上游冲突面 |
+| `config` 挂载点 / app-config 包                           | 无独立配置包；站点配置在 `apps/web/src/config/site.ts`，模块服务在 `apps/web/src/services.ts`（组合根）组装                                              | 沿用 XSTACK 的工厂 + DI 约定，配置跟随服务注入                    |
+| 产物可同时支持两种方言                                           | 每次生成只选一种方言（`dialects/<database>/`）                                                                                              | 与 XSTACK `database` 选项一致，避免双 schema 维护            |
+| i18n 为可选模块                                            | i18n 为产品模式的隐藏基础模块，路由固定为 `app/[lang]/`；`--module-options i18n.locales=zh-CN,en`（第一个为默认语言）                                        | 各模块文案都按 locale 组织，可选会让每个模块分叉                      |
+| `cbt.jsonc`                                           | 仍为 `xstack.jsonc`，新增 `product: { features, providers, options }`                                                                | 复用 XSTACK 的 `add`/检测逻辑，P4 再考虑改名                   |
+| `--providers payment=stripe,wechat`、`--db`、`--deploy` | `--features a,b`、`--providers payment:stripe`、`--module-options module.key=value`；数据库与部署仍用 XSTACK 的 `--database`、`--web-deploy` | 与 XSTACK 参数体系保持一致                                 |
+| 预设 `starter` = auth + i18n + seo                      | `starter` = auth（+ 基础模块）；seo 随 P3 加入                                                                                            | seo 模块尚未实现                                        |
+
+
+产品模式固定的技术栈：`frontend next`、`backend self`、`runtime none`、`orm drizzle`、`api none`、`server-deploy none`；`database` 限 sqlite / postgres，`web-deploy` 限 vercel / docker / none。用户显式传入不兼容的值会报错，未显式传入的值自动收敛并提示。
+
+测试：`apps/cli/test/product-mode.test.ts`（生成结构、栈收敛、冲突拦截）；`generated-builds.test.ts` 中的 `product-starter-postgres` 样例在 `XSTACK_BUILD_SAMPLES=1` 时跑安装与构建。
+
+## 16. P1 实现现状
+
+模块：`auth`、`email`、`admin`、`payment`、`credits`；预设 `starter`（auth）与 `saas-global`（auth[google, github] + email[resend] + admin + payment[stripe] + credits）。`saas-global` 在 sqlite/Docker 与 postgres/Vercel 下 `install + check-types + next build` 通过，并做过运行时冒烟测试（注册、注册赠送积分、mock 支付、webhook 重放、订阅、后台调账）。
+
+
+| 约定     | 实现                                                                                                                                               |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 集成     | `apps/web/src/integrations/<name>.ts` 默认导出 `register(services)`，由 `services.ts` 自动导入并调用；模块间只通过领域事件通信（`auth.user_created`、`payment.order_paid` 等） |
+| 事件投递语义 | 至少一次：处理器抛错会让 webhook 失败并由服务商重试，重试时重新发出事件；处理器须幂等（积分用 `referenceId` 去重，如 `order:<id>`、`signup:<userId>`）                                           |
+| 权限     | `packages/permissions`（CASL），`SubjectMap` 可扩充；better-auth `admin` 插件提供 `role`/封禁/冒充；`ADMIN_EMAILS` 中的邮箱注册即为管理员                                   |
+| 支付服务商  | `PaymentProvider` 接口 + 归一化 webhook 事件；结账默认使用第一个 `configured` 的服务商，开发环境下未配置 Stripe 时自动回落到 `mock`                                                  |
+| 导航     | 清单 `nav` 支持 `role`（仅该角色可见）与 `when`（仅当另一模块存在时生成，如 `/admin/orders`）                                                                                |
+| 模块选项   | `OptionSpec` 支持 `number`（如 `--module-options credits.signupBonus=100`）                                                                           |
+| 依赖版本   | 生成项目使用发布至少约两周的版本，避免新版本尚未同步到镜像/缓存导致安装失败                                                                                                           |
+
+
+## 17. 栈与模块融合迁移方案
+
+### 17.1 现状问题
+
+P1 的产品模式是"先跑完整的 XSTACK 栈生成，再用模块覆盖或删除"。同一栈配置（next、self、drizzle、sqlite）下，saas-global 相对纯栈输出：8 个 XSTACK 文件被删、13 个被改写、57 个原样复用、105 个新增。由此产生：
+
+- **auth 两处维护**：XSTACK 的 better-auth 模板生成 `packages/auth`、schema、登录表单，auth 模块再整份覆盖或删除。依赖来自 XSTACK，代码来自模块；上游改名时 `removes` 静默失效。
+- **支付两套概念**：栈维度 `payments: polar` 与 `payment` 模块并存，产品模式只能强制 `payments: none`。
+- **隐式接缝**：模块靠解析 `services.ts` 文本、正则改写 `.env.schema`、按 XSTACK 文件名删除来接入，没有任何测试兜底。
+- **模式割裂**：CLI 有"栈模式 / 产品模式"两个入口，产品模式把技术栈硬编码为 `PRODUCT_STACK`。
+
+### 17.2 决定
+
+与上游分家，不再保留独立的栈模式；用户始终选择技术栈。业务领域（auth、支付、示例）只以模块形式存在，不再是技术栈维度。
+
+### 17.3 目标模型
+
+```
+ProjectConfig
+├── Stack（基础设施）  frontend、backend、runtime、database、orm、api、dbSetup、webDeploy、serverDeploy、addons、packageManager
+└── Product（领域）    features、providers、options
+```
+
+- **一个入口**：先选技术栈，再选功能模块（可为空）。默认技术栈为 next + self + drizzle + sqlite + api none，即原生模块的完整支持范围。
+- **推导字段**：`ProjectConfig`、`CreateInput`、`xstack.jsonc` 中没有 `auth`、`payments`。生成器用 `toRenderConfig` 从模块计划推导出 `RenderConfig`（`ProjectConfig` + `auth` + `payments`），只供 `stack` 模板、处理器和生成后的 CLI 步骤读取；模板条件沿用这两个上下文名。
+- **两种实现（variant）**，求解器按所选技术栈为每个模块选一种，同一栈组合只有一个实现：
+  
+  | variant  | 模板来源                                         | 范围                      |
+  | -------- | -------------------------------------------- | ----------------------- |
+  | `native` | `templates/modules/<id>/`                    | 完整功能，受清单 `supports` 约束  |
+  | `stack`  | `templates/modules/<id>/stack/`（XSTACK 原有模板） | 基础功能，覆盖 XSTACK 原先支持的技术栈 |
+  
+
+  两者都不支持时报错，并列出各自的支持范围。`native` 时对应的 XSTACK 模板不再渲染，不存在"生成后覆盖"。
+- **auth**：`engine` 选项（`better-auth` | `clerk`）决定认证引擎；`providers` 仍表示第三方登录（google、github…）。clerk 只有 `stack` 实现。
+- **payment**：服务商 `stripe`、`polar`、`mock`，都实现原生 `PaymentProvider`；payment 没有 `domain`，也没有 `stack` 实现，只在原生栈上可用。
+- **不混用**：只要有模块走 `stack` 实现，就不加外壳，只有原生实现的模块（email、admin、credits…）报错。`stack` 实现依赖的模块会被一并切到 `stack`。
+- **外壳**：next + self 时 `core`、`i18n` 是隐藏基础模块；其他技术栈沿用 XSTACK 前端模板做外壳。`core` 不依赖 auth：会话、用户菜单、控制台归 auth 模块。
+- **CLI**：只有 `--features`、`--preset`、`--providers`、`--module-options` 选择业务能力；`--auth`、`--payments`、`--examples` 已删除。技术栈参数与模块冲突时报错而不是静默改写。
+
+### 17.4 迁移步骤
+
+
+| 步骤          | 内容                                                                                                                                                                                                                                                                                                                                                           | 验收                                                    |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| **M1 领域推导** | 清单增加 `domain`（推导字段与 `stack` 实现）和更细的 `supports`（backend、orm、api）；求解器选择 variant，计划始终存在（无功能时为空）；生成器入口推导 `auth`/`payments`，`native` 时跳过对应 XSTACK 模板；auth 原生实现接管 `packages/auth`、`api/auth` 路由、会话、用户菜单、控制台；core 去掉 auth 依赖；删除 `PRODUCT_STACK` 收敛逻辑，默认技术栈改为原生栈；CLI 合并入口、去掉 auth/payments 提问、旧参数映射                                                                  | saas-global、starter 产物不回退；旧参数生成的非 next 项目与原 XSTACK 一致 |
+| **M1 状态**   | 已完成。50 个 XSTACK 构建样例经 `--auth`/`--payments` 别名生成，产物与迁移前逐字节一致（`xstack.jsonc` 改记录 `product` 除外）；产品样例 starter、saas-global、仅外壳均通过安装、类型检查与构建                                                                                                                                                                                                                      | —                                                     |
+| **M2 接缝契约** | 剩余 `removes`（XSTACK next 前端的 layout、首页、header）改为 `replaces`，目标不存在即报错；模块对栈产物的修改集中到 `seams`（`services.ts`、`.env.schema`、`package.json`、`turbo.json`、README）；为 next 外壳依赖的 XSTACK 产物加快照测试                                                                                                                                                                        | 删除或改名 XSTACK 文件时测试失败                                  |
+| **M2 状态**   | 已完成。`src/modules/seams.ts` 是模块修改栈产物的唯一入口（`package.json` 依赖、`.env`、`.env.schema`、`services.ts`、db schema 索引），缺少依赖的栈文件即报错；模块模板覆盖未在 `replaces` 中声明的栈文件也报错；`packages/template-generator/test/modules.test.ts` 覆盖求解器 variant 选择、接缝守卫与外壳/starter/saas-global 文件清单快照。README 仍由 readme 生成器追加模块章节，无 turbo.json 接缝                                                     | —                                                     |
+| **M3 模板迁移** | `templates/auth`、`templates/payments`、`templates/examples` 迁入对应模块的 `stack/`；`processAuthTemplates` 等由模块 variant 调用；模板条件改读模块上下文，删除推导字段                                                                                                                                                                                                                        | `templates/` 下不再有领域目录                                 |
+| **M3 状态**   | 已完成。auth、payment 的 XSTACK 模板与处理器迁入 `templates/modules/<id>/stack/` 与 `src/modules/stack/`，由 `domain.stack.render` 调用；`auth`、`payments` 从 `ProjectConfig`、CLI 参数、`xstack.jsonc` schema 删除，只存在于 `RenderConfig`；`examples`（todo、ai）整体删除，不再迁成模块；网页版 builder 的 auth/payments/examples 三栏合并为"功能"一栏，可用性由模块求解器判断。55 个构建样例产物与迁移前逐字节一致（`xstack.jsonc` 与随机密钥除外）         | —                                                     |
+| **M4 收尾**   | polar 原生 `PaymentProvider`；需要 AI 能力时以 ai 模块重新加入                                                                                                                                                                                                                                                                                                              | —                                                     |
+| **M4 状态**   | polar 已完成。`providers/polar.ts` 基于 `@polar-sh/sdk` 1.0（API `2026-10`）：checkout 使用 `providerRefs.polar` 指定的 product，webhook 将 `order.paid`、`subscription.created/updated` 映射为标准事件，客户门户使用 customer session；payment 的 `domain`、XSTACK polar 模板、`payments-deps`、`PaymentsSchema` 和 `RenderConfig.payments` 全部删除，非 Next 栈不再能选支付。生成项目已通过安装、类型检查、构建以及本地签名 webhook 测试 | —                                                     |

@@ -1,0 +1,32 @@
+import { payment } from "@{{projectName}}/app-services";
+
+function notFound() {
+  return new Response("Not found", { status: 404 });
+}
+
+/** A stand-in checkout page for local development. */
+export function GET(request: Request) {
+  if (process.env.NODE_ENV === "production") return notFound();
+  const params = new URL(request.url).searchParams;
+  const hidden = [...params]
+    .map(([name, value]) => `<input type="hidden" name="${name}" value="${encodeURI(value)}">`)
+    .join("");
+
+  return new Response(
+    `<!doctype html><html><body style="font-family:system-ui;max-width:420px;margin:15vh auto;padding:0 16px">
+<h1 style="font-size:20px">Mock checkout</h1>
+<p>Plan <strong>${encodeURI(params.get("planId") ?? "")}</strong>. No real payment is made.</p>
+<form method="post">${hidden}<button style="padding:8px 16px">Pay</button>
+<a href="${encodeURI(params.get("cancel") ?? "/")}" style="margin-left:12px">Cancel</a></form>
+</body></html>`,
+    { headers: { "content-type": "text/html; charset=utf-8" } },
+  );
+}
+
+export async function POST(request: Request) {
+  if (process.env.NODE_ENV === "production") return notFound();
+  const body = await request.text();
+  await payment.handleWebhook("mock", new Request(request.url, { method: "POST", body }));
+  const success = new URLSearchParams(body).get("success");
+  return Response.redirect(success ?? new URL("/", request.url), 303);
+}

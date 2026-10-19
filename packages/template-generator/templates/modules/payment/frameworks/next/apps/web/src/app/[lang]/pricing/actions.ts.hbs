@@ -1,0 +1,35 @@
+"use server";
+
+import { payment } from "@{{projectName}}/app-services";
+import { PaymentError } from "@{{projectName}}/payment";
+import type { Route } from "next";
+import { redirect } from "next/navigation";
+
+import { localePath } from "@/lib/i18n/paths";
+import { resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+export async function startCheckout(formData: FormData) {
+  const locale = resolveLocale(String(formData.get("locale")));
+  const user = await requireUser(locale, "/pricing");
+
+  let url: string;
+  try {
+    url = await payment.checkout({
+      user,
+      planId: String(formData.get("planId")),
+      successPath: `${localePath(locale, "/dashboard/billing")}?status=success`,
+      cancelPath: localePath(locale, "/pricing"),
+    });
+  } catch (error) {
+    if (!(error instanceof PaymentError)) throw error;
+    redirect(`${localePath(locale, "/pricing")}?error=${error.code}`);
+  }
+  redirect(url as Route);
+}
+
+export async function openBillingPortal(formData: FormData) {
+  const locale = resolveLocale(String(formData.get("locale")));
+  const user = await requireUser(locale, "/dashboard/billing");
+  redirect((await payment.portalUrl(user.id, localePath(locale, "/dashboard/billing"))) as Route);
+}

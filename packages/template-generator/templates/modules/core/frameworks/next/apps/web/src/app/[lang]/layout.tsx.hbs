@@ -1,0 +1,58 @@
+import { getMessages, locales } from "@{{projectName}}/i18n";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+
+import "../../index.css";
+import { I18nProvider } from "@/components/i18n-provider";
+import Providers from "@/components/providers";
+import SiteFooter from "@/components/site-footer";
+import SiteHeader from "@/components/site-header";
+import { site } from "@/config/site";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+type Props = {
+  children: React.ReactNode;
+  params: Promise<{ lang: string }>;
+};
+
+export function generateStaticParams() {
+  return locales.map((lang) => ({ lang }));
+}
+
+export async function generateMetadata({ params }: Omit<Props, "children">): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return {
+    title: { default: site.name, template: `%s | ${site.name}` },
+    description: t("core.site.description"),
+  };
+}
+
+export default async function LocaleLayout({ children, params }: Props) {
+  const locale = resolveLocale((await params).lang);
+
+  return (
+    <html lang={locale} suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <I18nProvider locale={locale} messages={getMessages(locale)}>
+          <Providers>
+            <div className="flex min-h-svh flex-col">
+              <SiteHeader />
+              <main className="flex flex-1 flex-col">{children}</main>
+              <SiteFooter />
+            </div>
+          </Providers>
+        </I18nProvider>
+      </body>
+    </html>
+  );
+}

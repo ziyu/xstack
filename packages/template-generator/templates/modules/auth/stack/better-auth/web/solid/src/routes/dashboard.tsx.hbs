@@ -1,0 +1,44 @@
+import { useNavigate } from "@solidjs/router";
+{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/solid-query";
+import { orpc } from "~/utils/orpc";
+{{/if}}
+import {
+	createEffect,
+	Show,
+} from "solid-js";
+import { useSession } from "~/lib/auth-client";
+
+export default function Dashboard() {
+	const navigate = useNavigate();
+	const session = useSession();
+
+	createEffect(
+		() => !session().isPending && !session().data,
+		(shouldRedirect) => {
+		if (shouldRedirect) {
+			navigate("/login", { replace: true });
+		}
+		},
+	);
+
+
+	return (
+		<Show when={!session().isPending && session().data} fallback={<p>Loading...</p>}>
+			<div>
+			<h1>Dashboard</h1>
+			<p>Welcome {session().data?.user.name}</p>
+			{{#if (eq api "orpc")}}
+			<PrivateData />
+			{{/if}}
+			</div>
+		</Show>
+	);
+}
+
+{{#if (eq api "orpc")}}
+function PrivateData() {
+  const privateData = useQuery(() => orpc.privateData.queryOptions());
+  return <p>API: {privateData.data?.message}</p>;
+}
+{{/if}}

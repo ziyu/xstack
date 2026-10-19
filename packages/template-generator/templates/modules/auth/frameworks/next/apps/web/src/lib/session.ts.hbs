@@ -1,0 +1,24 @@
+import { auth } from "@{{projectName}}/app-services";
+import type { Locale } from "@{{projectName}}/i18n";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { cache } from "react";
+
+import { localePath } from "./i18n/paths";
+
+export const getSession = cache(async () => auth.api.getSession({ headers: await headers() }));
+
+/** Returns the signed-in user or redirects to the login page, coming back to `next` afterwards. */
+export async function requireUser(locale: Locale, next?: `/${string}`) {
+  const session = await getSession();
+  if (!session) {
+    const login = localePath(locale, "/login");
+    redirect(next ? `${login}?next=${encodeURIComponent(localePath(locale, next))}` : login);
+  }
+  return session.user;
+}
+
+/** Accepts only same-origin paths so `?next=` cannot redirect off-site. */
+export function safeNext(value: string | undefined, fallback: string): string {
+  return value?.startsWith("/") && !value.startsWith("//") ? value : fallback;
+}

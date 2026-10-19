@@ -1,0 +1,62 @@
+<script setup lang="ts">
+
+{{#if (eq api "orpc")}}
+import { useQuery } from '@tanstack/vue-query'
+{{/if}}
+
+const { $authClient, $orpc } = useNuxtApp()
+
+definePageMeta({
+  middleware: ['auth']
+})
+
+const { data: session } = await useAuthSession()
+
+
+{{#if (eq api "orpc")}}
+const privateData = useQuery({
+  ...$orpc.privateData.queryOptions(),
+  enabled: computed(() => !!session.value?.user)
+})
+
+onServerPrefetch(async () => {
+  if (session.value?.user) await privateData.suspense()
+})
+{{/if}}
+
+</script>
+
+<template>
+  <UContainer class="py-8">
+    <UPageHeader
+      title="Dashboard"
+      :description="session?.user ? `Welcome back, ${session.user.name}!` : 'Loading...'"
+    />
+
+    <div class="mt-6 space-y-4">
+      {{#if (eq api "orpc")}}
+      <UCard>
+        <template #header>
+          <div class="font-medium">Private Data</div>
+        </template>
+
+        <USkeleton v-if="privateData.status.value === 'pending'" class="h-6 w-48" />
+
+        <UAlert
+          v-else-if="privateData.status.value === 'error'"
+          color="error"
+          icon="i-lucide-alert-circle"
+          title="Error loading data"
+          :description="privateData.error.value?.message || 'Failed to load private data'"
+        />
+
+        <div v-else-if="privateData.data.value" class="flex items-center gap-2">
+          <UIcon name="i-lucide-check-circle" class="text-success" />
+          <span>\{{ privateData.data.value.message }}</span>
+        </div>
+      </UCard>
+      {{/if}}
+
+    </div>
+  </UContainer>
+</template>

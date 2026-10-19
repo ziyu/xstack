@@ -1,0 +1,16 @@
+import { payment } from "@{{projectName}}/app-services";
+
+/** Point your provider's webhook at `/api/payment/webhook/<provider>`, e.g. `/api/payment/webhook/stripe`. */
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ provider: string }> },
+) {
+  const { provider } = await params;
+  try {
+    await payment.handleWebhook(provider, request);
+    return Response.json({ received: true });
+  } catch (error) {
+    console.error(`[payment] ${provider} webhook failed`, error);
+    return Response.json({ error: "Webhook handling failed" }, { status: 400 });
+  }
+}

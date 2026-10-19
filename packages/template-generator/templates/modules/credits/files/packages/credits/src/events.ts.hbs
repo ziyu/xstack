@@ -1,0 +1,12 @@
+import type { creditTransactionTypes } from "@{{projectName}}/db/schema/credits";
+
+declare module "@{{projectName}}/events" {
+  interface EventMap {
+    "credits.changed": {
+      userId: string;
+      amount: number;
+      balance: number;
+      type: (typeof creditTransactionTypes)[number];
+    };
+  }
+}

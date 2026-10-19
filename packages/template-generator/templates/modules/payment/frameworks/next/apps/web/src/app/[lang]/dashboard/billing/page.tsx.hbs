@@ -1,0 +1,102 @@
+import { payment } from "@{{projectName}}/app-services";
+import { getPlan } from "@{{projectName}}/payment";
+import { Button, buttonVariants } from "@{{projectName}}/ui/components/button";
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { openBillingPortal } from "@/app/[lang]/pricing/actions";
+import { formatMoney } from "@/lib/format";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ status?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("payment.billing.title") };
+}
+
+export default async function BillingPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const user = await requireUser(locale, "/dashboard/billing");
+  const { status } = await searchParams;
+
+  const [subscription, orders] = await Promise.all([
+    payment.getSubscription(user.id),
+    payment.listOrders(user.id),
+  ]);
+  const plan = subscription && getPlan(subscription.planId);
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+
+  return (
+    <div className="flex flex-col gap-8">
+      <h1 className="font-semibold text-2xl">{t("payment.billing.title")}</h1>
+      {status === "success" && (
+        <p className="border border-primary/40 bg-primary/5 px-4 py-3 text-sm">
+          {t("payment.billing.success")}
+        </p>
+      )}
+
+      <section className="flex flex-col gap-3 border p-4">
+        <h2 className="font-medium">{t("payment.billing.subscription")}</h2>
+        {subscription && plan ? (
+          <>
+            <p className="text-sm">
+              {t(`payment.plans.${plan.id}.name`)} · {t(`payment.billing.status.${subscription.status}`)}
+            </p>
+            {subscription.currentPeriodEnd && (
+              <p className="text-muted-foreground text-sm">
+                {t(
+                  subscription.cancelAtPeriodEnd ? "payment.billing.endsOn" : "payment.billing.renewsOn",
+                  { date: date.format(subscription.currentPeriodEnd) },
+                )}
+              </p>
+            )}
+            {subscription.customerRef && (
+              <form action={openBillingPortal}>
+                <input type="hidden" name="locale" value={locale} />
+                <Button type="submit" variant="outline">
+                  {t("payment.billing.manage")}
+                </Button>
+              </form>
+            )}
+          </>
+        ) : (
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-muted-foreground text-sm">{t("payment.billing.none")}</p>
+            <Link href={localePath(locale, "/pricing")} className={buttonVariants()}>
+              {t("payment.billing.viewPlans")}
+            </Link>
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium">{t("payment.billing.history")}</h2>
+        {orders.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("payment.billing.noOrders")}</p>
+        ) : (
+          <ul className="divide-y border">
+            {orders.map((order) => {
+              const orderPlan = getPlan(order.planId);
+              return (
+                <li key={order.id} className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+                  <span>{orderPlan ? t(`payment.plans.${orderPlan.id}.name`) : order.planId}</span>
+                  <span className="text-muted-foreground">
+                    {date.format(order.paidAt ?? order.createdAt)}
+                  </span>
+                  <span className="tabular-nums">{formatMoney(order.amount, order.currency, locale)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}

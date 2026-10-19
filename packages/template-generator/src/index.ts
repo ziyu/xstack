@@ -1,0 +1,25 @@
+export * from "./types";
+export * from "./core/virtual-fs";
+export * from "./core/template-processor";
+export * from "./generator";
+export { processPnpmWorkspaceConfig } from "./template-handlers/extras";
+export { processAddonTemplates } from "./template-handlers/addons";
+export { processAddonsDeps } from "./processors/addons-deps";
+export { processPwaPlugins } from "./processors/pwa-plugins";
+export { processNxConfig } from "./processors/nx-generator";
+export { processTurboConfig } from "./processors/turbo-generator";
+export { processVitePlusConfig } from "./processors/vite-plus-generator";
+export { processPackageConfigs, processVercelConfig } from "./post-process";
+export { writeXStackConfigToVfs } from "./xstack-config";
+
+export { EMBEDDED_TEMPLATES, TEMPLATE_COUNT } from "./templates.generated";
+export { dependencyVersionMap, type AvailableDependencies } from "./utils/add-deps";
+export { generateReproducibleCommand } from "./utils/reproducible-command";
+
+export { processNpmScriptApprovals } from "./post-process/package-configs";
+
+export * from "./modules/types";
+export { MODULE_CATALOG } from "./modules/catalog";
+export { resolveModules, toSelection, hasErrors, toDeployTarget } from "./modules/resolver";
+export { PRODUCT_PRESETS } from "./modules/presets";
+export { getModulePlan, toRenderConfig } from "./modules/pipeline";

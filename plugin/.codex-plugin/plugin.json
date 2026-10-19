@@ -1,0 +1,52 @@
+{
+  "name": "xstack",
+  "version": "3.47.0",
+  "description": "Let your AI scaffold and extend projects with xstack. Bundles the xstack MCP server plus skills so the assistant plans a valid stack and generates it instead of hand-rolling boilerplate.",
+  "author": {
+    "name": "Aman Varshney",
+    "url": "https://github.com/AmanVarshney01"
+  },
+  "homepage": "https://xstack.dev",
+  "repository": "https://github.com/ziyu/xstack",
+  "license": "MIT",
+  "keywords": [
+    "xstack",
+    "xstack",
+    "scaffold",
+    "starter",
+    "boilerplate",
+    "typescript",
+    "fullstack",
+    "monorepo",
+    "turborepo",
+    "nx",
+    "nextjs",
+    "react",
+    "hono",
+    "trpc",
+    "better-auth",
+    "drizzle",
+    "tanstack",
+    "ai-agent",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "xstack",
+    "shortDescription": "Scaffold end-to-end type-safe TypeScript projects",
+    "longDescription": "Bring xstack into Codex with skills that plan a valid stack and generate it through the official xstack MCP server, plus an add-addons workflow for existing projects. Covers frontends (Next, TanStack, Nuxt, Svelte, Solid, Astro, React Native), backends (Hono, Express, Fastify, Elysia, Convex), databases and ORMs, auth, payments, deployment, and DB provisioning (Neon, Prisma Postgres, Supabase, Turso, PlanetScale, MongoDB Atlas, Cloudflare D1, Docker).",
+    "developerName": "Aman Varshney",
+    "category": "Coding",
+    "capabilities": ["Interactive", "Write", "MCP"],
+    "websiteURL": "https://xstack.dev",
+    "brandColor": "#8839EF",
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/icon.svg",
+    "defaultPrompt": [
+      "Create a fullstack app with Next, Hono, Postgres + Drizzle, and Better Auth",
+      "Scaffold a TanStack Start project with a Neon database",
+      "Add PWA, Biome, and Turborepo to my xstack project"
+    ]
+  }
+}

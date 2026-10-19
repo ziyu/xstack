@@ -1,0 +1,41 @@
+# Email
+
+`packages/email` exposes a provider-neutral `Mailer`:
+
+```ts
+import { mailer } from "@/services";
+import { renderEmail } from "@{{projectName}}/email";
+
+await mailer.send({
+  to: "user@example.com",
+  subject: "Welcome",
+  ...renderEmail({ brand: "Acme", heading: "Welcome", paragraphs: ["Thanks for joining."] }),
+});
+```
+
+Provider: **{{module.providers.[0]}}** (`packages/email/src/providers/{{module.providers.[0]}}.ts`).
+
+## Configuration
+
+| Variable | Purpose |
+| --- | --- |
+| `EMAIL_FROM` | Sender, e.g. `"Acme <noreply@acme.com>"` |
+{{#if (eq module.providers.[0] "resend")}}
+| `RESEND_API_KEY` | API key from [resend.com](https://resend.com); verify your sending domain there |
+{{/if}}
+{{#if (eq module.providers.[0] "smtp")}}
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` | SMTP server (Aliyun DirectMail, Tencent SES, Amazon SES, Mailgun, Postfix…) |
+| `SMTP_USER`, `SMTP_PASSWORD` | SMTP credentials |
+{{/if}}
+
+Without credentials, development prints emails (including verification links) to the server console; production refuses to send.
+
+## Switching providers
+
+A provider is one file implementing `createTransport(env): Transport | undefined`. To switch, add a file under `src/providers/`, point the import in `src/index.ts` at it and update the env variables.
+{{#if (includes module.integrations "auth")}}
+
+## Auth emails
+
+`apps/web/src/integrations/auth-email.ts` subscribes to `auth.verification_requested` and `auth.password_reset_requested` and sends localized emails. The copy lives in `packages/i18n/src/messages/*/auth.ts` under `emails`.
+{{/if}}

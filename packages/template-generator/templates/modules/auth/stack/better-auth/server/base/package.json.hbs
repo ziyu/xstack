@@ -1,0 +1,17 @@
+{
+  "name": "@{{projectName}}/auth",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "type": "module",
+  "scripts": {
+    {{#if (eq api "orpc")}}
+    "build": "tsc -b",
+    "check-types": "tsc -b"
+    {{else}}
+    "check-types": "tsc --noEmit"
+    {{/if}}
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,70 @@
+{
+  "name": "create-xstack",
+  "version": "3.47.0",
+  "description": "A modern CLI tool for scaffolding end-to-end type-safe TypeScript projects with best practices and customizable configurations (alias for xstack)",
+  "keywords": [
+    "better-auth",
+    "xstack",
+    "biome",
+    "boilerplate",
+    "xstack",
+    "cli",
+    "drizzle",
+    "elysia",
+    "expo",
+    "fullstack",
+    "hono",
+    "monorepo",
+    "prisma",
+    "pwa",
+    "react",
+    "react-native",
+    "shadcn",
+    "starter",
+    "tailwind",
+    "tanstack",
+    "tauri",
+    "trpc",
+    "turborepo",
+    "type-safety",
+    "typescript"
+  ],
+  "homepage": "https://xstack.dev/",
+  "license": "MIT",
+  "author": "Aman Varshney",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ziyu/xstack.git",
+    "directory": "packages/create-xstack"
+  },
+  "bin": {
+    "create-xstack": "cli.js"
+  },
+  "files": [
+    "cli.js",
+    "index.d.ts",
+    "index.js"
+  ],
+  "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    },
+    "./cli": {
+      "import": "./cli.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "xstack": "^3.47.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

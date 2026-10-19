@@ -1,0 +1,54 @@
+import { auth } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+
+import { StatCard } from "@/components/admin/stat-card";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+type Props = { params: Promise<{ lang: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("admin.overview.title") };
+}
+
+export default async function AdminOverviewPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  await requireAdmin(locale);
+
+  const requestHeaders = await headers();
+  const [recent, admins] = await Promise.all([
+    auth.api.listUsers({
+      headers: requestHeaders,
+      query: { limit: 5, sortBy: "createdAt", sortDirection: "desc" },
+    }),
+    auth.api.listUsers({
+      headers: requestHeaders,
+      query: { limit: 1, filterField: "role", filterValue: "admin", filterOperator: "eq" },
+    }),
+  ]);
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="font-semibold text-2xl">{t("admin.overview.title")}</h1>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label={t("admin.overview.users")} value={recent.total} />
+        <StatCard label={t("admin.overview.admins")} value={admins.total} />
+      </div>
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium">{t("admin.overview.recent")}</h2>
+        <ul className="divide-y border">
+          {recent.users.map((user) => (
+            <li key={user.id} className="flex items-center justify-between gap-4 px-4 py-2 text-sm">
+              <span className="truncate">{user.email}</span>
+              <span className="text-muted-foreground text-xs">{date.format(user.createdAt)}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}

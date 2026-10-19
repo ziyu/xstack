@@ -1,0 +1,38 @@
+FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS base
+{{#if (eq packageManager "bun")}}
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
+ARG PUBLIC_SERVER_URL
+ENV PUBLIC_SERVER_URL=${PUBLIC_SERVER_URL}
+{{/if}}
+{{#if (eq backend "convex")}}
+ARG PUBLIC_CONVEX_URL
+ENV PUBLIC_CONVEX_URL=${PUBLIC_CONVEX_URL}
+{{/if}}
+ENV NODE_ENV=production
+RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+{{#if (eq orm "prisma")}}
+ENV DATABASE_URL=
+{{/if}}
+
+ENV HOST=0.0.0.0
+ENV PORT=3001
+EXPOSE 3001
+
+WORKDIR /app/apps/web
+CMD ["node", "build/index.js"]

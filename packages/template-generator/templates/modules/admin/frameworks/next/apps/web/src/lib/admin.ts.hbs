@@ -1,0 +1,13 @@
+import type { Locale } from "@{{projectName}}/i18n";
+import { defineAbilityFor } from "@{{projectName}}/permissions";
+import { notFound } from "next/navigation";
+
+import { requireUser } from "./session";
+
+/** Guards admin pages; non-admins get a 404 so the area stays undiscoverable. */
+export async function requireAdmin(locale: Locale) {
+  const user = await requireUser(locale, "/admin");
+  const ability = defineAbilityFor(user);
+  if (ability.cannot("access", "Admin")) notFound();
+  return { user, ability };
+}

@@ -1,0 +1,184 @@
+import pc from "picocolors";
+
+import type { ProjectConfig } from "../types";
+
+export type ConfigDisplayRow = {
+  label: string;
+  value: string;
+};
+
+export type ConfigDisplaySection = {
+  title: string;
+  rows: ConfigDisplayRow[];
+};
+
+type ConfigDisplayValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | readonly ConfigDisplayValue[];
+
+const VALUE_LABELS = {
+  none: "None",
+  "tanstack-router": "TanStack Router",
+  "react-router": "React Router",
+  "tanstack-start": "TanStack Start",
+  next: "Next.js",
+  nuxt: "Nuxt",
+  svelte: "SvelteKit",
+  solid: "Solid",
+  astro: "Astro",
+  "native-bare": "Expo (bare)",
+  "native-uniwind": "Expo + Uniwind",
+  "native-unistyles": "Expo + Unistyles",
+  hono: "Hono",
+  express: "Express",
+  fastify: "Fastify",
+  elysia: "Elysia",
+  convex: "Convex",
+  self: "Fullstack framework",
+  bun: "Bun",
+  node: "Node.js",
+  workers: "Cloudflare Workers",
+  trpc: "tRPC",
+  orpc: "oRPC",
+  sqlite: "SQLite",
+  postgres: "PostgreSQL",
+  mysql: "MySQL",
+  mongodb: "MongoDB",
+  drizzle: "Drizzle",
+  prisma: "Prisma",
+  mongoose: "Mongoose",
+  "better-auth": "Better Auth",
+  clerk: "Clerk",
+  polar: "Polar",
+  pwa: "PWA",
+  tauri: "Tauri",
+  electrobun: "Electrobun",
+  biome: "Biome",
+  oxlint: "Oxlint + Oxfmt",
+  ultracite: "Ultracite",
+  lefthook: "Lefthook",
+  husky: "Husky",
+  turborepo: "Turborepo",
+  nx: "Nx",
+  "vite-plus": "Vite+",
+  starlight: "Starlight",
+  fumadocs: "Fumadocs",
+  opentui: "OpenTUI",
+  wxt: "WXT",
+  skills: "Agent skills",
+  mcp: "MCP servers",
+  evlog: "evlog",
+  axiom: "Axiom",
+  todo: "Todo app",
+  ai: "AI chat",
+  turso: "Turso",
+  neon: "Neon",
+  planetscale: "PlanetScale",
+  supabase: "Supabase",
+  "prisma-postgres": "Prisma Postgres",
+  "mongodb-atlas": "MongoDB Atlas",
+  d1: "Cloudflare D1",
+  docker: "Docker",
+  cloudflare: "Cloudflare",
+  vercel: "Vercel",
+  alchemy: "Alchemy",
+  auto: "Automatic",
+  manual: "Manual",
+  npm: "npm",
+  pnpm: "pnpm",
+} satisfies Record<string, string>;
+
+function isKnownValueLabel(value: string): value is keyof typeof VALUE_LABELS {
+  return Object.hasOwn(VALUE_LABELS, value);
+}
+
+export function formatConfigValue(value: ConfigDisplayValue): string {
+  if (value === true) return "Yes";
+  if (value === false) return "No";
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.map(formatConfigValue).join(", ") : "None";
+  }
+
+  const text = String(value);
+  if (isKnownValueLabel(text)) return VALUE_LABELS[text];
+  return text
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function section(
+  title: string,
+  entries: Array<[label: string, value: ConfigDisplayValue, format?: "raw"]>,
+): ConfigDisplaySection | undefined {
+  const rows = entries
+    .filter(([, value]) => value !== undefined)
+    .map(([label, value, format]) => ({
+      label,
+      value: format === "raw" ? String(value) : formatConfigValue(value),
+    }));
+
+  return rows.length > 0 ? { title, rows } : undefined;
+}
+
+export function getConfigSections(config: Partial<ProjectConfig>): ConfigDisplaySection[] {
+  return [
+    section("Project", [
+      ["Name", config.projectName, "raw"],
+      ["Directory", config.relativePath, "raw"],
+    ]),
+    section("Application", [
+      ["Frontend", config.frontend],
+      ["Backend", config.backend],
+      ["Runtime", config.runtime],
+      ["API", config.api],
+    ]),
+    section("Data", [
+      ["Database", config.database],
+      ["ORM", config.orm],
+      ["Setup", config.dbSetup],
+      ["Provisioning", config.dbSetupOptions?.mode],
+    ]),
+    section("Extras", [["Addons", config.addons]]),
+    config.product
+      ? section("Features", [
+          ["Modules", config.product.features.length ? config.product.features : "foundation only"],
+          [
+            "Providers",
+            Object.entries(config.product.providers ?? {})
+              .map(([feature, ids]) => `${feature}: ${ids.join(", ")}`)
+              .join("; ") || undefined,
+            "raw",
+          ],
+        ])
+      : undefined,
+    section("Delivery", [
+      ["Web deploy", config.webDeploy],
+      ["Server deploy", config.serverDeploy],
+      ["Package manager", config.packageManager],
+      ["Git", config.git],
+      ["Install deps", config.install],
+    ]),
+  ].filter((value): value is ConfigDisplaySection => value !== undefined);
+}
+
+export function displayConfig(config: Partial<ProjectConfig>): string {
+  const sections = getConfigSections(config);
+  if (sections.length === 0) {
+    return pc.yellow("No configuration selected.");
+  }
+
+  return sections
+    .map(({ title, rows }) => {
+      const labelWidth = Math.max(...rows.map(({ label }) => label.length));
+      const renderedRows = rows
+        .map(({ label, value }) => `  ${pc.dim(label.padEnd(labelWidth))}  ${value}`)
+        .join("\n");
+      return `${pc.magenta(pc.bold(title))}\n${renderedRows}`;
+    })
+    .join("\n\n");
+}

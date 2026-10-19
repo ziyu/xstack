@@ -1,0 +1,671 @@
+import { z } from "zod";
+
+import { TASK_RUNNER_ADDONS, OBSERVABILITY_ADDONS } from "./compatibility";
+
+export const DatabaseSchema = z
+  .enum(["none", "sqlite", "postgres", "mysql", "mongodb"])
+  .describe("Database type");
+
+export const ORMSchema = z.enum(["drizzle", "prisma", "mongoose", "none"]).describe("ORM type");
+
+export const BackendSchema = z
+  .enum(["hono", "express", "fastify", "elysia", "convex", "self", "none"])
+  .describe("Backend framework");
+
+export const RuntimeSchema = z
+  .enum(["bun", "node", "workers", "none"])
+  .describe("Runtime environment");
+
+export const FrontendSchema = z
+  .enum([
+    "tanstack-router",
+    "react-router",
+    "tanstack-start",
+    "next",
+    "nuxt",
+    "native-bare",
+    "native-uniwind",
+    "native-unistyles",
+    "svelte",
+    "solid",
+    "astro",
+    "none",
+  ])
+  .describe("Frontend framework");
+
+export const AddonsSchema = z
+  .enum([
+    "pwa",
+    "tauri",
+    "electrobun",
+    "starlight",
+    "biome",
+    "lefthook",
+    "husky",
+    "mcp",
+    "turborepo",
+    "nx",
+    "vite-plus",
+    "fumadocs",
+    "ultracite",
+    "oxlint",
+    "opentui",
+    "wxt",
+    "skills",
+    "evlog",
+    "axiom",
+    "none",
+  ])
+  .describe("Additional addons");
+
+const AddonsListSchema = z.array(AddonsSchema).superRefine((addons, ctx) => {
+  const taskRunners = addons.filter((addon) => TASK_RUNNER_ADDONS.includes(addon));
+  if (taskRunners.length > 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "`nx`, `turborepo`, and `vite-plus` cannot be used together",
+    });
+  }
+
+  const observabilityAddons = addons.filter((addon) => OBSERVABILITY_ADDONS.includes(addon));
+  if (observabilityAddons.length > 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "`evlog` and `axiom` cannot be used together because Axiom includes evlog",
+    });
+  }
+});
+
+export const PackageManagerSchema = z.enum(["npm", "pnpm", "bun"]).describe("Package manager");
+
+export const DatabaseSetupSchema = z
+  .enum([
+    "turso",
+    "neon",
+    "prisma-postgres",
+    "planetscale",
+    "mongodb-atlas",
+    "supabase",
+    "d1",
+    "docker",
+    "none",
+  ])
+  .describe("Database hosting setup");
+
+export const APISchema = z.enum(["trpc", "orpc", "none"]).describe("API type");
+
+/** Engine the auth module's stack templates render; derived from the module plan, never a stack choice. */
+export const AuthSchema = z
+  .enum(["better-auth", "clerk", "none"])
+  .describe("Auth engine of the auth module");
+
+export const WebDeploySchema = z
+  .enum(["cloudflare", "prisma", "docker", "vercel", "none"])
+  .describe("Web deployment");
+
+export const ServerDeploySchema = z
+  .enum(["cloudflare", "prisma", "docker", "vercel", "none"])
+  .describe("Server deployment");
+
+export const DirectoryConflictSchema = z
+  .enum(["merge", "overwrite", "increment", "error"])
+  .describe("How to handle existing directory conflicts");
+
+export const TemplateSchema = z
+  .enum(["mern", "pern", "t3", "uniwind", "none"])
+  .describe("Predefined project template");
+
+export const WxtTemplateSchema = z
+  .enum(["vanilla", "vue", "react", "solid", "svelte"])
+  .describe("WXT template");
+
+export const TuiTemplateSchema = z.enum(["core", "react", "solid"]).describe("OpenTUI template");
+
+export const FumadocsTemplateSchema = z
+  .enum([
+    "next-mdx",
+    "next-mdx-static",
+    "waku",
+    "react-router",
+    "react-router-spa",
+    "tanstack-start",
+    "tanstack-start-spa",
+    "astro",
+  ])
+  .describe("Fumadocs template");
+
+export const FumadocsSearchSchema = z
+  .enum(["orama", "orama-cloud"])
+  .describe("Fumadocs search solution");
+
+export const FumadocsOgImageSchema = z
+  .enum(["next-og", "takumi"])
+  .describe("Fumadocs OG image generator");
+
+export const FumadocsAiChatSchema = z
+  .enum(["openrouter", "llmgateway", "inkeep"])
+  .describe("Fumadocs AI chat provider");
+
+export const InstallScopeSchema = z.enum(["project", "global"]).describe("Installation scope");
+
+export const McpServerSchema = z
+  .enum([
+    "xstack",
+    "context7",
+    "nx",
+    "cloudflare-docs",
+    "convex",
+    "shadcn",
+    "next-devtools",
+    "nuxt-docs",
+    "nuxt-ui-docs",
+    "svelte-docs",
+    "astro-docs",
+    "planetscale",
+    "neon",
+    "supabase",
+    "better-auth",
+    "clerk",
+    "expo",
+    "polar",
+  ])
+  .describe("MCP server to install");
+
+export const McpAgentSchema = z
+  .enum([
+    "antigravity",
+    "cline",
+    "cline-cli",
+    "cursor",
+    "claude-code",
+    "codex",
+    "opencode",
+    "gemini-cli",
+    "github-copilot-cli",
+    "grok-build",
+    "mcporter",
+    "vscode",
+    "windsurf",
+    "zed",
+    "claude-desktop",
+    "goose",
+    "fx",
+    "kilo-code",
+    "kimi-code",
+    "kiro-cli",
+  ])
+  .describe("Agent target for MCP installation");
+
+export const SkillsSourceSchema = z
+  .enum([
+    "vercel-labs/agent-skills",
+    "vercel/ai",
+    "vercel/turborepo",
+    "honojs/skills",
+    "vercel/next.js",
+    "nuxt/ui",
+    "heroui-inc/heroui",
+    "shadcn/ui",
+    "better-auth/skills",
+    "clerk/skills",
+    "neondatabase/agent-skills",
+    "supabase/agent-skills",
+    "planetscale/database-skills",
+    "expo/skills",
+    "prisma/skills",
+    "elysiajs/skills",
+    "waynesutton/convexskills",
+    "msmps/opentui-skill",
+    "haydenbleasel/ultracite",
+    "https://www.evlog.dev",
+  ])
+  .describe("Skill source repository");
+
+export const SkillsAgentSchema = z
+  .enum([
+    "universal",
+    "adal",
+    "aider-desk",
+    "amp",
+    "antigravity",
+    "antigravity-cli",
+    "astrbot",
+    "augment",
+    "autohand-code",
+    "bob",
+    "claude-code",
+    "cline",
+    "codearts-agent",
+    "codebuddy",
+    "codemaker",
+    "codestudio",
+    "codex",
+    "command-code",
+    "continue",
+    "cortex",
+    "crush",
+    "cursor",
+    "deepagents",
+    "devin",
+    "dexto",
+    "droid",
+    "eve",
+    "firebender",
+    "forgecode",
+    "gemini-cli",
+    "github-copilot",
+    "goose",
+    "grok",
+    "hermes-agent",
+    "iflow-cli",
+    "inference-sh",
+    "jazz",
+    "junie",
+    "kilo",
+    "kimchi",
+    "kimi-code-cli",
+    "kiro-cli",
+    "kode",
+    "lingma",
+    "loaf",
+    "mcpjam",
+    "minimax-code",
+    "mistral-vibe",
+    "moxby",
+    "mux",
+    "neovate",
+    "ona",
+    "clawdbot",
+    "openclaw",
+    "opencode",
+    "openhands",
+    "pi",
+    "pochi",
+    "posit-assistant",
+    "promptscript",
+    "qoder",
+    "qoder-cn",
+    "qwen-code",
+    "reasonix",
+    "replit",
+    "roo",
+    "rovodev",
+    "tabnine-cli",
+    "terramind",
+    "tinycloud",
+    "trae",
+    "trae-cn",
+    "warp",
+    "windsurf",
+    "zcode",
+    "zed",
+    "zencoder",
+    "zenflow",
+  ])
+  .describe(
+    "Agent target for skill installation; prefer universal for agents that consume .agents/skills",
+  );
+
+export const SkillSelectionSchema = z.strictObject({
+  source: SkillsSourceSchema.describe("Skill source to install from"),
+  skills: z.array(z.string()).describe("Curated skill names to install from this source"),
+});
+
+export const UltraciteLinterSchema = z.enum(["biome", "oxlint"]).describe("Ultracite linter");
+
+export const UltraciteEditorSchema = z
+  .enum([
+    "vscode",
+    "cursor",
+    "windsurf",
+    "devin",
+    "codebuddy",
+    "antigravity",
+    "bob",
+    "kiro",
+    "trae",
+    "void",
+    "zed",
+    "universal",
+  ])
+  .describe("Ultracite editor integration");
+
+export const UltraciteAgentSchema = z
+  .enum([
+    "universal",
+    "claude",
+    "codex",
+    "jules",
+    "replit",
+    "devin",
+    "lovable",
+    "zencoder",
+    "ona",
+    "openclaw",
+    "continue",
+    "snowflake-cortex",
+    "deepagents",
+    "qoder",
+    "kimi-cli",
+    "mcpjam",
+    "mux",
+    "pi",
+    "adal",
+    "copilot",
+    "cline",
+    "amp",
+    "aider",
+    "firebase-studio",
+    "open-hands",
+    "gemini",
+    "junie",
+    "augmentcode",
+    "bob",
+    "kilo-code",
+    "goose",
+    "roo-code",
+    "warp",
+    "droid",
+    "opencode",
+    "crush",
+    "qwen",
+    "amazon-q-cli",
+    "firebender",
+    "cursor-cli",
+    "mistral-vibe",
+    "vercel",
+    "snowflake-coco",
+    "kimi-code",
+    "xum",
+    "kiro-cli",
+    "fx",
+    "antigravity",
+    "grok",
+  ])
+  .describe("Ultracite agent integration");
+
+export const UltraciteHookSchema = z
+  .enum([
+    "cursor",
+    "windsurf",
+    "devin",
+    "codebuddy",
+    "claude",
+    "codex",
+    "deepagents",
+    "copilot",
+    "grok",
+  ])
+  .describe("Ultracite hook integration");
+
+export const DbSetupModeSchema = z
+  .enum(["manual", "auto", "alchemy"])
+  .describe("Database setup mode");
+
+export const NeonSetupMethodSchema = z
+  .enum(["neon-new", "neon", "neondb", "neonctl"])
+  .describe("Neon database provisioning method");
+
+export const AddonOptionsSchema = z
+  .strictObject({
+    wxt: z
+      .strictObject({
+        template: WxtTemplateSchema,
+        devPort: z.number().int().min(1).max(65535).optional().describe("WXT dev server port"),
+      })
+      .optional()
+      .describe("Options for the WXT addon"),
+    fumadocs: z
+      .strictObject({
+        template: FumadocsTemplateSchema,
+        devPort: z.number().int().min(1).max(65535).optional().describe("Fumadocs dev server port"),
+        search: FumadocsSearchSchema.optional().describe("Fumadocs search solution"),
+        ogImage: FumadocsOgImageSchema.optional().describe("Fumadocs OG image generator"),
+        aiChat: FumadocsAiChatSchema.optional().describe("Fumadocs AI chat provider"),
+      })
+      .optional()
+      .describe("Options for the Fumadocs addon"),
+    opentui: z
+      .strictObject({
+        template: TuiTemplateSchema,
+      })
+      .optional()
+      .describe("Options for the OpenTUI addon"),
+    mcp: z
+      .strictObject({
+        scope: InstallScopeSchema.optional(),
+        servers: z.array(McpServerSchema).optional().describe("MCP servers to install"),
+        agents: z.array(McpAgentSchema).optional().describe("Agents to wire MCP servers into"),
+      })
+      .optional()
+      .describe("Options for the MCP addon"),
+    skills: z
+      .strictObject({
+        scope: InstallScopeSchema.optional(),
+        agents: z.array(SkillsAgentSchema).optional().describe("Agents to install skills into"),
+        selections: z.array(SkillSelectionSchema).optional().describe("Skills grouped by source"),
+      })
+      .optional()
+      .describe("Options for the Skills addon"),
+    ultracite: z
+      .strictObject({
+        linter: UltraciteLinterSchema.optional(),
+        editors: z.array(UltraciteEditorSchema).optional(),
+        agents: z.array(UltraciteAgentSchema).optional(),
+        hooks: z.array(UltraciteHookSchema).optional(),
+      })
+      .optional()
+      .describe("Options for the Ultracite addon"),
+  })
+  .describe("Addon-specific configuration");
+
+export const DbSetupOptionsSchema = z
+  .strictObject({
+    mode: DbSetupModeSchema.optional().describe("How database setup should be executed"),
+    neon: z
+      .strictObject({
+        method: NeonSetupMethodSchema.optional(),
+        projectName: z.string().min(1).optional().describe("Neon project name"),
+        regionId: z.string().min(1).optional().describe("Neon region identifier"),
+      })
+      .optional()
+      .describe("Options for Neon setup"),
+    prismaPostgres: z
+      .strictObject({
+        regionId: z.string().min(1).optional().describe("Prisma Postgres region identifier"),
+      })
+      .optional()
+      .describe("Options for Prisma Postgres setup"),
+    turso: z
+      .strictObject({
+        databaseName: z.string().min(1).optional().describe("Turso database name"),
+        groupName: z.string().min(1).optional().describe("Turso database group name"),
+        installCli: z
+          .boolean()
+          .optional()
+          .describe("Whether the CLI may install the Turso CLI automatically"),
+      })
+      .optional()
+      .describe("Options for Turso setup"),
+  })
+  .describe("Database setup configuration");
+
+export const ProductPresetSchema = z
+  .enum(["starter", "saas-global"])
+  .describe("Product preset (feature modules + providers)");
+
+export const ProductConfigSchema = z
+  .strictObject({
+    features: z.array(z.string().min(1)).describe("Feature modules to include"),
+    providers: z
+      .record(z.string(), z.array(z.string().min(1)))
+      .optional()
+      .describe("Selected providers per feature module"),
+    options: z
+      .record(z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])))
+      .optional()
+      .describe("Module-specific options"),
+  })
+  .describe("Product layer: feature modules composed on top of the stack");
+
+export const ProjectNameSchema = z
+  .string()
+  .min(1, "Project name cannot be empty")
+  .max(255, "Project name must be less than 255 characters")
+  .refine(
+    (name) => name === "." || !name.startsWith("."),
+    "Project name cannot start with a dot (except for '.')",
+  )
+  .refine((name) => name === "." || !name.startsWith("-"), "Project name cannot start with a dash")
+  .refine((name) => {
+    const invalidChars = ["<", ">", ":", '"', "|", "?", "*"];
+    return !invalidChars.some((char) => name.includes(char));
+  }, "Project name contains invalid characters")
+  .refine((name) => name.toLowerCase() !== "node_modules", "Project name is reserved")
+  .describe("Project name or path");
+
+export const CreateInputSchema = z
+  .object({
+    projectName: z.string().optional(),
+    template: TemplateSchema.optional(),
+    yes: z.boolean().optional(),
+    yolo: z.boolean().optional(),
+    dryRun: z.boolean().optional(),
+    verbose: z.boolean().optional(),
+    addonOptions: AddonOptionsSchema.optional(),
+    dbSetupOptions: DbSetupOptionsSchema.optional(),
+    database: DatabaseSchema.optional(),
+    orm: ORMSchema.optional(),
+    frontend: z.array(FrontendSchema).optional(),
+    addons: AddonsListSchema.optional(),
+    git: z.boolean().optional(),
+    packageManager: PackageManagerSchema.optional(),
+    install: z.boolean().optional(),
+    dbSetup: DatabaseSetupSchema.optional(),
+    backend: BackendSchema.optional(),
+    runtime: RuntimeSchema.optional(),
+    api: APISchema.optional(),
+    webDeploy: WebDeploySchema.optional(),
+    serverDeploy: ServerDeploySchema.optional(),
+    directoryConflict: DirectoryConflictSchema.optional(),
+    renderTitle: z.boolean().optional(),
+    disableAnalytics: z.boolean().optional(),
+    manualDb: z.boolean().optional(),
+    preset: ProductPresetSchema.optional(),
+    product: ProductConfigSchema.optional(),
+  })
+  .strict()
+  .refine((input) => !(input.manualDb !== undefined && input.dbSetupOptions?.mode !== undefined), {
+    message: "`manualDb` and `dbSetupOptions.mode` are mutually exclusive",
+    path: ["dbSetupOptions", "mode"],
+  });
+
+export const WorkspacePackageNameSchema = z
+  .string()
+  .min(1, "Package name cannot be empty")
+  .max(214, "Package name must not exceed 214 characters")
+  .regex(
+    /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/,
+    "Package name must be an unscoped lowercase npm name",
+  )
+  .refine((name) => name !== "node_modules", "Package name is reserved")
+  .describe("Name of a workspace package to scaffold");
+
+export const AddInputSchema = z
+  .object({
+    addons: AddonsListSchema.optional(),
+    package: WorkspacePackageNameSchema.optional(),
+    addonOptions: AddonOptionsSchema.optional(),
+    webDeploy: WebDeploySchema.optional(),
+    serverDeploy: ServerDeploySchema.optional(),
+    projectDir: z.string().optional(),
+    install: z.boolean().optional(),
+    packageManager: PackageManagerSchema.optional(),
+    dryRun: z.boolean().optional(),
+    disableAnalytics: z.boolean().optional(),
+  })
+  .strict();
+
+export const CLIInputSchema = CreateInputSchema.safeExtend({
+  projectDirectory: z.string().optional(),
+}).strict();
+
+export const ProjectConfigSchema = z.object({
+  projectName: z.string(),
+  projectDir: z.string(),
+  relativePath: z.string(),
+  addonOptions: AddonOptionsSchema.optional(),
+  dbSetupOptions: DbSetupOptionsSchema.optional(),
+  database: DatabaseSchema,
+  orm: ORMSchema,
+  backend: BackendSchema,
+  runtime: RuntimeSchema,
+  frontend: z.array(FrontendSchema),
+  addons: AddonsListSchema,
+  git: z.boolean(),
+  packageManager: PackageManagerSchema,
+  install: z.boolean(),
+  dbSetup: DatabaseSetupSchema,
+  api: APISchema,
+  webDeploy: WebDeploySchema,
+  serverDeploy: ServerDeploySchema,
+  product: ProductConfigSchema.optional(),
+});
+
+export const XStackConfigSchema = z.object({
+  version: z.string().describe("CLI version used to create this project"),
+  createdAt: z.string().describe("Timestamp when the project was created"),
+  reproducibleCommand: z.string().optional().describe("Command to reproduce this project setup"),
+  addonOptions: AddonOptionsSchema.optional(),
+  dbSetupOptions: DbSetupOptionsSchema.optional(),
+  database: DatabaseSchema,
+  orm: ORMSchema,
+  backend: BackendSchema,
+  runtime: RuntimeSchema,
+  frontend: z.array(FrontendSchema),
+  addons: AddonsListSchema,
+  packageManager: PackageManagerSchema,
+  dbSetup: DatabaseSetupSchema,
+  api: APISchema,
+  webDeploy: WebDeploySchema,
+  serverDeploy: ServerDeploySchema,
+  product: ProductConfigSchema.optional(),
+});
+
+export const XStackConfigFileSchema = XStackConfigSchema.safeExtend({
+  $schema: z.string().optional().describe("JSON Schema reference for validation"),
+})
+  .strict()
+  .meta({
+    id: "https://r2.xstack.dev/schema.json",
+    title: "xstack Configuration",
+    description: "Configuration file for xstack projects",
+  });
+
+export const InitResultSchema = z.object({
+  success: z.boolean(),
+  projectConfig: ProjectConfigSchema,
+  reproducibleCommand: z.string(),
+  timeScaffolded: z.string(),
+  elapsedTimeMs: z.number(),
+  projectDirectory: z.string(),
+  relativePath: z.string(),
+  error: z.string().optional(),
+  warnings: z.array(z.string()).optional(),
+});
+
+export const DATABASE_VALUES = DatabaseSchema.options;
+export const ORM_VALUES = ORMSchema.options;
+export const BACKEND_VALUES = BackendSchema.options;
+export const RUNTIME_VALUES = RuntimeSchema.options;
+export const FRONTEND_VALUES = FrontendSchema.options;
+export const ADDONS_VALUES = AddonsSchema.options;
+export const PACKAGE_MANAGER_VALUES = PackageManagerSchema.options;
+export const DATABASE_SETUP_VALUES = DatabaseSetupSchema.options;
+export const API_VALUES = APISchema.options;
+export const AUTH_VALUES = AuthSchema.options;
+export const WEB_DEPLOY_VALUES = WebDeploySchema.options;
+export const SERVER_DEPLOY_VALUES = ServerDeploySchema.options;
+export const DIRECTORY_CONFLICT_VALUES = DirectoryConflictSchema.options;
+export const TEMPLATE_VALUES = TemplateSchema.options;
+export const PRODUCT_PRESET_VALUES = ProductPresetSchema.options;

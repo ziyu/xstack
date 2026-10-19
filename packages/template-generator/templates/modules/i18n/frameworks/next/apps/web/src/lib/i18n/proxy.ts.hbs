@@ -1,0 +1,16 @@
+import { isLocale, LOCALE_COOKIE, matchLocale } from "@{{projectName}}/i18n";
+import { NextResponse } from "next/server";
+
+import type { ProxyStep } from "../proxy";
+
+/** Redirects paths without a locale prefix to the preferred locale. */
+export const localeStep: ProxyStep = (request) => {
+  const { pathname } = request.nextUrl;
+  if (isLocale(pathname.split("/")[1])) return undefined;
+
+  const cookie = request.cookies.get(LOCALE_COOKIE)?.value;
+  const locale = isLocale(cookie) ? cookie : matchLocale(request.headers.get("accept-language"));
+  const url = request.nextUrl.clone();
+  url.pathname = `/${locale}${pathname === "/" ? "" : pathname}`;
+  return NextResponse.redirect(url);
+};

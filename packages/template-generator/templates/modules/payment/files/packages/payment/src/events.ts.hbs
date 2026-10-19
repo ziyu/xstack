@@ -1,0 +1,24 @@
+import type { Plan, SubscriptionStatus } from "./types";
+
+declare module "@{{projectName}}/events" {
+  interface EventMap {
+    /**
+     * Fired for every successful payment, including subscription renewals. Delivered at
+     * least once: webhook retries re-emit it, so handlers must be idempotent on `orderId`.
+     */
+    "payment.order_paid": {
+      orderId: string;
+      userId: string;
+      plan: Plan;
+      amount: number;
+      currency: string;
+      renewal: boolean;
+    };
+    "payment.subscription_updated": {
+      userId: string;
+      planId: string;
+      status: SubscriptionStatus;
+      currentPeriodEnd?: Date;
+    };
+  }
+}

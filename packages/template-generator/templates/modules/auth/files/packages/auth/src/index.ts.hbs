@@ -1,0 +1,115 @@
+import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
+import type { Database } from "@{{projectName}}/db";
+import * as schema from "@{{projectName}}/db/schema/auth";
+import type { EventBus } from "@{{projectName}}/events";
+{{#if (includes module.integrations "email")}}
+import { localeFromHeaders } from "@{{projectName}}/i18n";
+{{/if}}
+import { betterAuth } from "better-auth";
+import { nextCookies } from "better-auth/next-js";
+import { admin } from "better-auth/plugins";
+
+import "./events";
+
+export type AuthConfig = {
+  BETTER_AUTH_URL: string;
+  BETTER_AUTH_SECRET: string;
+  ADMIN_EMAILS?: string;
+{{#if (includes module.providers "google")}}
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+{{/if}}
+{{#if (includes module.providers "github")}}
+  GITHUB_CLIENT_ID?: string;
+  GITHUB_CLIENT_SECRET?: string;
+{{/if}}
+};
+
+export const roles = ["user", "admin"] as const;
+
+export type Role = (typeof roles)[number];
+
+function parseEmails(value: string | undefined): Set<string> {
+  return new Set(
+    (value ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export function createAuth(env: AuthConfig, database: Database, events: EventBus) {
+  const adminEmails = parseEmails(env.ADMIN_EMAILS);
+
+  return betterAuth({
+    database: drizzleAdapter(database, {
+      provider: "{{#if (eq database "postgres")}}pg{{else}}sqlite{{/if}}",
+      schema,
+    }),
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL,
+    trustedOrigins: [env.BETTER_AUTH_URL],
+    emailAndPassword: {
+      enabled: true,
+{{#if (includes module.integrations "email")}}
+      requireEmailVerification: true,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }, request) => {
+        await events.emit("auth.password_reset_requested", {
+          email: user.email,
+          name: user.name,
+          url,
+          locale: localeFromHeaders(request?.headers),
+        });
+      },
+{{/if}}
+    },
+{{#if (includes module.integrations "email")}}
+    emailVerification: {
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
+      sendVerificationEmail: async ({ user, url }, request) => {
+        await events.emit("auth.verification_requested", {
+          email: user.email,
+          name: user.name,
+          url,
+          locale: localeFromHeaders(request?.headers),
+        });
+      },
+    },
+{{/if}}
+    socialProviders: {
+{{#if (includes module.providers "google")}}
+      ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+        ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
+        : {}),
+{{/if}}
+{{#if (includes module.providers "github")}}
+      ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+        ? { github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET } }
+        : {}),
+{{/if}}
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => ({
+            data: { ...user, role: adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
+          }),
+          after: async (user) => {
+            await events.emit("auth.user_created", {
+              userId: user.id,
+              email: user.email,
+              name: user.name,
+            });
+          },
+        },
+      },
+    },
+    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }), nextCookies()],
+  });
+}
+
+export type Auth = ReturnType<typeof createAuth>;
+
+export type Session = Auth["$Infer"]["Session"];

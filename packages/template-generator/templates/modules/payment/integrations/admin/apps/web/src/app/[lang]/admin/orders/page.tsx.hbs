@@ -1,0 +1,77 @@
+import { payment } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+
+import { Pagination } from "@/components/admin/pagination";
+import { requireAdmin } from "@/lib/admin";
+import { formatMoney } from "@/lib/format";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+const PAGE_SIZE = 20;
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ page?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("payment.admin.title") };
+}
+
+export default async function AdminOrdersPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  await requireAdmin(locale);
+  const page = Math.max(1, Number((await searchParams).page) || 1);
+
+  const { rows, total } = await payment.listAllOrders({
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  });
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="font-semibold text-2xl">{t("payment.admin.title")}</h1>
+      <div className="overflow-x-auto border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-muted-foreground text-xs">
+            <tr>
+              <th className="px-4 py-2 font-medium">{t("payment.admin.columns.date")}</th>
+              <th className="px-4 py-2 font-medium">{t("payment.admin.columns.customer")}</th>
+              <th className="px-4 py-2 font-medium">{t("payment.admin.columns.plan")}</th>
+              <th className="px-4 py-2 font-medium">{t("payment.admin.columns.provider")}</th>
+              <th className="px-4 py-2 font-medium">{t("payment.admin.columns.status")}</th>
+              <th className="px-4 py-2 text-right font-medium">{t("payment.admin.columns.amount")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.map(({ order, email }) => (
+              <tr key={order.id}>
+                <td className="px-4 py-2 text-muted-foreground">{date.format(order.createdAt)}</td>
+                <td className="px-4 py-2">{email}</td>
+                <td className="px-4 py-2">{order.planId}</td>
+                <td className="px-4 py-2">{order.provider}</td>
+                <td className="px-4 py-2">{t(`payment.admin.status.${order.status}`)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {formatMoney(order.amount, order.currency, locale)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && (
+          <p className="px-4 py-6 text-center text-muted-foreground text-sm">
+            {t("payment.admin.empty")}
+          </p>
+        )}
+      </div>
+      <Pagination
+        locale={locale}
+        page={page}
+        pages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        query={ {} }
+      />
+    </div>
+  );
+}

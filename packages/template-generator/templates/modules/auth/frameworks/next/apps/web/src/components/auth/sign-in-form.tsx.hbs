@@ -1,0 +1,72 @@
+"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import Link from "next/link";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+import { localePath } from "@/lib/i18n/paths";
+import type { SocialProvider } from "@/lib/social-providers";
+
+import { useLocale, useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+import { SocialButtons } from "./social-buttons";
+
+export default function SignInForm({
+  next,
+  providers,
+  canResetPassword,
+}: {
+  next: string;
+  providers: SocialProvider[];
+  canResetPassword: boolean;
+}) {
+  const locale = useLocale();
+  const t = useT();
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setPending(true);
+    const { error } = await authClient.signIn.email({
+      email: formValue(form, "email"),
+      password: formValue(form, "password"),
+      callbackURL: next,
+    });
+    setPending(false);
+    if (error) {
+      toast.error(error.message ?? t("auth.errors.generic"));
+      return;
+    }
+    window.location.assign(next);
+  }
+
+  return (
+    <>
+      <SocialButtons providers={providers} callbackURL={next} />
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+        <Field
+          label={t("auth.fields.password")}
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          minLength={8}
+        />
+        {canResetPassword && (
+          <Link
+            href={localePath(locale, "/forgot-password")}
+            className="self-end text-muted-foreground text-xs hover:text-foreground"
+          >
+            {t("auth.signIn.forgot")}
+          </Link>
+        )}
+        <Button type="submit" disabled={pending}>
+          {t("auth.signIn.submit")}
+        </Button>
+      </form>
+    </>
+  );
+}

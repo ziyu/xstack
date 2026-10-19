@@ -1,0 +1,45 @@
+export default {
+  nav: {
+    credits: "Credits",
+  },
+  page: {
+    title: "Credits",
+    balance: "Available credits",
+    buyMore: "Get more credits",
+    history: "History",
+    empty: "No credit activity yet.",
+  },
+  types: {
+    purchase: "Purchase",
+    subscription: "Subscription",
+    signup: "Sign-up bonus",
+    grant: "Grant",
+    consume: "Usage",
+    refund: "Refund",
+    adjust: "Adjustment",
+  },
+  admin: {
+    title: "Credits",
+    adjust: "Adjust balance",
+    email: "User email",
+    amount: "Amount",
+    amountHint: "Use a negative amount to deduct credits.",
+    reason: "Reason (optional)",
+    submit: "Apply",
+    done: "Balance updated.",
+    empty: "No transactions yet.",
+    errors: {
+      invalid: "Enter an email and a non-zero whole number.",
+      user: "No user with that email.",
+      balance: "The user doesn't have enough credits for that deduction.",
+    },
+    columns: {
+      date: "Date",
+      user: "User",
+      type: "Type",
+      reason: "Reason",
+      amount: "Amount",
+      balance: "Balance",
+    },
+  },
+} as const;
