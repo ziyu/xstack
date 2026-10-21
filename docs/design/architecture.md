@@ -531,3 +531,15 @@ ProjectConfig
 | **M3 状态**   | 已完成。auth、payment 的 XSTACK 模板与处理器迁入 `templates/modules/<id>/stack/` 与 `src/modules/stack/`，由 `domain.stack.render` 调用；`auth`、`payments` 从 `ProjectConfig`、CLI 参数、`xstack.jsonc` schema 删除，只存在于 `RenderConfig`；`examples`（todo、ai）整体删除，不再迁成模块；网页版 builder 的 auth/payments/examples 三栏合并为"功能"一栏，可用性由模块求解器判断。55 个构建样例产物与迁移前逐字节一致（`xstack.jsonc` 与随机密钥除外）         | —                                                     |
 | **M4 收尾**   | polar 原生 `PaymentProvider`；需要 AI 能力时以 ai 模块重新加入                                                                                                                                                                                                                                                                                                              | —                                                     |
 | **M4 状态**   | polar 已完成。`providers/polar.ts` 基于 `@polar-sh/sdk` 1.0（API `2026-10`）：checkout 使用 `providerRefs.polar` 指定的 product，webhook 将 `order.paid`、`subscription.created/updated` 映射为标准事件，客户门户使用 customer session；payment 的 `domain`、XSTACK polar 模板、`payments-deps`、`PaymentsSchema` 和 `RenderConfig.payments` 全部删除，非 Next 栈不再能选支付。生成项目已通过安装、类型检查、构建以及本地签名 webhook 测试 | —                                                     |
+
+## 18. P2.1 短信与手机号登录
+
+范围经确认限定为 P2 的第一批：短信模块（阿里云、腾讯云、Twilio）和手机号验证码注册/登录；不包含微信登录、国内支付、OSS/COS、`saas-cn` 或 Node 部署目标。
+
+实现采用现有模块清单与集成机制：`sms` 单独生成服务，`auth + sms` 激活手机号登录。服务商单选；默认 `aliyun`。三家 SDK 仅在所选产物中安装。CLI、Builder 和预览读取同一清单，已有预设保持不变。
+
+验证码由认证模块生成；HMAC 保存手机号索引与验证码，数据库原子更新控制 60 秒重发间隔、5 分钟过期、3 次尝试和单次消费。短信模块通过领域事件投递；只有显式 `SMS_DELIVERY_MODE=console` 且开发模式才输出本地验证码。生产模式不允许控制台投递，未配置服务商时失败。合成手机号账户不能通过 `ADMIN_EMAILS` 自动提权。
+
+本地验证（2026-10-20）：三家服务商产物通过安装、类型检查和生产构建；SQLite、PostgreSQL 迁移与手机号验证码并发消费通过。浏览器完成中文手机号注册/登录、刷新会话和 25 积分注册赠送；重复登录未重复赠送。接口检查包括重发冷却、过期、尝试次数、并发发送、重放、封禁用户、未验证手机号占用与生产控制台拒绝。Builder 可选择 SMS 服务商并生成相应参数。
+
+外部验收未完成：没有调用真实短信发送接口或验证手机送达。正式接入需要提供所选服务商凭据、已审核签名/模板及合法测试号码；SDK 接受请求不等于运营商送达。完整 P2 仍未完成。

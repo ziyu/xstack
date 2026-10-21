@@ -7,5 +7,8 @@ declare module "@{{projectName}}/events" {
     "auth.user_created": { userId: string; email: string; name: string };
     "auth.verification_requested": AuthEmail;
     "auth.password_reset_requested": AuthEmail;
+    {{#if (includes module.integrations "sms")}}
+    "auth.phone_verification_requested": { phoneNumber: string; code: string };
+    {{/if}}
   }
 }

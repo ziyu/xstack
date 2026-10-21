@@ -329,6 +329,13 @@ export function ProductOptions({
                   : "Mock payments are development-only. Production payments require a real provider, its credentials, webhook configuration and product/price setup. Polar defaults to sandbox; switch its environment to production before launch."}
               </p>
             )}
+            {manifest.id === "sms" && (
+              <p className="border-l-2 border-amber-500/50 pl-2 text-[11px] leading-relaxed text-fd-muted-foreground">
+                Select Authentication as well to enable phone-number signup and login. Real SMS
+                delivery needs provider credentials and approved sender/template settings. Console
+                delivery is explicitly development-only; never enter credentials here.
+              </p>
+            )}
             {uniqueEnvironment.length > 0 && (
               <details className="border-t border-fd-border pt-3">
                 <summary className="builder-focus-ring cursor-pointer text-xs text-fd-muted-foreground">

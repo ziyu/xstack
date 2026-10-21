@@ -1,0 +1,100 @@
+# SMS
+
+Provider: **{{module.providers.[0]}}**. Exactly one provider is generated in `packages/sms`; its public server-side API is independent of authentication:
+
+```ts
+import { sms } from "@/services";
+
+await sms.sendOtp({ phoneNumber: "+8613800138000", code: "123456" });
+```
+
+For another server process, import `createSms` and the `Sms`, `SmsConfig`, or `OtpMessage` types from `@{{projectName}}/sms` and initialize with its environment. Never import this package into a browser component. The SDKs require a Node.js runtime, not an Edge or Cloudflare Worker runtime.
+
+`phoneNumber` must be an E.164 string: `+`, a nonzero country-code digit, then digits only, with at most 15 digits total. Spaces, punctuation, national-format numbers, and multiple recipients are rejected. `code` must be a string of exactly six ASCII digits. The service does not generate, store, verify, or expire codes; the caller owns those responsibilities. Codes in examples are illustrative, not suitable for production generation.
+
+## Delivery mode
+
+| Variable | Contract |
+| --- | --- |
+| `SMS_DELIVERY_MODE` | `provider` (default) or `console` |
+| `NODE_ENV` | Only the exact value `development` permits console mode |
+
+SDK credentials are optional at application startup so builds do not need live secrets. In provider mode, every provider-specific key below must be configured before sending; missing, empty, or partial configuration rejects the send. Region defaults are provided by the generated environment schema, not inferred by the SDK. There is no automatic console fallback.
+
+For local development without real SMS, explicitly set:
+
+```dotenv
+SMS_DELIVERY_MODE=console
+NODE_ENV=development
+```
+
+This mode never calls the provider, even if credentials exist. It writes one server-console line in the form `[sms:console] {"phoneNumber":"+8613800138000","code":"123456"}`. Console mode throws outside development, including production and test environments. Treat development logs as sensitive and do not enable this mode on a public deployment.
+
+To send real SMS, use `SMS_DELIVERY_MODE=provider` and configure the selected provider. Configuration keys are server-only and must never use a public environment prefix.
+
+{{#if (eq module.providers.[0] "aliyun")}}
+## Alibaba Cloud configuration
+
+| Variable | Contract |
+| --- | --- |
+| `ALIYUN_SMS_ACCESS_KEY_ID` | AccessKey ID for an account/RAM identity authorized to send SMS |
+| `ALIYUN_SMS_ACCESS_KEY_SECRET` | Matching AccessKey secret |
+| `ALIYUN_SMS_REGION_ID` | `cn-hangzhou` (generated default); this adapter requires this region |
+| `ALIYUN_SMS_SIGN_NAME` | Approved SMS signature text, not its ID |
+| `ALIYUN_SMS_TEMPLATE_CODE` | Approved SMS template code, such as `SMS_...` |
+
+This adapter uses Alibaba Cloud's **Dysmsapi 2017-05-25** service at the fixed HTTPS endpoint `dysmsapi.aliyuncs.com`. It does not use the separate Singapore/global Dypns or Dysmsapi international service, and changing the region is not a way to switch services. Obtain credentials, approve the signature/template, fund the account, and enable the applicable destination products in the [Alibaba Cloud SMS console](https://dysms.console.aliyun.com/).
+
+The template must contain exactly the variable `code`; the request sends `templateParam: JSON.stringify({ code })`. If the template mentions expiry, use five minutes to match the generated phone-auth flow.
+
+The adapter removes **only the leading `+`** from E.164 input for the API's country-code-plus-number representation; it retains all country-code digits, including `86`. It never turns an arbitrary international number into a mainland China national number. Mainland China and international/Hong Kong/Macao/Taiwan messaging have different account eligibility, template/signature approvals, destination availability, and carrier restrictions. An approved domestic template does not authorize international sending. Use the appropriate international template and service entitlement on this service, or select another provider; this adapter does not silently route between products or expose an endpoint override.
+
+The request uses `sendSmsWithOptions`, with SDK retries disabled. Only `response.body.code === "OK"` counts as API acceptance.
+{{/if}}
+{{#if (eq module.providers.[0] "tencent")}}
+## Tencent Cloud configuration
+
+| Variable | Contract |
+| --- | --- |
+| `TENCENT_SMS_SECRET_ID` | SecretId for a CAM identity authorized to send SMS |
+| `TENCENT_SMS_SECRET_KEY` | Matching SecretKey |
+| `TENCENT_SMS_REGION` | SMS-supported service region; generated default `ap-guangzhou` |
+| `TENCENT_SMS_SDK_APP_ID` | Actual SMS application SdkAppId, not the account AppId |
+| `TENCENT_SMS_SIGN_NAME` | Approved SMS signature text, not its ID; required by this adapter |
+| `TENCENT_SMS_TEMPLATE_ID` | Approved verification SMS template ID |
+
+This adapter uses Tencent Cloud SMS **API 2021-01-11** at the fixed HTTPS endpoint `sms.tencentcloudapi.com`. Create an SMS application and configure credentials, balance, signature, and template in the [Tencent Cloud SMS console](https://console.cloud.tencent.com/smsv2). The region configures the service request, not the recipient country; use a supported SMS region for your account.
+
+The template must have exactly one parameter: the code. Requests send `TemplateParamSet: [code]`. If the template mentions expiry, use five minutes to match the generated phone-auth flow. `PhoneNumberSet` contains the original E.164 number with its country code unchanged.
+
+Domestic China and international/Hong Kong/Macao/Taiwan SMS require their respective product entitlements and approved templates. An international recipient requires an international template; a domestic template is not a global fallback. This adapter requires a sign name even where the international API makes it optional, and uses the provider's default shared international SenderId rather than exposing a custom SenderId. If the destination requires an independently registered sender, configure an appropriate approved provider implementation before sending there.
+
+A successful HTTP response is not sufficient: the adapter requires exactly one recipient result with `Code === "Ok"` and the requested phone number. No automatic retry is performed.
+{{/if}}
+{{#if (eq module.providers.[0] "twilio")}}
+## Twilio configuration
+
+| Variable | Contract |
+| --- | --- |
+| `TWILIO_ACCOUNT_SID` | Twilio account SID |
+| `TWILIO_AUTH_TOKEN` | Matching account auth token |
+| `TWILIO_FROM_NUMBER` | SMS-capable Twilio sender number belonging to that account, in E.164 format |
+
+Use Node.js 20 or later. Configure an SMS-capable sender, balance, and geographic permissions in the [Twilio Console](https://console.twilio.com/). Trial accounts restrict recipients. Destination-specific sender registration, A2P requirements, consent, and carrier restrictions still apply; selecting Twilio does not guarantee service in mainland China or any other country.
+
+The adapter uses Programmable Messaging, not Twilio Verify. It sends `Your verification code is CODE. It expires in 5 minutes.` with a 300-second queue validity period. Auth (or your standalone caller) remains responsible for actually expiring the code. The adapter accepts only a phone-number sender, not an alphanumeric sender or Messaging Service SID.
+
+`messages.create` has automatic retries disabled. Responses with a nonzero error code or a status other than `accepted`, `queued`, `sending`, `sent`, or `delivered` are rejected.
+{{/if}}
+
+## Acceptance, failures, and abuse controls
+
+A resolved `sendOtp` promise means **provider API acceptance only**, not confirmed handset delivery. Carrier delivery receipts are not implemented. Check the provider console for delivery status and sanitized application errors for send failures. Provider exception messages and causes are intentionally not propagated because they may contain phone numbers, credentials, or OTP request bodies.
+
+No adapter automatically retries OTP sends: after a timeout, the provider may already have accepted the request. Do not wrap this API in a blind retry loop. For standalone usage, implement authorization, recipient/IP rate limits, secure random code generation, hashed code storage, expiry, and bounded verification attempts before exposing an endpoint. Never expose unrestricted SMS sending to browsers.
+{{#if (includes module.integrations "auth")}}
+
+## Phone authentication integration
+
+`apps/web/src/integrations/auth-sms.ts` subscribes to `auth.phone_verification_requested` and awaits `sms.sendOtp({ phoneNumber, code })`. Authentication owns code generation and verification; SMS owns sending. Auth does not import the SMS package. The phone-login flow uses six-digit codes with a five-minute expiry.
+{{/if}}

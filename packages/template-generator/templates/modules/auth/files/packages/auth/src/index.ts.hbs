@@ -10,6 +10,9 @@ import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 
 import "./events";
+{{#if (includes module.integrations "sms")}}
+import { createPhoneAuth } from "./phone";
+{{/if}}
 
 export type AuthConfig = {
   BETTER_AUTH_URL: string;
@@ -49,6 +52,16 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     trustedOrigins: [env.BETTER_AUTH_URL],
+{{#if (includes module.integrations "sms")}}
+    rateLimit: {
+      enabled: true,
+      storage: "database",
+      customRules: {
+        "/phone-number/send-otp": { window: 60, max: 5 },
+        "/phone-number/verify": { window: 60, max: 10 },
+      },
+    },
+{{/if}}
     emailAndPassword: {
       enabled: true,
 {{#if (includes module.integrations "email")}}
@@ -91,10 +104,25 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
 {{/if}}
     },
     databaseHooks: {
+{{#if (includes module.integrations "sms")}}
+      verification: {
+        create: {
+          // The phone plugin writes an unused plaintext OTP before sendOTP.
+          // Suppress only this flow; email/reset verification stays untouched.
+          before: async (verification, context) => {
+            if (
+              context?.path === "/phone-number/send-otp" &&
+              verification.identifier === context.body?.phoneNumber &&
+              /^\+[1-9]\d{7,14}$/.test(verification.identifier)
+            ) return false;
+          },
+        },
+      },
+{{/if}}
       user: {
         create: {
           before: async (user) => ({
-            data: { ...user, role: adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
+            data: { ...user, role: {{#if (includes module.integrations "sms")}}!user.email.toLowerCase().endsWith("@phone.invalid") && {{/if}}adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
           }),
           after: async (user) => {
             await events.emit("auth.user_created", {
@@ -106,7 +134,7 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
         },
       },
     },
-    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }), nextCookies()],
+    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }), {{#if (includes module.integrations "sms")}}createPhoneAuth(env.BETTER_AUTH_SECRET, database, events), {{/if}}nextCookies()],
   });
 }
 

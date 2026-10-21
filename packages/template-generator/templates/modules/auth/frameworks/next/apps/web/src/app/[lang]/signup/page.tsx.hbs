@@ -44,6 +44,14 @@ export default async function SignUpPage({ params, searchParams }: Props) {
         providers={enabledSocialProviders()}
         verifyEmail={ {{#if (includes module.integrations "email")}}true{{else}}false{{/if}} }
       />
+      {{#if (includes module.integrations "sms")}}
+      <Link
+        href={ { pathname: localePath(locale, "/login/phone"), query: { next: safeNext(next, localePath(locale, "/dashboard")) } } }
+        className="mt-4 block text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+      >
+        {t("auth.phone.link")}
+      </Link>
+      {{/if}}
     </AuthCard>
   );
 }

@@ -123,6 +123,35 @@ describe("module resolver", () => {
       'Provider "auth.github" is not available with the stack templates',
     );
   });
+
+  it("enables phone authentication only with the SMS integration", () => {
+    const selected = plan({ features: ["auth", "sms"], providers: { sms: ["aliyun"] } });
+    expect(selected.issues.filter((issue) => issue.level === "error")).toEqual([]);
+    expect(
+      selected.modules.find((module) => module.manifest.id === "auth")?.integrations,
+    ).toContain("sms");
+    expect(selected.modules.find((module) => module.manifest.id === "sms")?.integrations).toContain(
+      "auth",
+    );
+    expect(
+      plan({ features: ["sms"] }).modules.some((module) => module.manifest.id === "auth"),
+    ).toBe(false);
+    expect(
+      plan({ features: ["auth"] }).modules.some((module) => module.manifest.id === "sms"),
+    ).toBe(false);
+  });
+
+  it("rejects multiple SMS providers and non-native authentication combinations", () => {
+    for (const selection of [
+      { features: ["sms"], providers: { sms: ["aliyun", "twilio"] } },
+      { features: ["sms"], providers: { sms: [] } },
+      { features: ["auth", "sms"], options: { auth: { engine: "clerk" } } },
+    ]) {
+      expect(hasErrors(plan(selection))).toBe(true);
+    }
+    expect(hasErrors(plan({ features: ["sms"] }, { frontend: ["nuxt"] }))).toBe(true);
+    expect(hasErrors(plan({ features: ["sms"] }, { webDeploy: "cloudflare" }))).toBe(true);
+  });
 });
 
 describe("module seams", () => {

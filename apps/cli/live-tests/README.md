@@ -63,6 +63,18 @@ With Chromium installed, the optional credential-scoping regression checks brows
 XSTACK_LIVE_BROWSER_TESTS=1 bun test apps/cli/live-tests/protection.test.ts
 ```
 
+## Phone OTP checks
+
+Generate a disposable Next.js/Drizzle/SQLite project under `apps/cli/.smoke` with `auth`, `sms`, and optionally `credits`. Install its dependencies and apply its database schema. Start its development server with `SMS_DELIVERY_MODE=console`, a matching `BETTER_AUTH_URL`, and capture server output to a private log. Then run:
+
+```sh
+bun apps/cli/live-tests/phone.ts apps/cli/.smoke/phone-app http://localhost:3001 /absolute/path/to/phone-server.log
+```
+
+This exercises real HTTP auth endpoints and the generated SQLite database, not a provider API. It resets rate limits and expires challenges, so it refuses projects outside `.smoke` and non-loopback origins. It checks phone signup/session, resend cooldown, expiry, bounded attempts, concurrent send/verification, replay rejection and unverified phone assignment. Console OTPs in the log are sensitive; remove the disposable project and log after testing. This check does not establish real SMS delivery.
+
+Generated install/typecheck/build samples for all three providers are selected with `XSTACK_BUILD_SAMPLES=1 XSTACK_BUILD_SAMPLE_FILTER=product-phone bun test apps/cli/test/generated-builds.test.ts`.
+
 ## Selected validation run
 
 The [2026-10-02 verification record](./verification-2026-10-02.md) lists the 19 local, five Postgres, and two Vercel fixtures that passed, including production and protected preview stages.

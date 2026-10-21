@@ -111,6 +111,26 @@ describe("builder preview over oRPC", () => {
     }
   });
 
+  test("shares and previews the selected SMS provider without enabling unselected vendors", async () => {
+    for (const provider of ["aliyun", "tencent", "twilio"]) {
+      const selected = {
+        ...DEFAULT_STACK,
+        features: ["auth", "sms"],
+        providers: { auth: [], sms: [provider] },
+      };
+      const shared = await loadStackParams(
+        Promise.resolve(new URL(generateStackUrlFromState(selected))),
+      );
+      expect(shared.providers).toEqual(selected.providers);
+      const output = files((await client.preview(shared)).root);
+      expect(output.has("apps/web/src/app/[lang]/login/phone/page.tsx")).toBe(true);
+      expect(output.has(`packages/sms/src/providers/${provider}.ts`)).toBe(true);
+      for (const other of ["aliyun", "tencent", "twilio"].filter((id) => id !== provider)) {
+        expect(output.has(`packages/sms/src/providers/${other}.ts`)).toBe(false);
+      }
+    }
+  });
+
   test("rejects invalid payloads at the HTTP boundary", async () => {
     for (const json of [
       null,

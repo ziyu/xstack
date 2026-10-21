@@ -9,20 +9,83 @@ xstack composes TypeScript product templates from infrastructure choices, featur
 - Latest dependencies: always use current, stable versions by default.
 - Free and open source: forever.
 
-## Quick Start
+## Generate Your Project
 
-The commands below target the renamed packages. This repository migration does not publish npm packages or deploy the `xstack.dev` domains; use the local development commands until those services are available.
+### Get the CLI
+
+Use Node.js 24 LTS and Bun (1.4+ recommended). Until the npm packages are published, build the CLI from this repository:
 
 ```bash
-# Using bun (recommended)
-bun create xstack@latest
-
-# Using pnpm
-pnpm create xstack@latest
-
-# Using npm
-npx xstack@latest
+git clone https://github.com/ziyu/xstack.git
+cd xstack
+bun install
+bun run build:cli
+export XSTACK_CLI="$PWD/apps/cli/dist/cli.mjs"
+cd ..
 ```
+
+Run the following commands in the same terminal. Projects are created in your current directory; replace `my-app` with your chosen folder name.
+
+### Create a project
+
+Interactive setup:
+
+```bash
+node "$XSTACK_CLI" my-app
+```
+
+Default Next.js full-stack shell with SQLite, Drizzle and Turborepo, without optional business modules:
+
+```bash
+node "$XSTACK_CLI" my-app --yes --package-manager bun --no-install --no-git
+```
+
+For an authentication-ready Starter without further configuration prompts:
+
+```bash
+node "$XSTACK_CLI" my-app \
+  --frontend next --backend self --runtime none \
+  --database sqlite --orm drizzle --api none --db-setup none \
+  --web-deploy none --server-deploy none --addons turborepo \
+  --preset starter --providers auth:none \
+  --module-options i18n.locales=en,zh-CN \
+  --package-manager bun --no-install --no-git
+```
+
+Choose one example per output folder. `auth:none` disables OAuth, not email/password login. Use `--preset saas-global` for authentication, email, admin, payments and credits, or `--features` for individual modules. Omitted options may still be prompted for. Do not combine `--yes` with custom stack flags.
+
+### Run the generated project
+
+For the Next.js + SQLite examples above:
+
+```bash
+cd my-app
+bun install
+bun run db:push  # initialize tables for authentication and other database modules
+bun run dev
+```
+
+Open **http://localhost:3001**. A shell with no database tables can skip `db:push`. The CLI creates local environment files; configure external service credentials in `apps/web/.env` before using email, OAuth, payments or SMS. Keep the database URLs in `apps/web/.env` and `packages/db/.env` pointed at the same database. Do not commit secrets.
+
+To serve a production build locally, stop development, run `bun run build` from the generated project root, then `cd apps/web && bun run start --port 3001`.
+
+Use `node "$XSTACK_CLI" --help` for options, add `--dry-run` to validate without writing files, or run `node "$XSTACK_CLI" add --addons biome` from an existing generated project. Keep `xstack.jsonc` for the `add` command. See the [CLI reference](apps/cli/README.md) for provider and module options.
+
+After the packages are published, `bun create xstack@latest my-app`, `pnpm create xstack@latest my-app`, and `npx xstack@latest my-app` are equivalent package-runner entry points. A GitHub push alone does not publish those packages.
+
+### Phone-number signup and login
+
+Select `auth` and `sms` together, then choose one SMS service:
+
+```bash
+# From the xstack repository after bun install && bun run build:cli
+node apps/cli/dist/cli.mjs create-json --json '{"projectName":"phone-app","product":{"features":["auth","sms"],"providers":{"auth":[],"sms":["aliyun"]}},"packageManager":"bun","install":false,"git":false}'
+cd phone-app
+bun install
+bun run db:push
+```
+
+Choose `aliyun`, `tencent`, or `twilio` in JSON (or `--providers sms:aliyun` with ordinary CLI flags). Fill in `apps/web/.env` using the generated `docs/modules/sms.md`, then run `bun run dev` and choose phone login at `http://localhost:3001/en/login`. For local testing without paid messages, set `SMS_DELIVERY_MODE=console`; codes are printed to the development server log. Console delivery is forbidden in production. Real sending requires provider credentials and approved sender/template settings.
 
 ## Claude Code plugin
 
@@ -115,20 +178,6 @@ bunx --no-install convex run healthCheck:get
 Deployment secrets belong in Convex's environment, not `NEXT_PUBLIC_*` variables. Local deployment data and `.env.local` files must remain ignored by Git. A new database contains no testimonials or analytics events; empty lists and zero counts are expected until real data is added. This setup does not create or deploy a production cloud project.
 
 `next-themes@0.4.6` has a Bun patch in `patches/` for React's client-rendered script warning. Its theme bootstrap remains in SSR output and the hydration pass; client-only mounts use the existing theme effect instead of creating an inert script element. `bun install` applies the patch automatically. After dependency patches change, restart the Next.js development server. Browser smoke checks cover client remounts, persisted dark-theme SSR, hydration, and system-theme changes.
-
-### Generated-project verification (2026-10-19)
-
-Validated the default shell, `starter`, and `saas-global` using Next.js, SQLite, Drizzle, and Bun 1.3.14 on Node.js 26.11.1. All three installed dependencies, passed `bun run check-types`, built with `bun run build`, and started with the generated web workspace's `bun run start --port <port>` command. The auth presets also generated and applied SQLite migrations.
-
-- `starter`: browser signup, logout, login, profile updates, session persistence after reload, and anonymous dashboard protection passed against the production server.
-- `saas-global`: verified email using the documented development-console delivery, checked admin/user separation, granted 125 credits, rejected a 200-credit deduction without changing the balance, and rendered English/Chinese pages. After restarting in production, login, existing sessions, access restrictions, and the persisted balance still worked.
-- Reproduction commands now target `xstack` for Bun, pnpm, and npm. Regression tests replay their generated arguments and compare the resulting stack and module configuration.
-- Template Builder: SMTP + Polar, OAuth disabled, Chinese locale, and 50 signup credits survived URL reload, saved preferences, and sharing. The copied command generated a project that installed, typechecked, migrated SQLite, built, and served its Chinese homepage and login page in production mode. This did not verify live SMTP or Polar transactions.
-- Builder icons: all 50 local SVG sources decoded in the browser; light/dark backend cards and selected badges loaded without requests to the former icon CDN.
-
-Run the command regressions with `bun run build:cli && bun test apps/cli/test/cli-output.test.ts packages/template-generator/test`.
-
-Limits: no live OAuth, Resend delivery, payment checkout, signed payment webhook, PostgreSQL, or deployment-provider certification was performed. `saas-global` requires real email credentials for production signup verification; without them, production email delivery is rejected. Development prints verification links to the server console. Root `db:generate` / `db:migrate` tasks require a terminal because Turbo marks them interactive; automation can run those scripts directly in `packages/db`.
 
 ## Want to contribute?
 

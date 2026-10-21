@@ -8,6 +8,9 @@ Built on [Better Auth](https://better-auth.com). The `packages/auth` package exp
 {{#if (includes module.integrations "email")}}
 - Email verification on sign-up and password reset (`/forgot-password`, `/reset-password`), sent by the email module
 {{/if}}
+{{#if (includes module.integrations "sms")}}
+- Phone OTP sign-up and sign-in (`/[lang]/login/phone`), delivered by the SMS module
+{{/if}}
 {{#each module.providers}}
 - {{this}} OAuth
 {{/each}}
@@ -37,9 +40,28 @@ OAuth buttons appear only when both the client ID and secret are set.
 | `auth.user_created` | A user record was created |
 | `auth.verification_requested` | A verification email should be sent |
 | `auth.password_reset_requested` | A password reset email should be sent |
+{{#if (includes module.integrations "sms")}}
+| `auth.phone_verification_requested` | A phone OTP should be sent; payload is `{ phoneNumber, code }` |
+{{/if}}
 
 Subscribe in `apps/web/src/integrations/*.ts`.
 
+{{#if (includes module.integrations "sms")}}
+## Phone sign-up and sign-in
+
+Open `/en/login/phone` or `/zh-CN/login/phone`, enter an E.164 phone number (for example `+14155552671`), and verify the six-digit SMS code. A new number creates a `user` account and emits the same `auth.user_created` event as email registration, so registration credits are awarded by the existing integration. Returning users receive a normal Better Auth session. Email/password and configured OAuth sign-in remain available.
+
+Configure the selected SMS provider using [the SMS module guide](sms.md). Auth emits an event and never imports the SMS package. Codes are sent only on the server; the UI does not expose credentials or development OTPs.
+
+- Each code expires after five minutes and allows at most three attempts. Resends have a database-enforced 60-second cooldown per phone, including failed delivery attempts.
+- The `phone_otp_challenge` table stores HMAC phone identifiers and HMAC codes, not plaintext codes. A single atomic update spends an attempt and consumes a matching code, so parallel verification cannot reuse it. The phone plugin's unused plaintext verification insert is suppressed without affecting email verification.
+- Better Auth rate limiting is explicitly enabled with database storage (`rate_limit`) across workers: five send requests and ten verification requests per IP/path per minute. Deploy behind a trusted proxy that strips spoofed forwarded-IP headers, and configure Better Auth's `advanced.ipAddress` for your infrastructure. If no trusted IP is available, Better Auth uses a shared per-path bucket rather than bypassing the limit.
+- Phone-only accounts receive a non-deliverable, HMAC-derived `@phone.invalid` email and the ordinary `user` role, even if that address appears in `ADMIN_EMAILS`. Keep `BETTER_AUTH_SECRET` stable and private; rotating it invalidates pending OTP challenges and changes synthetic email derivation for new registrations. Existing phone users are looked up by phone number.
+- This integration supports OTP registration/login only. Phone-password sign-in, phone-password reset, linking or changing a phone number through verification, and session-less verification are rejected. Email signup and profile updates cannot attach an unverified phone number. Accounts are not automatically merged by phone number or synthetic email.
+
+Expired and consumed challenge rows retain their hashed phone identifier until the next send replaces them. Apply your application's retention policy to rows whose `expires_at` and `resend_at` are both in the past. Do not remove active cooldown rows, log codes, or log raw phone numbers.
+
+{{/if}}
 ## Protecting pages
 
 ```ts
@@ -53,3 +75,7 @@ const user = await requireUser(locale, "/dashboard/billing");
 ## Schema changes
 
 After adding Better Auth plugins, regenerate the schema with `bun run auth:generate` in `apps/web`, then `bun run db:push`.
+{{#if (includes module.integrations "sms")}}
+
+The generated Drizzle auth schema already includes nullable, unique `user.phoneNumber`, `phoneNumberVerified`, `phone_otp_challenge`, and `rate_limit` for {{database}}. Preserve the custom challenge table when regenerating Better Auth's schema: it is managed by this integration rather than the upstream phone plugin. Apply the schema to the deployment database before accepting phone sign-ins.
+{{/if}}

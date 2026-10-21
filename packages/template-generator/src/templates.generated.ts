@@ -13283,14 +13283,18 @@ export async function requireAdmin(locale: Locale) {
   return { user, ability };
 }
 `],
-  ["modules/auth/dialects/postgres/packages/db/src/schema/auth.ts", `import { defineRelationsPart } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+  ["modules/auth/dialects/postgres/packages/db/src/schema/auth.ts.hbs", `import { defineRelationsPart } from "drizzle-orm";
+import { pgTable, text, timestamp, boolean, index{{#if (includes module.integrations "sms")}}, integer, bigint{{/if}} } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
+  {{#if (includes module.integrations "sms")}}
+  phoneNumber: text("phone_number").unique(),
+  phoneNumberVerified: boolean("phone_number_verified").default(false).notNull(),
+  {{/if}}
   image: text("image"),
   role: text("role").default("user").notNull(),
   banned: boolean("banned").default(false),
@@ -13363,6 +13367,24 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
+{{#if (includes module.integrations "sms")}}
+export const phoneOtpChallenge = pgTable("phone_otp_challenge", {
+  phoneHash: text("phone_hash").primaryKey(),
+  challengeId: text("challenge_id").notNull(),
+  codeHash: text("code_hash"),
+  attempts: integer("attempts").default(0).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  resendAt: timestamp("resend_at", { withTimezone: true }).notNull(),
+});
+
+export const rateLimit = pgTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+});
+
+{{/if}}
 export const authRelations = defineRelationsPart({ user, session, account, verification }, (r) => ({
   user: {
     sessions: r.many.session({
@@ -13388,7 +13410,7 @@ export const authRelations = defineRelationsPart({ user, session, account, verif
   },
 }));
 `],
-  ["modules/auth/dialects/sqlite/packages/db/src/schema/auth.ts", `import { defineRelationsPart, sql } from "drizzle-orm";
+  ["modules/auth/dialects/sqlite/packages/db/src/schema/auth.ts.hbs", `import { defineRelationsPart, sql } from "drizzle-orm";
 import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 
 export const user = sqliteTable("user", {
@@ -13396,6 +13418,10 @@ export const user = sqliteTable("user", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: integer("email_verified", { mode: "boolean" }).default(false).notNull(),
+  {{#if (includes module.integrations "sms")}}
+  phoneNumber: text("phone_number").unique(),
+  phoneNumberVerified: integer("phone_number_verified", { mode: "boolean" }).default(false).notNull(),
+  {{/if}}
   image: text("image"),
   role: text("role").default("user").notNull(),
   banned: integer("banned", { mode: "boolean" }).default(false),
@@ -13480,6 +13506,24 @@ export const verification = sqliteTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
+{{#if (includes module.integrations "sms")}}
+export const phoneOtpChallenge = sqliteTable("phone_otp_challenge", {
+  phoneHash: text("phone_hash").primaryKey(),
+  challengeId: text("challenge_id").notNull(),
+  codeHash: text("code_hash"),
+  attempts: integer("attempts").default(0).notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  resendAt: integer("resend_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const rateLimit = sqliteTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: integer("last_request").notNull(),
+});
+
+{{/if}}
 export const authRelations = defineRelationsPart({ user, session, account, verification }, (r) => ({
   user: {
     sessions: r.many.session({
@@ -13515,6 +13559,9 @@ Built on [Better Auth](https://better-auth.com). The \`packages/auth\` package e
 {{#if (includes module.integrations "email")}}
 - Email verification on sign-up and password reset (\`/forgot-password\`, \`/reset-password\`), sent by the email module
 {{/if}}
+{{#if (includes module.integrations "sms")}}
+- Phone OTP sign-up and sign-in (\`/[lang]/login/phone\`), delivered by the SMS module
+{{/if}}
 {{#each module.providers}}
 - {{this}} OAuth
 {{/each}}
@@ -13544,9 +13591,28 @@ OAuth buttons appear only when both the client ID and secret are set.
 | \`auth.user_created\` | A user record was created |
 | \`auth.verification_requested\` | A verification email should be sent |
 | \`auth.password_reset_requested\` | A password reset email should be sent |
+{{#if (includes module.integrations "sms")}}
+| \`auth.phone_verification_requested\` | A phone OTP should be sent; payload is \`{ phoneNumber, code }\` |
+{{/if}}
 
 Subscribe in \`apps/web/src/integrations/*.ts\`.
 
+{{#if (includes module.integrations "sms")}}
+## Phone sign-up and sign-in
+
+Open \`/en/login/phone\` or \`/zh-CN/login/phone\`, enter an E.164 phone number (for example \`+14155552671\`), and verify the six-digit SMS code. A new number creates a \`user\` account and emits the same \`auth.user_created\` event as email registration, so registration credits are awarded by the existing integration. Returning users receive a normal Better Auth session. Email/password and configured OAuth sign-in remain available.
+
+Configure the selected SMS provider using [the SMS module guide](sms.md). Auth emits an event and never imports the SMS package. Codes are sent only on the server; the UI does not expose credentials or development OTPs.
+
+- Each code expires after five minutes and allows at most three attempts. Resends have a database-enforced 60-second cooldown per phone, including failed delivery attempts.
+- The \`phone_otp_challenge\` table stores HMAC phone identifiers and HMAC codes, not plaintext codes. A single atomic update spends an attempt and consumes a matching code, so parallel verification cannot reuse it. The phone plugin's unused plaintext verification insert is suppressed without affecting email verification.
+- Better Auth rate limiting is explicitly enabled with database storage (\`rate_limit\`) across workers: five send requests and ten verification requests per IP/path per minute. Deploy behind a trusted proxy that strips spoofed forwarded-IP headers, and configure Better Auth's \`advanced.ipAddress\` for your infrastructure. If no trusted IP is available, Better Auth uses a shared per-path bucket rather than bypassing the limit.
+- Phone-only accounts receive a non-deliverable, HMAC-derived \`@phone.invalid\` email and the ordinary \`user\` role, even if that address appears in \`ADMIN_EMAILS\`. Keep \`BETTER_AUTH_SECRET\` stable and private; rotating it invalidates pending OTP challenges and changes synthetic email derivation for new registrations. Existing phone users are looked up by phone number.
+- This integration supports OTP registration/login only. Phone-password sign-in, phone-password reset, linking or changing a phone number through verification, and session-less verification are rejected. Email signup and profile updates cannot attach an unverified phone number. Accounts are not automatically merged by phone number or synthetic email.
+
+Expired and consumed challenge rows retain their hashed phone identifier until the next send replaces them. Apply your application's retention policy to rows whose \`expires_at\` and \`resend_at\` are both in the past. Do not remove active cooldown rows, log codes, or log raw phone numbers.
+
+{{/if}}
 ## Protecting pages
 
 \`\`\`ts
@@ -13560,6 +13626,10 @@ const user = await requireUser(locale, "/dashboard/billing");
 ## Schema changes
 
 After adding Better Auth plugins, regenerate the schema with \`bun run auth:generate\` in \`apps/web\`, then \`bun run db:push\`.
+{{#if (includes module.integrations "sms")}}
+
+The generated Drizzle auth schema already includes nullable, unique \`user.phoneNumber\`, \`phoneNumberVerified\`, \`phone_otp_challenge\`, and \`rate_limit\` for {{database}}. Preserve the custom challenge table when regenerating Better Auth's schema: it is managed by this integration rather than the upstream phone plugin. Apply the schema to the deployment database before accepting phone sign-ins.
+{{/if}}
 `],
   ["modules/auth/files/packages/auth/src/events.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
 
@@ -13570,6 +13640,9 @@ declare module "@{{projectName}}/events" {
     "auth.user_created": { userId: string; email: string; name: string };
     "auth.verification_requested": AuthEmail;
     "auth.password_reset_requested": AuthEmail;
+    {{#if (includes module.integrations "sms")}}
+    "auth.phone_verification_requested": { phoneNumber: string; code: string };
+    {{/if}}
   }
 }
 `],
@@ -13585,6 +13658,9 @@ import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 
 import "./events";
+{{#if (includes module.integrations "sms")}}
+import { createPhoneAuth } from "./phone";
+{{/if}}
 
 export type AuthConfig = {
   BETTER_AUTH_URL: string;
@@ -13624,6 +13700,16 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     trustedOrigins: [env.BETTER_AUTH_URL],
+{{#if (includes module.integrations "sms")}}
+    rateLimit: {
+      enabled: true,
+      storage: "database",
+      customRules: {
+        "/phone-number/send-otp": { window: 60, max: 5 },
+        "/phone-number/verify": { window: 60, max: 10 },
+      },
+    },
+{{/if}}
     emailAndPassword: {
       enabled: true,
 {{#if (includes module.integrations "email")}}
@@ -13666,10 +13752,25 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
 {{/if}}
     },
     databaseHooks: {
+{{#if (includes module.integrations "sms")}}
+      verification: {
+        create: {
+          // The phone plugin writes an unused plaintext OTP before sendOTP.
+          // Suppress only this flow; email/reset verification stays untouched.
+          before: async (verification, context) => {
+            if (
+              context?.path === "/phone-number/send-otp" &&
+              verification.identifier === context.body?.phoneNumber &&
+              /^\\+[1-9]\\d{7,14}$/.test(verification.identifier)
+            ) return false;
+          },
+        },
+      },
+{{/if}}
       user: {
         create: {
           before: async (user) => ({
-            data: { ...user, role: adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
+            data: { ...user, role: {{#if (includes module.integrations "sms")}}!user.email.toLowerCase().endsWith("@phone.invalid") && {{/if}}adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
           }),
           after: async (user) => {
             await events.emit("auth.user_created", {
@@ -13681,7 +13782,7 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
         },
       },
     },
-    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }), nextCookies()],
+    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }), {{#if (includes module.integrations "sms")}}createPhoneAuth(env.BETTER_AUTH_SECRET, database, events), {{/if}}nextCookies()],
   });
 }
 
@@ -13689,7 +13790,7 @@ export type Auth = ReturnType<typeof createAuth>;
 
 export type Session = Auth["$Infer"]["Session"];
 `],
-  ["modules/auth/files/packages/i18n/src/messages/en/auth.ts", `export default {
+  ["modules/auth/files/packages/i18n/src/messages/en/auth.ts.hbs", `export default {
   dashboard: {
     title: "Dashboard",
     welcome: "Welcome back, {name}",
@@ -13734,6 +13835,29 @@ export type Session = Auth["$Infer"]["Session"];
     signInLink: "Sign in",
     checkEmail: "Check your inbox for {email} to verify your account.",
   },
+  {{#if (includes module.integrations "sms")}}
+  phone: {
+    title: "Continue with your phone",
+    subtitle: "We'll text you a code. New here? Your account is created when you verify.",
+    link: "Continue with phone number",
+    emailLink: "Use email instead",
+    number: "Phone number",
+    numberHint: "Include your country code, for example +14155552671.",
+    code: "Verification code",
+    send: "Send code",
+    sending: "Sending code…",
+    verify: "Verify and continue",
+    verifying: "Verifying…",
+    sent: "A 6-digit code was sent to {phone}. It expires in 5 minutes.",
+    edit: "Edit phone number",
+    resend: "Resend code",
+    cooldown: "Request another code in {seconds}s",
+    invalidPhone: "Enter a valid phone number with + and your country code.",
+    invalidCode: "The code is incorrect, expired, or already used. Request a new code after 3 unsuccessful attempts.",
+    rateLimited: "Too many requests. Please wait before trying again.",
+    deliveryFailed: "We couldn't send your code. Please wait a minute and try again.",
+  },
+  {{/if}}
   social: {
     divider: "or",
     continueWith: "Continue with {provider}",
@@ -13775,7 +13899,7 @@ export type Session = Auth["$Infer"]["Session"];
   },
 } as const;
 `],
-  ["modules/auth/files/packages/i18n/src/messages/zh-CN/auth.ts", `export default {
+  ["modules/auth/files/packages/i18n/src/messages/zh-CN/auth.ts.hbs", `export default {
   dashboard: {
     title: "控制台",
     welcome: "欢迎回来，{name}",
@@ -13820,6 +13944,29 @@ export type Session = Auth["$Infer"]["Session"];
     signInLink: "登录",
     checkEmail: "验证邮件已发送至 {email}，请查收并完成验证。",
   },
+  {{#if (includes module.integrations "sms")}}
+  phone: {
+    title: "使用手机号继续",
+    subtitle: "我们会向你发送短信验证码。首次验证后将自动创建账户。",
+    link: "使用手机号继续",
+    emailLink: "改用邮箱登录",
+    number: "手机号",
+    numberHint: "请包含国家区号，例如 +8613812345678。",
+    code: "短信验证码",
+    send: "发送验证码",
+    sending: "正在发送…",
+    verify: "验证并继续",
+    verifying: "正在验证…",
+    sent: "6 位验证码已发送至 {phone}，5 分钟内有效。",
+    edit: "修改手机号",
+    resend: "重新发送验证码",
+    cooldown: "{seconds} 秒后可重新获取验证码",
+    invalidPhone: "请输入包含 + 和国家区号的有效手机号。",
+    invalidCode: "验证码错误、已过期或已使用。连续输错 3 次后请重新获取。",
+    rateLimited: "请求过于频繁，请稍后重试。",
+    deliveryFailed: "验证码发送失败，请等待一分钟后重试。",
+  },
+  {{/if}}
   social: {
     divider: "或",
     continueWith: "使用 {provider} 继续",
@@ -13989,6 +14136,14 @@ export default async function LoginPage({ params, searchParams }: Props) {
         providers={enabledSocialProviders()}
         canResetPassword={ {{#if (includes module.integrations "email")}}true{{else}}false{{/if}} }
       />
+      {{#if (includes module.integrations "sms")}}
+      <Link
+        href={ { pathname: localePath(locale, "/login/phone"), query: { next: target } } }
+        className="mt-4 block text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+      >
+        {t("auth.phone.link")}
+      </Link>
+      {{/if}}
     </AuthCard>
   );
 }
@@ -14039,6 +14194,14 @@ export default async function SignUpPage({ params, searchParams }: Props) {
         providers={enabledSocialProviders()}
         verifyEmail={ {{#if (includes module.integrations "email")}}true{{else}}false{{/if}} }
       />
+      {{#if (includes module.integrations "sms")}}
+      <Link
+        href={ { pathname: localePath(locale, "/login/phone"), query: { next: safeNext(next, localePath(locale, "/dashboard")) } } }
+        className="mt-4 block text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+      >
+        {t("auth.phone.link")}
+      </Link>
+      {{/if}}
     </AuthCard>
   );
 }
@@ -14451,10 +14614,10 @@ export default function UserMenu() {
   );
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/lib/auth-client.ts", `import { adminClient } from "better-auth/client/plugins";
+  ["modules/auth/frameworks/next/apps/web/src/lib/auth-client.ts.hbs", `import { adminClient{{#if (includes module.integrations "sms")}}, phoneNumberClient{{/if}} } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
-export const authClient = createAuthClient({ plugins: [adminClient()] });
+export const authClient = createAuthClient({ plugins: [adminClient(){{#if (includes module.integrations "sms")}}, phoneNumberClient(){{/if}}] });
 `],
   ["modules/auth/frameworks/next/apps/web/src/lib/session.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 import type { Locale } from "@{{projectName}}/i18n";
@@ -14655,6 +14818,346 @@ export function ResetPasswordForm({ token }: { token: string }) {
       </Button>
     </form>
   );
+}
+`],
+  ["modules/auth/integrations/sms/apps/web/src/app/[lang]/login/phone/page.tsx", `import type { Metadata } from "next";
+import Link from "next/link";
+
+import { AuthCard } from "@/components/auth/auth-card";
+import PhoneSignInForm from "@/components/auth/phone-sign-in-form";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { safeNext } from "@/lib/session";
+
+type Props = {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ next?: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("auth.phone.title") };
+}
+
+export default async function PhoneLoginPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const target = safeNext((await searchParams).next, localePath(locale, "/dashboard"));
+
+  return (
+    <AuthCard
+      title={t("auth.phone.title")}
+      description={t("auth.phone.subtitle")}
+      footer={
+        <Link
+          href={{ pathname: localePath(locale, "/login"), query: { next: target } }}
+          className="text-foreground underline-offset-4 hover:underline"
+        >
+          {t("auth.phone.emailLink")}
+        </Link>
+      }
+    >
+      <PhoneSignInForm next={target} />
+    </AuthCard>
+  );
+}
+`],
+  ["modules/auth/integrations/sms/apps/web/src/components/auth/phone-sign-in-form.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useEffect, useState } from "react";
+
+import { authClient } from "@/lib/auth-client";
+
+import { useT } from "../i18n-provider";
+import { Field } from "./field";
+
+export default function PhoneSignInForm({ next }: { next: string }) {
+  const t = useT();
+  const [phone, setPhone] = useState("");
+  const [sentTo, setSentTo] = useState<string>();
+  const [code, setCode] = useState("");
+  const [pending, setPending] = useState<"send" | "verify">();
+  const [error, setError] = useState<string>();
+  const [cooldown, setCooldown] = useState({ phone: "", until: 0 });
+  const [now, setNow] = useState(0);
+  const remaining = cooldown.phone === phone.trim() ? Math.max(0, Math.ceil((cooldown.until - now) / 1000)) : 0;
+
+  useEffect(() => {
+    if (cooldown.until <= Date.now()) return;
+    const timer = window.setInterval(() => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= cooldown.until) window.clearInterval(timer);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown.until]);
+
+  function startCooldown(value: string, seconds: number) {
+    const current = Date.now();
+    setNow(current);
+    setCooldown({ phone: value, until: current + seconds * 1000 });
+  }
+
+  async function sendCode() {
+    if (pending || remaining > 0) return;
+    const value = phone.trim();
+    if (!/^\\+[1-9]\\d{7,14}$/.test(value)) {
+      setError(t("auth.phone.invalidPhone"));
+      return;
+    }
+    setPhone(value);
+    setPending("send");
+    setError(undefined);
+    let retryAfter: string | null = null;
+    try {
+      const result = await authClient.phoneNumber.sendOtp({ phoneNumber: value }, {
+        onError: ({ response }) => {
+          retryAfter = response.headers.get("Retry-After") ?? response.headers.get("X-Retry-After");
+        },
+      });
+      if (result.error) {
+        if (result.error.status === 429) {
+          const seconds = Number(retryAfter);
+          startCooldown(value, Number.isFinite(seconds) && seconds > 0 ? seconds : 60);
+          setError(t("auth.phone.rateLimited"));
+        } else if (result.error.code === "INVALID_PHONE_NUMBER") {
+          setError(t("auth.phone.invalidPhone"));
+        } else {
+          startCooldown(value, 60);
+          setError(t("auth.phone.deliveryFailed"));
+        }
+        return;
+      }
+      startCooldown(value, 60);
+      setSentTo(value);
+      setCode("");
+    } catch {
+      setError(t("auth.phone.deliveryFailed"));
+    } finally {
+      setPending(undefined);
+    }
+  }
+
+  async function verifyCode() {
+    if (pending || !sentTo) return;
+    if (!/^\\d{6}$/.test(code)) {
+      setError(t("auth.phone.invalidCode"));
+      return;
+    }
+    setPending("verify");
+    setError(undefined);
+    try {
+      const result = await authClient.phoneNumber.verify({ phoneNumber: sentTo, code });
+      if (result.error) {
+        setError(t(result.error.status === 429 ? "auth.phone.rateLimited" : "auth.phone.invalidCode"));
+        return;
+      }
+      // The server page has already constrained next with safeNext.
+      window.location.assign(next);
+    } catch {
+      setError(t("auth.errors.generic"));
+    } finally {
+      setPending(undefined);
+    }
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      aria-busy={Boolean(pending)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void (sentTo ? verifyCode() : sendCode());
+      }}
+    >
+      <Field
+        label={t("auth.phone.number")}
+        name="phoneNumber"
+        type="tel"
+        autoComplete="tel"
+        value={phone}
+        onChange={(event) => setPhone(event.target.value)}
+        readOnly={Boolean(sentTo)}
+        disabled={Boolean(pending)}
+        aria-describedby="phone-hint"
+        maxLength={16}
+      />
+      <p id="phone-hint" className="-mt-2 text-xs text-muted-foreground">{t("auth.phone.numberHint")}</p>
+      {sentTo && (
+        <>
+          <div className="flex flex-col gap-2">
+            <p role="status" className="text-sm text-muted-foreground">{t("auth.phone.sent", { phone: sentTo })}</p>
+            <button
+              type="button"
+              className="self-start text-sm underline underline-offset-4 disabled:opacity-50"
+              disabled={Boolean(pending)}
+              onClick={() => {
+                setSentTo(undefined);
+                setCode("");
+                setError(undefined);
+              }}
+            >
+              {t("auth.phone.edit")}
+            </button>
+          </div>
+          <Field
+            label={t("auth.phone.code")}
+            name="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6}"
+            minLength={6}
+            maxLength={6}
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\\D/g, "").slice(0, 6))}
+            disabled={Boolean(pending)}
+          />
+        </>
+      )}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <Button type="submit" disabled={Boolean(pending) || (!sentTo && remaining > 0)}>
+        {pending === "send" ? t("auth.phone.sending") : pending === "verify" ? t("auth.phone.verifying") : sentTo ? t("auth.phone.verify") : t("auth.phone.send")}
+      </Button>
+      {sentTo && (
+        <Button type="button" variant="outline" disabled={Boolean(pending) || remaining > 0} onClick={() => void sendCode()}>
+          {t("auth.phone.resend")}
+        </Button>
+      )}
+      {remaining > 0 && <p className="text-center text-xs text-muted-foreground">{t("auth.phone.cooldown", { seconds: remaining })}</p>}
+    </form>
+  );
+}
+`],
+  ["modules/auth/integrations/sms/packages/auth/src/phone.ts.hbs", `import { createHmac, randomUUID } from "node:crypto";
+
+import type { Database } from "@{{projectName}}/db";
+import { phoneOtpChallenge } from "@{{projectName}}/db/schema/auth";
+import type { EventBus } from "@{{projectName}}/events";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { phoneNumber } from "better-auth/plugins";
+import { and, eq, gt, isNotNull, lt, lte, sql } from "drizzle-orm";
+
+const phonePattern = /^\\+[1-9]\\d{7,14}$/;
+
+export function createPhoneAuth(secret: string, database: Database, events: EventBus) {
+  function digest(purpose: string, value: string) {
+    return createHmac("sha256", secret).update(\`\${purpose}:\${value}\`).digest("base64url");
+  }
+
+  const plugin = phoneNumber({
+    otpLength: 6,
+    expiresIn: 300,
+    allowedAttempts: 3,
+    phoneNumberValidator: (value) => phonePattern.test(value),
+    signUpOnVerification: {
+      getTempEmail: (value) => \`phone-\${digest("phone-email", value)}@phone.invalid\`,
+      getTempName: () => "Member",
+    },
+    sendOTP: async ({ phoneNumber: value, code }, context) => {
+      if (!phonePattern.test(value)) {
+        throw APIError.from("BAD_REQUEST", { code: "INVALID_PHONE_NUMBER", message: "Use an E.164 phone number." });
+      }
+      const phoneHash = digest("phone", value);
+      const challengeId = randomUUID();
+      const now = new Date();
+      const challenge = {
+        phoneHash,
+        challengeId,
+        codeHash: digest("phone-code", \`\${phoneHash}:\${code}\`),
+        attempts: 0,
+        expiresAt: new Date(now.getTime() + 300_000),
+        resendAt: new Date(now.getTime() + 60_000),
+      };
+      // One winner per phone across workers; resending also replaces the old OTP.
+      const [reserved] = await database.insert(phoneOtpChallenge).values(challenge)
+        .onConflictDoUpdate({
+          target: phoneOtpChallenge.phoneHash,
+          set: challenge,
+          setWhere: lte(phoneOtpChallenge.resendAt, now),
+        })
+        .returning({ challengeId: phoneOtpChallenge.challengeId });
+      if (!reserved) {
+        const [existing] = await database.select({ resendAt: phoneOtpChallenge.resendAt })
+          .from(phoneOtpChallenge).where(eq(phoneOtpChallenge.phoneHash, phoneHash));
+        const retryAfter = Math.max(1, Math.ceil(((existing?.resendAt.getTime() ?? now.getTime() + 60_000) - now.getTime()) / 1000));
+        context?.setHeader("Retry-After", String(retryAfter));
+        throw new APIError("TOO_MANY_REQUESTS", {
+          code: "PHONE_OTP_COOLDOWN",
+          message: "Please wait before requesting another code.",
+          retryAfter,
+        });
+      }
+      try {
+        await events.emit("auth.phone_verification_requested", { phoneNumber: value, code });
+      } catch {
+        // A slow failed send must never invalidate a newer successful challenge.
+        await database.update(phoneOtpChallenge).set({ codeHash: null })
+          .where(and(eq(phoneOtpChallenge.phoneHash, phoneHash), eq(phoneOtpChallenge.challengeId, challengeId)));
+        throw APIError.from("SERVICE_UNAVAILABLE", {
+          code: "PHONE_OTP_DELIVERY_FAILED",
+          message: "Unable to send a code. Please try again later.",
+        });
+      }
+    },
+    verifyOTP: async ({ phoneNumber: value, code }, context) => {
+      if (!phonePattern.test(value)) {
+        throw APIError.from("BAD_REQUEST", { code: "INVALID_PHONE_NUMBER", message: "Use an E.164 phone number." });
+      }
+      if (context?.body?.updatePhoneNumber || context?.body?.disableSession) {
+        throw APIError.from("BAD_REQUEST", { code: "PHONE_OTP_LOGIN_ONLY", message: "Phone verification is for sign-up and sign-in only." });
+      }
+      const phoneHash = digest("phone", value);
+      const codeHash = digest("phone-code", \`\${phoneHash}:\${code}\`);
+      // Counting and consuming happen in the same UPDATE, never read-then-write.
+      // A successful match clears the hash; every concurrent replay then fails
+      // the isNotNull predicate. Wrong codes atomically spend one of 3 attempts.
+      const [result] = await database.update(phoneOtpChallenge).set({
+        attempts: sql\`\${phoneOtpChallenge.attempts} + 1\`,
+        codeHash: sql\`case when \${phoneOtpChallenge.codeHash} = \${codeHash} then null else \${phoneOtpChallenge.codeHash} end\`,
+      }).where(and(
+        eq(phoneOtpChallenge.phoneHash, phoneHash),
+        isNotNull(phoneOtpChallenge.codeHash),
+        gt(phoneOtpChallenge.expiresAt, new Date()),
+        lt(phoneOtpChallenge.attempts, 3),
+      )).returning({ codeHash: phoneOtpChallenge.codeHash });
+      return result?.codeHash === null;
+    },
+  });
+
+  return {
+    ...plugin,
+    schema: {
+      ...plugin.schema,
+      user: {
+        ...plugin.schema.user,
+        fields: {
+          ...plugin.schema.user.fields,
+          // Neither email signup nor profile updates may claim an unverified phone.
+          phoneNumber: { ...plugin.schema.user.fields.phoneNumber, input: false },
+          phoneNumberVerified: { ...plugin.schema.user.fields.phoneNumberVerified, defaultValue: false },
+        },
+      },
+    },
+    hooks: {
+      ...plugin.hooks,
+      before: [
+        ...plugin.hooks.before,
+        {
+          matcher: (context: { path?: string }) => context.path === "/sign-in/phone-number" ||
+            (context.path?.startsWith("/phone-number/") ?? false),
+          handler: createAuthMiddleware(async (context) => {
+            if (context.path !== "/phone-number/send-otp" && context.path !== "/phone-number/verify") {
+              throw APIError.from("NOT_FOUND", { code: "PHONE_OTP_LOGIN_ONLY", message: "Phone authentication supports OTP sign-up and sign-in only." });
+            }
+            if (context.path === "/phone-number/verify" && (context.body?.updatePhoneNumber || context.body?.disableSession)) {
+              throw APIError.from("BAD_REQUEST", { code: "PHONE_OTP_LOGIN_ONLY", message: "Phone verification is for sign-up and sign-in only." });
+            }
+          }),
+        },
+      ],
+    },
+  };
 }
 `],
   ["modules/auth/stack/better-auth/client/auth-client.ts.hbs", `import { createClient, type AuthClient } from "@{{projectName}}/auth/client";
@@ -28348,6 +28851,373 @@ export function createProvider({ env }: ProviderOptions<ProviderConfig>): Paymen
   };
 }
 `],
+  ["modules/sms/files/docs/modules/sms.md.hbs", `# SMS
+
+Provider: **{{module.providers.[0]}}**. Exactly one provider is generated in \`packages/sms\`; its public server-side API is independent of authentication:
+
+\`\`\`ts
+import { sms } from "@/services";
+
+await sms.sendOtp({ phoneNumber: "+8613800138000", code: "123456" });
+\`\`\`
+
+For another server process, import \`createSms\` and the \`Sms\`, \`SmsConfig\`, or \`OtpMessage\` types from \`@{{projectName}}/sms\` and initialize with its environment. Never import this package into a browser component. The SDKs require a Node.js runtime, not an Edge or Cloudflare Worker runtime.
+
+\`phoneNumber\` must be an E.164 string: \`+\`, a nonzero country-code digit, then digits only, with at most 15 digits total. Spaces, punctuation, national-format numbers, and multiple recipients are rejected. \`code\` must be a string of exactly six ASCII digits. The service does not generate, store, verify, or expire codes; the caller owns those responsibilities. Codes in examples are illustrative, not suitable for production generation.
+
+## Delivery mode
+
+| Variable | Contract |
+| --- | --- |
+| \`SMS_DELIVERY_MODE\` | \`provider\` (default) or \`console\` |
+| \`NODE_ENV\` | Only the exact value \`development\` permits console mode |
+
+SDK credentials are optional at application startup so builds do not need live secrets. In provider mode, every provider-specific key below must be configured before sending; missing, empty, or partial configuration rejects the send. Region defaults are provided by the generated environment schema, not inferred by the SDK. There is no automatic console fallback.
+
+For local development without real SMS, explicitly set:
+
+\`\`\`dotenv
+SMS_DELIVERY_MODE=console
+NODE_ENV=development
+\`\`\`
+
+This mode never calls the provider, even if credentials exist. It writes one server-console line in the form \`[sms:console] {"phoneNumber":"+8613800138000","code":"123456"}\`. Console mode throws outside development, including production and test environments. Treat development logs as sensitive and do not enable this mode on a public deployment.
+
+To send real SMS, use \`SMS_DELIVERY_MODE=provider\` and configure the selected provider. Configuration keys are server-only and must never use a public environment prefix.
+
+{{#if (eq module.providers.[0] "aliyun")}}
+## Alibaba Cloud configuration
+
+| Variable | Contract |
+| --- | --- |
+| \`ALIYUN_SMS_ACCESS_KEY_ID\` | AccessKey ID for an account/RAM identity authorized to send SMS |
+| \`ALIYUN_SMS_ACCESS_KEY_SECRET\` | Matching AccessKey secret |
+| \`ALIYUN_SMS_REGION_ID\` | \`cn-hangzhou\` (generated default); this adapter requires this region |
+| \`ALIYUN_SMS_SIGN_NAME\` | Approved SMS signature text, not its ID |
+| \`ALIYUN_SMS_TEMPLATE_CODE\` | Approved SMS template code, such as \`SMS_...\` |
+
+This adapter uses Alibaba Cloud's **Dysmsapi 2017-05-25** service at the fixed HTTPS endpoint \`dysmsapi.aliyuncs.com\`. It does not use the separate Singapore/global Dypns or Dysmsapi international service, and changing the region is not a way to switch services. Obtain credentials, approve the signature/template, fund the account, and enable the applicable destination products in the [Alibaba Cloud SMS console](https://dysms.console.aliyun.com/).
+
+The template must contain exactly the variable \`code\`; the request sends \`templateParam: JSON.stringify({ code })\`. If the template mentions expiry, use five minutes to match the generated phone-auth flow.
+
+The adapter removes **only the leading \`+\`** from E.164 input for the API's country-code-plus-number representation; it retains all country-code digits, including \`86\`. It never turns an arbitrary international number into a mainland China national number. Mainland China and international/Hong Kong/Macao/Taiwan messaging have different account eligibility, template/signature approvals, destination availability, and carrier restrictions. An approved domestic template does not authorize international sending. Use the appropriate international template and service entitlement on this service, or select another provider; this adapter does not silently route between products or expose an endpoint override.
+
+The request uses \`sendSmsWithOptions\`, with SDK retries disabled. Only \`response.body.code === "OK"\` counts as API acceptance.
+{{/if}}
+{{#if (eq module.providers.[0] "tencent")}}
+## Tencent Cloud configuration
+
+| Variable | Contract |
+| --- | --- |
+| \`TENCENT_SMS_SECRET_ID\` | SecretId for a CAM identity authorized to send SMS |
+| \`TENCENT_SMS_SECRET_KEY\` | Matching SecretKey |
+| \`TENCENT_SMS_REGION\` | SMS-supported service region; generated default \`ap-guangzhou\` |
+| \`TENCENT_SMS_SDK_APP_ID\` | Actual SMS application SdkAppId, not the account AppId |
+| \`TENCENT_SMS_SIGN_NAME\` | Approved SMS signature text, not its ID; required by this adapter |
+| \`TENCENT_SMS_TEMPLATE_ID\` | Approved verification SMS template ID |
+
+This adapter uses Tencent Cloud SMS **API 2021-01-11** at the fixed HTTPS endpoint \`sms.tencentcloudapi.com\`. Create an SMS application and configure credentials, balance, signature, and template in the [Tencent Cloud SMS console](https://console.cloud.tencent.com/smsv2). The region configures the service request, not the recipient country; use a supported SMS region for your account.
+
+The template must have exactly one parameter: the code. Requests send \`TemplateParamSet: [code]\`. If the template mentions expiry, use five minutes to match the generated phone-auth flow. \`PhoneNumberSet\` contains the original E.164 number with its country code unchanged.
+
+Domestic China and international/Hong Kong/Macao/Taiwan SMS require their respective product entitlements and approved templates. An international recipient requires an international template; a domestic template is not a global fallback. This adapter requires a sign name even where the international API makes it optional, and uses the provider's default shared international SenderId rather than exposing a custom SenderId. If the destination requires an independently registered sender, configure an appropriate approved provider implementation before sending there.
+
+A successful HTTP response is not sufficient: the adapter requires exactly one recipient result with \`Code === "Ok"\` and the requested phone number. No automatic retry is performed.
+{{/if}}
+{{#if (eq module.providers.[0] "twilio")}}
+## Twilio configuration
+
+| Variable | Contract |
+| --- | --- |
+| \`TWILIO_ACCOUNT_SID\` | Twilio account SID |
+| \`TWILIO_AUTH_TOKEN\` | Matching account auth token |
+| \`TWILIO_FROM_NUMBER\` | SMS-capable Twilio sender number belonging to that account, in E.164 format |
+
+Use Node.js 20 or later. Configure an SMS-capable sender, balance, and geographic permissions in the [Twilio Console](https://console.twilio.com/). Trial accounts restrict recipients. Destination-specific sender registration, A2P requirements, consent, and carrier restrictions still apply; selecting Twilio does not guarantee service in mainland China or any other country.
+
+The adapter uses Programmable Messaging, not Twilio Verify. It sends \`Your verification code is CODE. It expires in 5 minutes.\` with a 300-second queue validity period. Auth (or your standalone caller) remains responsible for actually expiring the code. The adapter accepts only a phone-number sender, not an alphanumeric sender or Messaging Service SID.
+
+\`messages.create\` has automatic retries disabled. Responses with a nonzero error code or a status other than \`accepted\`, \`queued\`, \`sending\`, \`sent\`, or \`delivered\` are rejected.
+{{/if}}
+
+## Acceptance, failures, and abuse controls
+
+A resolved \`sendOtp\` promise means **provider API acceptance only**, not confirmed handset delivery. Carrier delivery receipts are not implemented. Check the provider console for delivery status and sanitized application errors for send failures. Provider exception messages and causes are intentionally not propagated because they may contain phone numbers, credentials, or OTP request bodies.
+
+No adapter automatically retries OTP sends: after a timeout, the provider may already have accepted the request. Do not wrap this API in a blind retry loop. For standalone usage, implement authorization, recipient/IP rate limits, secure random code generation, hashed code storage, expiry, and bounded verification attempts before exposing an endpoint. Never expose unrestricted SMS sending to browsers.
+{{#if (includes module.integrations "auth")}}
+
+## Phone authentication integration
+
+\`apps/web/src/integrations/auth-sms.ts\` subscribes to \`auth.phone_verification_requested\` and awaits \`sms.sendOtp({ phoneNumber, code })\`. Authentication owns code generation and verification; SMS owns sending. Auth does not import the SMS package. The phone-login flow uses six-digit codes with a five-minute expiry.
+{{/if}}
+`],
+  ["modules/sms/files/packages/sms/src/index.ts.hbs", `import { createTransport, type ProviderConfig } from "./providers/{{module.providers.[0]}}";
+import type { Sms } from "./types";
+
+export type { OtpMessage, Sms } from "./types";
+
+export type SmsConfig = ProviderConfig & {
+  NODE_ENV: string;
+  SMS_DELIVERY_MODE?: "provider" | "console";
+};
+
+/** Credentials are optional at startup; provider delivery always requires complete configuration. */
+export function createSms(env: SmsConfig): Sms {
+  let transport: Sms | undefined;
+
+  return {
+    async sendOtp(message) {
+      if (
+        typeof message.phoneNumber !== "string" ||
+        message.phoneNumber.trim() !== message.phoneNumber ||
+        !/^\\+[1-9]\\d{1,14}$/.test(message.phoneNumber)
+      ) {
+        throw new Error("SMS phone number must use E.164 format");
+      }
+      if (typeof message.code !== "string" || message.code.length !== 6 || !/^\\d{6}$/.test(message.code)) {
+        throw new Error("SMS verification code must contain exactly six digits");
+      }
+
+      const mode = env.SMS_DELIVERY_MODE ?? "provider";
+      if (mode === "console") {
+        if (env.NODE_ENV !== "development") {
+          throw new Error("SMS console delivery is allowed only in development");
+        }
+        console.info(
+          \`[sms:console] \${JSON.stringify({ phoneNumber: message.phoneNumber, code: message.code })}\`,
+        );
+        return;
+      }
+      if (mode !== "provider") {
+        throw new Error("Invalid SMS_DELIVERY_MODE; expected provider or console");
+      }
+
+      try {
+        transport ??= createTransport(env);
+      } catch {
+        // SDK errors can contain request details or credentials; never retain their cause.
+        throw new Error("SMS provider initialization failed; check docs/modules/sms.md");
+      }
+      if (!transport) {
+        throw new Error("SMS provider is not fully configured; see docs/modules/sms.md");
+      }
+      await transport.sendOtp(message);
+    },
+  };
+}
+`],
+  ["modules/sms/files/packages/sms/src/types.ts", `export type OtpMessage = {
+  /** E.164: a leading + and country code, with no spaces or punctuation. */
+  phoneNumber: string;
+  code: string;
+};
+
+export type Sms = {
+  /** Resolves on provider API acceptance, not confirmed handset delivery. */
+  sendOtp(message: OtpMessage): Promise<void>;
+};
+`],
+  ["modules/sms/integrations/auth/apps/web/src/integrations/auth-sms.ts.hbs", `import type { Services } from "../services";
+
+/** Await provider acceptance so a failed request cannot appear to have sent an OTP. */
+export default function registerAuthSms({ events, sms }: Services) {
+  events.on("auth.phone_verification_requested", async ({ phoneNumber, code }) => {
+    await sms.sendOtp({ phoneNumber, code });
+  });
+}
+`],
+  ["modules/sms/providers/aliyun/packages/sms/src/providers/aliyun.ts", `import Dysmsapi, { SendSmsRequest } from "@alicloud/dysmsapi20170525";
+import { $OpenApiUtil } from "@alicloud/openapi-core";
+import { RetryOptions, RuntimeOptions } from "@darabonba/typescript";
+
+import type { Sms } from "../types";
+
+export type ProviderConfig = {
+  ALIYUN_SMS_ACCESS_KEY_ID?: string;
+  ALIYUN_SMS_ACCESS_KEY_SECRET?: string;
+  ALIYUN_SMS_REGION_ID?: string;
+  ALIYUN_SMS_SIGN_NAME?: string;
+  ALIYUN_SMS_TEMPLATE_CODE?: string;
+};
+
+export function createTransport(env: ProviderConfig): Sms | undefined {
+  const {
+    ALIYUN_SMS_ACCESS_KEY_ID: accessKeyId,
+    ALIYUN_SMS_ACCESS_KEY_SECRET: accessKeySecret,
+    ALIYUN_SMS_REGION_ID: regionId,
+    ALIYUN_SMS_SIGN_NAME: signName,
+    ALIYUN_SMS_TEMPLATE_CODE: templateCode,
+  } = env;
+  if (
+    !accessKeyId?.trim() ||
+    !accessKeySecret?.trim() ||
+    regionId !== "cn-hangzhou" ||
+    !signName?.trim() ||
+    !templateCode?.trim()
+  ) {
+    return undefined;
+  }
+
+  const retryOptions = new RetryOptions({ retryable: false });
+  const client = new Dysmsapi(
+    new $OpenApiUtil.Config({
+      accessKeyId,
+      accessKeySecret,
+      regionId,
+      endpoint: "dysmsapi.aliyuncs.com",
+      protocol: "HTTPS",
+      retryOptions,
+    }),
+  );
+  const runtime = new RuntimeOptions({ autoretry: false, maxAttempts: 1, retryOptions });
+
+  return {
+    async sendOtp({ phoneNumber, code }) {
+      try {
+        const response = await client.sendSmsWithOptions(
+          new SendSmsRequest({
+            // This API accepts country-code digits; remove only +, never the country code.
+            phoneNumbers: phoneNumber.slice(1),
+            signName,
+            templateCode,
+            templateParam: JSON.stringify({ code }),
+          }),
+          runtime,
+        );
+        // OK means API acceptance, not confirmed handset delivery.
+        if (response.body?.code !== "OK") {
+          throw new Error("SMS request rejected");
+        }
+      } catch {
+        // Do not expose SDK messages, causes, phone numbers, or OTPs.
+        throw new Error("Alibaba Cloud SMS request failed; check the provider console");
+      }
+    },
+  };
+}
+`],
+  ["modules/sms/providers/tencent/packages/sms/src/providers/tencent.ts", `import { sms } from "tencentcloud-sdk-nodejs-sms";
+
+import type { Sms } from "../types";
+
+export type ProviderConfig = {
+  TENCENT_SMS_SECRET_ID?: string;
+  TENCENT_SMS_SECRET_KEY?: string;
+  TENCENT_SMS_REGION?: string;
+  TENCENT_SMS_SDK_APP_ID?: string;
+  TENCENT_SMS_SIGN_NAME?: string;
+  TENCENT_SMS_TEMPLATE_ID?: string;
+};
+
+export function createTransport(env: ProviderConfig): Sms | undefined {
+  const {
+    TENCENT_SMS_SECRET_ID: secretId,
+    TENCENT_SMS_SECRET_KEY: secretKey,
+    TENCENT_SMS_REGION: region,
+    TENCENT_SMS_SDK_APP_ID: sdkAppId,
+    TENCENT_SMS_SIGN_NAME: signName,
+    TENCENT_SMS_TEMPLATE_ID: templateId,
+  } = env;
+  if (
+    !secretId?.trim() ||
+    !secretKey?.trim() ||
+    !region?.trim() ||
+    !sdkAppId?.trim() ||
+    !signName?.trim() ||
+    !templateId?.trim()
+  ) {
+    return undefined;
+  }
+
+  const client = new sms.v20210111.Client({
+    credential: { secretId, secretKey },
+    region,
+    profile: { httpProfile: { endpoint: "sms.tencentcloudapi.com" } },
+  });
+
+  return {
+    async sendOtp({ phoneNumber, code }) {
+      try {
+        // One request only: retrying an ambiguous failure can send duplicate OTPs.
+        const response = await client.SendSms({
+          PhoneNumberSet: [phoneNumber],
+          SmsSdkAppId: sdkAppId,
+          SignName: signName,
+          TemplateId: templateId,
+          TemplateParamSet: [code],
+        });
+        const statuses = response.SendStatusSet;
+        // HTTP success alone is insufficient; check acceptance for the requested recipient.
+        if (
+          statuses?.length !== 1 ||
+          statuses[0]?.Code !== "Ok" ||
+          statuses[0]?.PhoneNumber !== phoneNumber
+        ) {
+          throw new Error("SMS request rejected");
+        }
+      } catch {
+        throw new Error("Tencent Cloud SMS request failed; check the provider console");
+      }
+    },
+  };
+}
+`],
+  ["modules/sms/providers/twilio/packages/sms/src/providers/twilio.ts", `import twilio from "twilio";
+
+import type { Sms } from "../types";
+
+export type ProviderConfig = {
+  TWILIO_ACCOUNT_SID?: string;
+  TWILIO_AUTH_TOKEN?: string;
+  TWILIO_FROM_NUMBER?: string;
+};
+
+export function createTransport(env: ProviderConfig): Sms | undefined {
+  const {
+    TWILIO_ACCOUNT_SID: accountSid,
+    TWILIO_AUTH_TOKEN: authToken,
+    TWILIO_FROM_NUMBER: from,
+  } = env;
+  if (
+    !accountSid?.trim() ||
+    !authToken?.trim() ||
+    !from ||
+    from.trim() !== from ||
+    !/^\\+[1-9]\\d{1,14}$/.test(from)
+  ) {
+    return undefined;
+  }
+
+  const client = twilio(accountSid, authToken, { autoRetry: false, maxRetries: 0 });
+
+  return {
+    async sendOtp({ phoneNumber, code }) {
+      try {
+        const message = await client.messages.create({
+          to: phoneNumber,
+          from,
+          body: \`Your verification code is \${code}. It expires in 5 minutes.\`,
+          validityPeriod: 300,
+        });
+        // Accepted/queued is not delivery; reject errors and unexpected outbound states.
+        if (
+          (message.errorCode != null && message.errorCode !== 0) ||
+          (message.status !== "accepted" &&
+            message.status !== "queued" &&
+            message.status !== "sending" &&
+            message.status !== "sent" &&
+            message.status !== "delivered")
+        ) {
+          throw new Error("SMS request rejected");
+        }
+      } catch {
+        throw new Error("Twilio SMS request failed; check the provider console");
+      }
+    },
+  };
+}
+`],
   ["packages/config/package.json.hbs", `{
   "name": "@{{projectName}}/config",
   "version": "0.0.0",
@@ -30184,4 +31054,4 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 `]
 ]);
 
-export const TEMPLATE_COUNT = 578;
+export const TEMPLATE_COUNT = 588;

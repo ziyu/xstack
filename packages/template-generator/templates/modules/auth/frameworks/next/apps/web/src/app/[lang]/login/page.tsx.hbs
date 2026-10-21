@@ -45,6 +45,14 @@ export default async function LoginPage({ params, searchParams }: Props) {
         providers={enabledSocialProviders()}
         canResetPassword={ {{#if (includes module.integrations "email")}}true{{else}}false{{/if}} }
       />
+      {{#if (includes module.integrations "sms")}}
+      <Link
+        href={ { pathname: localePath(locale, "/login/phone"), query: { next: target } } }
+        className="mt-4 block text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+      >
+        {t("auth.phone.link")}
+      </Link>
+      {{/if}}
     </AuthCard>
   );
 }

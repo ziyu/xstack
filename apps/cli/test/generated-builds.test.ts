@@ -65,6 +65,19 @@ const baseConfig = {
 } satisfies Partial<CreateInput>;
 
 const buildSamples: BuildSample[] = [
+  ...(["aliyun", "tencent", "twilio"] as const).map((provider): BuildSample => ({
+    name: `product-phone-${provider}`,
+    packageManagers: ["bun"],
+    config: {
+      ...baseConfig,
+      database: provider === "tencent" ? "postgres" : "sqlite",
+      product: {
+        features: ["auth", "sms", "credits"],
+        providers: { auth: [], sms: [provider] },
+        options: { credits: { signupBonus: 25 } },
+      },
+    },
+  })),
   {
     name: "product-starter-postgres",
     packageManagers: ["bun"],
@@ -705,7 +718,9 @@ function getSelectedBuildSamples() {
     ? samples.filter((sample) => sample.name.includes(sampleFilter))
     : samples;
   if (selected.length === 0) {
-    throw new Error(`No generated build samples matched XSTACK_BUILD_SAMPLE_FILTER=${sampleFilter}`);
+    throw new Error(
+      `No generated build samples matched XSTACK_BUILD_SAMPLE_FILTER=${sampleFilter}`,
+    );
   }
   const shard = process.env.XSTACK_BUILD_SAMPLE_SHARD;
   if (shard) {

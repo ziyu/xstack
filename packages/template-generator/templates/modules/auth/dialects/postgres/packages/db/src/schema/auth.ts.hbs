@@ -1,11 +1,15 @@
 import { defineRelationsPart } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index{{#if (includes module.integrations "sms")}}, integer, bigint{{/if}} } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
+  {{#if (includes module.integrations "sms")}}
+  phoneNumber: text("phone_number").unique(),
+  phoneNumberVerified: boolean("phone_number_verified").default(false).notNull(),
+  {{/if}}
   image: text("image"),
   role: text("role").default("user").notNull(),
   banned: boolean("banned").default(false),
@@ -78,6 +82,24 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
+{{#if (includes module.integrations "sms")}}
+export const phoneOtpChallenge = pgTable("phone_otp_challenge", {
+  phoneHash: text("phone_hash").primaryKey(),
+  challengeId: text("challenge_id").notNull(),
+  codeHash: text("code_hash"),
+  attempts: integer("attempts").default(0).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  resendAt: timestamp("resend_at", { withTimezone: true }).notNull(),
+});
+
+export const rateLimit = pgTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+});
+
+{{/if}}
 export const authRelations = defineRelationsPart({ user, session, account, verification }, (r) => ({
   user: {
     sessions: r.many.session({

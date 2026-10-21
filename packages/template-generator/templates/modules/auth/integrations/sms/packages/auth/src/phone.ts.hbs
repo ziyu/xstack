@@ -1,0 +1,130 @@
+import { createHmac, randomUUID } from "node:crypto";
+
+import type { Database } from "@{{projectName}}/db";
+import { phoneOtpChallenge } from "@{{projectName}}/db/schema/auth";
+import type { EventBus } from "@{{projectName}}/events";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { phoneNumber } from "better-auth/plugins";
+import { and, eq, gt, isNotNull, lt, lte, sql } from "drizzle-orm";
+
+const phonePattern = /^\+[1-9]\d{7,14}$/;
+
+export function createPhoneAuth(secret: string, database: Database, events: EventBus) {
+  function digest(purpose: string, value: string) {
+    return createHmac("sha256", secret).update(`${purpose}:${value}`).digest("base64url");
+  }
+
+  const plugin = phoneNumber({
+    otpLength: 6,
+    expiresIn: 300,
+    allowedAttempts: 3,
+    phoneNumberValidator: (value) => phonePattern.test(value),
+    signUpOnVerification: {
+      getTempEmail: (value) => `phone-${digest("phone-email", value)}@phone.invalid`,
+      getTempName: () => "Member",
+    },
+    sendOTP: async ({ phoneNumber: value, code }, context) => {
+      if (!phonePattern.test(value)) {
+        throw APIError.from("BAD_REQUEST", { code: "INVALID_PHONE_NUMBER", message: "Use an E.164 phone number." });
+      }
+      const phoneHash = digest("phone", value);
+      const challengeId = randomUUID();
+      const now = new Date();
+      const challenge = {
+        phoneHash,
+        challengeId,
+        codeHash: digest("phone-code", `${phoneHash}:${code}`),
+        attempts: 0,
+        expiresAt: new Date(now.getTime() + 300_000),
+        resendAt: new Date(now.getTime() + 60_000),
+      };
+      // One winner per phone across workers; resending also replaces the old OTP.
+      const [reserved] = await database.insert(phoneOtpChallenge).values(challenge)
+        .onConflictDoUpdate({
+          target: phoneOtpChallenge.phoneHash,
+          set: challenge,
+          setWhere: lte(phoneOtpChallenge.resendAt, now),
+        })
+        .returning({ challengeId: phoneOtpChallenge.challengeId });
+      if (!reserved) {
+        const [existing] = await database.select({ resendAt: phoneOtpChallenge.resendAt })
+          .from(phoneOtpChallenge).where(eq(phoneOtpChallenge.phoneHash, phoneHash));
+        const retryAfter = Math.max(1, Math.ceil(((existing?.resendAt.getTime() ?? now.getTime() + 60_000) - now.getTime()) / 1000));
+        context?.setHeader("Retry-After", String(retryAfter));
+        throw new APIError("TOO_MANY_REQUESTS", {
+          code: "PHONE_OTP_COOLDOWN",
+          message: "Please wait before requesting another code.",
+          retryAfter,
+        });
+      }
+      try {
+        await events.emit("auth.phone_verification_requested", { phoneNumber: value, code });
+      } catch {
+        // A slow failed send must never invalidate a newer successful challenge.
+        await database.update(phoneOtpChallenge).set({ codeHash: null })
+          .where(and(eq(phoneOtpChallenge.phoneHash, phoneHash), eq(phoneOtpChallenge.challengeId, challengeId)));
+        throw APIError.from("SERVICE_UNAVAILABLE", {
+          code: "PHONE_OTP_DELIVERY_FAILED",
+          message: "Unable to send a code. Please try again later.",
+        });
+      }
+    },
+    verifyOTP: async ({ phoneNumber: value, code }, context) => {
+      if (!phonePattern.test(value)) {
+        throw APIError.from("BAD_REQUEST", { code: "INVALID_PHONE_NUMBER", message: "Use an E.164 phone number." });
+      }
+      if (context?.body?.updatePhoneNumber || context?.body?.disableSession) {
+        throw APIError.from("BAD_REQUEST", { code: "PHONE_OTP_LOGIN_ONLY", message: "Phone verification is for sign-up and sign-in only." });
+      }
+      const phoneHash = digest("phone", value);
+      const codeHash = digest("phone-code", `${phoneHash}:${code}`);
+      // Counting and consuming happen in the same UPDATE, never read-then-write.
+      // A successful match clears the hash; every concurrent replay then fails
+      // the isNotNull predicate. Wrong codes atomically spend one of 3 attempts.
+      const [result] = await database.update(phoneOtpChallenge).set({
+        attempts: sql`${phoneOtpChallenge.attempts} + 1`,
+        codeHash: sql`case when ${phoneOtpChallenge.codeHash} = ${codeHash} then null else ${phoneOtpChallenge.codeHash} end`,
+      }).where(and(
+        eq(phoneOtpChallenge.phoneHash, phoneHash),
+        isNotNull(phoneOtpChallenge.codeHash),
+        gt(phoneOtpChallenge.expiresAt, new Date()),
+        lt(phoneOtpChallenge.attempts, 3),
+      )).returning({ codeHash: phoneOtpChallenge.codeHash });
+      return result?.codeHash === null;
+    },
+  });
+
+  return {
+    ...plugin,
+    schema: {
+      ...plugin.schema,
+      user: {
+        ...plugin.schema.user,
+        fields: {
+          ...plugin.schema.user.fields,
+          // Neither email signup nor profile updates may claim an unverified phone.
+          phoneNumber: { ...plugin.schema.user.fields.phoneNumber, input: false },
+          phoneNumberVerified: { ...plugin.schema.user.fields.phoneNumberVerified, defaultValue: false },
+        },
+      },
+    },
+    hooks: {
+      ...plugin.hooks,
+      before: [
+        ...plugin.hooks.before,
+        {
+          matcher: (context: { path?: string }) => context.path === "/sign-in/phone-number" ||
+            (context.path?.startsWith("/phone-number/") ?? false),
+          handler: createAuthMiddleware(async (context) => {
+            if (context.path !== "/phone-number/send-otp" && context.path !== "/phone-number/verify") {
+              throw APIError.from("NOT_FOUND", { code: "PHONE_OTP_LOGIN_ONLY", message: "Phone authentication supports OTP sign-up and sign-in only." });
+            }
+            if (context.path === "/phone-number/verify" && (context.body?.updatePhoneNumber || context.body?.disableSession)) {
+              throw APIError.from("BAD_REQUEST", { code: "PHONE_OTP_LOGIN_ONLY", message: "Phone verification is for sign-up and sign-in only." });
+            }
+          }),
+        },
+      ],
+    },
+  };
+}

@@ -37,6 +37,8 @@ xstack my-saas --preset saas-global \
 
 OAuth providers are optional (`auth:none` explicitly selects none). Email supports Resend or SMTP; payments support Stripe, Polar, or development-only mock payments. Configure real provider credentials in the generated environment before using their services. The web Template Builder shares this catalog and includes provider/options state in commands, previews, saved preferences, and URLs.
 
+Phone-number OTP login is enabled by selecting both `auth` and `sms`, with one SMS provider: `--features auth sms --providers auth:none sms:aliyun` (or `sms:tencent` / `sms:twilio`). It targets the native Next.js + Drizzle stack. Configure the selected provider in the generated `apps/web/.env`; for local development only, `SMS_DELIVERY_MODE=console` prints codes to the server log. Production requires real provider credentials. Setup details are in the generated `docs/modules/sms.md`.
+
 ## Requirements
 
 - Node.js 22.12 or newer to run the CLI with Node.js. The selected framework may require a newer release; the CLI checks the exact stack before writing files.
@@ -78,7 +80,7 @@ Options:
   --database <type>               Database type (none, sqlite, postgres, mysql, mongodb)
   --orm <type>                    ORM type (none, drizzle, prisma, mongoose)
   --dry-run                       Validate configuration without writing files
-  --features <modules...>         Feature modules (auth, email, admin, payment, credits, none)
+  --features <modules...>         Feature modules (auth, email, sms, admin, payment, credits, none)
   --preset <name>                 Feature preset (starter, saas-global)
   --providers <pairs...>          Module providers (feature:provider, e.g. payment:polar)
   --module-options <pairs...>     Module options (module.key=value, e.g. auth.engine=clerk)

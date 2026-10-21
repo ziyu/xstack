@@ -289,6 +289,7 @@ Business capabilities such as authentication and payments are feature modules, n
 
 - `auth`: Sign-in, sessions, roles and account settings
 - `email`: Transactional email (native stack only)
+- `sms`: Verification SMS through Alibaba Cloud, Tencent Cloud or Twilio; select with `auth` to enable phone-number signup/login (native Next.js/Drizzle stack only)
 - `admin`: Role-based admin console (native stack only)
 - `payment`: Pricing, one-time payments and subscriptions (native stack only)
 - `credits`: Usage credits with an auditable ledger (native stack only)
@@ -310,6 +311,7 @@ Chooses the providers a module uses, for example `--providers payment:stripe,moc
 - `payment`: `stripe` (default), `polar` or `mock`; several can be enabled at once and checkout uses the first configured one
 - `auth`: `google`, `github`, or `auth:none` to keep email/password authentication without OAuth providers. Do not combine `none` with named providers for the same module.
 - `email`: choose exactly one of `resend` or `smtp`.
+- `sms`: choose exactly one of `aliyun` (default), `tencent`, or `twilio`. Provider credentials and approved sign/template settings belong in the generated environment.
 
 ### `--module-options <module.key=value...>`
 
@@ -321,6 +323,25 @@ Sets module options, for example `--module-options auth.engine=clerk i18n.locale
 - `credits.signupBonus`: a non-negative number of credits granted when an account is created.
 
 The [Template Builder](/new) uses these same module manifests for presets, provider controls, dependency resolution, command output, and generated-file previews. Share links and saved preferences include provider choices and module options. Provider credentials are configured in the generated project's environment, never entered into the builder.
+
+### Phone-number signup and login
+
+```bash
+xstack phone-app \
+  --frontend next --backend self --runtime none \
+  --database sqlite --orm drizzle --api none --db-setup none \
+  --web-deploy none --server-deploy none --addons turborepo \
+  --features auth sms --providers auth:none sms:aliyun \
+  --module-options i18n.locales=zh-CN,en \
+  --package-manager bun --no-install --no-git
+```
+
+After generation, run `bun install` and `bun run db:push` in `phone-app`. Set the selected SMS provider's credentials in `apps/web/.env`, then run `bun run dev`. Use the phone login link on `/zh-CN/login` and enter an E.164 number such as `+8613800138000`.
+
+For local development without sending paid SMS, explicitly set `SMS_DELIVERY_MODE=console` in `apps/web/.env`; codes are printed only when running the development server. The default mode is `provider`, and console mode is rejected in production. Never expose development console delivery publicly. The generated `docs/modules/sms.md` lists the selected provider's required credentials and template format.
+
+Selecting `sms` alone creates a server-side SMS service, not an authentication flow. Existing `starter` and `saas-global` presets are unchanged; add `sms` explicitly. This does not include WeChat login or the future `saas-cn` preset.
+
 
 ## Addons
 

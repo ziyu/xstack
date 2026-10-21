@@ -6,6 +6,10 @@ export const user = sqliteTable("user", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: integer("email_verified", { mode: "boolean" }).default(false).notNull(),
+  {{#if (includes module.integrations "sms")}}
+  phoneNumber: text("phone_number").unique(),
+  phoneNumberVerified: integer("phone_number_verified", { mode: "boolean" }).default(false).notNull(),
+  {{/if}}
   image: text("image"),
   role: text("role").default("user").notNull(),
   banned: integer("banned", { mode: "boolean" }).default(false),
@@ -90,6 +94,24 @@ export const verification = sqliteTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
+{{#if (includes module.integrations "sms")}}
+export const phoneOtpChallenge = sqliteTable("phone_otp_challenge", {
+  phoneHash: text("phone_hash").primaryKey(),
+  challengeId: text("challenge_id").notNull(),
+  codeHash: text("code_hash"),
+  attempts: integer("attempts").default(0).notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  resendAt: integer("resend_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const rateLimit = sqliteTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: integer("last_request").notNull(),
+});
+
+{{/if}}
 export const authRelations = defineRelationsPart({ user, session, account, verification }, (r) => ({
   user: {
     sessions: r.many.session({

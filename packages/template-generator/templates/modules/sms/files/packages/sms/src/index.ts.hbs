@@ -1,0 +1,54 @@
+import { createTransport, type ProviderConfig } from "./providers/{{module.providers.[0]}}";
+import type { Sms } from "./types";
+
+export type { OtpMessage, Sms } from "./types";
+
+export type SmsConfig = ProviderConfig & {
+  NODE_ENV: string;
+  SMS_DELIVERY_MODE?: "provider" | "console";
+};
+
+/** Credentials are optional at startup; provider delivery always requires complete configuration. */
+export function createSms(env: SmsConfig): Sms {
+  let transport: Sms | undefined;
+
+  return {
+    async sendOtp(message) {
+      if (
+        typeof message.phoneNumber !== "string" ||
+        message.phoneNumber.trim() !== message.phoneNumber ||
+        !/^\+[1-9]\d{1,14}$/.test(message.phoneNumber)
+      ) {
+        throw new Error("SMS phone number must use E.164 format");
+      }
+      if (typeof message.code !== "string" || message.code.length !== 6 || !/^\d{6}$/.test(message.code)) {
+        throw new Error("SMS verification code must contain exactly six digits");
+      }
+
+      const mode = env.SMS_DELIVERY_MODE ?? "provider";
+      if (mode === "console") {
+        if (env.NODE_ENV !== "development") {
+          throw new Error("SMS console delivery is allowed only in development");
+        }
+        console.info(
+          `[sms:console] ${JSON.stringify({ phoneNumber: message.phoneNumber, code: message.code })}`,
+        );
+        return;
+      }
+      if (mode !== "provider") {
+        throw new Error("Invalid SMS_DELIVERY_MODE; expected provider or console");
+      }
+
+      try {
+        transport ??= createTransport(env);
+      } catch {
+        // SDK errors can contain request details or credentials; never retain their cause.
+        throw new Error("SMS provider initialization failed; check docs/modules/sms.md");
+      }
+      if (!transport) {
+        throw new Error("SMS provider is not fully configured; see docs/modules/sms.md");
+      }
+      await transport.sendOtp(message);
+    },
+  };
+}

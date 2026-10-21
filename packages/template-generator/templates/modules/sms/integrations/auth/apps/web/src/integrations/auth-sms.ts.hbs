@@ -1,0 +1,8 @@
+import type { Services } from "../services";
+
+/** Await provider acceptance so a failed request cannot appear to have sent an OTP. */
+export default function registerAuthSms({ events, sms }: Services) {
+  events.on("auth.phone_verification_requested", async ({ phoneNumber, code }) => {
+    await sms.sendOtp({ phoneNumber, code });
+  });
+}

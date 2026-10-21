@@ -283,6 +283,9 @@ export function moduleReadmeSection(config: ProjectConfig): string {
     ids.has("email")
       ? "Without an email provider key, development emails (verification, password reset) are printed to the server console."
       : "",
+    ids.has("sms")
+      ? "Configure the selected SMS provider in `apps/web/.env`. For local development only, explicitly set `SMS_DELIVERY_MODE=console` to print verification codes instead of sending SMS; production requires provider credentials."
+      : "",
     plan.modules.some((m) => m.providers.includes("mock"))
       ? "Checkout falls back to the `mock` payment provider in development until real provider keys are set."
       : "",

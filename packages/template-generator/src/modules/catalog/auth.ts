@@ -11,7 +11,7 @@ export default defineModule({
   },
   category: "identity",
   requires: ["core"],
-  enhances: ["email"],
+  enhances: ["email", "sms"],
   supports: NEXT_SHELL_DB,
   domain: {
     field: "auth",

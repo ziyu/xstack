@@ -1,0 +1,166 @@
+"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useEffect, useState } from "react";
+
+import { authClient } from "@/lib/auth-client";
+
+import { useT } from "../i18n-provider";
+import { Field } from "./field";
+
+export default function PhoneSignInForm({ next }: { next: string }) {
+  const t = useT();
+  const [phone, setPhone] = useState("");
+  const [sentTo, setSentTo] = useState<string>();
+  const [code, setCode] = useState("");
+  const [pending, setPending] = useState<"send" | "verify">();
+  const [error, setError] = useState<string>();
+  const [cooldown, setCooldown] = useState({ phone: "", until: 0 });
+  const [now, setNow] = useState(0);
+  const remaining = cooldown.phone === phone.trim() ? Math.max(0, Math.ceil((cooldown.until - now) / 1000)) : 0;
+
+  useEffect(() => {
+    if (cooldown.until <= Date.now()) return;
+    const timer = window.setInterval(() => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= cooldown.until) window.clearInterval(timer);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown.until]);
+
+  function startCooldown(value: string, seconds: number) {
+    const current = Date.now();
+    setNow(current);
+    setCooldown({ phone: value, until: current + seconds * 1000 });
+  }
+
+  async function sendCode() {
+    if (pending || remaining > 0) return;
+    const value = phone.trim();
+    if (!/^\+[1-9]\d{7,14}$/.test(value)) {
+      setError(t("auth.phone.invalidPhone"));
+      return;
+    }
+    setPhone(value);
+    setPending("send");
+    setError(undefined);
+    let retryAfter: string | null = null;
+    try {
+      const result = await authClient.phoneNumber.sendOtp({ phoneNumber: value }, {
+        onError: ({ response }) => {
+          retryAfter = response.headers.get("Retry-After") ?? response.headers.get("X-Retry-After");
+        },
+      });
+      if (result.error) {
+        if (result.error.status === 429) {
+          const seconds = Number(retryAfter);
+          startCooldown(value, Number.isFinite(seconds) && seconds > 0 ? seconds : 60);
+          setError(t("auth.phone.rateLimited"));
+        } else if (result.error.code === "INVALID_PHONE_NUMBER") {
+          setError(t("auth.phone.invalidPhone"));
+        } else {
+          startCooldown(value, 60);
+          setError(t("auth.phone.deliveryFailed"));
+        }
+        return;
+      }
+      startCooldown(value, 60);
+      setSentTo(value);
+      setCode("");
+    } catch {
+      setError(t("auth.phone.deliveryFailed"));
+    } finally {
+      setPending(undefined);
+    }
+  }
+
+  async function verifyCode() {
+    if (pending || !sentTo) return;
+    if (!/^\d{6}$/.test(code)) {
+      setError(t("auth.phone.invalidCode"));
+      return;
+    }
+    setPending("verify");
+    setError(undefined);
+    try {
+      const result = await authClient.phoneNumber.verify({ phoneNumber: sentTo, code });
+      if (result.error) {
+        setError(t(result.error.status === 429 ? "auth.phone.rateLimited" : "auth.phone.invalidCode"));
+        return;
+      }
+      // The server page has already constrained next with safeNext.
+      window.location.assign(next);
+    } catch {
+      setError(t("auth.errors.generic"));
+    } finally {
+      setPending(undefined);
+    }
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      aria-busy={Boolean(pending)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void (sentTo ? verifyCode() : sendCode());
+      }}
+    >
+      <Field
+        label={t("auth.phone.number")}
+        name="phoneNumber"
+        type="tel"
+        autoComplete="tel"
+        value={phone}
+        onChange={(event) => setPhone(event.target.value)}
+        readOnly={Boolean(sentTo)}
+        disabled={Boolean(pending)}
+        aria-describedby="phone-hint"
+        maxLength={16}
+      />
+      <p id="phone-hint" className="-mt-2 text-xs text-muted-foreground">{t("auth.phone.numberHint")}</p>
+      {sentTo && (
+        <>
+          <div className="flex flex-col gap-2">
+            <p role="status" className="text-sm text-muted-foreground">{t("auth.phone.sent", { phone: sentTo })}</p>
+            <button
+              type="button"
+              className="self-start text-sm underline underline-offset-4 disabled:opacity-50"
+              disabled={Boolean(pending)}
+              onClick={() => {
+                setSentTo(undefined);
+                setCode("");
+                setError(undefined);
+              }}
+            >
+              {t("auth.phone.edit")}
+            </button>
+          </div>
+          <Field
+            label={t("auth.phone.code")}
+            name="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6}"
+            minLength={6}
+            maxLength={6}
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            disabled={Boolean(pending)}
+          />
+        </>
+      )}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <Button type="submit" disabled={Boolean(pending) || (!sentTo && remaining > 0)}>
+        {pending === "send" ? t("auth.phone.sending") : pending === "verify" ? t("auth.phone.verifying") : sentTo ? t("auth.phone.verify") : t("auth.phone.send")}
+      </Button>
+      {sentTo && (
+        <Button type="button" variant="outline" disabled={Boolean(pending) || remaining > 0} onClick={() => void sendCode()}>
+          {t("auth.phone.resend")}
+        </Button>
+      )}
+      {remaining > 0 && <p className="text-center text-xs text-muted-foreground">{t("auth.phone.cooldown", { seconds: remaining })}</p>}
+    </form>
+  );
+}
