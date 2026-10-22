@@ -30,8 +30,24 @@ Built on [Better Auth](https://better-auth.com). The `packages/auth` package exp
 {{#if (includes module.providers "github")}}
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub OAuth app. Callback URL: `<BETTER_AUTH_URL>/api/auth/callback/github` |
 {{/if}}
+{{#if (includes module.providers "wechat")}}
+| `WECHAT_CLIENT_ID`, `WECHAT_CLIENT_SECRET` | Approved WeChat Open Platform **website application** AppID and AppSecret. Callback URL: `<BETTER_AUTH_URL>/api/auth/callback/wechat` |
+{{/if}}
 
 OAuth buttons appear only when both the client ID and secret are set.
+{{#if (includes module.providers "wechat")}}
+
+### WeChat website login
+
+1. Register and obtain approval for a website application at [WeChat Open Platform](https://open.weixin.qq.com/). Official-account or mini-program credentials are not interchangeable with website application credentials.
+2. Configure its authorization callback domain to match the public domain of `BETTER_AUTH_URL`. Use HTTPS for production. Localhost alone is not a usable WeChat callback domain; use an approved development domain and tunnel when testing with real accounts.
+3. Set `WECHAT_CLIENT_ID` and `WECHAT_CLIENT_SECRET` in the server environment and restart the application. Both values are required for the login button to appear.
+4. Open the login or signup page and choose **Continue with WeChat**. The browser goes to WeChat's hosted `qrconnect` page (`snsapi_login`); scan and approve there, then return to `/api/auth/callback/wechat`. Supported desktop clients may offer WeChat's quick-login confirmation instead of scanning.
+
+The generated application uses Better Auth's authorization-code flow and state/cookie validation. Do not disable these checks or mark WeChat as a trusted email-linking provider. WeChat does not provide a verified email address: accounts receive a non-deliverable `@wechat.invalid` address, never automatic admin privileges, and are not implicitly merged with email accounts. Keep the website AppID stable. Better Auth uses UnionID when present, otherwise OpenID; cross-application identity migration and account merging are not provided by this template.
+
+No inline QR script or provider secret is sent to the browser. AppSecret and tokens stay server-side. An authorization redirect is not proof that real scanning, token exchange or provider delivery has been tested; verify those using your approved application before launch.
+{{/if}}
 
 ## Events
 

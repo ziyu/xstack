@@ -39,6 +39,8 @@ OAuth providers are optional (`auth:none` explicitly selects none). Email suppor
 
 Phone-number OTP login is enabled by selecting both `auth` and `sms`, with one SMS provider: `--features auth sms --providers auth:none sms:aliyun` (or `sms:tencent` / `sms:twilio`). It targets the native Next.js + Drizzle stack. Configure the selected provider in the generated `apps/web/.env`; for local development only, `SMS_DELIVERY_MODE=console` prints codes to the server log. Production requires real provider credentials. Setup details are in the generated `docs/modules/sms.md`.
 
+WeChat website login is selected with `--features auth --providers auth:wechat` on the native Next.js/Drizzle stack. Configure `WECHAT_CLIENT_ID` and `WECHAT_CLIENT_SECRET` from an approved WeChat Open Platform website application, plus the callback domain for `BETTER_AUTH_URL`. The endpoint is `/api/auth/callback/wechat`; the login button opens WeChat's hosted QR/quick-login page. Mini-program and official-account credentials are not supported by this flow.
+
 ## Requirements
 
 - Node.js 22.12 or newer to run the CLI with Node.js. The selected framework may require a newer release; the CLI checks the exact stack before writing files.

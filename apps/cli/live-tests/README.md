@@ -75,6 +75,10 @@ This exercises real HTTP auth endpoints and the generated SQLite database, not a
 
 Generated install/typecheck/build samples for all three providers are selected with `XSTACK_BUILD_SAMPLES=1 XSTACK_BUILD_SAMPLE_FILTER=product-phone bun test apps/cli/test/generated-builds.test.ts`.
 
+## WeChat protocol checks
+
+Generate an `auth` + `auth:wechat` Next.js/SQLite fixture under `apps/cli/.smoke`, install dependencies, and apply its schema. Run `bun apps/cli/live-tests/wechat.ts apps/cli/.smoke/wechat-app` to exercise the generated auth handler and database with a local provider-response fixture. This checks authorization URL parameters, state/cookie binding, expiration, replay, synthetic-email/admin isolation, returning login, rejected external redirects and forged ID tokens. It does not contact WeChat or validate a real scan. Use an approved website AppID, AppSecret and reachable callback domain for live-provider acceptance. Never report this fixture as real WeChat verification.
+
 ## Selected validation run
 
 The [2026-10-02 verification record](./verification-2026-10-02.md) lists the 19 local, five Postgres, and two Vercel fixtures that passed, including production and protected preview stages.

@@ -1,9 +1,5 @@
 import type { ProjectConfig } from "@xstack/types";
 
-import type { VirtualFileSystem } from "../core/virtual-fs";
-import type { TemplateData } from "../template-handlers/utils";
-import type { RenderConfig } from "../types";
-
 export type Localized = { en: string; "zh-CN": string };
 
 export type Market = "global" | "cn" | "any";
@@ -69,17 +65,12 @@ export type ModuleDomain = {
     providers?: string[];
     /** Modules it needs, which must use their stack implementation too. */
     requires?: string[];
-    render: StackRenderer;
+    /** Renderer key resolved by the generation pipeline, never a browser-imported function. */
+    renderer: "auth";
   };
 };
 
 export type Variant = "native" | "stack";
-
-export type StackRenderer = (
-  vfs: VirtualFileSystem,
-  templates: TemplateData,
-  config: RenderConfig,
-) => Promise<void>;
 
 export type ProviderSpec = {
   name: string;

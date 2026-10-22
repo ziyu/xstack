@@ -254,6 +254,9 @@ export function ProductOptions({
                     : `Choose at least ${providerSpec.min ?? 0}${providerSpec.max === undefined ? "" : ` and at most ${providerSpec.max}`} providers.`}
                   {manifest.id === "auth" &&
                     " Uncheck all providers to disable OAuth; email/password authentication remains available with the native engine."}
+                  {manifest.id === "auth" &&
+                    providers.includes("wechat") &&
+                    " WeChat requires an approved Open Platform website application and a public callback domain. Set its AppID/AppSecret only in the generated server environment."}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(providerSpec.options).map(([providerId, provider]) => {

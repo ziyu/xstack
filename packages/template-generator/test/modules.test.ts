@@ -124,6 +124,17 @@ describe("module resolver", () => {
     );
   });
 
+  it("allows WeChat only through native authentication", () => {
+    const product = { features: ["auth"], providers: { auth: ["wechat"] } };
+    const native = plan(product);
+    expect(hasErrors(native)).toBe(false);
+    expect(native.modules.find((module) => module.manifest.id === "auth")?.providers).toEqual([
+      "wechat",
+    ]);
+    expect(hasErrors(plan(product, { frontend: ["nuxt"] }))).toBe(true);
+    expect(hasErrors(plan({ ...product, options: { auth: { engine: "clerk" } } }))).toBe(true);
+  });
+
   it("enables phone authentication only with the SMS integration", () => {
     const selected = plan({ features: ["auth", "sms"], providers: { sms: ["aliyun"] } });
     expect(selected.issues.filter((issue) => issue.level === "error")).toEqual([]);

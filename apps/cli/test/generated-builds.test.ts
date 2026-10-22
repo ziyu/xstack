@@ -65,6 +65,15 @@ const baseConfig = {
 } satisfies Partial<CreateInput>;
 
 const buildSamples: BuildSample[] = [
+  ...(["sqlite", "postgres"] as const).map((database): BuildSample => ({
+    name: `product-wechat-${database}`,
+    packageManagers: ["bun"],
+    config: {
+      ...baseConfig,
+      database,
+      product: { features: ["auth", "credits"], providers: { auth: ["wechat"] } },
+    },
+  })),
   ...(["aliyun", "tencent", "twilio"] as const).map((provider): BuildSample => ({
     name: `product-phone-${provider}`,
     packageManagers: ["bun"],

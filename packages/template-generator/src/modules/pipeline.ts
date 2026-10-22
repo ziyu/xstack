@@ -17,6 +17,7 @@ import {
   replaceStackFiles,
   wireServices,
 } from "./seams";
+import { processAuthTemplates } from "./stack/auth";
 import type { NavArea, ResolvedModule, ResolvedPlan, WorkspacePackageSpec } from "./types";
 
 const WEB = "apps/web";
@@ -69,8 +70,16 @@ export async function processStackModules(
   config: RenderConfig,
 ): Promise<void> {
   for (const module of getModulePlan(config).modules) {
-    if (module.variant === "stack")
-      await module.manifest.domain?.stack?.render(vfs, templates, config);
+    if (module.variant === "stack") {
+      const renderer = module.manifest.domain?.stack?.renderer;
+      if (renderer !== "auth") {
+        throw new GeneratorError({
+          message: `No stack renderer registered for "${module.manifest.id}"`,
+          phase: "modules",
+        });
+      }
+      await processAuthTemplates(vfs, templates, config);
+    }
   }
 }
 

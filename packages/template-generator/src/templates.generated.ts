@@ -13581,8 +13581,24 @@ Built on [Better Auth](https://better-auth.com). The \`packages/auth\` package e
 {{#if (includes module.providers "github")}}
 | \`GITHUB_CLIENT_ID\`, \`GITHUB_CLIENT_SECRET\` | GitHub OAuth app. Callback URL: \`<BETTER_AUTH_URL>/api/auth/callback/github\` |
 {{/if}}
+{{#if (includes module.providers "wechat")}}
+| \`WECHAT_CLIENT_ID\`, \`WECHAT_CLIENT_SECRET\` | Approved WeChat Open Platform **website application** AppID and AppSecret. Callback URL: \`<BETTER_AUTH_URL>/api/auth/callback/wechat\` |
+{{/if}}
 
 OAuth buttons appear only when both the client ID and secret are set.
+{{#if (includes module.providers "wechat")}}
+
+### WeChat website login
+
+1. Register and obtain approval for a website application at [WeChat Open Platform](https://open.weixin.qq.com/). Official-account or mini-program credentials are not interchangeable with website application credentials.
+2. Configure its authorization callback domain to match the public domain of \`BETTER_AUTH_URL\`. Use HTTPS for production. Localhost alone is not a usable WeChat callback domain; use an approved development domain and tunnel when testing with real accounts.
+3. Set \`WECHAT_CLIENT_ID\` and \`WECHAT_CLIENT_SECRET\` in the server environment and restart the application. Both values are required for the login button to appear.
+4. Open the login or signup page and choose **Continue with WeChat**. The browser goes to WeChat's hosted \`qrconnect\` page (\`snsapi_login\`); scan and approve there, then return to \`/api/auth/callback/wechat\`. Supported desktop clients may offer WeChat's quick-login confirmation instead of scanning.
+
+The generated application uses Better Auth's authorization-code flow and state/cookie validation. Do not disable these checks or mark WeChat as a trusted email-linking provider. WeChat does not provide a verified email address: accounts receive a non-deliverable \`@wechat.invalid\` address, never automatic admin privileges, and are not implicitly merged with email accounts. Keep the website AppID stable. Better Auth uses UnionID when present, otherwise OpenID; cross-application identity migration and account merging are not provided by this template.
+
+No inline QR script or provider secret is sent to the browser. AppSecret and tokens stay server-side. An authorization redirect is not proof that real scanning, token exchange or provider delivery has been tested; verify those using your approved application before launch.
+{{/if}}
 
 ## Events
 
@@ -13646,7 +13662,10 @@ declare module "@{{projectName}}/events" {
   }
 }
 `],
-  ["modules/auth/files/packages/auth/src/index.ts.hbs", `import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
+  ["modules/auth/files/packages/auth/src/index.ts.hbs", `{{#if (includes module.providers "wechat")}}
+import { createHash } from "node:crypto";
+{{/if}}
+import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import type { Database } from "@{{projectName}}/db";
 import * as schema from "@{{projectName}}/db/schema/auth";
 import type { EventBus } from "@{{projectName}}/events";
@@ -13673,6 +13692,10 @@ export type AuthConfig = {
 {{#if (includes module.providers "github")}}
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
+{{/if}}
+{{#if (includes module.providers "wechat")}}
+  WECHAT_CLIENT_ID?: string;
+  WECHAT_CLIENT_SECRET?: string;
 {{/if}}
 };
 
@@ -13750,6 +13773,24 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
         ? { github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET } }
         : {}),
 {{/if}}
+{{#if (includes module.providers "wechat")}}
+      ...(env.WECHAT_CLIENT_ID?.trim() && env.WECHAT_CLIENT_SECRET?.trim()
+        ? {
+            wechat: {
+              clientId: env.WECHAT_CLIENT_ID.trim(),
+              clientSecret: env.WECHAT_CLIENT_SECRET.trim(),
+              lang: "cn" as const,
+              disableIdTokenSignIn: true,
+              // WeChat does not provide a verified email. Never trust a profile email
+              // or use it to link to an existing email/password account.
+              mapProfileToUser: (profile: { openid: string; unionid?: string }) => ({
+                email: \`wechat-\${createHash("sha256").update(\`\${env.WECHAT_CLIENT_ID!.trim()}:\${profile.unionid || profile.openid}\`).digest("hex").slice(0, 48)}@wechat.invalid\`,
+                emailVerified: false,
+              }),
+            },
+          }
+        : {}),
+{{/if}}
     },
     databaseHooks: {
 {{#if (includes module.integrations "sms")}}
@@ -13770,7 +13811,7 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
       user: {
         create: {
           before: async (user) => ({
-            data: { ...user, role: {{#if (includes module.integrations "sms")}}!user.email.toLowerCase().endsWith("@phone.invalid") && {{/if}}adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
+            data: { ...user, role: {{#if (includes module.integrations "sms")}}!user.email.toLowerCase().endsWith("@phone.invalid") && {{/if}}{{#if (includes module.providers "wechat")}}!user.email.toLowerCase().endsWith("@wechat.invalid") && {{/if}}adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
           }),
           after: async (user) => {
             await events.emit("auth.user_created", {
@@ -13861,6 +13902,9 @@ export type Session = Auth["$Infer"]["Session"];
   social: {
     divider: "or",
     continueWith: "Continue with {provider}",
+    {{#if (includes module.providers "wechat")}}
+    wechat: "Continue with WeChat",
+    {{/if}}
   },
   forgot: {
     title: "Reset your password",
@@ -13970,6 +14014,9 @@ export type Session = Auth["$Infer"]["Session"];
   social: {
     divider: "或",
     continueWith: "使用 {provider} 继续",
+    {{#if (includes module.providers "wechat")}}
+    wechat: "使用微信继续",
+    {{/if}}
   },
   forgot: {
     title: "重置密码",
@@ -14506,6 +14553,7 @@ export default function SignUpForm({
   ["modules/auth/frameworks/next/apps/web/src/components/auth/social-buttons.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { type SocialProvider, socialProviderLabels } from "@/lib/social-providers";
@@ -14520,6 +14568,8 @@ export function SocialButtons({
   callbackURL: string;
 }) {
   const t = useT();
+  const [pending, setPending] = useState<SocialProvider>();
+  const [error, setError] = useState(false);
   if (providers.length === 0) return null;
 
   return (
@@ -14530,12 +14580,27 @@ export function SocialButtons({
             key={provider}
             variant="outline"
             type="button"
-            onClick={() => authClient.signIn.social({ provider, callbackURL })}
+            disabled={Boolean(pending)}
+            onClick={async () => {
+              setPending(provider);
+              setError(false);
+              try {
+                const result = await authClient.signIn.social({ provider, callbackURL });
+                if (result.error) {
+                  setError(true);
+                  setPending(undefined);
+                }
+              } catch {
+                setError(true);
+                setPending(undefined);
+              }
+            }}
           >
-            {t("auth.social.continueWith", { provider: socialProviderLabels[provider] })}
+            { {{#if (includes module.providers "wechat")}}provider === "wechat" ? t("auth.social.wechat") : {{/if}}t("auth.social.continueWith", { provider: socialProviderLabels[provider] })}
           </Button>
         ))}
       </div>
+      {error && <p role="alert" className="text-sm text-destructive">{t("auth.errors.generic")}</p>}
       <div className="flex items-center gap-3 text-muted-foreground text-xs">
         <span className="h-px flex-1 bg-border" />
         {t("auth.social.divider")}
@@ -14653,9 +14718,12 @@ export function enabledSocialProviders(): SocialProvider[] {
   return Object.keys(auth.options.socialProviders).filter(isSocialProvider);
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/lib/social-providers.ts", `export const socialProviderLabels = {
+  ["modules/auth/frameworks/next/apps/web/src/lib/social-providers.ts.hbs", `export const socialProviderLabels = {
   google: "Google",
   github: "GitHub",
+{{#if (includes module.providers "wechat")}}
+  wechat: "WeChat",
+{{/if}}
 } as const;
 
 export type SocialProvider = keyof typeof socialProviderLabels;

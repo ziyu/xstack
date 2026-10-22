@@ -1,6 +1,6 @@
 import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 
 import Providers from "@/components/providers";
@@ -16,15 +16,17 @@ import {
 import "./global.css";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+const geist = localFont({
+  src: "../../assets/fonts/Geist-Variable.woff2",
+  weight: "100 900",
+  display: "swap",
   variable: "--font-geist",
 });
 
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+const geistMono = localFont({
+  src: "../../assets/fonts/GeistMono-Variable.woff2",
+  weight: "100 900",
+  display: "swap",
   variable: "--font-geist-mono",
 });
 

@@ -75,6 +75,10 @@ This repository is organized as a monorepo containing:
 
 The Template Builder reads product options from the shared module catalog. Update the schema, URL parsers, command generation, file preview, and tests together when changing that contract. Technology icons live in `apps/web/public/icons/`; both builder cards and badges use `src/components/ui/tech-icon.tsx`. Add matching theme variants locally rather than introducing an external CDN dependency.
 
+Keep `@xstack/template-generator/modules` browser-safe: module manifests contain a stack-renderer key, while the generation pipeline owns the renderer implementation. Do not import template processing, filesystem utilities, or Node built-ins from the catalog/resolver entry point. `packages/template-generator/test/browser-catalog.test.ts` checks that this entry bundles for browsers.
+
+The website loads Geist Sans and Geist Mono through `next/font/local` from `apps/web/assets/fonts/`. These unmodified variable fonts come from the official `geist@1.8.2` package; retain the accompanying SIL Open Font License. Website compilation must not require downloading Google Fonts CSS.
+
 ### Focused Verification
 
 ```bash

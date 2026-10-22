@@ -1,5 +1,4 @@
 import { defineModule } from "../define";
-import { processAuthTemplates } from "../stack/auth";
 import { NEXT_SHELL_DB } from "./stack";
 
 export default defineModule({
@@ -17,7 +16,7 @@ export default defineModule({
     field: "auth",
     value: ({ options }) => String(options.engine),
     native: ({ options }) => options.engine === "better-auth",
-    stack: { providers: [], render: processAuthTemplates },
+    stack: { providers: [], renderer: "auth" },
   },
   options: {
     engine: {
@@ -45,6 +44,23 @@ export default defineModule({
         env: [
           { key: "GITHUB_CLIENT_ID", required: false, sensitive: false },
           { key: "GITHUB_CLIENT_SECRET", required: false },
+        ],
+      },
+      wechat: {
+        name: "WeChat Website Login",
+        market: "cn",
+        env: [
+          {
+            key: "WECHAT_CLIENT_ID",
+            required: false,
+            sensitive: false,
+            comment: "AppID of an approved WeChat Open Platform website application",
+          },
+          {
+            key: "WECHAT_CLIENT_SECRET",
+            required: false,
+            comment: "Website application AppSecret; server-only",
+          },
         ],
       },
     },

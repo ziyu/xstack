@@ -69,6 +69,9 @@ export default {
   social: {
     divider: "or",
     continueWith: "Continue with {provider}",
+    {{#if (includes module.providers "wechat")}}
+    wechat: "Continue with WeChat",
+    {{/if}}
   },
   forgot: {
     title: "Reset your password",

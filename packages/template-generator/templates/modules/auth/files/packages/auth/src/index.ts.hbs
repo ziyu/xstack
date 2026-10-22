@@ -1,3 +1,6 @@
+{{#if (includes module.providers "wechat")}}
+import { createHash } from "node:crypto";
+{{/if}}
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import type { Database } from "@{{projectName}}/db";
 import * as schema from "@{{projectName}}/db/schema/auth";
@@ -25,6 +28,10 @@ export type AuthConfig = {
 {{#if (includes module.providers "github")}}
   GITHUB_CLIENT_ID?: string;
   GITHUB_CLIENT_SECRET?: string;
+{{/if}}
+{{#if (includes module.providers "wechat")}}
+  WECHAT_CLIENT_ID?: string;
+  WECHAT_CLIENT_SECRET?: string;
 {{/if}}
 };
 
@@ -102,6 +109,24 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
         ? { github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET } }
         : {}),
 {{/if}}
+{{#if (includes module.providers "wechat")}}
+      ...(env.WECHAT_CLIENT_ID?.trim() && env.WECHAT_CLIENT_SECRET?.trim()
+        ? {
+            wechat: {
+              clientId: env.WECHAT_CLIENT_ID.trim(),
+              clientSecret: env.WECHAT_CLIENT_SECRET.trim(),
+              lang: "cn" as const,
+              disableIdTokenSignIn: true,
+              // WeChat does not provide a verified email. Never trust a profile email
+              // or use it to link to an existing email/password account.
+              mapProfileToUser: (profile: { openid: string; unionid?: string }) => ({
+                email: `wechat-${createHash("sha256").update(`${env.WECHAT_CLIENT_ID!.trim()}:${profile.unionid || profile.openid}`).digest("hex").slice(0, 48)}@wechat.invalid`,
+                emailVerified: false,
+              }),
+            },
+          }
+        : {}),
+{{/if}}
     },
     databaseHooks: {
 {{#if (includes module.integrations "sms")}}
@@ -122,7 +147,7 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
       user: {
         create: {
           before: async (user) => ({
-            data: { ...user, role: {{#if (includes module.integrations "sms")}}!user.email.toLowerCase().endsWith("@phone.invalid") && {{/if}}adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
+            data: { ...user, role: {{#if (includes module.integrations "sms")}}!user.email.toLowerCase().endsWith("@phone.invalid") && {{/if}}{{#if (includes module.providers "wechat")}}!user.email.toLowerCase().endsWith("@wechat.invalid") && {{/if}}adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
           }),
           after: async (user) => {
             await events.emit("auth.user_created", {

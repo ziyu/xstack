@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { type SocialProvider, socialProviderLabels } from "@/lib/social-providers";
@@ -15,6 +16,8 @@ export function SocialButtons({
   callbackURL: string;
 }) {
   const t = useT();
+  const [pending, setPending] = useState<SocialProvider>();
+  const [error, setError] = useState(false);
   if (providers.length === 0) return null;
 
   return (
@@ -25,12 +28,27 @@ export function SocialButtons({
             key={provider}
             variant="outline"
             type="button"
-            onClick={() => authClient.signIn.social({ provider, callbackURL })}
+            disabled={Boolean(pending)}
+            onClick={async () => {
+              setPending(provider);
+              setError(false);
+              try {
+                const result = await authClient.signIn.social({ provider, callbackURL });
+                if (result.error) {
+                  setError(true);
+                  setPending(undefined);
+                }
+              } catch {
+                setError(true);
+                setPending(undefined);
+              }
+            }}
           >
-            {t("auth.social.continueWith", { provider: socialProviderLabels[provider] })}
+            { {{#if (includes module.providers "wechat")}}provider === "wechat" ? t("auth.social.wechat") : {{/if}}t("auth.social.continueWith", { provider: socialProviderLabels[provider] })}
           </Button>
         ))}
       </div>
+      {error && <p role="alert" className="text-sm text-destructive">{t("auth.errors.generic")}</p>}
       <div className="flex items-center gap-3 text-muted-foreground text-xs">
         <span className="h-px flex-1 bg-border" />
         {t("auth.social.divider")}

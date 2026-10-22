@@ -1,6 +1,9 @@
 export const socialProviderLabels = {
   google: "Google",
   github: "GitHub",
+{{#if (includes module.providers "wechat")}}
+  wechat: "WeChat",
+{{/if}}
 } as const;
 
 export type SocialProvider = keyof typeof socialProviderLabels;

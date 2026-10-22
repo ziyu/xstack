@@ -131,6 +131,20 @@ describe("builder preview over oRPC", () => {
     }
   });
 
+  test("preserves WeChat selection through sharing and exposes only server-side credential keys", async () => {
+    const stack = { ...DEFAULT_STACK, features: ["auth"], providers: { auth: ["wechat"] } };
+    const shared = await loadStackParams(
+      Promise.resolve(new URL(generateStackUrlFromState(stack))),
+    );
+    expect(shared.providers.auth).toEqual(["wechat"]);
+    const output = files((await client.preview(shared)).root);
+    expect(output.get("apps/web/.env.schema")).toContain("WECHAT_CLIENT_ID");
+    expect(output.get("apps/web/.env.schema")).toContain("WECHAT_CLIENT_SECRET");
+    expect(output.get("apps/web/.env.schema")).not.toContain("GOOGLE_CLIENT_ID");
+    expect(output.get("apps/web/.env.schema")).not.toContain("NEXT_PUBLIC_WECHAT");
+    expect(generateStackCommand(shared)).toContain("auth:wechat");
+  });
+
   test("rejects invalid payloads at the HTTP boundary", async () => {
     for (const json of [
       null,

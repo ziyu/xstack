@@ -69,6 +69,9 @@ export default {
   social: {
     divider: "或",
     continueWith: "使用 {provider} 继续",
+    {{#if (includes module.providers "wechat")}}
+    wechat: "使用微信继续",
+    {{/if}}
   },
   forgot: {
     title: "重置密码",

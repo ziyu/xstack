@@ -543,3 +543,15 @@ ProjectConfig
 本地验证（2026-10-20）：三家服务商产物通过安装、类型检查和生产构建；SQLite、PostgreSQL 迁移与手机号验证码并发消费通过。浏览器完成中文手机号注册/登录、刷新会话和 25 积分注册赠送；重复登录未重复赠送。接口检查包括重发冷却、过期、尝试次数、并发发送、重放、封禁用户、未验证手机号占用与生产控制台拒绝。Builder 可选择 SMS 服务商并生成相应参数。
 
 外部验收未完成：没有调用真实短信发送接口或验证手机送达。正式接入需要提供所选服务商凭据、已审核签名/模板及合法测试号码；SDK 接受请求不等于运营商送达。完整 P2 仍未完成。
+
+## 19. P2.2 微信网站登录
+
+在现有 `auth` 模块中新增 `wechat` 服务商，仅支持原生 Next.js/Better Auth 模板，沿用固定版本 Better Auth 的微信网站授权码实现。CLI 使用 `--providers auth:wechat`；Builder 从清单展示相同选项。配置 `WECHAT_CLIENT_ID`、`WECHAT_CLIENT_SECRET` 后启用登录按钮，回调为 `/api/auth/callback/wechat`，授权范围为 `snsapi_login`。未修改既有预设，也未加入公众号/小程序登录。
+
+微信不提供可信邮箱：映射为 AppID 与 UnionID/OpenID 派生的不可投递 `@wechat.invalid` 邮箱，保持未验证状态，并禁止此类身份经 `ADMIN_EMAILS` 自动提权。保留 Better Auth 的 state/cookie、可信回调源和未验证邮箱关联限制；禁用客户端 ID Token 登录。
+
+本地验证：SQLite 原生认证项目及 PostgreSQL + SMS + Email 组合均通过安装、类型检查和生产构建。生产页面验证了凭据缺失时隐藏按钮及配置后显示按钮。`apps/cli/live-tests/wechat.ts` 使用受控服务商响应，执行真实生成认证处理器与 SQLite，覆盖授权 URL、state/cookie、过期、重放、错误 code、恶意跳转、伪造 ID Token、首次/重复登录及邮箱/管理员隔离。此测试不联系微信，不代表真实扫码成功。
+
+真实开放平台验收仍需已审核网站应用、AppID/AppSecret、可达且已登记的回调域名和微信测试账号。跨应用身份迁移、UnionID/OpenID 变更迁移和账号合并不在本模板中自动处理。P2 的微信/支付宝支付、OSS/COS、`saas-cn` 和 Node 主机配置仍待实施。
+
+主站构建阻塞已修复：Geist 字体改为随仓库发布的本地字体；`domain.stack.render` 的函数引用改为 `domain.stack.renderer` 标识，渲染器只由生成流水线导入，浏览器模块清单不再引入模板处理器和 Node 依赖。增加浏览器入口打包回归。默认 Turbopack 开发、webpack 开发和生产构建/启动均通过，浏览器验证 Builder 配置与文件预览正常。

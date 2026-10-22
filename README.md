@@ -87,6 +87,10 @@ bun run db:push
 
 Choose `aliyun`, `tencent`, or `twilio` in JSON (or `--providers sms:aliyun` with ordinary CLI flags). Fill in `apps/web/.env` using the generated `docs/modules/sms.md`, then run `bun run dev` and choose phone login at `http://localhost:3001/en/login`. For local testing without paid messages, set `SMS_DELIVERY_MODE=console`; codes are printed to the development server log. Console delivery is forbidden in production. Real sending requires provider credentials and approved sender/template settings.
 
+### WeChat website login
+
+Select `--features auth --providers auth:wechat` with the native Next.js + Drizzle stack. Set `WECHAT_CLIENT_ID` and `WECHAT_CLIENT_SECRET` in the generated `apps/web/.env`, using an approved WeChat Open Platform **website application**. Register the authorization callback domain for `BETTER_AUTH_URL`; the callback endpoint is `/api/auth/callback/wechat`. Once configured, login/signup pages offer WeChat QR/quick login. Mini-program and official-account credentials do not work for this flow. Setup details are in the generated `docs/modules/auth.md`.
+
 ## Claude Code plugin
 
 Want your AI assistant to scaffold and extend projects with xstack? Install the plugin and it will plan a valid stack and generate it through the bundled MCP server instead of hand-rolling boilerplate.
