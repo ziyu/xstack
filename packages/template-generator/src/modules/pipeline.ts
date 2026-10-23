@@ -232,6 +232,9 @@ export function processModuleTemplates(
     }
 
     if (manifest.appDependencies) addAppDependencies(vfs, manifest.appDependencies);
+    for (const spec of providerSpecs) {
+      if (spec.appDependencies) addAppDependencies(vfs, spec.appDependencies);
+    }
   }
 
   aggregateMessages(vfs, plan);

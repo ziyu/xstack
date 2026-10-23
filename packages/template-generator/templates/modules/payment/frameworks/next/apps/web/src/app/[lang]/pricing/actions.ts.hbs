@@ -18,6 +18,8 @@ export async function startCheckout(formData: FormData) {
     url = await payment.checkout({
       user,
       planId: String(formData.get("planId")),
+      provider: String(formData.get("provider")),
+      checkoutPath: localePath(locale, "/payment"),
       successPath: `${localePath(locale, "/dashboard/billing")}?status=success`,
       cancelPath: localePath(locale, "/pricing"),
     });

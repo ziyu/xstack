@@ -1,4 +1,5 @@
-import { plans } from "@{{projectName}}/payment";
+import { payment } from "@{{projectName}}/app-services";
+import { plans, type Plan } from "@{{projectName}}/payment";
 import { Button } from "@{{projectName}}/ui/components/button";
 import type { Metadata } from "next";
 
@@ -21,6 +22,13 @@ export default async function PricingPage({ params, searchParams }: Props) {
   const locale = resolveLocale((await params).lang);
   const t = getTranslator(locale);
   const { error } = await searchParams;
+  const providerLabels: Record<string, string> = {
+    stripe: t("payment.providers.stripe"),
+    polar: t("payment.providers.polar"),
+    mock: t("payment.providers.mock"),
+    wechat: t("payment.providers.wechat"),
+    alipay: t("payment.providers.alipay"),
+  };
 
   return (
     <div className="container mx-auto flex max-w-5xl flex-col gap-10 px-4 py-16">
@@ -36,7 +44,10 @@ export default async function PricingPage({ params, searchParams }: Props) {
         )}
       </div>
       <div className="mx-auto grid w-full max-w-3xl gap-6 md:grid-cols-2">
-        {plans.map((plan) => (
+        {plans.map((plan) => {
+          const providers = payment.availableProviders(plan.id);
+          const { interval, mode }: Plan = plan;
+          return (
           <div
             key={plan.id}
             className={`flex flex-col gap-6 border p-6 ${"highlighted" in plan ? "border-primary" : ""}`}
@@ -52,8 +63,8 @@ export default async function PricingPage({ params, searchParams }: Props) {
                 {formatMoney(plan.amount, plan.currency, locale)}
               </span>
               <span className="text-muted-foreground text-sm">
-                {"interval" in plan
-                  ? t(`payment.pricing.per.${plan.interval}`)
+                {interval
+                  ? t(`payment.pricing.per.${interval}`)
                   : t("payment.pricing.oneTime")}
               </span>
             </p>
@@ -62,15 +73,30 @@ export default async function PricingPage({ params, searchParams }: Props) {
               <p className="text-sm">{t("payment.pricing.credits", { credits: plan.credits })}</p>
             )}
 {{/if}}
-            <form action={startCheckout} className="mt-auto">
-              <input type="hidden" name="planId" value={plan.id} />
-              <input type="hidden" name="locale" value={locale} />
-              <Button type="submit" className="w-full" variant={"highlighted" in plan ? "default" : "outline"}>
-                {plan.mode === "subscription" ? t("payment.pricing.subscribe") : t("payment.pricing.buy")}
-              </Button>
-            </form>
+            <div className="mt-auto flex flex-col gap-3">
+              {providers.length > 0 ? providers.map((provider) => (
+                <form key={provider} action={startCheckout}>
+                  <input type="hidden" name="planId" value={plan.id} />
+                  <input type="hidden" name="locale" value={locale} />
+                  <input type="hidden" name="provider" value={provider} />
+                  <Button type="submit" className="w-full" variant={"highlighted" in plan ? "default" : "outline"}>
+                    {t(mode !== "payment" ? "payment.pricing.subscribeWith" : "payment.pricing.buyWith", {
+                      provider: providerLabels[provider] ?? provider,
+                    })}
+                  </Button>
+                </form>
+              )) : (
+                <>
+                  <Button type="button" className="w-full" variant="outline" disabled>
+                    {t("payment.pricing.unavailable")}
+                  </Button>
+                  <p className="text-muted-foreground text-sm">{t("payment.pricing.noProviders")}</p>
+                </>
+              )}
+            </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -8,9 +8,12 @@ export async function POST(
   const { provider } = await params;
   try {
     await payment.handleWebhook(provider, request);
+    if (provider === "alipay") return new Response("success");
+    if (provider === "wechat") return new Response(null, { status: 204 });
     return Response.json({ received: true });
   } catch (error) {
     console.error(`[payment] ${provider} webhook failed`, error);
+    if (provider === "alipay") return new Response("failure", { status: 400 });
     return Response.json({ error: "Webhook handling failed" }, { status: 400 });
   }
 }

@@ -21,6 +21,7 @@ export const paymentOrder = pgTable(
     provider: text("provider").notNull(),
     /** Checkout session or invoice ID at the provider. */
     providerRef: text("provider_ref"),
+    qrCodeUrl: text("qr_code_url"),
     status: text("status", { enum: ["pending", "paid", "failed", "refunded"] })
       .notNull()
       .default("pending"),

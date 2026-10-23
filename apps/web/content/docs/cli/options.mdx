@@ -308,7 +308,7 @@ Selects a curated feature set: `starter` (auth) or `saas-global` (auth, email, a
 
 Chooses the providers a module uses, for example `--providers payment:stripe,mock auth:github`.
 
-- `payment`: `stripe` (default), `polar` or `mock`; several can be enabled at once and checkout uses the first configured one
+- `payment`: `stripe` (default), `polar`, `wechat` (Native QR), `alipay` (desktop website), or development-only `mock`. Pricing shows configured providers compatible with the plan. Selecting either domestic provider generates CNY one-time credit packs, not automatic subscriptions; configure merchant credentials and HTTPS callbacks in the generated environment.
 - `auth`: `google`, `github`, `wechat`, or `auth:none` to keep email/password authentication without OAuth providers. WeChat requires the native Next.js/Better Auth implementation. Do not combine `none` with named providers for the same module.
 - `email`: choose exactly one of `resend` or `smtp`.
 - `sms`: choose exactly one of `aliyun` (default), `tencent`, or `twilio`. Provider credentials and approved sign/template settings belong in the generated environment.
@@ -357,7 +357,6 @@ xstack wechat-app \
 Install dependencies and apply the schema, then configure `WECHAT_CLIENT_ID` and `WECHAT_CLIENT_SECRET` in the generated `apps/web/.env`. These must belong to an approved **website application** on WeChat Open Platform, not a mini-program or official account. Set `BETTER_AUTH_URL` to your public application origin and register the corresponding authorization callback domain. The callback endpoint is `/api/auth/callback/wechat`.
 
 The login/signup page displays WeChat only when both credentials are configured. It opens WeChat's hosted QR/quick-login page, then returns to your application after consent. Local testing with real accounts needs an approved reachable callback domain. WeChat does not supply verified email, so generated accounts use a non-deliverable address and are not automatically granted admin roles or merged with email accounts. See the generated `docs/modules/auth.md` for setup and identity limitations.
-
 
 ## Addons
 

@@ -20,14 +20,14 @@ Supply credentials in the local process environment or use the provider CLI's ex
 
 Account-free Neon claims use a separate context file per case, so parallel batches do not link the repository to a disposable project.
 
-| Provider                                    | Runner input                                                            | Status                                                                                              |
-| ------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Provider                                    | Runner input                                                                  | Status                                                                                              |
+| ------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Neon                                        | Optional `NEON_API_KEY`, `XSTACK_LIVE_NEON_ORG_ID`, `XSTACK_LIVE_NEON_REGION` | Account-free claimable project, or authenticated API project; deleted after the case                |
-| Prisma Postgres                             | No account; optional `XSTACK_LIVE_PRISMA_POSTGRES_REGION`                  | Disposable database expires after two hours                                                         |
-| Vercel                                      | Existing `vercel login`; `XSTACK_LIVE_VERCEL_SCOPE`                        | Disposable project; production and preview deployments; browser checks and runtime logs implemented |
-| Cloudflare through Alchemy                  | Project-local Alchemy profile; `CLOUDFLARE_ACCOUNT_ID`                  | Adapter needs an authenticated live run; Wrangler login alone is insufficient                       |
-| Clerk, Polar sandbox, Convex                | Dedicated test accounts to be added later                               | Blocked; provider-specific verification still required                                              |
-| Supabase, Turso, PlanetScale, MongoDB Atlas | Dedicated test accounts to be added later                               | Blocked; database provisioners still required                                                       |
+| Prisma Postgres                             | No account; optional `XSTACK_LIVE_PRISMA_POSTGRES_REGION`                     | Disposable database expires after two hours                                                         |
+| Vercel                                      | Existing `vercel login`; `XSTACK_LIVE_VERCEL_SCOPE`                           | Disposable project; production and preview deployments; browser checks and runtime logs implemented |
+| Cloudflare through Alchemy                  | Project-local Alchemy profile; `CLOUDFLARE_ACCOUNT_ID`                        | Adapter needs an authenticated live run; Wrangler login alone is insufficient                       |
+| Clerk, Polar sandbox, Convex                | Dedicated test accounts to be added later                                     | Blocked; provider-specific verification still required                                              |
+| Supabase, Turso, PlanetScale, MongoDB Atlas | Dedicated test accounts to be added later                                     | Blocked; database provisioners still required                                                       |
 
 Vercel function cases require the Node runtime; Bun remains a supported package manager. The runner verifies production and preview on its disposable project. It creates a deployment-protection bypass secret scoped to that project and verifies that preview access without it is denied. Authorization exchanges the bypass header for Vercel's scoped cookie at each deployment origin, without following bootstrap redirects. Subsequent requests use cookies, so external resources do not receive the bypass header. Nuxt dashboards are also checked with JavaScript disabled to verify server-rendered sessions and private RPC data.
 
@@ -78,6 +78,12 @@ Generated install/typecheck/build samples for all three providers are selected w
 ## WeChat protocol checks
 
 Generate an `auth` + `auth:wechat` Next.js/SQLite fixture under `apps/cli/.smoke`, install dependencies, and apply its schema. Run `bun apps/cli/live-tests/wechat.ts apps/cli/.smoke/wechat-app` to exercise the generated auth handler and database with a local provider-response fixture. This checks authorization URL parameters, state/cookie binding, expiration, replay, synthetic-email/admin isolation, returning login, rejected external redirects and forged ID tokens. It does not contact WeChat or validate a real scan. Use an approved website AppID, AppSecret and reachable callback domain for live-provider acceptance. Never report this fixture as real WeChat verification.
+
+## Domestic payment protocol checks
+
+Generate an auth/payment/credits SQLite fixture under `apps/cli/.smoke` with `auth:none` and `payment:wechat,alipay`, install dependencies, and apply its schema to `<fixture>/local.db`. Run `bun apps/cli/live-tests/payments.ts apps/cli/.smoke/<fixture>`. It exercises real generated payment services and credit ledger with ephemeral RSA keys and a controlled WeChat HTTP boundary. Checks cover signed checkout/response, Alipay page URL signatures, bad signatures/timestamps/key IDs, wrong app/merchant/amount/currency, provider/order binding, private QR ownership and repeat notifications granting credits once.
+
+This does not contact payment providers or transfer money. Live acceptance still requires approved Native/desktop payment products, matching credentials, reachable HTTPS notifications, a real scan/payment and settlement reconciliation. Generated build samples use `XSTACK_BUILD_SAMPLES=1 XSTACK_BUILD_SAMPLE_FILTER=product-domestic-payment bun test apps/cli/test/generated-builds.test.ts`.
 
 ## Selected validation run
 

@@ -10,8 +10,13 @@ export default {
       description: "一次性购买，快速上手。",
     },
     pro: {
+{{#if (or (includes module.providers "wechat") (includes module.providers "alipay"))}}
+      name: "专业积分包",
+      description: "一次性购买更多积分，不自动续费。",
+{{else}}
       name: "专业版",
       description: "适合每周都在交付的团队。",
+{{/if}}
     },
   },
   pricing: {
@@ -23,8 +28,27 @@ export default {
     },
     oneTime: "一次性",
     credits: "包含 {credits} 积分",
-    subscribe: "订阅",
-    buy: "立即购买",
+    subscribeWith: "使用{provider}订阅",
+    buyWith: "使用{provider}支付",
+    unavailable: "暂时无法支付",
+    noProviders: "当前套餐暂无可用的支付方式。",
+  },
+  providers: {
+    stripe: "Stripe",
+    polar: "Polar",
+    mock: "模拟支付（开发环境）",
+    wechat: "微信",
+    alipay: "支付宝",
+  },
+  checkout: {
+    title: "完成支付",
+    amount: "订单金额",
+    scan: "请打开微信，扫描二维码完成支付。",
+    qrAlt: "当前订单的微信支付二维码",
+    pending: "正在等待支付确认，付款后请刷新查看订单状态。",
+    paid: "支付已确认，感谢你的支持！",
+    refresh: "刷新支付状态",
+    billing: "查看账单",
   },
   errors: {
     alreadySubscribed: "你已有生效中的订阅，可在账单页管理。",
@@ -32,7 +56,7 @@ export default {
   },
   billing: {
     title: "账单",
-    success: "支付成功，感谢你的支持！",
+    success: "已从收银台返回。支付记录出现在订单历史中后，才表示支付已确认。",
     subscription: "订阅",
     none: "你还没有生效中的订阅。",
     viewPlans: "查看套餐",

@@ -8,13 +8,55 @@ Edit `packages/payment/src/plans.ts`. Amounts are in the currency's minor unit (
 
 Checkout uses inline prices by default. To use prices managed in your provider dashboard, set `providerRefs`, e.g. `providerRefs: { stripe: "price_123" }`.{{#if (includes module.providers "polar")}} Polar has no inline prices: every plan needs `providerRefs.polar` set to a Polar product ID.{{/if}}
 
+Selecting `wechat` or `alipay` generates CNY one-time credit packs, including when combined with global providers. Domestic providers reject subscriptions and non-CNY plans. Edit the generated plans for your actual prices; no automatic renewal is implied.
+
 ## Flow
 
-1. `/pricing` posts to the `startCheckout` server action, which creates a `pending` order and redirects to the provider.
+1. `/pricing` shows configured providers compatible with each plan. `startCheckout` creates a `pending` order and redirects to the provider, or to an authenticated local QR page for WeChat.
 2. The provider calls `/api/payment/webhook/<provider>`.
 3. The order becomes `paid` and `payment.order_paid` is emitted. Renewals create a new paid order and emit the same event with `renewal: true`.
 
 Orders change state at most once. `payment.order_paid` is delivered at least once: if a handler throws, the webhook fails, the provider retries and the event is emitted again. Make handlers idempotent on `orderId`, as the credits integration does.
+
+Domestic settlement checks the signed merchant/app identity, stored order provider, amount and currency before fulfillment. Browser return URLs never grant purchases or prove payment. QR pages read the signed-in user's order only; refresh after paying to see the webhook-confirmed state.
+{{#if (includes module.providers "wechat")}}
+
+## WeChat Native Pay
+
+Requires an approved ordinary merchant with Native Pay enabled and an AppID bound to that merchant. This is separate from WeChat website login. Set `BETTER_AUTH_URL` to your publicly reachable HTTPS application origin.
+
+| Variable | Purpose |
+| --- | --- |
+| `WECHAT_PAY_APP_ID` | Merchant-bound application ID |
+| `WECHAT_PAY_MCH_ID` | Merchant number |
+| `WECHAT_PAY_SERIAL_NO` | Merchant API certificate serial (hexadecimal) |
+| `WECHAT_PAY_PRIVATE_KEY` | Merchant RSA private key PEM |
+| `WECHAT_PAY_API_V3_KEY` | Exactly 32-byte APIv3 key for notification decryption |
+| `WECHAT_PAY_PUBLIC_KEY_ID` | WeChat payment public-key ID (`PUB_KEY_ID_…`) |
+| `WECHAT_PAY_PUBLIC_KEY` | Matching WeChat payment RSA public key PEM |
+
+This adapter uses pinned public-key mode, not automatic platform certificate downloads. Keep the key and ID updated together when rotating credentials. PEM values may use escaped `\n` newlines. Never expose private keys or the APIv3 key to the browser.
+
+The adapter signs `/v3/pay/transactions/native` requests and verifies signed responses before rendering the QR. Notifications at `/api/payment/webhook/wechat` must pass signature, key-ID and five-minute timestamp checks before AES-256-GCM decryption. Keep server time synchronized. Successful handling returns HTTP 204. QR links expire at the provider; start a new checkout if expired.
+
+Protocol references: [Native checkout](https://pay.weixin.qq.com/doc/v3/merchant/4012791877), [payment notifications](https://pay.weixin.qq.com/doc/v3/merchant/4012791882).
+{{/if}}
+{{#if (includes module.providers "alipay")}}
+
+## Alipay desktop website payment
+
+Requires an approved application with the desktop website payment product enabled. This adapter uses RSA2 plain-public-key mode and a PKCS8 application private key; certificate mode is not included.
+
+| Variable | Purpose |
+| --- | --- |
+| `ALIPAY_APP_ID` | Application ID |
+| `ALIPAY_SELLER_ID` | Receiving merchant's seller ID |
+| `ALIPAY_PRIVATE_KEY` | Application PKCS8 private key PEM or base64 |
+| `ALIPAY_PUBLIC_KEY` | Alipay verification public key, not your application's public key |
+| `ALIPAY_SANDBOX` | `true` for sandbox, `false` (default) for production; Varlock supplies a boolean |
+
+The [official SDK](https://github.com/alipay/alipay-sdk-nodejs-all) signs `alipay.trade.page.pay` with `FAST_INSTANT_TRADE_PAY`. Use matching sandbox keys/accounts when sandbox is enabled. Set a reachable HTTPS `BETTER_AUTH_URL`; asynchronous notifications go to `/api/payment/webhook/alipay` and return plain `success` only after fulfillment, otherwise `failure`. Duplicate form fields, invalid signatures, wrong app/seller IDs and mismatched totals are rejected. Only `TRADE_SUCCESS` and `TRADE_FINISHED` grant purchases. The browser return only navigates to billing.
+{{/if}}
 {{#if (includes module.providers "stripe")}}
 
 ## Stripe
@@ -54,7 +96,7 @@ Webhook endpoint: `<BETTER_AUTH_URL>/api/payment/webhook/polar`, format "Raw", w
 
 ## Mock provider
 
-`mock` completes checkouts locally through `/api/payment/mock` without any account. Checkout uses the first configured provider, so `mock` takes over in development until real credentials are set. It is disabled in production; remove it from `packages/payment/src/providers/index.ts` before launch.
+`mock` completes checkouts locally through `/api/payment/mock` without any account and appears as an explicit development payment choice. It is disabled in production; remove it from `packages/payment/src/providers/index.ts` before launch.
 {{/if}}
 
 ## Adding a provider

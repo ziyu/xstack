@@ -27461,6 +27461,7 @@ export const paymentOrder = pgTable(
     provider: text("provider").notNull(),
     /** Checkout session or invoice ID at the provider. */
     providerRef: text("provider_ref"),
+    qrCodeUrl: text("qr_code_url"),
     status: text("status", { enum: ["pending", "paid", "failed", "refunded"] })
       .notNull()
       .default("pending"),
@@ -27520,6 +27521,7 @@ export const paymentOrder = sqliteTable(
     provider: text("provider").notNull(),
     /** Checkout session or invoice ID at the provider. */
     providerRef: text("provider_ref"),
+    qrCodeUrl: text("qr_code_url"),
     status: text("status", { enum: ["pending", "paid", "failed", "refunded"] })
       .notNull()
       .default("pending"),
@@ -27578,13 +27580,55 @@ Edit \`packages/payment/src/plans.ts\`. Amounts are in the currency's minor unit
 
 Checkout uses inline prices by default. To use prices managed in your provider dashboard, set \`providerRefs\`, e.g. \`providerRefs: { stripe: "price_123" }\`.{{#if (includes module.providers "polar")}} Polar has no inline prices: every plan needs \`providerRefs.polar\` set to a Polar product ID.{{/if}}
 
+Selecting \`wechat\` or \`alipay\` generates CNY one-time credit packs, including when combined with global providers. Domestic providers reject subscriptions and non-CNY plans. Edit the generated plans for your actual prices; no automatic renewal is implied.
+
 ## Flow
 
-1. \`/pricing\` posts to the \`startCheckout\` server action, which creates a \`pending\` order and redirects to the provider.
+1. \`/pricing\` shows configured providers compatible with each plan. \`startCheckout\` creates a \`pending\` order and redirects to the provider, or to an authenticated local QR page for WeChat.
 2. The provider calls \`/api/payment/webhook/<provider>\`.
 3. The order becomes \`paid\` and \`payment.order_paid\` is emitted. Renewals create a new paid order and emit the same event with \`renewal: true\`.
 
 Orders change state at most once. \`payment.order_paid\` is delivered at least once: if a handler throws, the webhook fails, the provider retries and the event is emitted again. Make handlers idempotent on \`orderId\`, as the credits integration does.
+
+Domestic settlement checks the signed merchant/app identity, stored order provider, amount and currency before fulfillment. Browser return URLs never grant purchases or prove payment. QR pages read the signed-in user's order only; refresh after paying to see the webhook-confirmed state.
+{{#if (includes module.providers "wechat")}}
+
+## WeChat Native Pay
+
+Requires an approved ordinary merchant with Native Pay enabled and an AppID bound to that merchant. This is separate from WeChat website login. Set \`BETTER_AUTH_URL\` to your publicly reachable HTTPS application origin.
+
+| Variable | Purpose |
+| --- | --- |
+| \`WECHAT_PAY_APP_ID\` | Merchant-bound application ID |
+| \`WECHAT_PAY_MCH_ID\` | Merchant number |
+| \`WECHAT_PAY_SERIAL_NO\` | Merchant API certificate serial (hexadecimal) |
+| \`WECHAT_PAY_PRIVATE_KEY\` | Merchant RSA private key PEM |
+| \`WECHAT_PAY_API_V3_KEY\` | Exactly 32-byte APIv3 key for notification decryption |
+| \`WECHAT_PAY_PUBLIC_KEY_ID\` | WeChat payment public-key ID (\`PUB_KEY_ID_…\`) |
+| \`WECHAT_PAY_PUBLIC_KEY\` | Matching WeChat payment RSA public key PEM |
+
+This adapter uses pinned public-key mode, not automatic platform certificate downloads. Keep the key and ID updated together when rotating credentials. PEM values may use escaped \`\\n\` newlines. Never expose private keys or the APIv3 key to the browser.
+
+The adapter signs \`/v3/pay/transactions/native\` requests and verifies signed responses before rendering the QR. Notifications at \`/api/payment/webhook/wechat\` must pass signature, key-ID and five-minute timestamp checks before AES-256-GCM decryption. Keep server time synchronized. Successful handling returns HTTP 204. QR links expire at the provider; start a new checkout if expired.
+
+Protocol references: [Native checkout](https://pay.weixin.qq.com/doc/v3/merchant/4012791877), [payment notifications](https://pay.weixin.qq.com/doc/v3/merchant/4012791882).
+{{/if}}
+{{#if (includes module.providers "alipay")}}
+
+## Alipay desktop website payment
+
+Requires an approved application with the desktop website payment product enabled. This adapter uses RSA2 plain-public-key mode and a PKCS8 application private key; certificate mode is not included.
+
+| Variable | Purpose |
+| --- | --- |
+| \`ALIPAY_APP_ID\` | Application ID |
+| \`ALIPAY_SELLER_ID\` | Receiving merchant's seller ID |
+| \`ALIPAY_PRIVATE_KEY\` | Application PKCS8 private key PEM or base64 |
+| \`ALIPAY_PUBLIC_KEY\` | Alipay verification public key, not your application's public key |
+| \`ALIPAY_SANDBOX\` | \`true\` for sandbox, \`false\` (default) for production; Varlock supplies a boolean |
+
+The [official SDK](https://github.com/alipay/alipay-sdk-nodejs-all) signs \`alipay.trade.page.pay\` with \`FAST_INSTANT_TRADE_PAY\`. Use matching sandbox keys/accounts when sandbox is enabled. Set a reachable HTTPS \`BETTER_AUTH_URL\`; asynchronous notifications go to \`/api/payment/webhook/alipay\` and return plain \`success\` only after fulfillment, otherwise \`failure\`. Duplicate form fields, invalid signatures, wrong app/seller IDs and mismatched totals are rejected. Only \`TRADE_SUCCESS\` and \`TRADE_FINISHED\` grant purchases. The browser return only navigates to billing.
+{{/if}}
 {{#if (includes module.providers "stripe")}}
 
 ## Stripe
@@ -27624,14 +27668,14 @@ Webhook endpoint: \`<BETTER_AUTH_URL>/api/payment/webhook/polar\`, format "Raw",
 
 ## Mock provider
 
-\`mock\` completes checkouts locally through \`/api/payment/mock\` without any account. Checkout uses the first configured provider, so \`mock\` takes over in development until real credentials are set. It is disabled in production; remove it from \`packages/payment/src/providers/index.ts\` before launch.
+\`mock\` completes checkouts locally through \`/api/payment/mock\` without any account and appears as an explicit development payment choice. It is disabled in production; remove it from \`packages/payment/src/providers/index.ts\` before launch.
 {{/if}}
 
 ## Adding a provider
 
 Create \`packages/payment/src/providers/<id>.ts\` exporting \`createProvider({ env, baseUrl })\` and \`ProviderConfig\`, then register it in \`providers/index.ts\`. Map the provider's webhooks to the three normalized events in \`types.ts\`.
 `],
-  ["modules/payment/files/packages/i18n/src/messages/en/payment.ts", `export default {
+  ["modules/payment/files/packages/i18n/src/messages/en/payment.ts.hbs", `export default {
   nav: {
     pricing: "Pricing",
     billing: "Billing",
@@ -27643,8 +27687,13 @@ Create \`packages/payment/src/providers/<id>.ts\` exporting \`createProvider({ e
       description: "A one-time purchase to get going.",
     },
     pro: {
+{{#if (or (includes module.providers "wechat") (includes module.providers "alipay"))}}
+      name: "Pro pack",
+      description: "More credits in a one-time purchase. No auto-renewal.",
+{{else}}
       name: "Pro",
       description: "For teams shipping every week.",
+{{/if}}
     },
   },
   pricing: {
@@ -27656,8 +27705,27 @@ Create \`packages/payment/src/providers/<id>.ts\` exporting \`createProvider({ e
     },
     oneTime: "one-time",
     credits: "Includes {credits} credits",
-    subscribe: "Subscribe",
-    buy: "Buy now",
+    subscribeWith: "Subscribe with {provider}",
+    buyWith: "Pay with {provider}",
+    unavailable: "Payment unavailable",
+    noProviders: "No payment method is currently available for this plan.",
+  },
+  providers: {
+    stripe: "Stripe",
+    polar: "Polar",
+    mock: "Mock (development)",
+    wechat: "WeChat Pay",
+    alipay: "Alipay",
+  },
+  checkout: {
+    title: "Complete your payment",
+    amount: "Order total",
+    scan: "Open WeChat and scan this QR code to pay.",
+    qrAlt: "WeChat Pay QR code for this order",
+    pending: "Waiting for payment confirmation. Refresh after paying to check your order.",
+    paid: "Payment confirmed. Thank you!",
+    refresh: "Refresh payment status",
+    billing: "View billing",
   },
   errors: {
     alreadySubscribed: "You already have an active subscription. Manage it from Billing.",
@@ -27665,7 +27733,7 @@ Create \`packages/payment/src/providers/<id>.ts\` exporting \`createProvider({ e
   },
   billing: {
     title: "Billing",
-    success: "Payment received. Thank you!",
+    success: "Returned from checkout. Payment is confirmed only when it appears in your order history.",
     subscription: "Subscription",
     none: "You don't have an active subscription.",
     viewPlans: "View plans",
@@ -27703,7 +27771,7 @@ Create \`packages/payment/src/providers/<id>.ts\` exporting \`createProvider({ e
   },
 } as const;
 `],
-  ["modules/payment/files/packages/i18n/src/messages/zh-CN/payment.ts", `export default {
+  ["modules/payment/files/packages/i18n/src/messages/zh-CN/payment.ts.hbs", `export default {
   nav: {
     pricing: "定价",
     billing: "账单",
@@ -27715,8 +27783,13 @@ Create \`packages/payment/src/providers/<id>.ts\` exporting \`createProvider({ e
       description: "一次性购买，快速上手。",
     },
     pro: {
+{{#if (or (includes module.providers "wechat") (includes module.providers "alipay"))}}
+      name: "专业积分包",
+      description: "一次性购买更多积分，不自动续费。",
+{{else}}
       name: "专业版",
       description: "适合每周都在交付的团队。",
+{{/if}}
     },
   },
   pricing: {
@@ -27728,8 +27801,27 @@ Create \`packages/payment/src/providers/<id>.ts\` exporting \`createProvider({ e
     },
     oneTime: "一次性",
     credits: "包含 {credits} 积分",
-    subscribe: "订阅",
-    buy: "立即购买",
+    subscribeWith: "使用{provider}订阅",
+    buyWith: "使用{provider}支付",
+    unavailable: "暂时无法支付",
+    noProviders: "当前套餐暂无可用的支付方式。",
+  },
+  providers: {
+    stripe: "Stripe",
+    polar: "Polar",
+    mock: "模拟支付（开发环境）",
+    wechat: "微信",
+    alipay: "支付宝",
+  },
+  checkout: {
+    title: "完成支付",
+    amount: "订单金额",
+    scan: "请打开微信，扫描二维码完成支付。",
+    qrAlt: "当前订单的微信支付二维码",
+    pending: "正在等待支付确认，付款后请刷新查看订单状态。",
+    paid: "支付已确认，感谢你的支持！",
+    refresh: "刷新支付状态",
+    billing: "查看账单",
   },
   errors: {
     alreadySubscribed: "你已有生效中的订阅，可在账单页管理。",
@@ -27737,7 +27829,7 @@ Create \`packages/payment/src/providers/<id>.ts\` exporting \`createProvider({ e
   },
   billing: {
     title: "账单",
-    success: "支付成功，感谢你的支持！",
+    success: "已从收银台返回。支付记录出现在订单历史中后，才表示支付已确认。",
     subscription: "订阅",
     none: "你还没有生效中的订阅。",
     viewPlans: "查看套餐",
@@ -27840,7 +27932,6 @@ export type PaymentOptions = {
 
 export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
   const providers = createProviders(env, baseUrl);
-  const defaultProvider = providers.find((p) => p.configured);
 
   function provider(id: string): PaymentProvider {
     const found = providers.find((p) => p.id === id);
@@ -27863,21 +27954,28 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
     return row;
   }
 
-  /** Marks the order paid; returns it when it is (or already was) paid. */
+  /** Match the signed settlement to the stored order before changing state. */
   async function markPaid(
-    orderId: string,
-    providerRef: string,
+    providerId: string,
+    event: Extract<WebhookEvent, { type: "checkout.completed" }>,
   ): Promise<typeof paymentOrder.$inferSelect | undefined> {
-    const [updated] = await db
-      .update(paymentOrder)
-      .set({ status: "paid", providerRef, paidAt: new Date() })
-      .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "pending")))
+    const [order] = await db.select().from(paymentOrder).where(eq(paymentOrder.id, event.orderId));
+    if (!order || order.provider !== providerId ||
+      (event.amount !== undefined && event.amount !== order.amount) ||
+      (event.currency !== undefined && event.currency.toLowerCase() !== order.currency.toLowerCase()) ||
+      (order.status === "paid" && order.providerRef !== event.providerRef)) {
+      throw new PaymentError("provider_error", "Payment does not match the stored order");
+    }
+    const [updated] = await db.update(paymentOrder)
+      .set({ status: "paid", providerRef: event.providerRef, paidAt: new Date(), qrCodeUrl: null })
+      .where(and(eq(paymentOrder.id, event.orderId), eq(paymentOrder.status, "pending")))
       .returning();
     if (updated) return updated;
-    const [existing] = await db
-      .select()
-      .from(paymentOrder)
-      .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "paid")));
+    const [existing] = await db.select().from(paymentOrder).where(and(
+      eq(paymentOrder.id, event.orderId), eq(paymentOrder.status, "paid"),
+      eq(paymentOrder.providerRef, event.providerRef),
+    ));
+    if (!existing) throw new PaymentError("provider_error", "Order cannot be settled");
     return existing;
   }
 
@@ -27897,7 +27995,7 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
   async function apply(providerId: string, event: WebhookEvent) {
     switch (event.type) {
       case "checkout.completed": {
-        const order = await markPaid(event.orderId, event.providerRef);
+        const order = await markPaid(providerId, event);
         if (order) await emitPaid(order, false);
         return;
       }
@@ -27982,6 +28080,17 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
   return {
     plans,
     providers: providers.map((p) => p.id),
+    availableProviders(planId: string): string[] {
+      const plan = getPlan(planId);
+      return plan ? providers.filter((p) => p.configured && (p.supportsPlan?.(plan) ?? true)).map((p) => p.id) : [];
+    },
+
+    async getOrder(userId: string, orderId: string) {
+      const [order] = await db.select().from(paymentOrder).where(and(
+        eq(paymentOrder.id, orderId), eq(paymentOrder.userId, userId),
+      ));
+      return order;
+    },
 
     /** Creates a pending order and returns the provider's checkout URL. */
     async checkout(input: {
@@ -27991,18 +28100,24 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
       /** App paths, e.g. \`/en/dashboard/billing\`. */
       successPath: string;
       cancelPath: string;
+      checkoutPath?: string;
     }): Promise<string> {
       const plan = getPlan(input.planId);
       if (!plan) throw new PaymentError("unknown_plan", \`Unknown plan "\${input.planId}"\`);
-      const gateway = input.provider ? provider(input.provider) : defaultProvider;
-      if (!gateway) throw new PaymentError("unknown_provider", "No payment provider configured");
+      const gateway = input.provider ? provider(input.provider) : providers.find(
+        (p) => p.configured && (p.supportsPlan?.(plan) ?? true),
+      );
+      if (!gateway?.configured) throw new PaymentError("unknown_provider", "No payment provider configured");
+      if (!(gateway.supportsPlan?.(plan) ?? true)) {
+        throw new PaymentError("provider_error", "Provider does not support this plan");
+      }
 
       const current = await activeSubscription(input.user.id);
-      if (plan.mode === "subscription" && current) {
+      if (plan.mode !== "payment" && current) {
         throw new PaymentError("already_subscribed", "You already have an active subscription");
       }
 
-      const orderId = crypto.randomUUID();
+      const orderId = crypto.randomUUID().replaceAll("-", "");
       await db.insert(paymentOrder).values({
         id: orderId,
         userId: input.user.id,
@@ -28030,9 +28145,11 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
         });
       await db
         .update(paymentOrder)
-        .set({ providerRef: session.providerRef })
-        .where(eq(paymentOrder.id, orderId));
-      return session.url;
+        .set({ providerRef: session.providerRef, qrCodeUrl: session.qrCodeUrl ?? null })
+        .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "pending")));
+      return session.qrCodeUrl
+        ? new URL(\`\${input.checkoutPath ?? "/en/payment"}/\${orderId}\`, baseUrl).toString()
+        : session.url;
     },
 
     /** Verifies and applies a provider webhook. Safe to call repeatedly with the same event. */
@@ -28084,7 +28201,7 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
 
 export type Payment = ReturnType<typeof createPayment>;
 `],
-  ["modules/payment/files/packages/payment/src/plans.ts", `import type { Plan } from "./types";
+  ["modules/payment/files/packages/payment/src/plans.ts.hbs", `import type { Plan } from "./types";
 
 /**
  * Your pricing. Names and descriptions are translated in
@@ -28095,15 +28212,27 @@ export const plans = [
     id: "starter",
     mode: "payment",
     amount: 900,
+{{#if (or (includes module.providers "wechat") (includes module.providers "alipay"))}}
+    currency: "cny",
+{{else}}
     currency: "usd",
+{{/if}}
     credits: 500,
   },
   {
     id: "pro",
+{{#if (or (includes module.providers "wechat") (includes module.providers "alipay"))}}
+    mode: "payment",
+{{else}}
     mode: "subscription",
     interval: "month",
+{{/if}}
     amount: 1900,
+{{#if (or (includes module.providers "wechat") (includes module.providers "alipay"))}}
+    currency: "cny",
+{{else}}
     currency: "usd",
+{{/if}}
     credits: 3000,
     highlighted: true,
   },
@@ -28163,7 +28292,7 @@ export type CheckoutRequest = {
   cancelUrl: string;
 };
 
-export type CheckoutSession = { url: string; providerRef: string };
+export type CheckoutSession = { url: string; providerRef: string; qrCodeUrl?: string };
 
 /** Provider webhooks normalized into the events the payment service understands. */
 export type WebhookEvent =
@@ -28171,6 +28300,8 @@ export type WebhookEvent =
       type: "checkout.completed";
       orderId: string;
       providerRef: string;
+      amount?: number;
+      currency?: string;
       customerRef?: string;
       subscriptionRef?: string;
     }
@@ -28199,6 +28330,7 @@ export interface PaymentProvider {
   readonly id: string;
   /** False when credentials are missing; checkout then defaults to the next configured provider. */
   readonly configured: boolean;
+  supportsPlan?(plan: Plan): boolean;
   createCheckout(request: CheckoutRequest): Promise<CheckoutSession>;
   /** Verifies the request signature and returns the events it carries (possibly none). */
   parseWebhook(request: Request): Promise<WebhookEvent[]>;
@@ -28308,6 +28440,92 @@ export default async function BillingPage({ params, searchParams }: Props) {
   );
 }
 `],
+  ["modules/payment/frameworks/next/apps/web/src/app/[lang]/payment/[orderId]/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
+import { buttonVariants } from "@{{projectName}}/ui/components/button";
+import type { Metadata } from "next";
+{{#if (includes module.providers "wechat")}}
+import Image from "next/image";
+{{/if}}
+import Link from "next/link";
+import { notFound } from "next/navigation";
+{{#if (includes module.providers "wechat")}}
+import QRCode from "qrcode";
+{{/if}}
+
+import { formatMoney } from "@/lib/format";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = {
+  params: Promise<{ lang: string; orderId: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("payment.checkout.title") };
+}
+
+export default async function PaymentPage({ params }: Props) {
+  const { lang, orderId } = await params;
+  const locale = resolveLocale(lang);
+  const t = getTranslator(locale);
+  const orderPath = \`/payment/\${encodeURIComponent(orderId)}\` as const;
+  const user = await requireUser(locale, orderPath);
+  const order = await payment.getOrder(user.id, orderId);
+  if (!order) notFound();
+{{#if (includes module.providers "wechat")}}
+  const qrImage = order.status === "pending" && order.qrCodeUrl
+    ? await QRCode.toDataURL(order.qrCodeUrl, { width: 256, margin: 2 })
+    : null;
+{{/if}}
+
+  return (
+    <div className="container mx-auto flex max-w-lg flex-col gap-8 px-4 py-16">
+      <h1 className="font-semibold text-2xl tracking-tight">{t("payment.checkout.title")}</h1>
+      <section className="flex flex-col items-center gap-6 border p-6 text-center">
+        <div className="flex flex-col gap-2">
+          <p className="text-muted-foreground text-sm">{t("payment.checkout.amount")}</p>
+          <p className="font-semibold text-3xl tabular-nums">
+            {formatMoney(order.amount, order.currency, locale)}
+          </p>
+        </div>
+        {order.status === "paid" ? (
+          <p role="status">{t("payment.checkout.paid")}</p>
+        ) : order.status === "pending" ? (
+          <>
+{{#if (includes module.providers "wechat")}}
+            {qrImage && (
+              <>
+                <Image
+                  src={qrImage}
+                  alt={t("payment.checkout.qrAlt")}
+                  width={256}
+                  height={256}
+                  unoptimized
+                />
+                <p className="text-sm">{t("payment.checkout.scan")}</p>
+              </>
+            )}
+{{/if}}
+            <p role="status" className="text-muted-foreground text-sm">
+              {t("payment.checkout.pending")}
+            </p>
+            <a href={localePath(locale, orderPath)} className={buttonVariants()}>
+              {t("payment.checkout.refresh")}
+            </a>
+          </>
+        ) : (
+          <p role="status">{t(\`payment.admin.status.\${order.status}\`)}</p>
+        )}
+        <Link href={localePath(locale, "/dashboard/billing")} className={buttonVariants({ variant: "outline" })}>
+          {t("payment.checkout.billing")}
+        </Link>
+      </section>
+    </div>
+  );
+}
+`],
   ["modules/payment/frameworks/next/apps/web/src/app/[lang]/pricing/actions.ts.hbs", `"use server";
 
 import { payment } from "@{{projectName}}/app-services";
@@ -28328,6 +28546,8 @@ export async function startCheckout(formData: FormData) {
     url = await payment.checkout({
       user,
       planId: String(formData.get("planId")),
+      provider: String(formData.get("provider")),
+      checkoutPath: localePath(locale, "/payment"),
       successPath: \`\${localePath(locale, "/dashboard/billing")}?status=success\`,
       cancelPath: localePath(locale, "/pricing"),
     });
@@ -28344,7 +28564,8 @@ export async function openBillingPortal(formData: FormData) {
   redirect((await payment.portalUrl(user.id, localePath(locale, "/dashboard/billing"))) as Route);
 }
 `],
-  ["modules/payment/frameworks/next/apps/web/src/app/[lang]/pricing/page.tsx.hbs", `import { plans } from "@{{projectName}}/payment";
+  ["modules/payment/frameworks/next/apps/web/src/app/[lang]/pricing/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
+import { plans, type Plan } from "@{{projectName}}/payment";
 import { Button } from "@{{projectName}}/ui/components/button";
 import type { Metadata } from "next";
 
@@ -28367,6 +28588,13 @@ export default async function PricingPage({ params, searchParams }: Props) {
   const locale = resolveLocale((await params).lang);
   const t = getTranslator(locale);
   const { error } = await searchParams;
+  const providerLabels: Record<string, string> = {
+    stripe: t("payment.providers.stripe"),
+    polar: t("payment.providers.polar"),
+    mock: t("payment.providers.mock"),
+    wechat: t("payment.providers.wechat"),
+    alipay: t("payment.providers.alipay"),
+  };
 
   return (
     <div className="container mx-auto flex max-w-5xl flex-col gap-10 px-4 py-16">
@@ -28382,7 +28610,10 @@ export default async function PricingPage({ params, searchParams }: Props) {
         )}
       </div>
       <div className="mx-auto grid w-full max-w-3xl gap-6 md:grid-cols-2">
-        {plans.map((plan) => (
+        {plans.map((plan) => {
+          const providers = payment.availableProviders(plan.id);
+          const { interval, mode }: Plan = plan;
+          return (
           <div
             key={plan.id}
             className={\`flex flex-col gap-6 border p-6 \${"highlighted" in plan ? "border-primary" : ""}\`}
@@ -28398,8 +28629,8 @@ export default async function PricingPage({ params, searchParams }: Props) {
                 {formatMoney(plan.amount, plan.currency, locale)}
               </span>
               <span className="text-muted-foreground text-sm">
-                {"interval" in plan
-                  ? t(\`payment.pricing.per.\${plan.interval}\`)
+                {interval
+                  ? t(\`payment.pricing.per.\${interval}\`)
                   : t("payment.pricing.oneTime")}
               </span>
             </p>
@@ -28408,15 +28639,30 @@ export default async function PricingPage({ params, searchParams }: Props) {
               <p className="text-sm">{t("payment.pricing.credits", { credits: plan.credits })}</p>
             )}
 {{/if}}
-            <form action={startCheckout} className="mt-auto">
-              <input type="hidden" name="planId" value={plan.id} />
-              <input type="hidden" name="locale" value={locale} />
-              <Button type="submit" className="w-full" variant={"highlighted" in plan ? "default" : "outline"}>
-                {plan.mode === "subscription" ? t("payment.pricing.subscribe") : t("payment.pricing.buy")}
-              </Button>
-            </form>
+            <div className="mt-auto flex flex-col gap-3">
+              {providers.length > 0 ? providers.map((provider) => (
+                <form key={provider} action={startCheckout}>
+                  <input type="hidden" name="planId" value={plan.id} />
+                  <input type="hidden" name="locale" value={locale} />
+                  <input type="hidden" name="provider" value={provider} />
+                  <Button type="submit" className="w-full" variant={"highlighted" in plan ? "default" : "outline"}>
+                    {t(mode !== "payment" ? "payment.pricing.subscribeWith" : "payment.pricing.buyWith", {
+                      provider: providerLabels[provider] ?? provider,
+                    })}
+                  </Button>
+                </form>
+              )) : (
+                <>
+                  <Button type="button" className="w-full" variant="outline" disabled>
+                    {t("payment.pricing.unavailable")}
+                  </Button>
+                  <p className="text-muted-foreground text-sm">{t("payment.pricing.noProviders")}</p>
+                </>
+              )}
+            </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -28432,9 +28678,12 @@ export async function POST(
   const { provider } = await params;
   try {
     await payment.handleWebhook(provider, request);
+    if (provider === "alipay") return new Response("success");
+    if (provider === "wechat") return new Response(null, { status: 204 });
     return Response.json({ received: true });
   } catch (error) {
     console.error(\`[payment] \${provider} webhook failed\`, error);
+    if (provider === "alipay") return new Response("failure", { status: 400 });
     return Response.json({ error: "Webhook handling failed" }, { status: 400 });
   }
 }
@@ -28525,6 +28774,183 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
       />
     </div>
   );
+}
+`],
+  ["modules/payment/providers/alipay/packages/payment/src/providers/alipay.ts", `import { createPrivateKey, createPublicKey } from "node:crypto";
+
+import { AlipaySdk } from "alipay-sdk";
+
+import type { PaymentProvider, Plan, ProviderOptions, WebhookEvent } from "../types";
+
+export type ProviderConfig = {
+  ALIPAY_APP_ID?: string;
+  ALIPAY_PRIVATE_KEY?: string;
+  ALIPAY_PUBLIC_KEY?: string;
+  ALIPAY_SELLER_ID?: string;
+  ALIPAY_SANDBOX?: boolean;
+};
+
+const REQUIRED = [
+  "ALIPAY_APP_ID",
+  "ALIPAY_PRIVATE_KEY",
+  "ALIPAY_PUBLIC_KEY",
+  "ALIPAY_SELLER_ID",
+] as const;
+const ORDER_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+function supportsPlan(plan: Plan): boolean {
+  return (
+    plan.mode === "payment" &&
+    plan.currency.toLowerCase() === "cny" &&
+    Number.isSafeInteger(plan.amount) &&
+    plan.amount > 0
+  );
+}
+
+function pem(value: string, label: "PRIVATE KEY" | "PUBLIC KEY"): string {
+  const normalized = value.replace(/\\\\n/g, "\\n").trim();
+  if (normalized.startsWith("-----BEGIN ")) {
+    if (
+      !normalized.startsWith(\`-----BEGIN \${label}-----\`) ||
+      !normalized.endsWith(\`-----END \${label}-----\`)
+    ) {
+      throw new Error(
+        "Alipay requires a PKCS8 private key and a plain public key, not certificates",
+      );
+    }
+    return normalized;
+  }
+  return \`-----BEGIN \${label}-----\\n\${normalized}\\n-----END \${label}-----\`;
+}
+
+function amountInCents(value: string | undefined): number {
+  // Parse decimal digits, never round a floating-point currency amount.
+  const match = value?.match(/^(0|[1-9][0-9]*)(?:\\.([0-9]{1,2}))?$/);
+  if (!match) throw new Error("Invalid Alipay total_amount");
+  const cents = BigInt(match[1]!) * BigInt(100) + BigInt((match[2] ?? "").padEnd(2, "0"));
+  if (cents <= BigInt(0) || cents > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error("Alipay total_amount must be positive safe integer cents");
+  }
+  return Number(cents);
+}
+
+export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>): PaymentProvider {
+  let client: AlipaySdk | undefined;
+  function alipay(): AlipaySdk {
+    if (client) return client;
+    for (const name of REQUIRED) {
+      if (!env[name]?.trim()) throw new Error(\`\${name} is not set; see docs/modules/payment.md\`);
+    }
+    if (!/^[0-9]+$/.test(env.ALIPAY_APP_ID!) || !/^[0-9]+$/.test(env.ALIPAY_SELLER_ID!)) {
+      throw new Error("Invalid Alipay app ID or seller ID");
+    }
+    if (
+      env.ALIPAY_SANDBOX !== undefined &&
+      env.ALIPAY_SANDBOX !== true &&
+      env.ALIPAY_SANDBOX !== false
+    ) {
+      throw new Error("ALIPAY_SANDBOX must be a boolean");
+    }
+    const privateKey = pem(env.ALIPAY_PRIVATE_KEY!, "PRIVATE KEY");
+    const publicKey = pem(env.ALIPAY_PUBLIC_KEY!, "PUBLIC KEY");
+    if (
+      createPrivateKey(privateKey).asymmetricKeyType !== "rsa" ||
+      createPublicKey(publicKey).asymmetricKeyType !== "rsa"
+    ) {
+      throw new Error("Alipay requires RSA private and public keys");
+    }
+    client = new AlipaySdk({
+      appId: env.ALIPAY_APP_ID!,
+      privateKey,
+      alipayPublicKey: publicKey,
+      keyType: "PKCS8",
+      signType: "RSA2",
+      charset: "utf-8",
+      gateway:
+        env.ALIPAY_SANDBOX === true
+          ? "https://openapi-sandbox.dl.alipaydev.com/gateway.do"
+          : "https://openapi.alipay.com/gateway.do",
+    });
+    return client;
+  }
+
+  return {
+    id: "alipay",
+    configured: REQUIRED.every((name) => Boolean(env[name]?.trim())),
+    supportsPlan,
+
+    async createCheckout({ orderId, plan, successUrl }) {
+      const sdk = alipay();
+      if (!supportsPlan(plan))
+        throw new Error("Alipay only supports positive one-time CNY payments");
+      if (!ORDER_ID.test(orderId)) throw new Error("Invalid Alipay merchant order ID");
+      const cents = BigInt(plan.amount);
+      const url = sdk.pageExecute("alipay.trade.page.pay", "GET", {
+        notifyUrl: new URL("/api/payment/webhook/alipay", baseUrl).toString(),
+        // Browser returns are navigation only; only verified POST notifications grant purchases.
+        returnUrl: successUrl,
+        bizContent: {
+          outTradeNo: orderId,
+          productCode: "FAST_INSTANT_TRADE_PAY",
+          totalAmount: \`\${cents / BigInt(100)}.\${String(cents % BigInt(100)).padStart(2, "0")}\`,
+          subject: plan.id,
+          sellerId: env.ALIPAY_SELLER_ID!,
+        },
+      });
+      return { url, providerRef: orderId };
+    },
+
+    async parseWebhook(request): Promise<WebhookEvent[]> {
+      const sdk = alipay();
+      if (request.method !== "POST") throw new Error("Alipay notifications require POST");
+      if (
+        request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !==
+        "application/x-www-form-urlencoded"
+      ) {
+        throw new Error("Alipay notifications require form-urlencoded content");
+      }
+      const fields: Record<string, string> = Object.create(null);
+      for (const [key, value] of new URLSearchParams(await request.text())) {
+        if (!key || Object.hasOwn(fields, key))
+          throw new Error("Duplicate or empty Alipay notification field");
+        fields[key] = value;
+      }
+      // URLSearchParams decodes exactly once. V2 does not decode '%' or '+' a second time.
+      if (fields.sign_type !== "RSA2" || !sdk.checkNotifySignV2(fields)) {
+        throw new Error("Invalid Alipay notification signature");
+      }
+      if (
+        fields.app_id !== env.ALIPAY_APP_ID ||
+        fields.seller_id !== env.ALIPAY_SELLER_ID ||
+        fields.notify_type !== "trade_status_sync"
+      ) {
+        throw new Error("Invalid Alipay notification app, seller or notification type");
+      }
+      if (fields.trade_status !== "TRADE_SUCCESS" && fields.trade_status !== "TRADE_FINISHED") {
+        return [];
+      }
+      const orderId = fields.out_trade_no;
+      const transactionId = fields.trade_no;
+      if (
+        !orderId ||
+        !ORDER_ID.test(orderId) ||
+        !transactionId ||
+        !/^[A-Za-z0-9_-]{1,64}$/.test(transactionId)
+      ) {
+        throw new Error("Invalid Alipay order or transaction reference");
+      }
+      return [
+        {
+          type: "checkout.completed",
+          orderId,
+          providerRef: transactionId,
+          amount: amountInCents(fields.total_amount),
+          // Desktop page payments are CNY; the notify protocol has no currency field.
+          currency: "cny",
+        },
+      ];
+    },
+  };
 }
 `],
   ["modules/payment/providers/mock/apps/web/src/app/api/payment/mock/route.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
@@ -28915,6 +29341,230 @@ export function createProvider({ env }: ProviderOptions<ProviderConfig>): Paymen
         return_url: returnUrl,
       });
       return session.url;
+    },
+  };
+}
+`],
+  ["modules/payment/providers/wechat/packages/payment/src/providers/wechat.ts", `import {
+  createDecipheriv,
+  createPrivateKey,
+  createPublicKey,
+  type KeyObject,
+  randomBytes,
+  sign,
+  verify,
+} from "node:crypto";
+
+import { z } from "zod";
+
+import type { PaymentProvider, Plan, ProviderOptions, WebhookEvent } from "../types";
+
+export type ProviderConfig = {
+  WECHAT_PAY_APP_ID?: string;
+  WECHAT_PAY_MCH_ID?: string;
+  WECHAT_PAY_SERIAL_NO?: string;
+  WECHAT_PAY_PRIVATE_KEY?: string;
+  WECHAT_PAY_API_V3_KEY?: string;
+  WECHAT_PAY_PUBLIC_KEY_ID?: string;
+  WECHAT_PAY_PUBLIC_KEY?: string;
+};
+
+type WeChatCredentials = {
+  appId: string;
+  mchId: string;
+  serialNo: string;
+  publicKeyId: string;
+  apiV3Key: Buffer;
+  privateKey: KeyObject;
+  publicKey: KeyObject;
+};
+
+const REQUIRED = [
+  "WECHAT_PAY_APP_ID",
+  "WECHAT_PAY_MCH_ID",
+  "WECHAT_PAY_SERIAL_NO",
+  "WECHAT_PAY_PRIVATE_KEY",
+  "WECHAT_PAY_API_V3_KEY",
+  "WECHAT_PAY_PUBLIC_KEY_ID",
+  "WECHAT_PAY_PUBLIC_KEY",
+] as const;
+const NATIVE_PATH = "/v3/pay/transactions/native";
+const ORDER_ID = /^[A-Za-z0-9_\\-|*]{6,32}$/;
+
+function supportsPlan(plan: Plan): boolean {
+  return (
+    plan.mode === "payment" &&
+    plan.currency.toLowerCase() === "cny" &&
+    Number.isSafeInteger(plan.amount) &&
+    plan.amount > 0
+  );
+}
+
+const base64Schema = z
+  .string()
+  .min(1)
+  .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/);
+const checkoutSchema = z.object({ code_url: z.string().startsWith("weixin://wxpay/bizpayurl/") });
+const notificationSchema = z.object({ event_type: z.string() });
+const resourceSchema = z.object({
+  resource_type: z.literal("encrypt-resource"),
+  resource: z.object({
+    original_type: z.literal("transaction"),
+    algorithm: z.literal("AEAD_AES_256_GCM"),
+    nonce: z.string().refine((value) => Buffer.byteLength(value, "utf8") === 12),
+    associated_data: z.string().optional(),
+    ciphertext: base64Schema,
+  }),
+});
+const transactionSchema = z.object({
+  appid: z.string(),
+  mchid: z.string(),
+  trade_state: z.literal("SUCCESS"),
+  trade_type: z.literal("NATIVE"),
+  amount: z.object({
+    currency: z.literal("CNY"),
+    total: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  }),
+  out_trade_no: z.string().regex(ORDER_ID),
+  transaction_id: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/),
+});
+
+export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>): PaymentProvider {
+  let config: WeChatCredentials | undefined;
+  function credentials(): WeChatCredentials {
+    if (config) return config;
+    for (const name of REQUIRED) {
+      if (!env[name]?.trim()) throw new Error(\`\${name} is not set; see docs/modules/payment.md\`);
+    }
+    const appId = env.WECHAT_PAY_APP_ID!;
+    const mchId = env.WECHAT_PAY_MCH_ID!;
+    const serialNo = env.WECHAT_PAY_SERIAL_NO!;
+    const publicKeyId = env.WECHAT_PAY_PUBLIC_KEY_ID!;
+    if (
+      !/^[A-Za-z0-9]{1,32}$/.test(appId) ||
+      !/^[0-9]{1,32}$/.test(mchId) ||
+      !/^[A-Fa-f0-9]+$/.test(serialNo) ||
+      !/^PUB_KEY_ID_[0-9]+$/.test(publicKeyId)
+    ) {
+      throw new Error(
+        "Invalid WeChat Pay app ID, merchant ID, certificate serial or public key ID",
+      );
+    }
+    const apiV3Key = Buffer.from(env.WECHAT_PAY_API_V3_KEY!, "utf8");
+    if (apiV3Key.length !== 32)
+      throw new Error("WECHAT_PAY_API_V3_KEY must contain exactly 32 bytes");
+    const privateKey = createPrivateKey(env.WECHAT_PAY_PRIVATE_KEY!.replace(/\\\\n/g, "\\n"));
+    const publicKey = createPublicKey(env.WECHAT_PAY_PUBLIC_KEY!.replace(/\\\\n/g, "\\n"));
+    if (privateKey.asymmetricKeyType !== "rsa" || publicKey.asymmetricKeyType !== "rsa") {
+      throw new Error("WeChat Pay requires RSA private and public keys");
+    }
+    config = { appId, mchId, serialNo, publicKeyId, apiV3Key, privateKey, publicKey };
+    return config;
+  }
+
+  function verifyMessage(headers: Headers, body: string): void {
+    const { publicKeyId, publicKey } = credentials();
+    const timestamp = headers.get("wechatpay-timestamp");
+    const nonce = headers.get("wechatpay-nonce");
+    if (
+      headers.get("wechatpay-serial") !== publicKeyId ||
+      !timestamp ||
+      !/^[0-9]+$/.test(timestamp) ||
+      !Number.isSafeInteger(Number(timestamp)) ||
+      Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300 ||
+      !nonce ||
+      /[\\r\\n]/.test(nonce)
+    ) {
+      throw new Error("Invalid WeChat Pay signature headers, key ID or timestamp");
+    }
+    const signature = Buffer.from(base64Schema.parse(headers.get("wechatpay-signature")), "base64");
+    if (
+      !verify("RSA-SHA256", Buffer.from(\`\${timestamp}\\n\${nonce}\\n\${body}\\n\`), publicKey, signature)
+    ) {
+      throw new Error("Invalid WeChat Pay signature");
+    }
+  }
+
+  return {
+    id: "wechat",
+    configured: REQUIRED.every((name) => Boolean(env[name]?.trim())),
+    supportsPlan,
+
+    async createCheckout({ orderId, plan }) {
+      const { appId, mchId, serialNo, publicKeyId, privateKey } = credentials();
+      if (!supportsPlan(plan))
+        throw new Error("WeChat Pay only supports positive one-time CNY payments");
+      if (!ORDER_ID.test(orderId)) throw new Error("Invalid WeChat Pay merchant order ID");
+      const body = JSON.stringify({
+        appid: appId,
+        mchid: mchId,
+        description: plan.id,
+        out_trade_no: orderId,
+        notify_url: new URL("/api/payment/webhook/wechat", baseUrl).toString(),
+        amount: { total: plan.amount, currency: "CNY" },
+      });
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const nonce = randomBytes(16).toString("hex");
+      const signature = sign(
+        "RSA-SHA256",
+        Buffer.from(\`POST\\n\${NATIVE_PATH}\\n\${timestamp}\\n\${nonce}\\n\${body}\\n\`),
+        privateKey,
+      ).toString("base64");
+      const response = await fetch(\`https://api.mch.weixin.qq.com\${NATIVE_PATH}\`, {
+        method: "POST",
+        redirect: "error",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "Wechatpay-Serial": publicKeyId,
+          Authorization: \`WECHATPAY2-SHA256-RSA2048 mchid="\${mchId}",nonce_str="\${nonce}",timestamp="\${timestamp}",serial_no="\${serialNo}",signature="\${signature}"\`,
+        },
+        body,
+      });
+      const responseBody = await response.text();
+      // Verify the original bytes before parsing or trusting a checkout URL.
+      verifyMessage(response.headers, responseBody);
+      if (!response.ok) throw new Error(\`WeChat Pay checkout failed with HTTP \${response.status}\`);
+      const { code_url: codeUrl } = checkoutSchema.parse(JSON.parse(responseBody));
+      return { url: codeUrl, qrCodeUrl: codeUrl, providerRef: orderId };
+    },
+
+    async parseWebhook(request): Promise<WebhookEvent[]> {
+      const { appId, mchId, apiV3Key } = credentials();
+      if (request.method !== "POST") throw new Error("WeChat Pay notifications require POST");
+      const body = await request.text();
+      verifyMessage(request.headers, body);
+      const parsed: unknown = JSON.parse(body);
+      const notification = notificationSchema.parse(parsed);
+      if (notification.event_type !== "TRANSACTION.SUCCESS") return [];
+      const { resource } = resourceSchema.parse(parsed);
+      const encrypted = Buffer.from(resource.ciphertext, "base64");
+      if (encrypted.length <= 16) throw new Error("Invalid WeChat Pay notification ciphertext");
+      const decipher = createDecipheriv(
+        "aes-256-gcm",
+        apiV3Key,
+        Buffer.from(resource.nonce, "utf8"),
+      );
+      decipher.setAuthTag(encrypted.subarray(encrypted.length - 16));
+      decipher.setAAD(Buffer.from(resource.associated_data ?? "", "utf8"));
+      const plaintext = Buffer.concat([
+        decipher.update(encrypted.subarray(0, encrypted.length - 16)),
+        decipher.final(),
+      ]).toString("utf8");
+      const transaction = transactionSchema.parse(JSON.parse(plaintext));
+      const { amount } = transaction;
+      if (transaction.appid !== appId || transaction.mchid !== mchId) {
+        throw new Error("Invalid WeChat Pay merchant or app identity");
+      }
+      return [
+        {
+          type: "checkout.completed",
+          orderId: transaction.out_trade_no,
+          providerRef: transaction.transaction_id,
+          amount: amount.total,
+          currency: "cny",
+        },
+      ];
     },
   };
 }
@@ -31122,4 +31772,4 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 `]
 ]);
 
-export const TEMPLATE_COUNT = 588;
+export const TEMPLATE_COUNT = 591;

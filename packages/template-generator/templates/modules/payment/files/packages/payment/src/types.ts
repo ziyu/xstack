@@ -32,7 +32,7 @@ export type CheckoutRequest = {
   cancelUrl: string;
 };
 
-export type CheckoutSession = { url: string; providerRef: string };
+export type CheckoutSession = { url: string; providerRef: string; qrCodeUrl?: string };
 
 /** Provider webhooks normalized into the events the payment service understands. */
 export type WebhookEvent =
@@ -40,6 +40,8 @@ export type WebhookEvent =
       type: "checkout.completed";
       orderId: string;
       providerRef: string;
+      amount?: number;
+      currency?: string;
       customerRef?: string;
       subscriptionRef?: string;
     }
@@ -68,6 +70,7 @@ export interface PaymentProvider {
   readonly id: string;
   /** False when credentials are missing; checkout then defaults to the next configured provider. */
   readonly configured: boolean;
+  supportsPlan?(plan: Plan): boolean;
   createCheckout(request: CheckoutRequest): Promise<CheckoutSession>;
   /** Verifies the request signature and returns the events it carries (possibly none). */
   parseWebhook(request: Request): Promise<WebhookEvent[]>;

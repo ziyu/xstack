@@ -15,8 +15,41 @@ export default defineModule({
   supports: NEXT_SHELL_DB,
   providers: {
     min: 1,
-    default: { global: ["stripe"], cn: [] },
+    default: { global: ["stripe"], cn: ["wechat", "alipay"] },
     options: {
+      wechat: {
+        name: "WeChat Pay",
+        market: "cn",
+        dependencies: { zod: dependencyVersionMap.zod },
+        appDependencies: { qrcode: "^1.5.4", "@types/qrcode": "^1.5.5" },
+        env: [
+          { key: "WECHAT_PAY_APP_ID", required: false, sensitive: false },
+          { key: "WECHAT_PAY_MCH_ID", required: false, sensitive: false },
+          { key: "WECHAT_PAY_SERIAL_NO", required: false, sensitive: false },
+          { key: "WECHAT_PAY_PRIVATE_KEY", required: false },
+          { key: "WECHAT_PAY_API_V3_KEY", required: false },
+          { key: "WECHAT_PAY_PUBLIC_KEY_ID", required: false, sensitive: false },
+          { key: "WECHAT_PAY_PUBLIC_KEY", required: false },
+        ],
+      },
+      alipay: {
+        name: "Alipay",
+        market: "cn",
+        dependencies: { "alipay-sdk": "^4.14.0" },
+        env: [
+          { key: "ALIPAY_APP_ID", required: false, sensitive: false },
+          { key: "ALIPAY_PRIVATE_KEY", required: false },
+          { key: "ALIPAY_PUBLIC_KEY", required: false },
+          { key: "ALIPAY_SELLER_ID", required: false, sensitive: false },
+          {
+            key: "ALIPAY_SANDBOX",
+            required: false,
+            sensitive: false,
+            type: "boolean",
+            default: "false",
+          },
+        ],
+      },
       stripe: {
         name: "Stripe",
         market: "global",

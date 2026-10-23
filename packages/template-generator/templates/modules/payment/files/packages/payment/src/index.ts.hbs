@@ -38,7 +38,6 @@ export type PaymentOptions = {
 
 export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
   const providers = createProviders(env, baseUrl);
-  const defaultProvider = providers.find((p) => p.configured);
 
   function provider(id: string): PaymentProvider {
     const found = providers.find((p) => p.id === id);
@@ -61,21 +60,28 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
     return row;
   }
 
-  /** Marks the order paid; returns it when it is (or already was) paid. */
+  /** Match the signed settlement to the stored order before changing state. */
   async function markPaid(
-    orderId: string,
-    providerRef: string,
+    providerId: string,
+    event: Extract<WebhookEvent, { type: "checkout.completed" }>,
   ): Promise<typeof paymentOrder.$inferSelect | undefined> {
-    const [updated] = await db
-      .update(paymentOrder)
-      .set({ status: "paid", providerRef, paidAt: new Date() })
-      .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "pending")))
+    const [order] = await db.select().from(paymentOrder).where(eq(paymentOrder.id, event.orderId));
+    if (!order || order.provider !== providerId ||
+      (event.amount !== undefined && event.amount !== order.amount) ||
+      (event.currency !== undefined && event.currency.toLowerCase() !== order.currency.toLowerCase()) ||
+      (order.status === "paid" && order.providerRef !== event.providerRef)) {
+      throw new PaymentError("provider_error", "Payment does not match the stored order");
+    }
+    const [updated] = await db.update(paymentOrder)
+      .set({ status: "paid", providerRef: event.providerRef, paidAt: new Date(), qrCodeUrl: null })
+      .where(and(eq(paymentOrder.id, event.orderId), eq(paymentOrder.status, "pending")))
       .returning();
     if (updated) return updated;
-    const [existing] = await db
-      .select()
-      .from(paymentOrder)
-      .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "paid")));
+    const [existing] = await db.select().from(paymentOrder).where(and(
+      eq(paymentOrder.id, event.orderId), eq(paymentOrder.status, "paid"),
+      eq(paymentOrder.providerRef, event.providerRef),
+    ));
+    if (!existing) throw new PaymentError("provider_error", "Order cannot be settled");
     return existing;
   }
 
@@ -95,7 +101,7 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
   async function apply(providerId: string, event: WebhookEvent) {
     switch (event.type) {
       case "checkout.completed": {
-        const order = await markPaid(event.orderId, event.providerRef);
+        const order = await markPaid(providerId, event);
         if (order) await emitPaid(order, false);
         return;
       }
@@ -180,6 +186,17 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
   return {
     plans,
     providers: providers.map((p) => p.id),
+    availableProviders(planId: string): string[] {
+      const plan = getPlan(planId);
+      return plan ? providers.filter((p) => p.configured && (p.supportsPlan?.(plan) ?? true)).map((p) => p.id) : [];
+    },
+
+    async getOrder(userId: string, orderId: string) {
+      const [order] = await db.select().from(paymentOrder).where(and(
+        eq(paymentOrder.id, orderId), eq(paymentOrder.userId, userId),
+      ));
+      return order;
+    },
 
     /** Creates a pending order and returns the provider's checkout URL. */
     async checkout(input: {
@@ -189,18 +206,24 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
       /** App paths, e.g. `/en/dashboard/billing`. */
       successPath: string;
       cancelPath: string;
+      checkoutPath?: string;
     }): Promise<string> {
       const plan = getPlan(input.planId);
       if (!plan) throw new PaymentError("unknown_plan", `Unknown plan "${input.planId}"`);
-      const gateway = input.provider ? provider(input.provider) : defaultProvider;
-      if (!gateway) throw new PaymentError("unknown_provider", "No payment provider configured");
+      const gateway = input.provider ? provider(input.provider) : providers.find(
+        (p) => p.configured && (p.supportsPlan?.(plan) ?? true),
+      );
+      if (!gateway?.configured) throw new PaymentError("unknown_provider", "No payment provider configured");
+      if (!(gateway.supportsPlan?.(plan) ?? true)) {
+        throw new PaymentError("provider_error", "Provider does not support this plan");
+      }
 
       const current = await activeSubscription(input.user.id);
-      if (plan.mode === "subscription" && current) {
+      if (plan.mode !== "payment" && current) {
         throw new PaymentError("already_subscribed", "You already have an active subscription");
       }
 
-      const orderId = crypto.randomUUID();
+      const orderId = crypto.randomUUID().replaceAll("-", "");
       await db.insert(paymentOrder).values({
         id: orderId,
         userId: input.user.id,
@@ -228,9 +251,11 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
         });
       await db
         .update(paymentOrder)
-        .set({ providerRef: session.providerRef })
-        .where(eq(paymentOrder.id, orderId));
-      return session.url;
+        .set({ providerRef: session.providerRef, qrCodeUrl: session.qrCodeUrl ?? null })
+        .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "pending")));
+      return session.qrCodeUrl
+        ? new URL(`${input.checkoutPath ?? "/en/payment"}/${orderId}`, baseUrl).toString()
+        : session.url;
     },
 
     /** Verifies and applies a provider webhook. Safe to call repeatedly with the same event. */

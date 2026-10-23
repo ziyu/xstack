@@ -10,8 +10,13 @@ export default {
       description: "A one-time purchase to get going.",
     },
     pro: {
+{{#if (or (includes module.providers "wechat") (includes module.providers "alipay"))}}
+      name: "Pro pack",
+      description: "More credits in a one-time purchase. No auto-renewal.",
+{{else}}
       name: "Pro",
       description: "For teams shipping every week.",
+{{/if}}
     },
   },
   pricing: {
@@ -23,8 +28,27 @@ export default {
     },
     oneTime: "one-time",
     credits: "Includes {credits} credits",
-    subscribe: "Subscribe",
-    buy: "Buy now",
+    subscribeWith: "Subscribe with {provider}",
+    buyWith: "Pay with {provider}",
+    unavailable: "Payment unavailable",
+    noProviders: "No payment method is currently available for this plan.",
+  },
+  providers: {
+    stripe: "Stripe",
+    polar: "Polar",
+    mock: "Mock (development)",
+    wechat: "WeChat Pay",
+    alipay: "Alipay",
+  },
+  checkout: {
+    title: "Complete your payment",
+    amount: "Order total",
+    scan: "Open WeChat and scan this QR code to pay.",
+    qrAlt: "WeChat Pay QR code for this order",
+    pending: "Waiting for payment confirmation. Refresh after paying to check your order.",
+    paid: "Payment confirmed. Thank you!",
+    refresh: "Refresh payment status",
+    billing: "View billing",
   },
   errors: {
     alreadySubscribed: "You already have an active subscription. Manage it from Billing.",
@@ -32,7 +56,7 @@ export default {
   },
   billing: {
     title: "Billing",
-    success: "Payment received. Thank you!",
+    success: "Returned from checkout. Payment is confirmed only when it appears in your order history.",
     subscription: "Subscription",
     none: "You don't have an active subscription.",
     viewPlans: "View plans",

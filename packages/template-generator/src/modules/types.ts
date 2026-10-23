@@ -79,6 +79,8 @@ export type ProviderSpec = {
   /** Dependencies added to the module's workspace package. */
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  /** Dependencies needed by this provider's web checkout surface. */
+  appDependencies?: Record<string, string>;
   supports?: Support;
 };
 

@@ -1,0 +1,85 @@
+import { payment } from "@{{projectName}}/app-services";
+import { buttonVariants } from "@{{projectName}}/ui/components/button";
+import type { Metadata } from "next";
+{{#if (includes module.providers "wechat")}}
+import Image from "next/image";
+{{/if}}
+import Link from "next/link";
+import { notFound } from "next/navigation";
+{{#if (includes module.providers "wechat")}}
+import QRCode from "qrcode";
+{{/if}}
+
+import { formatMoney } from "@/lib/format";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = {
+  params: Promise<{ lang: string; orderId: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("payment.checkout.title") };
+}
+
+export default async function PaymentPage({ params }: Props) {
+  const { lang, orderId } = await params;
+  const locale = resolveLocale(lang);
+  const t = getTranslator(locale);
+  const orderPath = `/payment/${encodeURIComponent(orderId)}` as const;
+  const user = await requireUser(locale, orderPath);
+  const order = await payment.getOrder(user.id, orderId);
+  if (!order) notFound();
+{{#if (includes module.providers "wechat")}}
+  const qrImage = order.status === "pending" && order.qrCodeUrl
+    ? await QRCode.toDataURL(order.qrCodeUrl, { width: 256, margin: 2 })
+    : null;
+{{/if}}
+
+  return (
+    <div className="container mx-auto flex max-w-lg flex-col gap-8 px-4 py-16">
+      <h1 className="font-semibold text-2xl tracking-tight">{t("payment.checkout.title")}</h1>
+      <section className="flex flex-col items-center gap-6 border p-6 text-center">
+        <div className="flex flex-col gap-2">
+          <p className="text-muted-foreground text-sm">{t("payment.checkout.amount")}</p>
+          <p className="font-semibold text-3xl tabular-nums">
+            {formatMoney(order.amount, order.currency, locale)}
+          </p>
+        </div>
+        {order.status === "paid" ? (
+          <p role="status">{t("payment.checkout.paid")}</p>
+        ) : order.status === "pending" ? (
+          <>
+{{#if (includes module.providers "wechat")}}
+            {qrImage && (
+              <>
+                <Image
+                  src={qrImage}
+                  alt={t("payment.checkout.qrAlt")}
+                  width={256}
+                  height={256}
+                  unoptimized
+                />
+                <p className="text-sm">{t("payment.checkout.scan")}</p>
+              </>
+            )}
+{{/if}}
+            <p role="status" className="text-muted-foreground text-sm">
+              {t("payment.checkout.pending")}
+            </p>
+            <a href={localePath(locale, orderPath)} className={buttonVariants()}>
+              {t("payment.checkout.refresh")}
+            </a>
+          </>
+        ) : (
+          <p role="status">{t(`payment.admin.status.${order.status}`)}</p>
+        )}
+        <Link href={localePath(locale, "/dashboard/billing")} className={buttonVariants({ variant: "outline" })}>
+          {t("payment.checkout.billing")}
+        </Link>
+      </section>
+    </div>
+  );
+}

@@ -66,6 +66,18 @@ const baseConfig = {
 
 const buildSamples: BuildSample[] = [
   ...(["sqlite", "postgres"] as const).map((database): BuildSample => ({
+    name: `product-domestic-payment-${database}`,
+    packageManagers: ["bun"],
+    config: {
+      ...baseConfig,
+      database,
+      product: {
+        features: ["auth", "payment", "credits"],
+        providers: { auth: [], payment: ["wechat", "alipay"] },
+      },
+    },
+  })),
+  ...(["sqlite", "postgres"] as const).map((database): BuildSample => ({
     name: `product-wechat-${database}`,
     packageManagers: ["bun"],
     config: {

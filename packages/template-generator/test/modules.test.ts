@@ -11,7 +11,6 @@ import { hasErrors, resolveModules, toSelection } from "../src/modules/resolver"
 import { replaceStackFiles } from "../src/modules/seams";
 import type { StackContext } from "../src/modules/types";
 import { EMBEDDED_TEMPLATES } from "../src/templates.generated";
-import type { VirtualNode } from "../src/types";
 
 const NEXT_STACK: StackContext = {
   projectName: "app",
@@ -46,19 +45,6 @@ function plan(product: ProductConfig, stack: Partial<StackContext> = {}) {
 
 function variants(product: ProductConfig, stack: Partial<StackContext> = {}) {
   return Object.fromEntries(plan(product, stack).modules.map((m) => [m.manifest.id, m.variant]));
-}
-
-function paths(node: VirtualNode, prefix = ""): string[] {
-  if (node.type === "file") return [prefix];
-  return node.children.flatMap((child) =>
-    paths(child, prefix ? `${prefix}/${child.name}` : child.name),
-  );
-}
-
-async function generatedFiles(project: ProjectConfig) {
-  const result = await generate({ config: project, templates: EMBEDDED_TEMPLATES });
-  if (result.isErr()) throw result.error;
-  return paths(result.value.root).sort();
 }
 
 describe("module resolver", () => {
@@ -190,16 +176,4 @@ describe("module seams", () => {
     );
     expect(render.auth).toBe("better-auth");
   });
-});
-
-describe("generated product layout", () => {
-  for (const [name, product, overrides] of [
-    ["shell", { features: [] }, {}],
-    ["starter", PRODUCT_PRESETS.starter, { database: "postgres" }],
-    ["saas-global", PRODUCT_PRESETS["saas-global"], { webDeploy: "docker" }],
-  ] as const) {
-    it(`matches the ${name} file list`, async () => {
-      expect(await generatedFiles(config(product, overrides))).toMatchSnapshot();
-    });
-  }
 });

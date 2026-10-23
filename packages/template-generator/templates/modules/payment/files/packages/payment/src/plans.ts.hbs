@@ -9,15 +9,27 @@ export const plans = [
     id: "starter",
     mode: "payment",
     amount: 900,
+{{#if (or (includes module.providers "wechat") (includes module.providers "alipay"))}}
+    currency: "cny",
+{{else}}
     currency: "usd",
+{{/if}}
     credits: 500,
   },
   {
     id: "pro",
+{{#if (or (includes module.providers "wechat") (includes module.providers "alipay"))}}
+    mode: "payment",
+{{else}}
     mode: "subscription",
     interval: "month",
+{{/if}}
     amount: 1900,
+{{#if (or (includes module.providers "wechat") (includes module.providers "alipay"))}}
+    currency: "cny",
+{{else}}
     currency: "usd",
+{{/if}}
     credits: 3000,
     highlighted: true,
   },
