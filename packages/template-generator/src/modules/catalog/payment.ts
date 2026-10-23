@@ -35,6 +35,7 @@ export default defineModule({
       alipay: {
         name: "Alipay",
         market: "cn",
+        supports: { targets: ["none", "node", "vercel", "docker"] },
         dependencies: { "alipay-sdk": "^4.14.0" },
         env: [
           { key: "ALIPAY_APP_ID", required: false, sensitive: false },

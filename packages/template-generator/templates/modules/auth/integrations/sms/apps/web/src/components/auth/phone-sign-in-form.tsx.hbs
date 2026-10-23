@@ -7,6 +7,9 @@ import { authClient } from "@/lib/auth-client";
 
 import { useT } from "../i18n-provider";
 import { Field } from "./field";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
 
 export default function PhoneSignInForm({ next }: { next: string }) {
   const t = useT();
@@ -17,6 +20,9 @@ export default function PhoneSignInForm({ next }: { next: string }) {
   const [error, setError] = useState<string>();
   const [cooldown, setCooldown] = useState({ phone: "", until: 0 });
   const [now, setNow] = useState(0);
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
   const remaining = cooldown.phone === phone.trim() ? Math.max(0, Math.ceil((cooldown.until - now) / 1000)) : 0;
 
   useEffect(() => {
@@ -37,6 +43,9 @@ export default function PhoneSignInForm({ next }: { next: string }) {
 
   async function sendCode() {
     if (pending || remaining > 0) return;
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token) return;
+{{/if}}
     const value = phone.trim();
     if (!/^\+[1-9]\d{7,14}$/.test(value)) {
       setError(t("auth.phone.invalidPhone"));
@@ -48,6 +57,9 @@ export default function PhoneSignInForm({ next }: { next: string }) {
     let retryAfter: string | null = null;
     try {
       const result = await authClient.phoneNumber.sendOtp({ phoneNumber: value }, {
+{{#if (includes product.features "captcha")}}
+        headers: captcha.headers,
+{{/if}}
         onError: ({ response }) => {
           retryAfter = response.headers.get("Retry-After") ?? response.headers.get("X-Retry-After");
         },
@@ -72,6 +84,9 @@ export default function PhoneSignInForm({ next }: { next: string }) {
       setError(t("auth.phone.deliveryFailed"));
     } finally {
       setPending(undefined);
+      {{#if (includes product.features "captcha")}}
+      captcha.reset();
+      {{/if}}
     }
   }
 
@@ -151,12 +166,15 @@ export default function PhoneSignInForm({ next }: { next: string }) {
           />
         </>
       )}
+{{#if (includes product.features "captcha")}}
+      <Captcha action="phone_otp" challenge={captcha} />
+{{/if}}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <Button type="submit" disabled={Boolean(pending) || (!sentTo && remaining > 0)}>
+      <Button type="submit" disabled={Boolean(pending) || (!sentTo && (remaining > 0{{#if (includes product.features "captcha")}} || !captcha.token{{/if}}))}>
         {pending === "send" ? t("auth.phone.sending") : pending === "verify" ? t("auth.phone.verifying") : sentTo ? t("auth.phone.verify") : t("auth.phone.send")}
       </Button>
       {sentTo && (
-        <Button type="button" variant="outline" disabled={Boolean(pending) || remaining > 0} onClick={() => void sendCode()}>
+        <Button type="button" variant="outline" disabled={Boolean(pending) || remaining > 0{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} } onClick={() => void sendCode()}>
           {t("auth.phone.resend")}
         </Button>
       )}

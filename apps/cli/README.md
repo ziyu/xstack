@@ -27,7 +27,7 @@ npx xstack@latest
 
 Follow the prompts to configure your project or use the `--yes` flag for defaults.
 
-The default is a Next.js full-stack shell with SQLite, Drizzle, Turborepo, and no optional feature modules. `--preset starter` adds authentication; `--preset saas-global` includes authentication, email, admin, payments, and credits. These differ from legacy technology presets selected by `--template`.
+The default is a Next.js full-stack shell with SQLite, Drizzle, Turborepo, and no optional feature modules. `--preset starter` adds authentication; `--preset saas-global` adds authentication, email, admin, payments and credits; `--preset full` selects every feature module, including AI, publishing, private storage, referral credits and Turnstile. These differ from legacy technology presets selected by `--template`.
 
 ```bash
 xstack my-saas --preset saas-global \
@@ -42,6 +42,12 @@ Phone-number OTP login is enabled by selecting both `auth` and `sms`, with one S
 WeChat website login is selected with `--features auth --providers auth:wechat` on the native Next.js/Drizzle stack. Configure `WECHAT_CLIENT_ID` and `WECHAT_CLIENT_SECRET` from an approved WeChat Open Platform website application, plus the callback domain for `BETTER_AUTH_URL`. The endpoint is `/api/auth/callback/wechat`; the login button opens WeChat's hosted QR/quick-login page. Mini-program and official-account credentials are not supported by this flow.
 
 Domestic payments: `--features auth payment credits --providers auth:none payment:wechat,alipay` generates CNY one-time credit packs and a signed-in QR checkout page. No automatic renewals, H5 payments or refunds are included. Configure merchant approval, keys and public HTTPS callbacks using the generated `docs/modules/payment.md`; browser return URLs never confirm payment.
+
+Private files: `--features storage --providers auth:none storage:s3` supports S3, R2 API, OSS and COS on Node. Cloudflare uses `storage:r2-binding`, D1 and authenticated streamed downloads. API providers issue 60-second attachment URLs; browser uploads are capped at 4 MiB. Configure private buckets and least-privilege credentials using the generated storage documentation.
+
+P3 modules: `ai` provides chat/image/video jobs with provider capabilities, optional idempotent credit charging/refunds and generated-media storage; `blog` provides admin publishing and public localized articles; `seo` adds public metadata/sitemap; `affiliate` awards app credits for verified referred purchases; `captcha` enforces Turnstile before authentication mutations. `full` enables all of them. Configure `SITE_URL`, email verification and Turnstile before using full-preset signup. Unknown AI provider outcomes are never automatically resubmitted or refunded; reconcile them with the provider.
+
+For Cloudflare full: select `--preset full --database sqlite --db-setup d1 --web-deploy cloudflare --providers storage:r2-binding`. Generated docs describe local D1 migrations, OpenNext build/preview and production Alchemy provisioning. Node-only providers are rejected on Workers; selected features are never silently omitted.
 
 ## Requirements
 
@@ -84,8 +90,8 @@ Options:
   --database <type>               Database type (none, sqlite, postgres, mysql, mongodb)
   --orm <type>                    ORM type (none, drizzle, prisma, mongoose)
   --dry-run                       Validate configuration without writing files
-  --features <modules...>         Feature modules (auth, email, sms, admin, payment, credits, none)
-  --preset <name>                 Feature preset (starter, saas-global)
+  --features <modules...>         auth, email, sms, admin, payment, credits, storage, ai, seo, blog, affiliate, captcha, none
+  --preset <name>                 Feature preset (starter, saas-global, full)
   --providers <pairs...>          Module providers (feature:provider, e.g. payment:polar)
   --module-options <pairs...>     Module options (module.key=value, e.g. auth.engine=clerk)
   --frontend <types...>           Frontend types (tanstack-router, react-router, tanstack-start, next, nuxt, svelte, solid, astro, native-bare, native-uniwind, native-unistyles, none)

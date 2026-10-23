@@ -1,0 +1,76 @@
+# Private files
+
+The storage module uses exactly one private provider: S3, Cloudflare R2 (S3 API or Workers binding), Alibaba Cloud OSS or Tencent Cloud COS. `/dashboard/files` lets each signed-in user upload, list, download and delete only their own files. The database stores ownership and metadata in `storage_file`; the objects live in your bucket. There is no public bucket, mock provider or administrator file browser.
+
+Selecting storage automatically includes the authentication module. The file list shows all files owned by the signed-in user, newest first, without a pagination limit; it never includes another user's files.
+
+## Configure the selected provider
+
+{{#if (includes module.providers "s3")}}
+Use the official AWS SDK v3. Configure `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` and optional `S3_SESSION_TOKEN`. Create a private bucket with Block Public Access and BucketOwnerEnforced ownership. The adapter intentionally omits ACL headers (required for BucketOwnerEnforced) and never grants public read. Grant only `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject` on the application object prefix; no bucket administration or public bucket policy. Downloads use SigV4 URLs expiring after 60 seconds with signed attachment response headers.
+{{/if}}
+{{#if (includes module.providers "r2")}}
+Use the official AWS SDK v3 against `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com` with region `auto`. Configure `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Create a private bucket, disable r2.dev and custom public domains, and issue a bucket-scoped Object Read & Write API token. R2 does not support ACL headers; none are sent. Downloads use 60-second SigV4 signed attachment URLs. This adapter targets Node deployments; select `r2-binding` for Workers.
+{{/if}}
+{{#if (includes module.providers "r2-binding")}}
+The generated OpenNext adapter obtains `STORAGE_BUCKET` from `getCloudflareContext({ async: true })` per request. No Node SDK or S3 credentials are used. Alchemy provisions a private R2 bucket; wrangler.jsonc supplies its local equivalent. Keep public access disabled. See [Cloudflare setup](../cloudflare.md) for D1 migrations, local dev and deployment.
+
+`downloadUrl` returns an application-relative `/api/storage/:id` URL, **not** a signed bearer URL. Every GET requires the current owner's authenticated session, checks ownership, and streams an attachment with `private, no-store` and `nosniff` headers. Sharing the URL does not share the file, and logout revokes access. The application does not support anonymous expiring links for this provider.
+{{/if}}
+{{#if (includes module.providers "oss")}}
+The generated package uses the official `ali-oss` SDK and `@types/ali-oss` development types.
+
+1. Create an OSS bucket in your selected region. Set its ACL to **private** and enable the account/bucket block-public-access controls. Do not add anonymous read policies.
+2. Set `OSS_REGION` (for example `oss-cn-hangzhou`), `OSS_BUCKET`, `OSS_ACCESS_KEY_ID` and `OSS_ACCESS_KEY_SECRET` in `apps/web/.env` or your server's secret manager. `OSS_SECURITY_TOKEN` is optional for temporary credentials; rotate all temporary credentials before expiration.
+3. Use a dedicated RAM identity. Grant only `oss:PutObject`, `oss:GetObject` and `oss:DeleteObject` on this bucket's application objects (`acs:oss:*:*:<bucket>/*`, narrowed to the generated application object prefix when deploying). Do not grant bucket administration, ACL administration, public access or wildcard-account permissions. Bucket enumeration is not needed: the application lists its own database rows.
+
+See [OSS Node.js SDK documentation](https://www.alibabacloud.com/help/en/oss/developer-reference/node-js) and [RAM policies for OSS](https://www.alibabacloud.com/help/en/oss/user-guide/overview-10).
+{{/if}}
+{{#if (includes module.providers "cos")}}
+The generated package uses the official `cos-nodejs-sdk-v5` SDK, which includes its TypeScript declarations.
+
+1. Create a COS bucket and choose **private read/write**. Keep public access disabled and do not add anonymous read policies.
+2. Set `COS_REGION` (for example `ap-guangzhou`), `COS_BUCKET` (including the APPID suffix), `COS_SECRET_ID` and `COS_SECRET_KEY` in `apps/web/.env` or your server's secret manager. `COS_SECURITY_TOKEN` is optional for temporary credentials; rotate all temporary credentials before expiration.
+3. Use a dedicated CAM identity. Grant only `name/cos:PutObject`, `name/cos:GetObject` and `name/cos:DeleteObject` on this bucket's application objects (`qcs::cos:<region>:uid/<APPID>:<bucket>/*`, narrowed to the generated application object prefix when deploying). Do not grant bucket administration, ACL administration, public access or wildcard-account permissions. Bucket enumeration is not needed: the application lists its own database rows.
+
+See [COS Node.js SDK documentation](https://www.tencentcloud.com/document/product/436/8629) and [COS access management](https://www.tencentcloud.com/document/product/436/10313).
+{{/if}}
+
+Create `storage_file` with `db:push` on local SQLite/Postgres, or `db:generate` then `db:migrate:local` on D1. Configure `BETTER_AUTH_URL` to the exact application URL. API-provider credentials are optional at startup: missing credentials disable operations and produce `503`; binding misconfiguration produces `503` when used. No files are silently stored elsewhere. Configuration completeness is not a cloud connectivity or IAM check.
+
+## Runtime and limits
+
+- S3/R2 API, OSS and COS use Node.js. R2 binding supports Cloudflare Workers through OpenNext's Node compatibility runtime; `runtime = "nodejs"` is intentional, not the unsupported Next Edge runtime.
+- The application cap is **4 MiB per file** (`4 * 1024 * 1024` bytes). The route counts actual request-stream bytes **before** parsing multipart form data and allows only another 64 KiB of multipart overhead. Chunked uploads are bounded too; missing `Content-Length` is supported, while malformed lengths are rejected. A hosting provider or reverse proxy may impose a lower total body limit; configure it appropriately or accept that lower limit.
+- The upload form accepts exactly one non-empty `file` part. Names are limited to 255 UTF-8 bytes and cannot contain path separators or control characters. Object keys are random and independent of filenames.
+- Browser files use `application/octet-stream`; user MIME types are not trusted. Downloads force `Content-Disposition: attachment`. Trusted server-generated image/video content can use `storeGenerated(userId, {name, contentType, body})` up to **64 MiB**; only supported image/video types are accepted. No malware scanning is provided.
+- Uploads go through the authenticated application server, not directly from the browser to the bucket. **No browser CORS policy is needed on the bucket.** Downloads are regular navigations to signed URLs, not browser cross-origin fetches.
+- Provider secrets remain on the server; they are not passed to client components. Do not add them to `NEXT_PUBLIC_*` variables.
+
+## API and security
+
+```ts
+import { storage } from "@{{projectName}}/app-services";
+
+storage.configured;
+await storage.upload(userId, file);
+await storage.listFiles(userId);
+await storage.downloadUrl(userId, fileId);
+await storage.deleteFile(userId, fileId);
+await storage.storeGenerated(userId, { name: "image.png", contentType: "image/png", body: bytes });
+const { body, contentType, name } = await storage.readFile(userId, fileId);
+```
+
+The service checks the owning user's database row before download/read/delete operations. Never accept a client-supplied `userId`; derive it from the session. S3/API private download URLs expire after **60 seconds** and act as bearer credentials until expiry; do not log/share them. R2 binding links are instead authenticated application URLs with an ownership check on **every request**. Redirects, streamed downloads and errors use `Cache-Control: no-store`.
+
+| Route | Behavior |
+| --- | --- |
+| `POST /api/storage` | Authenticated multipart upload, returns `201` and `{ "id": "…" }` |
+| `GET /api/storage/:id` | Authenticated owner lookup; `307` signed attachment redirect for API providers, `200` attachment stream for R2 binding |
+| `DELETE /api/storage/:id` | Authenticated owner deletion, returns `204` |
+
+Mutations require an `Origin` header matching the origin of configured `BETTER_AUTH_URL`, including scheme and port. Missing or mismatched origins return `403`; forwarded host headers cannot authorize a mutation. Unauthenticated requests return `401`, invalid files `400`, oversize bodies/files `413`, missing or another user's files `404`, and unavailable provider operations `503`. Provider errors do not expose credentials, keys or raw SDK messages.
+
+## Cloud acceptance
+
+Local checks do not prove cloud IAM behavior. On Workers, `bun apps/cli/live-tests/storage.ts <generated-project> http://localhost:8787 r2-binding` (from the generator repository, fixture under apps/cli/.smoke) exercises real local D1/R2 ownership, attachment bytes and deletion. Before production, verify the same flows in a private staging bucket, signed-link expiry for API adapters, unsigned URL rejection, least-privilege IAM and host request-size limits. No live cloud acceptance is claimed by the generated module.

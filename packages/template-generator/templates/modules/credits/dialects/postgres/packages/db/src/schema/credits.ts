@@ -10,6 +10,7 @@ export const creditTransactionTypes = [
   "consume",
   "refund",
   "adjust",
+  "affiliate",
 ] as const;
 
 export const creditBalance = pgTable("credit_balance", {

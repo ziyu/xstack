@@ -1,3 +1,4 @@
+import { dependencyVersionMap } from "../../utils/add-deps";
 import { defineModule } from "../define";
 import { NEXT_SHELL_DB } from "./stack";
 
@@ -11,15 +12,17 @@ export default defineModule({
   category: "communication",
   requires: ["core"],
   enhances: ["auth"],
-  supports: { ...NEXT_SHELL_DB, targets: ["vercel", "docker", "node"] },
+  supports: NEXT_SHELL_DB,
   providers: {
     min: 1,
     max: 1,
     default: { global: ["aliyun"], cn: ["aliyun"] },
+    targetDefaults: { cloudflare: ["twilio"] },
     options: {
       aliyun: {
         name: "Alibaba Cloud SMS",
         market: "cn",
+        supports: { targets: ["none", "node", "vercel", "docker"] },
         dependencies: {
           "@alicloud/dysmsapi20170525": "4.6.0",
           "@alicloud/openapi-core": "1.0.8",
@@ -41,6 +44,7 @@ export default defineModule({
       tencent: {
         name: "Tencent Cloud SMS",
         market: "cn",
+        supports: { targets: ["none", "node", "vercel", "docker"] },
         dependencies: { "tencentcloud-sdk-nodejs-sms": "4.1.306" },
         env: [
           { key: "TENCENT_SMS_SECRET_ID", required: false },
@@ -59,7 +63,7 @@ export default defineModule({
       twilio: {
         name: "Twilio",
         market: "global",
-        dependencies: { twilio: "6.2.0" },
+        dependencies: { zod: dependencyVersionMap.zod },
         env: [
           { key: "TWILIO_ACCOUNT_SID", required: false },
           { key: "TWILIO_AUTH_TOKEN", required: false },

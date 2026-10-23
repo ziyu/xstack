@@ -1,0 +1,8 @@
+import { captchaPublicConfig } from "@{{projectName}}/captcha";
+import { ENV } from "@/env.server";
+
+export const dynamic = "force-dynamic";
+
+export function GET() {
+  return Response.json(captchaPublicConfig(ENV), { headers: { "Cache-Control": "no-store" } });
+}

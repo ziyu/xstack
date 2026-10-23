@@ -65,6 +65,48 @@ describe("module resolver", () => {
     expect(variants({ features: [] }, { api: "trpc", backend: "hono" })).toEqual({});
   });
 
+  it("requires one storage provider and an owned native database", () => {
+    for (const providers of [[], ["oss", "cos"]]) {
+      expect(hasErrors(plan({ features: ["storage"], providers: { storage: providers } }))).toBe(
+        true,
+      );
+    }
+    for (const stack of [
+      { frontend: ["nuxt"] as ["nuxt"] },
+      { database: "none" as const },
+      { orm: "prisma" as const },
+    ]) {
+      expect(
+        hasErrors(plan({ features: ["storage"], providers: { storage: ["oss"] } }, stack)),
+      ).toBe(true);
+    }
+  });
+
+  it("uses Workers defaults only for omitted providers and rejects explicit incompatible choices", () => {
+    const stack = { webDeploy: "cloudflare", dbSetup: "d1" } as const;
+    const defaulted = plan({ features: ["storage"] }, stack);
+    expect(hasErrors(defaulted)).toBe(false);
+    expect(defaulted.modules.find((module) => module.manifest.id === "storage")?.providers).toEqual(
+      ["r2-binding"],
+    );
+    expect(hasErrors(plan({ features: ["storage"], providers: { storage: ["oss"] } }, stack))).toBe(
+      true,
+    );
+    expect(hasErrors(plan({ features: ["storage"] }, { ...stack, dbSetup: "none" }))).toBe(true);
+    expect(hasErrors(plan({ features: ["storage"], providers: { storage: ["r2-binding"] } }))).toBe(
+      true,
+    );
+  });
+
+  it("rejects fractional credit costs and out-of-range referral rewards", () => {
+    expect(hasErrors(plan({ features: ["ai"], options: { ai: { chatCost: 0.5 } } }))).toBe(true);
+    expect(
+      hasErrors(
+        plan({ features: ["affiliate"], options: { affiliate: { commissionPercent: 101 } } }),
+      ),
+    ).toBe(true);
+  });
+
   it("falls back to the stack templates outside the native stack", () => {
     const result = plan({ features: ["auth"] }, { frontend: ["svelte"], api: "orpc" });
     expect(hasErrors(result)).toBe(false);
@@ -147,7 +189,16 @@ describe("module resolver", () => {
       expect(hasErrors(plan(selection))).toBe(true);
     }
     expect(hasErrors(plan({ features: ["sms"] }, { frontend: ["nuxt"] }))).toBe(true);
-    expect(hasErrors(plan({ features: ["sms"] }, { webDeploy: "cloudflare" }))).toBe(true);
+    expect(
+      hasErrors(
+        plan({ features: ["sms"], providers: { sms: ["aliyun"] } }, { webDeploy: "cloudflare" }),
+      ),
+    ).toBe(true);
+    expect(
+      hasErrors(
+        plan({ features: ["sms"], providers: { sms: ["twilio"] } }, { webDeploy: "cloudflare" }),
+      ),
+    ).toBe(false);
   });
 });
 

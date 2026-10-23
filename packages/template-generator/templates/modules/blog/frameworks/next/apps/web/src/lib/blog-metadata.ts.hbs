@@ -1,0 +1,18 @@
+import type { BlogPost } from "@{{projectName}}/blog";
+import { defaultLocale } from "@{{projectName}}/i18n";
+import type { Metadata } from "next";
+import { blogOrigin } from "./blog-origin";
+
+export function blogUrl(locale: string, slug?: string) {
+  return new URL(`/${locale}/blog${slug ? `/${slug}` : ""}`, blogOrigin()).href;
+}
+export function blogMetadata(input: { locale: string; title: string; description: string; slug?: string; page?: number; translations?: { locale: string; slug: string }[] }): Metadata {
+  const url = `${blogUrl(input.locale, input.slug)}${input.page && input.page > 1 ? `?page=${input.page}` : ""}`;
+  const languages = Object.fromEntries((input.translations ?? []).map((post) => [post.locale, blogUrl(post.locale, post.slug)]));
+  if (languages[defaultLocale]) languages["x-default"] = languages[defaultLocale]!;
+  return { title: input.title, description: input.description, alternates: { canonical: url, ...(Object.keys(languages).length ? { languages } : {}) }, openGraph: { title: input.title, description: input.description, url, locale: input.locale.replaceAll("-", "_"), type: input.slug ? "article" : "website" }, twitter: { card: "summary", title: input.title, description: input.description } };
+}
+export function blogPosting(post: BlogPost) {
+  return { "@context": "https://schema.org", "@type": "BlogPosting", headline: post.title, description: post.excerpt, inLanguage: post.locale, author: { "@type": "Person", name: post.authorName }, datePublished: post.publishedAt?.toISOString(), dateModified: post.updatedAt.toISOString(), mainEntityOfPage: blogUrl(post.locale, post.slug), url: blogUrl(post.locale, post.slug) };
+}
+export function safeJsonLd(value: unknown) { return JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026"); }

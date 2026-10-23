@@ -2,6 +2,8 @@ import SideNav from "@/components/side-nav";
 import { requireAdmin } from "@/lib/admin";
 import { resolveLocale } from "@/lib/i18n/server";
 
+export const metadata = { robots: { index: false, follow: false } };
+
 export default async function AdminLayout({
   children,
   params,

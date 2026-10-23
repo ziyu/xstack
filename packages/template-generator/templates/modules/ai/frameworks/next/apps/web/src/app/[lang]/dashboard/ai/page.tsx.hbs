@@ -1,0 +1,17 @@
+import { ai } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+import { AIStudio } from "@/components/ai/studio";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = { params: Promise<{ lang: string }> };
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("ai.title") };
+}
+export default async function AIPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const user = await requireUser(locale, "/dashboard/ai");
+  const t = getTranslator(locale);
+  return <div className="space-y-8"><header className="space-y-2"><h1 className="font-serif text-4xl tracking-tight">{t("ai.title")}</h1><p className="text-muted-foreground">{t("ai.subtitle")}</p></header><AIStudio initialJobs={await ai.history(user.id)} capabilities={ai.capabilities()} /></div>;
+}

@@ -1,0 +1,20 @@
+import { ai } from "@{{projectName}}/app-services";
+import { requestSchema } from "@{{projectName}}/ai";
+import { getSession } from "@/lib/session";
+import { aiErrorResponse, privateHeaders, readAIRequest, requireAIOrigin } from "@/lib/ai-http";
+
+export async function GET() {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+  try { return Response.json({ capabilities: ai.capabilities(), jobs: await ai.history(session.user.id) }, { headers: privateHeaders }); }
+  catch (error) { return aiErrorResponse(error); }
+}
+export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+  try {
+    requireAIOrigin(request);
+    const job = await ai.generate(session.user.id, requestSchema.parse(await readAIRequest(request)));
+    return Response.json({ job }, { headers: privateHeaders, status: job.status === "failed" ? job.error === "insufficient_credits" ? 402 : 422 : job.status === "unknown" ? 503 : 200 });
+  } catch (error) { return aiErrorResponse(error); }
+}

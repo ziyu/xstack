@@ -1,0 +1,8 @@
+export default {
+  nav: { ai: "AI studio" },
+  title: "AI studio", subtitle: "A private space to think, imagine, and make.",
+  provider: "Provider", kind: "Create", prompt: "Your prompt", generate: "Generate", working: "Working…", history: "Your generations", empty: "Your first idea starts here.", notConfigured: "Add a provider API key on the server to start generating.", cost: "Credits", model: "Model", cancel: "Cancel generation", refresh: "Refresh", download: "Download", continue: "Continue this conversation", newChat: "New conversation", reply: "Replying to the selected conversation", retry: "Retry the same request", error: "We could not complete the request. Refresh to check its persisted status before trying again.",
+  kinds: { chat: "Chat", image: "Image", video: "Video" },
+  statuses: { queued: "Queued", starting: "Submitting", running: "Generating", saving: "Saving media — refresh to retry", unknown: "Provider outcome unknown — contact support; do not resubmit", completed: "Complete", failed: "Failed — credits returned if charged", cancelled: "Cancelled — credits returned" },
+  errors: { insufficient_credits: "Not enough credits. No generation was submitted.", provider_error: "Provider or storage temporarily unavailable.", unknown: "The provider may have accepted the request. Support must reconcile it before any retry or refund.", invalid_request: "Check your prompt and request.", unsupported: "This provider does not support that operation.", not_configured: "This provider is not configured.", conflict: "This request ID belongs to a different prompt.", not_found: "Generation not found.", busy: "This generation is already being processed.", cancelled: "Generation cancelled." },
+} as const;

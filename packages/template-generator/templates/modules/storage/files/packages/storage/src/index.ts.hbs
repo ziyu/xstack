@@ -1,0 +1,214 @@
+import type { Database } from "@{{projectName}}/db";
+import { storageFile } from "@{{projectName}}/db/schema/storage";
+import { and, desc, eq } from "drizzle-orm";
+import { z } from "zod";
+
+import { safeCause, StorageError } from "./errors";
+import { CONTENT_TYPE, createProvider, type StorageEnv } from "./provider";
+
+export { StorageError } from "./errors";
+export type { StorageErrorCode } from "./errors";
+export type { StorageEnv } from "./provider";
+export type StorageFile = typeof storageFile.$inferSelect;
+export type GeneratedFile = { name: string; contentType: string; body: Uint8Array };
+export type StoredFileBody = { body: ReadableStream<Uint8Array>; contentType: string; name: string };
+export interface Storage {
+  readonly configured: boolean;
+  upload(userId: string, file: File): Promise<StorageFile>;
+  storeGenerated(userId: string, input: GeneratedFile): Promise<StorageFile>;
+  readFile(userId: string, fileId: string): Promise<StoredFileBody>;
+  listFiles(userId: string): Promise<StorageFile[]>;
+  downloadUrl(userId: string, fileId: string): Promise<string>;
+  deleteFile(userId: string, fileId: string): Promise<void>;
+}
+
+export const MAX_FILE_BYTES = 4 * 1024 * 1024;
+export const MAX_GENERATED_BYTES = 64 * 1024 * 1024;
+
+const filename = z.string().min(1).max(255).refine(
+  (name) => name.trim().length > 0
+    && name !== "." && name !== ".."
+    && new TextEncoder().encode(name).byteLength <= 255
+    && !/[\u0000-\u001f\u007f-\u009f/\\]/u.test(name)
+    && !/[\ud800-\udfff]/u.test(name),
+  "Filename must be at most 255 UTF-8 bytes without control characters or path separators",
+);
+const metadata = z.object({
+  name: filename,
+  size: z.number().int().min(1).max(MAX_FILE_BYTES),
+});
+const signedUrl = z.string().url().refine((value) => new URL(value).protocol === "https:");
+
+/** ASCII fallback plus RFC 5987 preserves Unicode names without allowing header injection. */
+function attachment(name: string): string {
+  const encoded = encodeURIComponent(name).replace(/[!'()*]/g, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `attachment; filename="download"; filename*=UTF-8''${encoded}`;
+}
+
+export function createStorage({ env, db }: { env: StorageEnv; db: Database }): Storage {
+  const provider = createProvider(env);
+
+  function configuredProvider() {
+    if (!provider) throw new StorageError("not_configured", "Storage is not configured");
+    return provider;
+  }
+
+  async function ownedFile(userId: string, fileId: string): Promise<StorageFile> {
+    let row: StorageFile | undefined;
+    try {
+      [row] = await db.select().from(storageFile).where(and(
+        eq(storageFile.id, fileId),
+        eq(storageFile.userId, userId),
+      )).limit(1);
+    } catch (cause) {
+      throw new StorageError("provider_error", "Could not read file metadata", {
+        cause: safeCause(cause, "Metadata lookup"),
+      });
+    }
+    if (!row) throw new StorageError("not_found", "File not found");
+    return row;
+  }
+
+  function fileProvider(row: StorageFile) {
+    const selected = configuredProvider();
+    if (row.provider !== selected.id) {
+      throw new StorageError("provider_error", "The stored file belongs to a different storage provider");
+    }
+    return selected;
+  }
+
+  async function persist(userId: string, name: string, body: Uint8Array, contentType: string): Promise<StorageFile> {
+    const selected = configuredProvider();
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(userId));
+    const prefix = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const objectKey = `${prefix}/${crypto.randomUUID()}`;
+    try {
+      await selected.upload(objectKey, body, attachment(name), contentType);
+    } catch (cause) {
+      throw new StorageError("provider_error", "The storage provider could not upload the file", { cause: safeCause(cause, "Object upload") });
+    }
+    try {
+      const [row] = await db.insert(storageFile).values({
+        id: crypto.randomUUID(), userId, provider: selected.id, objectKey, name, contentType, size: body.byteLength,
+      }).returning();
+      if (!row) throw new Error("Metadata insertion returned no row");
+      return row;
+    } catch (cause) {
+      const persistenceCause = safeCause(cause, "Metadata persistence");
+      try { await selected.delete(objectKey); }
+      catch (cleanupCause) {
+        throw new StorageError("provider_error", "File metadata could not be saved and uploaded-object cleanup failed", {
+          cause: new AggregateError([persistenceCause, safeCause(cleanupCause, "Uploaded-object cleanup")]),
+        });
+      }
+      throw new StorageError("provider_error", "File metadata could not be saved; the uploaded object was removed", { cause: persistenceCause });
+    }
+  }
+
+  return {
+    configured: provider !== undefined,
+
+    async upload(userId: string, file: File): Promise<StorageFile> {
+      configuredProvider();
+      const validatedFile = z.instanceof(File).safeParse(file);
+      const parsed = validatedFile.success ? metadata.safeParse(validatedFile.data) : undefined;
+      if (!parsed?.success) {
+        throw new StorageError("invalid_file", "Choose a non-empty file up to 4 MiB with a safe filename");
+      }
+      const { name, size } = parsed.data;
+      let body: Uint8Array;
+      try {
+        // Validate declared size before allocating or reading the file body.
+        body = new Uint8Array(await file.arrayBuffer());
+      } catch (cause) {
+        throw new StorageError("invalid_file", "Could not read the uploaded file", {
+          cause: safeCause(cause, "File read"),
+        });
+      }
+      if (body.byteLength !== size) {
+        throw new StorageError("invalid_file", "The file size does not match its contents");
+      }
+      return persist(userId, name, body, CONTENT_TYPE);
+    },
+
+    /** Trusted server-generated media only; browser uploads retain the 4 MiB octet-stream policy. */
+    async storeGenerated(userId: string, input: { name: string; contentType: string; body: Uint8Array }): Promise<StorageFile> {
+      const parsed = z.object({
+        name: filename,
+        contentType: z.enum(["image/png", "image/jpeg", "image/webp", "image/gif", "video/mp4", "video/webm"]),
+        body: z.instanceof(Uint8Array).refine((body) => body.byteLength > 0 && body.byteLength <= MAX_GENERATED_BYTES),
+      }).safeParse(input);
+      if (!parsed.success) throw new StorageError("invalid_file", "Generated media must be a supported image/video up to 64 MiB");
+      return persist(userId, parsed.data.name, parsed.data.body, parsed.data.contentType);
+    },
+
+    async readFile(userId: string, fileId: string) {
+      const row = await ownedFile(userId, fileId);
+      const selected = fileProvider(row);
+      try {
+        let body: ReadableStream<Uint8Array> | null;
+        if (selected.read) body = await selected.read(row.objectKey);
+        else {
+          const response = await fetch(signedUrl.parse(await selected.downloadUrl(row.objectKey, attachment(filename.parse(row.name)))), { redirect: "manual" });
+          if (!response.ok) throw new Error("Stored object read failed");
+          body = response.body;
+        }
+        if (!body) throw new Error("Stored object has no body");
+        return { body, contentType: row.contentType, name: filename.parse(row.name) };
+      } catch (cause) {
+        throw new StorageError("provider_error", "The storage provider could not read the file", { cause: safeCause(cause, "Object read") });
+      }
+    },
+
+    /** Returns the signed-in user's files, newest first; no cross-user bucket listing is exposed. */
+    async listFiles(userId: string): Promise<StorageFile[]> {
+      try {
+        return await db.select().from(storageFile)
+          .where(eq(storageFile.userId, userId))
+          .orderBy(desc(storageFile.createdAt), desc(storageFile.id));
+      } catch (cause) {
+        throw new StorageError("provider_error", "Could not list file metadata", {
+          cause: safeCause(cause, "Metadata listing"),
+        });
+      }
+    },
+
+    async downloadUrl(userId: string, fileId: string): Promise<string> {
+      const row = await ownedFile(userId, fileId);
+      const selected = fileProvider(row);
+      if (selected.id === "r2-binding") return `/api/storage/${encodeURIComponent(row.id)}`;
+      try {
+        return signedUrl.parse(await selected.downloadUrl(row.objectKey, attachment(filename.parse(row.name))));
+      } catch (cause) {
+        throw new StorageError("provider_error", "The storage provider could not sign the download", {
+          cause: safeCause(cause, "Download signing"),
+        });
+      }
+    },
+
+    async deleteFile(userId: string, fileId: string): Promise<void> {
+      const row = await ownedFile(userId, fileId);
+      const selected = fileProvider(row);
+      try {
+        // Preserve metadata when remote deletion fails so the owner can retry.
+        await selected.delete(row.objectKey);
+      } catch (cause) {
+        throw new StorageError("provider_error", "The storage provider could not delete the file", {
+          cause: safeCause(cause, "Object deletion"),
+        });
+      }
+      try {
+        await db.delete(storageFile).where(and(
+          eq(storageFile.id, fileId),
+          eq(storageFile.userId, userId),
+        ));
+      } catch (cause) {
+        throw new StorageError("provider_error", "The object was removed but its metadata could not be deleted", {
+          cause: safeCause(cause, "Metadata deletion"),
+        });
+      }
+    },
+  };
+}

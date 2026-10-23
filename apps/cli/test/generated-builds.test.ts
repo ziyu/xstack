@@ -66,6 +66,35 @@ const baseConfig = {
 
 const buildSamples: BuildSample[] = [
   ...(["sqlite", "postgres"] as const).map((database): BuildSample => ({
+    name: `product-p3-full-${database}`,
+    packageManagers: ["bun"],
+    config: { ...baseConfig, database, preset: "full" },
+  })),
+  ...(["ai", "seo", "blog", "affiliate", "captcha"] as const).map((feature): BuildSample => ({
+    name: `product-p3-${feature}`,
+    packageManagers: ["bun"],
+    config: { ...baseConfig, product: { features: [feature], providers: { auth: [] } } },
+  })),
+  ...(["s3", "r2"] as const).map((provider): BuildSample => ({
+    name: `product-p3-storage-${provider}`,
+    packageManagers: ["bun"],
+    config: {
+      ...baseConfig,
+      product: { features: ["storage"], providers: { auth: [], storage: [provider] } },
+    },
+  })),
+  ...(["oss", "cos"] as const).flatMap((provider) =>
+    (["sqlite", "postgres"] as const).map((database): BuildSample => ({
+      name: `product-storage-${provider}-${database}`,
+      packageManagers: ["bun"],
+      config: {
+        ...baseConfig,
+        database,
+        product: { features: ["storage"], providers: { auth: [], storage: [provider] } },
+      },
+    })),
+  ),
+  ...(["sqlite", "postgres"] as const).map((database): BuildSample => ({
     name: `product-domestic-payment-${database}`,
     packageManagers: ["bun"],
     config: {

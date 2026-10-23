@@ -1,0 +1,97 @@
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { z } from "zod";
+
+export type CaptchaConfig = {
+  BETTER_AUTH_URL: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
+  TURNSTILE_TEST_MODE?: boolean;
+};
+
+const testSiteKey = "1x00000000000000000000AA";
+const testSecretKey = "1x0000000000000000000000000000000AA";
+const actions: Readonly<Record<string, string>> = {
+  "/sign-up/email": "signup",
+  "/sign-in/email": "login",
+  "/request-password-reset": "password_reset_request",
+  "/reset-password": "password_reset",
+  "/send-verification-email": "email_verification",
+  "/phone-number/send-otp": "phone_otp",
+};
+const responseSchema = z.object({
+  success: z.boolean(),
+  hostname: z.string().optional(),
+  action: z.string().optional(),
+  challenge_ts: z.string().optional(),
+  "error-codes": z.array(z.string()).optional(),
+});
+const tokenSchema = z.string().trim().min(1).max(2048);
+
+function configuration(env: CaptchaConfig) {
+  const origin = new URL(env.BETTER_AUTH_URL);
+  const test = env.TURNSTILE_TEST_MODE === true;
+  if (test && (process.env.NODE_ENV !== "development" || !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname))) {
+    throw new APIError("SERVICE_UNAVAILABLE", { code: "CAPTCHA_NOT_CONFIGURED", message: "Turnstile test mode requires development and a loopback BETTER_AUTH_URL" });
+  }
+  const siteKey = env.TURNSTILE_SITE_KEY?.trim() || (test ? testSiteKey : "");
+  const secretKey = env.TURNSTILE_SECRET_KEY?.trim() || (test ? testSecretKey : "");
+  if (!siteKey || !secretKey || (!test && (/^[123]x0+/.test(siteKey) || /^[123]x0+/.test(secretKey)))) {
+    throw new APIError("SERVICE_UNAVAILABLE", { code: "CAPTCHA_NOT_CONFIGURED", message: "Configure TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY before using protected authentication" });
+  }
+  if (test && (siteKey !== testSiteKey || secretKey !== testSecretKey)) {
+    throw new APIError("SERVICE_UNAVAILABLE", { code: "CAPTCHA_NOT_CONFIGURED", message: "Test mode only accepts the documented public always-pass key pair" });
+  }
+  return { origin, test, siteKey, secretKey };
+}
+
+/** Only the public site key crosses the server/client boundary. */
+export function captchaPublicConfig(env: CaptchaConfig) {
+  try {
+    return { siteKey: configuration(env).siteKey };
+  } catch {
+    return { siteKey: null };
+  }
+}
+
+export function createCaptchaBeforeHook(env: CaptchaConfig) {
+  return createAuthMiddleware(async (ctx) => {
+    const action = actions[ctx.path];
+    if (!action) return; // OAuth callbacks, sessions and webhooks are not challenges.
+    const config = configuration(env);
+    const headers = ctx.headers ?? ctx.request?.headers;
+    if (headers?.get("origin") !== config.origin.origin) {
+      throw new APIError("FORBIDDEN", { code: "CAPTCHA_ORIGIN_REJECTED", message: "A trusted Origin is required" });
+    }
+    const token = tokenSchema.safeParse(headers.get("x-captcha-token"));
+    if (!token.success) {
+      throw new APIError("BAD_REQUEST", { code: "CAPTCHA_REQUIRED", message: "Complete the verification challenge" });
+    }
+    let result: z.infer<typeof responseSchema>;
+    try {
+      // No remoteip: forwarded headers are caller-controlled outside a verified proxy boundary.
+      // Never retry a single-use token after a timeout; the provider may have consumed it.
+      const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ secret: config.secretKey, response: token.data }),
+        signal: AbortSignal.timeout(10_000),
+        redirect: "manual",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Siteverify unavailable");
+      result = responseSchema.parse(await response.json());
+    } catch {
+      throw new APIError("SERVICE_UNAVAILABLE", { code: "CAPTCHA_UNAVAILABLE", message: "Verification is unavailable; please try a new challenge" });
+    }
+    const timestamp = result.challenge_ts ? Date.parse(result.challenge_ts) : NaN;
+    // Public dummy tokens do not bind hostname/action/time. This explicit development-only
+    // mode still calls Siteverify; production always validates every binding below.
+    const validBinding = config.test || (
+      result.hostname === config.origin.hostname && result.action === action &&
+      Number.isFinite(timestamp) && timestamp <= Date.now() + 30_000 && Date.now() - timestamp <= 300_000
+    );
+    if (!result.success || result["error-codes"]?.length || !validBinding) {
+      throw new APIError("BAD_REQUEST", { code: "CAPTCHA_INVALID", message: "Verification expired or was rejected; complete a new challenge" });
+    }
+  });
+}

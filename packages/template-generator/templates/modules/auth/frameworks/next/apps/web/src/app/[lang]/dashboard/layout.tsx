@@ -2,6 +2,8 @@ import SideNav from "@/components/side-nav";
 import { resolveLocale } from "@/lib/i18n/server";
 import { requireUser } from "@/lib/session";
 
+export const metadata = { robots: { index: false, follow: false } };
+
 export default async function DashboardLayout({
   children,
   params,

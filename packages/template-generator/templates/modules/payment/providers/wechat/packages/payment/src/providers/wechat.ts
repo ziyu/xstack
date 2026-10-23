@@ -165,7 +165,7 @@ export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>
       ).toString("base64");
       const response = await fetch(`https://api.mch.weixin.qq.com${NATIVE_PATH}`, {
         method: "POST",
-        redirect: "error",
+        redirect: "manual",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",

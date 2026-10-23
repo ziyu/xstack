@@ -80,7 +80,7 @@ A successful HTTP response is not sufficient: the adapter requires exactly one r
 | `TWILIO_AUTH_TOKEN` | Matching account auth token |
 | `TWILIO_FROM_NUMBER` | SMS-capable Twilio sender number belonging to that account, in E.164 format |
 
-Use Node.js 20 or later. Configure an SMS-capable sender, balance, and geographic permissions in the [Twilio Console](https://console.twilio.com/). Trial accounts restrict recipients. Destination-specific sender registration, A2P requirements, consent, and carrier restrictions still apply; selecting Twilio does not guarantee service in mainland China or any other country.
+The adapter uses the Twilio HTTPS API with standard fetch on Node.js and Cloudflare Workers; no Node-only Twilio SDK is bundled. Configure an SMS-capable sender, balance, and geographic permissions in the [Twilio Console](https://console.twilio.com/). Trial accounts restrict recipients. Destination-specific sender registration, A2P requirements, consent, and carrier restrictions still apply; selecting Twilio does not guarantee service in mainland China or any other country.
 
 The adapter uses Programmable Messaging, not Twilio Verify. It sends `Your verification code is CODE. It expires in 5 minutes.` with a 300-second queue validity period. Auth (or your standalone caller) remains responsible for actually expiring the code. The adapter accepts only a phone-number sender, not an alphanumeric sender or Messaging Service SID.
 

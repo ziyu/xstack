@@ -81,6 +81,8 @@ export type ProviderSpec = {
   devDependencies?: Record<string, string>;
   /** Dependencies needed by this provider's web checkout surface. */
   appDependencies?: Record<string, string>;
+  /** Node-only SDKs that Next.js must load at runtime rather than bundle. */
+  serverExternalPackages?: string[];
   supports?: Support;
 };
 
@@ -90,13 +92,22 @@ export type ProvidersSpec = {
   /** Maximum number of providers (1 = single choice). */
   max?: number;
   default?: { global: string[]; cn: string[] };
+  /** Target-specific defaults apply only when the user did not select providers explicitly. */
+  targetDefaults?: Partial<Record<DeployTarget, string[]>>;
   options: Record<string, ProviderSpec>;
 };
 
 export type OptionSpec =
   | { type: "enum"; values: string[]; default: string; description?: string }
   | { type: "boolean"; default: boolean; description?: string }
-  | { type: "number"; default: number; min?: number; description?: string }
+  | {
+      type: "number";
+      default: number;
+      min?: number;
+      max?: number;
+      integer?: boolean;
+      description?: string;
+    }
   | { type: "string"; default: string; description?: string };
 
 export type WorkspacePackageSpec = {
@@ -208,4 +219,4 @@ export type ResolvedPlan = {
 export type StackContext = Pick<
   ProjectConfig,
   "frontend" | "backend" | "database" | "orm" | "api" | "webDeploy" | "projectName"
->;
+> & { dbSetup?: ProjectConfig["dbSetup"] };

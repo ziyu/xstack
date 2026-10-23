@@ -752,11 +752,13 @@ export const PRESET_TEMPLATES: {
     const product: ProductConfig = preset;
     return {
       id,
-      name: id === "starter" ? "Starter" : "Global SaaS",
+      name: id === "starter" ? "Starter" : id === "full" ? "Full" : "Global SaaS",
       description:
         id === "starter"
           ? "Product shell with authentication"
-          : "Authentication, email, admin, payments and credits",
+          : id === "full"
+            ? "All modules: AI, private files, publishing, referrals and protected authentication"
+            : "Authentication, email, admin, payments and credits",
       stack: {
         ...DEFAULT_STACK,
         features: [...product.features],

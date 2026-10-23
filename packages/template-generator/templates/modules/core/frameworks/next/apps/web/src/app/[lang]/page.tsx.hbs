@@ -5,6 +5,13 @@ import Link from "next/link";
 import { localePath } from "@/lib/i18n/paths";
 {{/if}}
 import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { site } from "@/config/site";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = resolveLocale((await params).lang);
+  return pageMetadata({ locale, path: "/", title: site.name, description: getTranslator(locale)("core.site.description") });
+}
 
 const features = ["modular", "portable", "deploy"] as const;
 

@@ -1,0 +1,8 @@
+import BlogEditor from "@/components/blog/editor";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+export default async function NewBlogPost({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = resolveLocale((await params).lang);
+  await requireAdmin(locale);
+  return <section><h1 className="mb-8 text-2xl font-semibold">{getTranslator(locale)("blog.editor.create")}</h1><BlogEditor locale={locale} /></section>;
+}

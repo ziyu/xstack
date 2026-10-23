@@ -255,6 +255,8 @@ export default defineCloudflareConfig({});
       if (!pkg.scripts["build:cloudflare"]) {
         pkg.scripts["build:cloudflare"] = "opennextjs-cloudflare build";
       }
+      pkg.scripts["preview:cloudflare"] = "opennextjs-cloudflare preview";
+      pkg.scripts["cf:typegen"] = "wrangler types --env-interface CloudflareBindings cloudflare-bindings.d.ts";
       vfs.writeFile(webPkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
     }
   }

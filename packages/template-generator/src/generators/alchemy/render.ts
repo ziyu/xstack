@@ -1,4 +1,5 @@
 import type { VirtualFileSystem } from "../../core/virtual-fs";
+import { getModulePlan } from "../../modules/pipeline";
 import type { RenderConfig } from "../../types";
 import { writeDatabaseResources } from "./database";
 import { writeObservabilityResources } from "./observability";
@@ -195,6 +196,9 @@ export function generateAlchemyRun(config: RenderConfig): string {
 
   writeImports(writer, plan);
   writer.blankLine();
+  if (getModulePlan(config).modules.some((module) => module.variant === "native")) {
+    writer.writeLine('import * as Redacted from "effect/Redacted";');
+  }
   writer.blankLine();
   writeDatabaseResources(writer, plan);
   if (plan.hasAlchemyManagedDatabase || plan.hasPrismaDeploy || plan.hasD1Resource) {

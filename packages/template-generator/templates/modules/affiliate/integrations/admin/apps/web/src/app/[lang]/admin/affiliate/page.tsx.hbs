@@ -1,0 +1,49 @@
+import { affiliate } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+import { z } from "zod";
+
+import { Pagination } from "@/components/admin/pagination";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+type Props = { params: Promise<{ lang: string }>; searchParams: Promise<{ page?: string }> };
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  return { title: getTranslator(resolveLocale((await params).lang))("affiliate.admin.title") };
+}
+export default async function AdminAffiliatePage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  await requireAdmin(locale);
+  const page = z.coerce.number().int().min(1).max(1_000_000).catch(1).parse((await searchParams).page);
+  const { rows, total } = await affiliate.listAll({ limit: 20, offset: (page - 1) * 20 });
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+  return (
+    <div className="flex flex-col gap-6">
+      <header>
+        <h1 className="text-2xl font-semibold">{t("affiliate.admin.title")}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{t("affiliate.admin.total", { total })}</p>
+      </header>
+      <p className="text-sm text-muted-foreground">{t("affiliate.policy", { percent: affiliate.commissionPercent })}</p>
+      <div className="overflow-x-auto border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-xs text-muted-foreground"><tr>
+            {(["date", "order", "referrer", "customer", "credits", "status"] as const).map((column) => <th key={column} className="px-4 py-3 font-medium">{t(`affiliate.admin.${column}`)}</th>)}
+          </tr></thead>
+          <tbody className="divide-y">{rows.map((row) => (
+            <tr key={row.orderId}>
+              <td className="px-4 py-3">{date.format(row.createdAt)}</td>
+              <td className="px-4 py-3 font-mono text-xs">{row.orderId}</td>
+              <td className="px-4 py-3 font-mono text-xs">{row.referrerId}</td>
+              <td className="px-4 py-3 font-mono text-xs">{row.userId}</td>
+              <td className="px-4 py-3 tabular-nums">{new Intl.NumberFormat(locale).format(row.credits)}</td>
+              <td className="px-4 py-3">{t(`affiliate.status.${row.status}`)}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+        {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">{t("affiliate.admin.empty")}</p>}
+      </div>
+      <Pagination locale={locale} page={page} pages={Math.max(1, Math.ceil(total / 20))} query={ {} } />
+      <p className="text-xs text-muted-foreground">{t("affiliate.refundPolicy")}</p>
+    </div>
+  );
+}

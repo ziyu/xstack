@@ -1,0 +1,17 @@
+import type { Services } from "../services";
+
+export default function registerBlogSeo({ blog, seo }: Services) {
+  seo.registerSitemap("blog", async () => {
+    const posts = await blog.sitemapPosts();
+    const translations = new Map<string, Record<string, string>>();
+    for (const post of posts) {
+      const group = translations.get(post.translationKey) ?? {};
+      group[post.locale] = seo.url(`/${post.locale}/blog/${post.slug}`);
+      translations.set(post.translationKey, group);
+    }
+    return [
+      ...[...new Set(posts.map((post) => post.locale))].map((locale) => ({ url: seo.url(`/${locale}/blog`) })),
+      ...posts.map((post) => ({ url: seo.url(`/${post.locale}/blog/${post.slug}`), lastModified: post.updatedAt, alternates: { languages: translations.get(post.translationKey)! } })),
+    ];
+  });
+}

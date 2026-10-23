@@ -1,0 +1,8 @@
+import { seo } from "@{{projectName}}/app-services";
+import { locales } from "@{{projectName}}/i18n";
+import type { MetadataRoute } from "next";
+
+export default function robots(): MetadataRoute.Robots {
+  const privatePaths = ["/login", "/signup", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/verify-email", "/dashboard", "/admin", "/api"];
+  return { rules: { userAgent: "*", allow: "/", disallow: [...privatePaths, ...locales.flatMap((locale) => privatePaths.map((path) => `/${locale}${path}`))] }, sitemap: seo.url("/sitemap.xml") };
+}

@@ -1,0 +1,72 @@
+import { storage } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+
+import { FileManager, type StorageLabels } from "@/components/storage/file-manager";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+export const runtime = "nodejs";
+
+type Props = { params: Promise<{ lang: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("storage.page.title") };
+}
+
+export default async function FilesPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const user = await requireUser(locale, "/dashboard/files");
+  const files = await storage.listFiles(user.id);
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+  const size = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
+  const labels: StorageLabels = {
+    uploadTitle: t("storage.page.uploadTitle"),
+    fileLabel: t("storage.page.fileLabel"),
+    upload: t("storage.page.upload"),
+    uploading: t("storage.page.uploading"),
+    listTitle: t("storage.page.listTitle"),
+    empty: t("storage.page.empty"),
+    download: t("storage.page.download"),
+    delete: t("storage.page.delete"),
+    deleting: t("storage.page.deleting"),
+    deleteConfirm: t("storage.page.deleteConfirm"),
+    uploaded: t("storage.page.uploaded"),
+    deleted: t("storage.page.deleted"),
+    errors: {
+      unauthorized: t("storage.errors.unauthorized"),
+      forbidden: t("storage.errors.forbidden"),
+      tooLarge: t("storage.errors.tooLarge"),
+      invalidFile: t("storage.errors.invalidFile"),
+      notFound: t("storage.errors.notFound"),
+      unavailable: t("storage.errors.unavailable"),
+      generic: t("storage.errors.generic"),
+    },
+  };
+
+  return (
+    <div className="flex flex-col gap-8">
+      <header className="flex max-w-2xl flex-col gap-3">
+        <h1 className="font-semibold text-2xl">{t("storage.page.title")}</h1>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("storage.page.description")}</p>
+        <p id="storage-limits" className="text-muted-foreground text-xs">{t("storage.page.limits")}</p>
+      </header>
+      {!storage.configured && (
+        <p role="status" className="border border-dashed p-4 text-muted-foreground text-sm">
+          {t("storage.page.unavailable")}
+        </p>
+      )}
+      <FileManager
+        configured={storage.configured}
+        labels={labels}
+        files={files.map((file) => ({
+          id: file.id,
+          name: file.name,
+          size: `${size.format(file.size / 1024)} KiB`,
+          createdAt: date.format(file.createdAt),
+        }))}
+      />
+    </div>
+  );
+}

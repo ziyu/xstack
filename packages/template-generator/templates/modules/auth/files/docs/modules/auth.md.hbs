@@ -16,6 +16,9 @@ Built on [Better Auth](https://better-auth.com). The `packages/auth` package exp
 {{/each}}
 - Roles (`user`, `admin`) through the Better Auth admin plugin
 - Account settings at `/dashboard/settings`
+{{#if (includes product.features "captcha")}}
+- Mandatory server-verified Turnstile for password login/signup/reset and phone OTP sending. Configure keys before using these forms; see [Bot protection / 人机验证](captcha.md). OAuth callbacks and sessions do not require captcha.
+{{/if}}
 
 ## Configuration
 

@@ -1,0 +1,51 @@
+import { z } from "zod";
+
+export const referralCookieName = "xstack_referral";
+export const referralCodeSchema = z.string().regex(/^[a-f0-9]{32}$/);
+export const referralCookieSeconds = {{module.options.cookieDays}} * 24 * 60 * 60;
+const payloadSchema = z.object({
+  code: referralCodeSchema,
+  issuedAt: z.number().int().positive(),
+  expiresAt: z.number().int().positive(),
+}).strict();
+const encoder = new TextEncoder();
+function encode(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+function decode(value: string) {
+  return Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), (character) => character.charCodeAt(0));
+}
+
+export function createReferralCookies(secret: string) {
+  const key = crypto.subtle.importKey("raw", encoder.encode(`affiliate-cookie:v1:${secret}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+  return {
+    async sign(code: string): Promise<string> {
+      const issuedAt = Date.now();
+      const payload = encode(encoder.encode(JSON.stringify(payloadSchema.parse({
+        code, issuedAt, expiresAt: issuedAt + referralCookieSeconds * 1000,
+      }))));
+      const signature = await crypto.subtle.sign("HMAC", await key, encoder.encode(payload));
+      return `${payload}.${encode(new Uint8Array(signature))}`;
+    },
+    async verify(value: string | undefined, at = Date.now()) {
+      if (!value || value.length > 1024) return undefined;
+      try {
+        const [payload, signature, extra] = value.split(".");
+        if (!payload || !signature || extra !== undefined || !/^[\w-]+$/.test(payload) || !/^[\w-]+$/.test(signature)) return undefined;
+        if (!(await crypto.subtle.verify("HMAC", await key, decode(signature), encoder.encode(payload)))) return undefined;
+        const result = payloadSchema.safeParse(JSON.parse(new TextDecoder().decode(decode(payload))));
+        if (!result.success) return undefined;
+        const data = result.data;
+        const now = at;
+        if (data.issuedAt > now || data.expiresAt <= now || data.expiresAt <= data.issuedAt || data.expiresAt - data.issuedAt > referralCookieSeconds * 1000) return undefined;
+        return data;
+      } catch {
+        return undefined;
+      }
+    },
+  };
+}
+
+export function referralCookieFromHeader(header: string | undefined): string | undefined {
+  return header?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${referralCookieName}=`))?.slice(referralCookieName.length + 1);
+}

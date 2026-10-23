@@ -16,6 +16,7 @@ export default defineModule({
     min: 1,
     max: 1,
     default: { global: ["resend"], cn: ["smtp"] },
+    targetDefaults: { cloudflare: ["resend"] },
     options: {
       resend: {
         name: "Resend",
@@ -26,6 +27,7 @@ export default defineModule({
       smtp: {
         name: "SMTP",
         market: "any",
+        supports: { targets: ["none", "node", "vercel", "docker"] },
         dependencies: { nodemailer: "^10.0.13" },
         devDependencies: { "@types/nodemailer": "^8.0.2" },
         env: [

@@ -548,3 +548,41 @@ ProjectConfig
 SQLite/PostgreSQL 两个国内支付生成样本均通过安装、所有工作区类型检查和生产构建；PostgreSQL 此次只做生成/构建验证，未运行真实数据库结算。模块测试 14 项、Builder 测试 11 项通过，主站类型检查、CLI 构建及显式国内支付参数 dry-run 通过。
 
 真实验收仍需已开通 Native/电脑网站支付的商户、匹配密钥、公开 HTTPS 回调、实际付款账号及账单核对。H5、自动扣款、退款、OSS/COS、`saas-cn` 和 Node 主机配置不属于本次交付。
+
+## 21. P2.4 OSS/COS 私有文件
+
+新增 `storage` 模块：`storage:oss`（默认）或 `storage:cos`，自动依赖认证，只支持原生 Next.js/self/Drizzle SQLite/PostgreSQL。生成私有文件控制台、上传/下载/删除 Route Handlers 和文件元数据表。使用官方 `ali-oss` / `cos-nodejs-sdk-v5`；SDK 服务端上传显式 private ACL，内容固定为二进制附件，下载签名有效期 60 秒，文件键使用用户 ID 哈希与随机 UUID。
+
+HTTP 层在解析 multipart 前按实际流量限制请求体，文件最大 4 MiB；写请求核对配置的可信 Origin，下载/删除先校验数据库所有权。远端删除失败保留元数据；上传成功但元数据写入失败时补偿删除对象，补偿失败保留安全诊断，错误不携带 SDK 凭据。列表显示所有本人文件，未加入分页、公开分享或管理员文件访问。
+
+SDK/真实 SQLite 验证使用限定测试桶域名的 HTTP 夹具，不接触真实云资源：两家 SDK 的私有签名上传/删除、60 秒附件链接、所有权、大小限制和失败补偿通过。两套生产 HTTP 应用的登录、CSRF、跨用户、上传/下载重定向/删除通过；浏览器验证 OSS 开发与生产页面上传、列表，以及开发页面删除。SQLite/PostgreSQL × OSS/COS 四种生成组合均通过安装、类型检查和生产构建。
+
+修复集成问题：增加模块 Next 配置接缝，将 OSS Node SDK 外置，避免 Turbopack 静态解析 urllib 可选代理依赖；保留已有外置包配置。Varlock 环境代理不可枚举，provider 显式读取环境字段后再做 schema 校验，不能直接解析整个代理。未修改应用认证流程；验证夹具的 Fetch 拦截曾干扰 SSR，会话问题通过改用仅 HTTP 的 SDK 拦截解决。
+
+真实 OSS/COS 权限、云端字节下载、签名过期与删除验收仍需专用私有桶和最小权限凭据；本地夹具不代表云端验收。S3/R2、`saas-cn` 和 Node 主机目标不在本次交付。
+
+## 22. P3 扩展模块与 Cloudflare
+
+P3 功能代码已实现，`full` 预设通过共享清单接入 CLI、Builder、oRPC 预览和配置复现；原 `starter`/`saas-global` 功能集合不变。`full` 包含 auth/email/sms/admin/payment/credits/storage/ai/seo/blog/affiliate/captcha，基础 i18n/core 自动加入。
+
+| 项目 | 实现边界 |
+| --- | --- |
+| S3/R2 | 官方 S3 SDK、私有桶、60 秒签名附件 URL；R2 Workers binding 使用真实绑定，下载经过登录和所有权检查后流式返回，不是公开链接 |
+| AI | OpenAI 对话/图片、Google 对话/图片/异步视频、OpenAI-compatible/DeepSeek 对话；能力决定 UI；模型/API 依据当前官方文档，不调用已停用 Sora/Veo |
+| AI × credits/storage | 持久化任务、费用快照、请求幂等、确定失败/取消只退款一次；租约与写入 fencing；结果先持久化再存储；不确定供应商结果不自动重提/退款；AI 媒体限制 8 MiB，读取 JSON 流先限制 12 MiB |
+| SEO/blog | canonical/hreflang、OG/Twitter、robots、动态公开 sitemap；数据库多语言文章、草稿/发布、管理员编辑/删除、版本冲突、安全 Markdown/JSON-LD，私有页面 noindex |
+| affiliate | 签名 first-touch 邀请、注册绑定、已验证支付订单产生唯一积分佣金、重放/并发安全、个人与管理员报表；奖励是应用积分，不是现金，退款/争议需人工审计调整 |
+| captcha | Turnstile 服务端 before-hook 强制保护邮箱注册/登录/重置/发验证邮件/短信发码；校验成功、域名、action、时间和重放；缺配置 fail closed，无生产绕过 |
+| Cloudflare | OpenNext、D1、R2、Alchemy、手动触发部署 workflow 和上线清单；按目标选择缺省 provider，显式不兼容选择报错；Twilio HTTP、Stripe fetch/WebCrypto；D1/SQLite 积分用原子 batch，PostgreSQL 用行锁事务 |
+
+验证记录（本地，不代表真实服务商验收）：
+
+- 九种生成组合安装、全部工作区类型检查、生产构建通过：full SQLite/PostgreSQL、独立 AI/SEO/blog/affiliate/captcha、S3/R2 API。
+- full Node 生产 HTTP：真实验证码钩子+本地签名 Siteverify 协议、真实邮件事件+本地邮件传输、确认链接、管理员/普通用户会话；博客 CRUD、草稿隔离、分页、翻译、CSRF、并发版本、sitemap 通过。
+- AI 协议脚本执行真实生成服务和 SQLite：并发重放、冲突/跨用户、余额不足、失败/异步失败/取消退款、媒体字节、不确定结果不重提、兼容对话通过。full HTTP 对话/图片/视频与真实 S3 SDK 存储/读取通过，外部 HTTP 用限定域名夹具。
+- 分销脚本执行真实 auth、Stripe 签名验证和积分账本：客户端私有字段拒绝、签名/过期/自邀请、并发付款重放、发奖后恢复、归因延迟恢复、归属和续费排除通过。
+- full Cloudflare：真实 D1 迁移 35 条 SQL、OpenNext 构建和 Wrangler dry-run 通过；原生 workerd preview 公共/私有路由通过；限定外连夹具下完整 workerd+D1+R2 注册/邮件确认、AI 三模态、媒体字节、并发幂等/余额保护、博客/SEO、R2 上传/下载/删除、CSRF/越权及伪造支付拒绝通过。
+- 浏览器执行验证码表单令牌交接、登录、AI 生成、博客创建/发布和邀请报表；截图保存在验证环境。验证码控件/模型结果是协议夹具，不是 Cloudflare 真人判断或真实模型输出。
+- 模块/求解器测试 17 项、Builder 测试 12 项通过；主站类型检查、CLI `full` + D1/R2 dry-run 通过。
+
+验收修复：Handlebars/JSX 结束边界、独立模块 unused context、Cloudflare 环境/导出类型、lazy proxy 的 `has` 行为、workerd 不支持 `redirect:error`（改 manual 且检查非成功状态）、SQLite 并发交互事务锁冲突（改原子 batch）。PostgreSQL 本轮做生成/类型/构建验证，未跑真实 PG 并发账本；云 IAM、真实付费模型、邮件/SMS 送达、支付收款和远端 Cloudflare 部署仍需专用账号验收。AI 供应商结果不确定时须人工核对；上传成功但链接写入前进程崩溃可能产生可追踪的孤立文件。

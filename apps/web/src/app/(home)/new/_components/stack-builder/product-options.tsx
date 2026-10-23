@@ -34,7 +34,9 @@ function OptionControl({
     spec.type === "number" &&
     (text.trim() === "" ||
       !Number.isFinite(Number(text)) ||
-      (spec.min !== undefined && Number(text) < spec.min));
+      (spec.min !== undefined && Number(text) < spec.min) ||
+      (spec.max !== undefined && Number(text) > spec.max) ||
+      (spec.integer === true && !Number.isSafeInteger(Number(text))));
   const helpId = `${id}-help`;
   useEffect(() => setDraft(null), [value]);
   const errorId = `${id}-error`;
@@ -76,7 +78,8 @@ function OptionControl({
           className={controlClass}
           type={spec.type === "number" ? "number" : "text"}
           min={spec.type === "number" ? spec.min : undefined}
-          step={spec.type === "number" ? "any" : undefined}
+          max={spec.type === "number" ? spec.max : undefined}
+          step={spec.type === "number" && spec.integer ? 1 : "any"}
           value={text}
           aria-invalid={invalid || undefined}
           aria-describedby={`${helpId}${invalid ? ` ${errorId}` : ""}`}
@@ -88,7 +91,9 @@ function OptionControl({
               if (
                 next.trim() !== "" &&
                 Number.isFinite(number) &&
-                (spec.min === undefined || number >= spec.min)
+                (spec.min === undefined || number >= spec.min) &&
+                (spec.max === undefined || number <= spec.max) &&
+                (!spec.integer || Number.isSafeInteger(number))
               ) {
                 onChange(number);
               }
@@ -105,11 +110,12 @@ function OptionControl({
       </p>
       {invalid && (
         <p id={errorId} role="alert" className="text-[11px] text-destructive">
-          Enter a finite number
+          Enter a finite {spec.type === "number" && spec.integer ? "integer" : "number"}
           {spec.type === "number" && spec.min !== undefined
             ? ` greater than or equal to ${spec.min}`
             : ""}
-          . This edit has not been applied.
+          {spec.type === "number" && spec.max !== undefined ? ` and at most ${spec.max}` : ""}. This
+          edit has not been applied.
         </p>
       )}
     </div>
@@ -261,17 +267,25 @@ export function ProductOptions({
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(providerSpec.options).map(([providerId, provider]) => {
                     const checked = providers.includes(providerId);
+                    const providerIssue = productPlan({
+                      ...stack,
+                      providers: { ...stack.providers, [manifest.id]: [providerId] },
+                    }).issues.find(
+                      (issue) => issue.level === "error" && issue.module === manifest.id,
+                    );
                     const disabled =
-                      providerSpec.max !== 1 &&
-                      ((checked && providers.length <= (providerSpec.min ?? 0)) ||
-                        (!checked &&
-                          providerSpec.max !== undefined &&
-                          providers.length >= providerSpec.max));
+                      (!checked && !!providerIssue) ||
+                      (providerSpec.max !== 1 &&
+                        ((checked && providers.length <= (providerSpec.min ?? 0)) ||
+                          (!checked &&
+                            providerSpec.max !== undefined &&
+                            providers.length >= providerSpec.max)));
                     const id = `${moduleId}-provider-${providerId}`;
                     return (
                       <label
                         key={providerId}
                         htmlFor={id}
+                        title={providerIssue?.message}
                         className={`flex min-h-9 items-center gap-2 rounded-[4px] border px-2.5 py-2 text-xs ${checked ? "border-primary text-primary" : "border-fd-border"}`}
                       >
                         <input

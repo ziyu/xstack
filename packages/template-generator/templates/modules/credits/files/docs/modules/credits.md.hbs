@@ -1,6 +1,6 @@
 # Credits
 
-`packages/credits` keeps a balance per user (`credit_balance`) and an append-only ledger (`credit_transaction`). Every change goes through one transaction that updates the balance and records the entry together.
+`packages/credits` keeps a balance per user (`credit_balance`) and an append-only ledger (`credit_transaction`). Every change updates the balance and ledger atomically: serialized account transactions on PostgreSQL, or atomic batches on SQLite/libSQL/D1. SQLite never holds an interactive write transaction across JavaScript await boundaries. Amounts and resulting balances are bounded to signed 32-bit integers for consistent dialect behavior.
 
 ## API
 
@@ -10,12 +10,14 @@ import { credits } from "@{{projectName}}/app-services";
 await credits.getBalance(userId);
 await credits.grant(userId, 100, { type: "grant", reason: "beta tester", referenceId: "beta:2026" });
 await credits.consume(userId, 5, { reason: "image generation", referenceId: `job:${jobId}` });
+await credits.refund(userId, `job:${jobId}`); // derives the amount from the debit; refunds at most once
 await credits.adjust(userId, -20, "manual correction");
 ```
 
 - `consume` throws `InsufficientCreditsError` and changes nothing if the balance is too low.
-- A `referenceId` is applied at most once. Pass one whenever the caller can retry.
+- A `referenceId` is applied at most once, including concurrent retries. Reuse with a different owner, amount, or type rejects. Pass a stable reference whenever the caller can retry.
 - Every applied change emits `credits.changed`.
+- `refund(userId, debitReference)` returns null if no debit was committed; otherwise it returns the unique compensating entry. A refund cannot exceed or belong to another user's debit.
 
 ## Sources
 

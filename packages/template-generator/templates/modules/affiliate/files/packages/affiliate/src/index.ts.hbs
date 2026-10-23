@@ -1,0 +1,108 @@
+import type { Database } from "@{{projectName}}/db";
+import { affiliateCommission, affiliateProfile, affiliateReferral } from "@{{projectName}}/db/schema/affiliate";
+import { user } from "@{{projectName}}/db/schema/auth";
+import { and, count, desc, eq, sql } from "drizzle-orm";
+
+import { createReferralCookies, referralCodeSchema } from "./cookie";
+export { referralCodeSchema, referralCookieName, referralCookieSeconds, referralCookieFromHeader } from "./cookie";
+
+export const commissionPercent = {{module.options.commissionPercent}};
+export type Commission = typeof affiliateCommission.$inferSelect;
+
+export function createAffiliate({ db, secret }: { db: Database; secret: string }) {
+  const cookies = createReferralCookies(secret);
+
+  async function findInviter(code: string) {
+    if (!referralCodeSchema.safeParse(code).success) return undefined;
+    const [profile] = await db.select({ userId: affiliateProfile.userId })
+      .from(affiliateProfile).innerJoin(user, eq(affiliateProfile.userId, user.id))
+      .where(and(eq(affiliateProfile.code, code), sql`coalesce(${user.banned}, false) = false`));
+    return profile;
+  }
+  // The private token is snapshotted atomically with the new account. Retrying this
+  // operation later checks expiry at signup, not at payment or replay time.
+  async function bindSignup(userId: string): Promise<void> {
+    const [account] = await db.select({ token: user.affiliateReferralToken, createdAt: user.createdAt })
+      .from(user).where(eq(user.id, userId));
+    if (!account) return;
+    const referral = await cookies.verify(account.token ?? undefined, account.createdAt.getTime());
+    if (!referral) return;
+    const inviter = await findInviter(referral.code);
+    if (!inviter || inviter.userId === userId) return;
+    await db.insert(affiliateReferral).values({ userId, referrerId: inviter.userId })
+      .onConflictDoNothing({ target: affiliateReferral.userId });
+  }
+
+
+  return {
+    commissionPercent,
+    findInviter,
+
+    async getCode(userId: string): Promise<string> {
+      await db.insert(affiliateProfile).values({ userId, code: crypto.randomUUID().replaceAll("-", "") })
+        .onConflictDoNothing({ target: affiliateProfile.userId });
+      const [profile] = await db.select().from(affiliateProfile).where(eq(affiliateProfile.userId, userId));
+      if (!profile) throw new Error("Affiliate profile was not persisted");
+      return profile.code;
+    },
+
+    /** First valid touch wins. The public capture route also rejects signed-in accounts. */
+    async capture(code: string, existing: string | undefined): Promise<string | undefined> {
+      const current = await cookies.verify(existing);
+      if (current && await findInviter(current.code)) return existing;
+      if (!await findInviter(code)) return undefined;
+      return cookies.sign(code);
+    },
+
+    bindSignup,
+
+    /** Durable intent freezes the beneficiary/amount before the independently idempotent grant. */
+    async prepareCommission(input: {
+      orderId: string; userId: string; planCredits: number; amount: number; renewal: boolean;
+    }): Promise<Commission | undefined> {
+      if (input.renewal || input.amount <= 0) return undefined;
+      const [existing] = await db.select().from(affiliateCommission).where(eq(affiliateCommission.orderId, input.orderId));
+      if (existing) return existing;
+      await bindSignup(input.userId);
+      const [referral] = await db.select().from(affiliateReferral).where(eq(affiliateReferral.userId, input.userId));
+      if (!referral || referral.referrerId === input.userId) return undefined;
+      const credits = Math.floor(input.planCredits * commissionPercent / 100);
+      if (!Number.isSafeInteger(credits) || credits <= 0) return undefined;
+      await db.insert(affiliateCommission).values({
+        orderId: input.orderId, userId: input.userId, referrerId: referral.referrerId, credits,
+      }).onConflictDoNothing({ target: affiliateCommission.orderId });
+      const [commission] = await db.select().from(affiliateCommission).where(eq(affiliateCommission.orderId, input.orderId));
+      return commission;
+    },
+
+    async markGranted(orderId: string): Promise<void> {
+      await db.update(affiliateCommission).set({ status: "granted", grantedAt: new Date() })
+        .where(and(eq(affiliateCommission.orderId, orderId), eq(affiliateCommission.status, "pending")));
+    },
+
+    async report(userId: string, limit = 50) {
+      const [[referrals], [totals], conversions] = await Promise.all([
+        db.select({ value: count() }).from(affiliateReferral).where(eq(affiliateReferral.referrerId, userId)),
+        db.select({
+          conversions: count(),
+          earned: sql<number>`coalesce(sum(case when ${affiliateCommission.status} = 'granted' then ${affiliateCommission.credits} else 0 end), 0)`.mapWith(Number),
+          pending: sql<number>`coalesce(sum(case when ${affiliateCommission.status} = 'pending' then ${affiliateCommission.credits} else 0 end), 0)`.mapWith(Number),
+        }).from(affiliateCommission).where(eq(affiliateCommission.referrerId, userId)),
+        db.select().from(affiliateCommission).where(eq(affiliateCommission.referrerId, userId))
+          .orderBy(desc(affiliateCommission.createdAt)).limit(limit),
+      ]);
+      return { referredSignups: referrals?.value ?? 0, convertedOrders: totals?.conversions ?? 0, earnedCredits: totals?.earned ?? 0, pendingCredits: totals?.pending ?? 0, conversions };
+    },
+
+    /** The Next admin page must authorize before calling this server-only API. */
+    async listAll({ limit, offset }: { limit: number; offset: number }) {
+      const [rows, [total]] = await Promise.all([
+        db.select().from(affiliateCommission).orderBy(desc(affiliateCommission.createdAt)).limit(limit).offset(offset),
+        db.select({ value: count() }).from(affiliateCommission),
+      ]);
+      return { rows, total: total?.value ?? 0 };
+    },
+  };
+}
+
+export type Affiliate = ReturnType<typeof createAffiliate>;

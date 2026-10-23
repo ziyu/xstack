@@ -5496,9 +5496,11 @@ export { env as ENV } from "cloudflare:workers";
 {{else if (and (eq backend "self") (eq webDeploy "cloudflare") (includes frontend "next"))}}
 /// <reference path="../cloudflare-env.d.ts" />
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+// Varlock's generated declaration supplies literal/optional module env types; native bindings stay typed by Alchemy.
+type AppEnv = Env & typeof import("./env").ENV;
 
 function getNodeEnvValue(key: string) {
-	if (key === "DB") {
+	if (key === "DB" || key === "STORAGE_BUCKET") {
 		return undefined;
 	}
 
@@ -5513,19 +5515,19 @@ function getCloudflareEnvSync() {
 	}
 }
 
-function createEnvProxy(getValue: (key: keyof Env & string) => unknown) {
-	return new Proxy({} as Env, {
+function createEnvProxy(getValue: (key: keyof AppEnv & string) => unknown) {
+	return new Proxy({} as AppEnv, {
 		get(_target, prop) {
 			if (typeof prop !== "string") {
 				return undefined;
 			}
 
-			return getValue(prop as keyof Env & string);
+			return getValue(prop as keyof AppEnv & string);
 		},
 	});
 }
 
-function resolveEnvValue(key: keyof Env & string) {
+function resolveEnvValue(key: keyof AppEnv & string) {
 	const nodeValue = getNodeEnvValue(key);
 	if (nodeValue !== undefined) {
 		return nodeValue;
@@ -12993,6 +12995,8 @@ export function defineAbilityFor(actor: Actor | null | undefined): AppAbility {
 import { requireAdmin } from "@/lib/admin";
 import { resolveLocale } from "@/lib/i18n/server";
 
+export const metadata = { robots: { index: false, follow: false } };
+
 export default async function AdminLayout({
   children,
   params,
@@ -13283,6 +13287,1283 @@ export async function requireAdmin(locale: Locale) {
   return { user, ability };
 }
 `],
+  ["modules/affiliate/dialects/postgres/packages/db/src/schema/affiliate.ts", `import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+
+import { user } from "./auth";
+
+export const affiliateProfile = pgTable("affiliate_profile", {
+  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  code: text("code").notNull().unique(),
+});
+
+export const affiliateReferral = pgTable("affiliate_referral", {
+  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  referrerId: text("referrer_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [index("affiliate_referral_referrer_idx").on(table.referrerId)]);
+
+// Cross-feature order IDs deliberately have no foreign key.
+export const affiliateCommission = pgTable("affiliate_commission", {
+  orderId: text("order_id").primaryKey(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  referrerId: text("referrer_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  credits: integer("credits").notNull(),
+  status: text("status", { enum: ["pending", "granted"] }).notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  grantedAt: timestamp("granted_at"),
+}, (table) => [index("affiliate_commission_referrer_idx").on(table.referrerId, table.createdAt)]);
+`],
+  ["modules/affiliate/dialects/sqlite/packages/db/src/schema/affiliate.ts", `import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+
+import { user } from "./auth";
+
+export const affiliateProfile = sqliteTable("affiliate_profile", {
+  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  code: text("code").notNull().unique(),
+});
+
+export const affiliateReferral = sqliteTable("affiliate_referral", {
+  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  referrerId: text("referrer_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+}, (table) => [index("affiliate_referral_referrer_idx").on(table.referrerId)]);
+
+// Cross-feature order IDs deliberately have no foreign key.
+export const affiliateCommission = sqliteTable("affiliate_commission", {
+  orderId: text("order_id").primaryKey(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  referrerId: text("referrer_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  credits: integer("credits").notNull(),
+  status: text("status", { enum: ["pending", "granted"] }).notNull().default("pending"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  grantedAt: integer("granted_at", { mode: "timestamp_ms" }),
+}, (table) => [index("affiliate_commission_referrer_idx").on(table.referrerId, table.createdAt)]);
+`],
+  ["modules/affiliate/files/apps/web/src/integrations/affiliate-payment.ts.hbs", `import type { Services } from "../services";
+
+/** Only verified payment events can earn credits; there is no client award endpoint. */
+export default function registerAffiliatePayment({ events, payment, affiliate, credits }: Services) {
+  events.on("payment.order_paid", async ({ orderId, userId, plan, amount, renewal }) => {
+    if (renewal) return;
+    const order = await payment.getOrder(userId, orderId);
+    if (!order || order.status !== "paid" || order.amount !== amount || order.planId !== plan.id) {
+      throw new Error("Affiliate settlement requires the persisted paid order");
+    }
+    const commission = await affiliate.prepareCommission({ orderId, userId, planCredits: plan.credits ?? 0, amount, renewal });
+    if (!commission || commission.status === "granted") return;
+    // The immutable intent survives a process failure. Replaying the webhook resumes it;
+    // the unique credit reference handles a failure after grant but before markGranted.
+    await credits.grant(commission.referrerId, commission.credits, {
+      type: "affiliate", reason: \`Referral purchase \${orderId}\`, referenceId: \`affiliate:\${orderId}\`,
+    });
+    await affiliate.markGranted(orderId);
+  });
+}
+`],
+  ["modules/affiliate/files/apps/web/src/integrations/affiliate-signup.ts.hbs", `import type { Services } from "../services";
+
+export default function registerAffiliateSignup({ events, affiliate }: Services) {
+  events.on("auth.user_created", async ({ userId }) => {
+    try {
+      await affiliate.bindSignup(userId);
+    } catch {
+      // Account creation already committed. Payment fulfillment can recover from
+      // the immutable private signup token; don't report the signup as failed.
+      console.error("[affiliate] Signup attribution deferred until settlement");
+    }
+  });
+}
+`],
+  ["modules/affiliate/files/docs/modules/affiliate.md.hbs", `# Referral credit rewards
+
+This module requires \`auth\`, \`payment\`, and \`credits\`. It awards **application credits, not cash**, and has no cash payout or withdrawal capability. The default reward is {{module.options.commissionPercent}}% of a paid checkout's plan credits, rounded down. A zero-credit/free order, a zero rounded reward, or a subscription renewal earns nothing. Each distinct qualifying checkout earns once; repeated webhook deliveries never create another reward. Multi-account/self-referral abuse is prohibited; identity or household uniqueness is not automatically verified.
+
+## Referral flow
+
+1. Sign in and open \`/<locale>/dashboard/affiliate\`. The page creates an unguessable, stable invitation code and displays the owned report and shareable \`/<locale>/ref/<code>\` link.
+2. The visitor opens that localized link and explicitly accepts the invitation. This same-origin POST to \`/api/affiliate/capture?code=<code>&lang=<locale>\` validates a real, non-banned inviter and refuses signed-in accounts. No attribution is written by an external GET. The first valid cookie wins.
+3. Capture sets a host-only, HttpOnly, SameSite=Lax cookie, Secure on HTTPS, signed with a domain-separated WebCrypto HMAC using \`BETTER_AUTH_SECRET\`. It expires after {{module.options.cookieDays}} days. Rotating the auth secret invalidates unbound invitations.
+4. The auth database **before** hook stores the bounded token on the new account in \`affiliate_referral_token\`. Better Auth marks this field \`input: false, returned: false\`: clients cannot choose it or retrieve it. The new-user event validates the signature and time window at the persisted account creation time, rejects self-referrals, and inserts the immutable referrer under a unique account key. Existing accounts never gain a referrer by signing in with a new cookie. OAuth and phone signup use the same new-user hook.
+5. A verified \`payment.order_paid\` event checks the persisted paid order and creates a unique commission intent. Only server-selected plan credits determine its amount. The integration grants credits under \`affiliate:<orderId>\` and then marks the intent granted.
+
+## Failure and concurrency behavior
+
+A signup attribution failure is logged without incorrectly reporting that the committed account failed to register. The immutable private token remains recoverable; a subsequent paid event reconstructs the same attribution using the original signup time, even if the browser cookie has since expired. The referral's unique account key makes the first binding permanent.
+
+A unique commission order key freezes beneficiary and reward amount before any credit grant. Concurrent events reuse that intent. The credits service applies a unique reference atomically. If grant succeeds but commission finalization fails, the verified provider webhook retry safely reuses the grant and completes the report. Failure propagates to the webhook so the provider can retry; configure provider retry/alerting and replay failed verified events. No client-facing award or ownership override endpoint exists. The operations use unique inserts and conditional updates, not a D1-incompatible interactive transaction.
+
+The policy is configured at generation with \`affiliate.commissionPercent\` (0–100) and \`affiliate.cookieDays\` (1–90). Commission uses the server plan credits and commission percentage in effect when its first verified settlement creates the commission intent, not a purchase-time pricing snapshot. The persisted intent then freezes that amount and beneficiary across retries and later policy changes. Payment's public event supplies the selected server plan; this module does not accept a client plan, user, or credit amount.
+
+## Reports and access
+
+\`GET /api/affiliate\` returns the authenticated account's code, referral count, conversion count, granted/pending credit totals, and latest 50 conversions. It never uses a requested user ID. \`/<locale>/admin/affiliate\` is generated only with \`admin\` and authorizes administrators before querying all commission intents. No invitee email is exposed in the owned report. Both English and Simplified Chinese pages label rewards as credits.
+
+## Refunds and chargebacks
+
+The payment service currently has no refund/chargeback domain event. **There is no automatic commission reversal.** Administrators must reconcile refunds/chargebacks with the provider and apply an audited negative credit adjustment in the credits console. Do not promise automatic clawbacks, a refund hold period, or cash payouts. The protocol regression explicitly verifies that an unsupported refund webhook is a no-op, not a fabricated refund integration.
+
+## Local verification
+
+In the xstack repository, generate a disposable SQLite fixture under \`apps/cli/.smoke\` with affiliate and Stripe, migrate it, and run \`bun apps/cli/live-tests/affiliate.ts <fixture>\`. This invokes the generated auth handler, affiliate service, payment Stripe signature verifier, credit ledger, and integrations against the actual local database. It uses local signed Stripe event payloads, not real purchases or Stripe API calls. It covers immutable attribution, tampering/expiry/self-referral, parallel replay, failure-after-grant recovery, renewals, and unsupported refund behavior. If captcha is generated, its Siteverify response is explicitly a local transport fixture; use the separate captcha HTTP/browser regression for widget validation. Parent full-preset HTTP validation additionally exercises the public capture and owned/admin pages.
+`],
+  ["modules/affiliate/files/packages/affiliate/src/cookie.ts.hbs", `import { z } from "zod";
+
+export const referralCookieName = "xstack_referral";
+export const referralCodeSchema = z.string().regex(/^[a-f0-9]{32}$/);
+export const referralCookieSeconds = {{module.options.cookieDays}} * 24 * 60 * 60;
+const payloadSchema = z.object({
+  code: referralCodeSchema,
+  issuedAt: z.number().int().positive(),
+  expiresAt: z.number().int().positive(),
+}).strict();
+const encoder = new TextEncoder();
+function encode(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+function decode(value: string) {
+  return Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), (character) => character.charCodeAt(0));
+}
+
+export function createReferralCookies(secret: string) {
+  const key = crypto.subtle.importKey("raw", encoder.encode(\`affiliate-cookie:v1:\${secret}\`), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+  return {
+    async sign(code: string): Promise<string> {
+      const issuedAt = Date.now();
+      const payload = encode(encoder.encode(JSON.stringify(payloadSchema.parse({
+        code, issuedAt, expiresAt: issuedAt + referralCookieSeconds * 1000,
+      }))));
+      const signature = await crypto.subtle.sign("HMAC", await key, encoder.encode(payload));
+      return \`\${payload}.\${encode(new Uint8Array(signature))}\`;
+    },
+    async verify(value: string | undefined, at = Date.now()) {
+      if (!value || value.length > 1024) return undefined;
+      try {
+        const [payload, signature, extra] = value.split(".");
+        if (!payload || !signature || extra !== undefined || !/^[\\w-]+$/.test(payload) || !/^[\\w-]+$/.test(signature)) return undefined;
+        if (!(await crypto.subtle.verify("HMAC", await key, decode(signature), encoder.encode(payload)))) return undefined;
+        const result = payloadSchema.safeParse(JSON.parse(new TextDecoder().decode(decode(payload))));
+        if (!result.success) return undefined;
+        const data = result.data;
+        const now = at;
+        if (data.issuedAt > now || data.expiresAt <= now || data.expiresAt <= data.issuedAt || data.expiresAt - data.issuedAt > referralCookieSeconds * 1000) return undefined;
+        return data;
+      } catch {
+        return undefined;
+      }
+    },
+  };
+}
+
+export function referralCookieFromHeader(header: string | undefined): string | undefined {
+  return header?.split(";").map((part) => part.trim()).find((part) => part.startsWith(\`\${referralCookieName}=\`))?.slice(referralCookieName.length + 1);
+}
+`],
+  ["modules/affiliate/files/packages/affiliate/src/index.ts.hbs", `import type { Database } from "@{{projectName}}/db";
+import { affiliateCommission, affiliateProfile, affiliateReferral } from "@{{projectName}}/db/schema/affiliate";
+import { user } from "@{{projectName}}/db/schema/auth";
+import { and, count, desc, eq, sql } from "drizzle-orm";
+
+import { createReferralCookies, referralCodeSchema } from "./cookie";
+export { referralCodeSchema, referralCookieName, referralCookieSeconds, referralCookieFromHeader } from "./cookie";
+
+export const commissionPercent = {{module.options.commissionPercent}};
+export type Commission = typeof affiliateCommission.$inferSelect;
+
+export function createAffiliate({ db, secret }: { db: Database; secret: string }) {
+  const cookies = createReferralCookies(secret);
+
+  async function findInviter(code: string) {
+    if (!referralCodeSchema.safeParse(code).success) return undefined;
+    const [profile] = await db.select({ userId: affiliateProfile.userId })
+      .from(affiliateProfile).innerJoin(user, eq(affiliateProfile.userId, user.id))
+      .where(and(eq(affiliateProfile.code, code), sql\`coalesce(\${user.banned}, false) = false\`));
+    return profile;
+  }
+  // The private token is snapshotted atomically with the new account. Retrying this
+  // operation later checks expiry at signup, not at payment or replay time.
+  async function bindSignup(userId: string): Promise<void> {
+    const [account] = await db.select({ token: user.affiliateReferralToken, createdAt: user.createdAt })
+      .from(user).where(eq(user.id, userId));
+    if (!account) return;
+    const referral = await cookies.verify(account.token ?? undefined, account.createdAt.getTime());
+    if (!referral) return;
+    const inviter = await findInviter(referral.code);
+    if (!inviter || inviter.userId === userId) return;
+    await db.insert(affiliateReferral).values({ userId, referrerId: inviter.userId })
+      .onConflictDoNothing({ target: affiliateReferral.userId });
+  }
+
+
+  return {
+    commissionPercent,
+    findInviter,
+
+    async getCode(userId: string): Promise<string> {
+      await db.insert(affiliateProfile).values({ userId, code: crypto.randomUUID().replaceAll("-", "") })
+        .onConflictDoNothing({ target: affiliateProfile.userId });
+      const [profile] = await db.select().from(affiliateProfile).where(eq(affiliateProfile.userId, userId));
+      if (!profile) throw new Error("Affiliate profile was not persisted");
+      return profile.code;
+    },
+
+    /** First valid touch wins. The public capture route also rejects signed-in accounts. */
+    async capture(code: string, existing: string | undefined): Promise<string | undefined> {
+      const current = await cookies.verify(existing);
+      if (current && await findInviter(current.code)) return existing;
+      if (!await findInviter(code)) return undefined;
+      return cookies.sign(code);
+    },
+
+    bindSignup,
+
+    /** Durable intent freezes the beneficiary/amount before the independently idempotent grant. */
+    async prepareCommission(input: {
+      orderId: string; userId: string; planCredits: number; amount: number; renewal: boolean;
+    }): Promise<Commission | undefined> {
+      if (input.renewal || input.amount <= 0) return undefined;
+      const [existing] = await db.select().from(affiliateCommission).where(eq(affiliateCommission.orderId, input.orderId));
+      if (existing) return existing;
+      await bindSignup(input.userId);
+      const [referral] = await db.select().from(affiliateReferral).where(eq(affiliateReferral.userId, input.userId));
+      if (!referral || referral.referrerId === input.userId) return undefined;
+      const credits = Math.floor(input.planCredits * commissionPercent / 100);
+      if (!Number.isSafeInteger(credits) || credits <= 0) return undefined;
+      await db.insert(affiliateCommission).values({
+        orderId: input.orderId, userId: input.userId, referrerId: referral.referrerId, credits,
+      }).onConflictDoNothing({ target: affiliateCommission.orderId });
+      const [commission] = await db.select().from(affiliateCommission).where(eq(affiliateCommission.orderId, input.orderId));
+      return commission;
+    },
+
+    async markGranted(orderId: string): Promise<void> {
+      await db.update(affiliateCommission).set({ status: "granted", grantedAt: new Date() })
+        .where(and(eq(affiliateCommission.orderId, orderId), eq(affiliateCommission.status, "pending")));
+    },
+
+    async report(userId: string, limit = 50) {
+      const [[referrals], [totals], conversions] = await Promise.all([
+        db.select({ value: count() }).from(affiliateReferral).where(eq(affiliateReferral.referrerId, userId)),
+        db.select({
+          conversions: count(),
+          earned: sql<number>\`coalesce(sum(case when \${affiliateCommission.status} = 'granted' then \${affiliateCommission.credits} else 0 end), 0)\`.mapWith(Number),
+          pending: sql<number>\`coalesce(sum(case when \${affiliateCommission.status} = 'pending' then \${affiliateCommission.credits} else 0 end), 0)\`.mapWith(Number),
+        }).from(affiliateCommission).where(eq(affiliateCommission.referrerId, userId)),
+        db.select().from(affiliateCommission).where(eq(affiliateCommission.referrerId, userId))
+          .orderBy(desc(affiliateCommission.createdAt)).limit(limit),
+      ]);
+      return { referredSignups: referrals?.value ?? 0, convertedOrders: totals?.conversions ?? 0, earnedCredits: totals?.earned ?? 0, pendingCredits: totals?.pending ?? 0, conversions };
+    },
+
+    /** The Next admin page must authorize before calling this server-only API. */
+    async listAll({ limit, offset }: { limit: number; offset: number }) {
+      const [rows, [total]] = await Promise.all([
+        db.select().from(affiliateCommission).orderBy(desc(affiliateCommission.createdAt)).limit(limit).offset(offset),
+        db.select({ value: count() }).from(affiliateCommission),
+      ]);
+      return { rows, total: total?.value ?? 0 };
+    },
+  };
+}
+
+export type Affiliate = ReturnType<typeof createAffiliate>;
+`],
+  ["modules/affiliate/files/packages/i18n/src/messages/en/affiliate.ts", `export default {
+  nav: { affiliate: "Referrals" },
+  title: "Share the product. Earn credits.",
+  policy: "Earn {percent}% of the purchased plan's credits, rounded down, on each referred account's paid checkout. Renewals and free orders are excluded. Rewards are app credits only, never cash.",
+  link: "Your personal referral link",
+  linkHint: "Share this link. The visitor must accept the invitation before creating a new account. The first valid invitation wins.",
+  stats: { signups: "Referred signups", conversions: "Paid conversions", earned: "Credits earned", pending: "Credits pending" },
+  history: "Latest 50 conversions",
+  empty: "No paid referrals yet. Your completed referrals will appear here.",
+  creditUnit: "credits",
+  status: { pending: "Awaiting fulfillment", granted: "Credited" },
+  refundPolicy: "Refunds and chargebacks do not automatically reverse referral credits. Administrators review them and make an audited credit adjustment. Multi-account abuse is prohibited.",
+  invite: {
+    eyebrow: "You're invited",
+    title: "A personal introduction.",
+    description: "Accept this invitation to associate your new account with the person who shared this link. Your inviter may receive app credits if you make a purchase.",
+    accept: "Accept invitation and sign up",
+  },
+  admin: {
+    title: "Referral commissions", total: "Recorded conversions: {total}",
+    order: "Order", referrer: "Inviter account", customer: "Referred account", credits: "Credits", status: "Status", date: "Created",
+    empty: "No referral commissions recorded.",
+  },
+} as const;
+`],
+  ["modules/affiliate/files/packages/i18n/src/messages/zh-CN/affiliate.ts", `export default {
+  nav: { affiliate: "邀请奖励" },
+  title: "分享产品，赚取积分。",
+  policy: "受邀账户每次完成付费购买，可获得套餐积分的 {percent}%（向下取整）。续订与免费订单不计奖励。奖励仅为应用积分，不可兑换现金。",
+  link: "您的专属邀请链接",
+  linkHint: "分享此链接，访客须先接受邀请，再注册新账户。首次有效邀请优先。",
+  stats: { signups: "受邀注册", conversions: "付费转化", earned: "已获积分", pending: "待发积分" },
+  history: "最近 50 笔转化",
+  empty: "暂无付费邀请，完成后的奖励将显示在此处。",
+  creditUnit: "积分",
+  status: { pending: "待发放", granted: "已入账" },
+  refundPolicy: "退款与拒付不会自动撤回邀请积分，管理员须审核并通过可审计的积分调整处理。禁止多账户套利。",
+  invite: {
+    eyebrow: "您收到一份邀请",
+    title: "来自朋友的推荐。",
+    description: "接受邀请后，新注册账户将关联此链接的分享者。如果您付费购买，邀请人可能获得应用积分。",
+    accept: "接受邀请并注册",
+  },
+  admin: {
+    title: "邀请奖励报表", total: "转化记录：{total}",
+    order: "订单", referrer: "邀请人账户", customer: "受邀账户", credits: "积分", status: "状态", date: "创建时间",
+    empty: "暂无邀请奖励记录。",
+  },
+} as const;
+`],
+  ["modules/affiliate/frameworks/next/apps/web/src/app/[lang]/dashboard/affiliate/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+
+import { ENV } from "@/env.server";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = { params: Promise<{ lang: string }> };
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  return { title: getTranslator(resolveLocale((await params).lang))("affiliate.title") };
+}
+
+export default async function AffiliatePage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const user = await requireUser(locale, "/dashboard/affiliate");
+  const [code, report] = await Promise.all([affiliate.getCode(user.id), affiliate.report(user.id)]);
+  const link = new URL(\`/\${locale}/ref/\${code}\`, ENV.BETTER_AUTH_URL).toString();
+  const number = new Intl.NumberFormat(locale);
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+  return (
+    <div className="flex flex-col gap-8">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold">{t("affiliate.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("affiliate.policy", { percent: affiliate.commissionPercent })}</p>
+      </header>
+      <section className="border p-5">
+        <label className="mb-2 block text-sm font-medium" htmlFor="referral-link">{t("affiliate.link")}</label>
+        <input id="referral-link" className="w-full border bg-background p-3 text-sm" value={link} readOnly />
+        <p className="mt-2 text-xs text-muted-foreground">{t("affiliate.linkHint")}</p>
+      </section>
+      <dl className="grid gap-px border bg-border sm:grid-cols-4">
+        {([
+          ["signups", report.referredSignups], ["conversions", report.convertedOrders],
+          ["earned", report.earnedCredits], ["pending", report.pendingCredits],
+        ] as const).map(([label, value]) => (
+          <div key={label} className="bg-background p-5">
+            <dt className="text-sm text-muted-foreground">{t(\`affiliate.stats.\${label}\`)}</dt>
+            <dd className="mt-2 text-3xl font-semibold tabular-nums">{number.format(value)}</dd>
+          </div>
+        ))}
+      </dl>
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium">{t("affiliate.history")}</h2>
+        {report.conversions.length === 0 ? <p className="text-sm text-muted-foreground">{t("affiliate.empty")}</p> : (
+          <ul className="divide-y border">
+            {report.conversions.map((row) => (
+              <li key={row.orderId} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+                <div><time dateTime={row.createdAt.toISOString()}>{date.format(row.createdAt)}</time><p className="font-mono text-xs text-muted-foreground">{row.orderId}</p></div>
+                <span>{t(\`affiliate.status.\${row.status}\`)}</span>
+                <span className="font-medium tabular-nums">{number.format(row.credits)} {t("affiliate.creditUnit")}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <p className="text-xs text-muted-foreground">{t("affiliate.refundPolicy")}</p>
+    </div>
+  );
+}
+`],
+  ["modules/affiliate/frameworks/next/apps/web/src/app/[lang]/ref/[code]/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+import { Button } from "@{{projectName}}/ui/components/button";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
+
+type Props = { params: Promise<{ lang: string; code: string }> };
+
+export default async function ReferralPage({ params }: Props) {
+  const { lang, code } = await params;
+  const locale = resolveLocale(lang);
+  const t = getTranslator(locale);
+  if (!await affiliate.findInviter(code)) notFound();
+  return (
+    <main className="mx-auto flex max-w-xl flex-col gap-6 px-6 py-24">
+      <p className="text-sm uppercase tracking-widest text-muted-foreground">{t("affiliate.invite.eyebrow")}</p>
+      <h1 className="text-4xl font-semibold tracking-tight">{t("affiliate.invite.title")}</h1>
+      <p className="text-muted-foreground">{t("affiliate.invite.description")}</p>
+      <form action={\`/api/affiliate/capture?\${new URLSearchParams({ code, lang: locale })}\`} method="post">
+        <Button type="submit">{t("affiliate.invite.accept")}</Button>
+      </form>
+      <p className="border-t pt-4 text-sm text-muted-foreground">{t("affiliate.policy", { percent: affiliate.commissionPercent })}</p>
+    </main>
+  );
+}
+`],
+  ["modules/affiliate/frameworks/next/apps/web/src/app/api/affiliate/capture/route.ts.hbs", `import { referralCodeSchema, referralCookieFromHeader, referralCookieName, referralCookieSeconds } from "@{{projectName}}/affiliate";
+import { affiliate } from "@{{projectName}}/app-services";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { ENV } from "@/env.server";
+import { getSession } from "@/lib/session";
+
+const inputSchema = z.object({ code: referralCodeSchema, lang: z.enum(["en", "zh-CN"]) }).strict();
+
+export async function POST(request: Request) {
+  const trusted = new URL(ENV.BETTER_AUTH_URL);
+  const failure = (status: number, error: string) => Response.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
+  if (request.headers.get("origin") !== trusted.origin) return failure(403, "forbidden");
+  const input = inputSchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if (!input.success) return failure(400, "invalid_referral");
+  // Referrals are only for new signups. Existing accounts cannot attach an inviter.
+  if (await getSession()) return failure(409, "existing_account");
+  const value = await affiliate.capture(input.data.code, referralCookieFromHeader(request.headers.get("cookie") ?? undefined));
+  if (!value) return failure(404, "unknown_referrer");
+  const response = NextResponse.redirect(new URL(\`/\${input.data.lang}/signup\`, trusted.origin), 303);
+  response.headers.set("Cache-Control", "no-store");
+  response.cookies.set(referralCookieName, value, {
+    httpOnly: true, secure: trusted.protocol === "https:", sameSite: "lax", path: "/", maxAge: referralCookieSeconds,
+  });
+  return response;
+}
+`],
+  ["modules/affiliate/frameworks/next/apps/web/src/app/api/affiliate/route.ts.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+
+import { getSession } from "@/lib/session";
+
+export async function GET() {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  const [code, report] = await Promise.all([affiliate.getCode(session.user.id), affiliate.report(session.user.id)]);
+  return Response.json({ code, commissionPercent: affiliate.commissionPercent, ...report }, { headers: { "Cache-Control": "no-store" } });
+}
+`],
+  ["modules/affiliate/integrations/admin/apps/web/src/app/[lang]/admin/affiliate/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+import { z } from "zod";
+
+import { Pagination } from "@/components/admin/pagination";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+type Props = { params: Promise<{ lang: string }>; searchParams: Promise<{ page?: string }> };
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  return { title: getTranslator(resolveLocale((await params).lang))("affiliate.admin.title") };
+}
+export default async function AdminAffiliatePage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  await requireAdmin(locale);
+  const page = z.coerce.number().int().min(1).max(1_000_000).catch(1).parse((await searchParams).page);
+  const { rows, total } = await affiliate.listAll({ limit: 20, offset: (page - 1) * 20 });
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+  return (
+    <div className="flex flex-col gap-6">
+      <header>
+        <h1 className="text-2xl font-semibold">{t("affiliate.admin.title")}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{t("affiliate.admin.total", { total })}</p>
+      </header>
+      <p className="text-sm text-muted-foreground">{t("affiliate.policy", { percent: affiliate.commissionPercent })}</p>
+      <div className="overflow-x-auto border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-xs text-muted-foreground"><tr>
+            {(["date", "order", "referrer", "customer", "credits", "status"] as const).map((column) => <th key={column} className="px-4 py-3 font-medium">{t(\`affiliate.admin.\${column}\`)}</th>)}
+          </tr></thead>
+          <tbody className="divide-y">{rows.map((row) => (
+            <tr key={row.orderId}>
+              <td className="px-4 py-3">{date.format(row.createdAt)}</td>
+              <td className="px-4 py-3 font-mono text-xs">{row.orderId}</td>
+              <td className="px-4 py-3 font-mono text-xs">{row.referrerId}</td>
+              <td className="px-4 py-3 font-mono text-xs">{row.userId}</td>
+              <td className="px-4 py-3 tabular-nums">{new Intl.NumberFormat(locale).format(row.credits)}</td>
+              <td className="px-4 py-3">{t(\`affiliate.status.\${row.status}\`)}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+        {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">{t("affiliate.admin.empty")}</p>}
+      </div>
+      <Pagination locale={locale} page={page} pages={Math.max(1, Math.ceil(total / 20))} query={ {} } />
+      <p className="text-xs text-muted-foreground">{t("affiliate.refundPolicy")}</p>
+    </div>
+  );
+}
+`],
+  ["modules/ai/dialects/postgres/packages/db/src/schema/ai.ts", `import { bigint, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { user } from "./auth";
+
+export const aiJob = pgTable("ai_job", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  requestId: text("request_id").notNull(),
+  provider: text("provider").notNull(),
+  kind: text("kind", { enum: ["chat", "image", "video"] }).notNull(),
+  model: text("model").notNull(),
+  prompt: text("prompt").notNull(),
+  parentId: text("parent_id"),
+  cost: integer("cost").notNull(),
+  status: text("status", { enum: ["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"] }).notNull().default("queued"),
+  remoteId: text("remote_id"),
+  resultText: text("result_text"),
+  contentType: text("content_type"),
+  fileId: text("file_id"),
+  errorCode: text("error_code"),
+  leaseToken: text("lease_token"),
+  leaseUntil: bigint("lease_until", { mode: "number" }).notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("ai_job_request_idx").on(table.userId, table.requestId), index("ai_job_user_idx").on(table.userId, table.createdAt)]);
+
+export const aiMediaChunk = pgTable("ai_media_chunk", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id").notNull().references(() => aiJob.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  data: text("data").notNull(),
+}, (table) => [uniqueIndex("ai_media_chunk_position_idx").on(table.jobId, table.position)]);
+`],
+  ["modules/ai/dialects/sqlite/packages/db/src/schema/ai.ts", `import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { user } from "./auth";
+
+export const aiJob = sqliteTable("ai_job", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  requestId: text("request_id").notNull(),
+  provider: text("provider").notNull(),
+  kind: text("kind", { enum: ["chat", "image", "video"] }).notNull(),
+  model: text("model").notNull(),
+  prompt: text("prompt").notNull(),
+  parentId: text("parent_id"),
+  cost: integer("cost").notNull(),
+  status: text("status", { enum: ["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"] }).notNull().default("queued"),
+  remoteId: text("remote_id"),
+  resultText: text("result_text"),
+  contentType: text("content_type"),
+  fileId: text("file_id"),
+  errorCode: text("error_code"),
+  leaseToken: text("lease_token"),
+  leaseUntil: integer("lease_until").notNull().default(0),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+}, (table) => [uniqueIndex("ai_job_request_idx").on(table.userId, table.requestId), index("ai_job_user_idx").on(table.userId, table.createdAt)]);
+
+// Keep each row below D1's per-row limit; media remains ownership-gated by ai_job.
+export const aiMediaChunk = sqliteTable("ai_media_chunk", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id").notNull().references(() => aiJob.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  data: text("data").notNull(),
+}, (table) => [uniqueIndex("ai_media_chunk_position_idx").on(table.jobId, table.position)]);
+`],
+  ["modules/ai/files/docs/modules/ai.md.hbs", `# AI studio
+
+Open \`/en/dashboard/ai\` or \`/zh-CN/dashboard/ai\` after signing in. The studio offers only configured providers and supported modalities, complete-text conversational replies, images, asynchronous video, private history, cancellation where supported, and owned downloads. No API key is sent to the browser.
+
+## Configuration and current provider capabilities
+
+Documentation checked on 2026-10-23. Model availability, access verification, region restrictions and upstream prices remain provider-controlled. Configure keys only on the server, and enable billing/access in each provider console before sending a real request.
+
+| Provider | Server environment | Default models | Capabilities |
+| --- | --- | --- | --- |
+| OpenAI | \`OPENAI_API_KEY\`, \`OPENAI_CHAT_MODEL\`, \`OPENAI_IMAGE_MODEL\` | \`gpt-4.1-mini\`, \`gpt-image-2.5-flare\` | Chat, PNG image; no video |
+| Google | \`GEMINI_API_KEY\`, \`GEMINI_CHAT_MODEL\`, \`GEMINI_IMAGE_MODEL\`, \`GEMINI_VIDEO_MODEL\` | \`gemini-4-argon\`, \`gemini-nano-banana-2.1\`, \`gemini-omni-1.1-flash\` | Chat, image, asynchronous MP4 video, cancellation |
+| OpenAI-compatible | \`AI_COMPATIBLE_API_KEY\`, \`AI_COMPATIBLE_BASE_URL\`, \`AI_COMPATIBLE_CHAT_MODEL\` | \`https://api.deepseek.com\`, \`deepseek-flash\` | Chat only |
+
+Only selected providers' environment variables and implementation files are generated. A custom compatible base URL is a trusted **operator-owned HTTPS server setting**, including an optional \`/v1\` path; it is never accepted from a user request. Chat compatibility alone does not imply support for image/video APIs.
+
+Official references and exact protocol:
+
+- [OpenAI chat completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create): \`POST /v1/chat/completions\`, messages, non-streaming text, output capped at 2048 tokens. [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini).
+- [OpenAI image generation](https://developers.openai.com/api/docs/guides/image-generation): \`gpt-image-2.5-flare\`, \`POST /v1/images/generations\`, one 1024×1024 PNG, \`data[].b64_json\`.
+- [OpenAI video notice](https://developers.openai.com/api/docs/guides/video-generation): **“The Sora 2 models and Videos API were shut down on September 24, 2026 and are no longer available. No one-to-one replacement API is available.”** This adapter intentionally does not advertise or call Sora.
+- [Gemini 4 Argon](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon), [Nano Banana image generation](https://ai.google.dev/gemini-api/docs/image-generation), [Omni video generation](https://ai.google.dev/gemini-api/docs/omni) document the exact Google model identifiers above. [Google video overview](https://ai.google.dev/gemini-api/docs/video) states that Veo 3.1 Preview has shut down; Omni is used instead.
+- [Google Interactions](https://ai.google.dev/gemini-api/docs/interactions-overview) and [background execution](https://ai.google.dev/gemini-api/docs/background-execution): \`POST /v1beta/interactions\`, \`background:true\` for video; \`GET /v1beta/interactions/{id}\` to poll; \`POST /v1beta/interactions/{id}/cancel\` to request cancellation. The REST response is parsed from \`steps[type=model_output].content\`, **not** SDK-only \`output_video\`/\`output_image\` accessors. Polling returns inline base64 video as documented by the Omni guide. Cancellation is final only when the provider reports \`cancelled\`; if generation wins the race, the completed result is retained and charged. Chat continues using the stored \`previous_interaction_id\`, preserving provider thought state. Google retains stored interactions according to its paid/free retention policies; an expired conversation may require a new chat.
+- [DeepSeek chat](https://api-docs.deepseek.com/api/create-chat-completion): \`deepseek-flash\`, \`POST /chat/completions\`, \`messages\`, \`max_tokens\`, \`stream:false\`.
+
+## Credits and costs
+
+Generated fixed product prices: chat **{{module.options.chatCost}}**, image **{{module.options.imageCost}}**, video **{{module.options.videoCost}}** credits per request. Change the module options before generating, or edit \`packages/ai/src/registry.ts\`. These are product credit prices, **not estimates of provider currency charges**. Each job snapshots its model and cost so changing configuration does not change a pending job's charge.
+
+When credits is selected, \`ai-credits\` registers billing after all services exist. A unique job is claimed with a conditional database update, then \`credits.consume\` commits before contacting the provider. An insufficient balance prevents the provider call. \`(userId, requestId)\` is unique; replaying the same UUID and identical payload returns/advances the same job, while changing a payload rejects the replay. Concurrent replays cannot make a second paid submission. Credits uses account serialization on PostgreSQL and atomic batch statements on SQLite/libSQL/D1, avoiding interactive SQLite write locks across JavaScript awaits.
+
+A definite rejection or a provider-reported asynchronous failure/cancellation refunds the matching debit once. Refunds derive the amount from the original ledger debit, not request input. Terminal job polling retries an interrupted refund safely. A failed media upload does **not** refund a successful generation: the result is persisted and \`saving\` can be retried without another model call.
+
+A network timeout, unexpected provider response, or crash between submission and persistence is **not proof the model failed**. Such jobs become \`unknown\`; their original debit remains held and automatic resubmission is forbidden. Reconcile these with provider request logs before any manual refund. For a confirmed failed request, use the server-only credits API \`credits.refund(userId, 'ai:' + jobId)\` and mark that specific job failed in the database after reconciliation. For Google, a recovered interaction ID can be saved to that job's \`remote_id\` and status changed from \`unknown\` to \`running\`; the normal authenticated poll retrieves its real result. Never reset a submitted job to \`queued\`.
+
+## Media and persistence
+
+\`ai_job\` stores owned request history, model/cost snapshots, status, leases, and provider IDs. \`ai_media_chunk\` persists base64 in 256,000-character rows to stay below D1 row limits. Only validated image PNG/JPEG/WebP and MP4 media are served, with a maximum of **8 MiB decoded bytes**; provider JSON is bounded while streaming at **12 MiB before parsing** to leave memory headroom on Workers. Oversized provider output is not false success: a submitted synchronous request becomes \`unknown\`, while an async job keeps its provider ID for operator reconciliation. Configure suitable short/small media models for this limit. Generated images are displayed without rendering provider text as HTML. Without storage, private media remains in the database. With storage, \`ai-storage\` calls \`storage.storeGenerated(userId,{name,contentType,body})\`, retains the returned file ID, and reads through ownership-checked \`storage.readFile\`; temporary database media is deleted after successful completion. Configure the selected storage provider before generating media.
+
+Media downloads accept **only an owned local job ID**, never client-supplied URLs. Provider output is inline base64: no arbitrary remote media URL is fetched. \`/api/ai/{id}/media\` authenticates every request and sends private/no-store responses. All mutation and polling requests enforce \`BETTER_AUTH_URL\` as their exact trusted Origin. JSON bodies are bounded at 40 KB, prompts at 8,000 characters, and chat history sent to OpenAI-compatible providers at 12 prior turns. The dashboard displays the newest 100 jobs.
+
+All job transitions are fenced by an owner token; a 30-second heartbeat renews the 180-second lease. External calls have bounded timeouts, and each media persistence stage renews ownership. A worker that loses its token cannot overwrite another worker's completion/refund. If an upload finishes after losing ownership, its unlinked storage object is removed. There is no cross-system transaction: a process crash after storage upload but before recording the returned file ID may leave an orphaned private storage file, visible in the owner's files list for cleanup. A crash during partial chunk persistence before \`saving\` is an unknown result for synchronous providers, not an automatically recoverable completed upload; asynchronous jobs with a saved provider ID can re-fetch their result. Do not claim exactly-once external delivery across an unknown network/crash boundary.
+
+## HTTP API
+
+- \`GET /api/ai\`: own history and configured capabilities.
+- \`POST /api/ai\`: \`{requestId: UUID, provider, kind: 'chat'|'image'|'video', prompt, parentId?: UUID}\` → \`{job}\`. Use the same UUID when retrying an uncertain HTTP response. \`parentId\` must be an owned completed chat from the same provider.
+- \`POST /api/ai/{id}\`: advance/poll; intentionally POST because completion can store media/refund credits.
+- \`DELETE /api/ai/{id}\`: request supported provider cancellation and poll its actual state.
+- \`GET /api/ai/{id}/media\`: owned image/video bytes.
+
+Video progress is reported as honest lifecycle states (the upstream interaction API does not expose a percentage). Poll at about 10 seconds, not continuously. Worker/host request deadlines must accommodate the 120-second outbound timeout for synchronous chat/image calls; video polling is resumable across requests. No queue/cron or browser-open requirement exists for job persistence, but a logged-in poll is needed to finalize asynchronous work.
+
+## Verification
+
+In the generator repository, after generating an all-provider AI+credits SQLite fixture and applying migrations:
+
+\`\`\`sh
+bun apps/cli/live-tests/ai.ts apps/cli/.smoke/<project> apps/cli/.smoke/<project>/<database-file>
+\`\`\`
+
+This permanent protocol regression executes generated services and a real SQLite database; only remote HTTP transport is a clearly labeled fixture. It covers concurrency, replay mismatch, ownership, insufficient balance before submission, failure/refund replay, image bytes, asynchronous video completion/error/cancellation, unknown-outcome safety, and compatible chat. It is **not cloud acceptance**. Real provider generation and cloud storage acceptance require dedicated credentials and explicit authorization for paid requests.
+`],
+  ["modules/ai/files/packages/ai/src/index.ts.hbs", `import type { Database } from "@{{projectName}}/db";
+import { aiJob, aiMediaChunk } from "@{{projectName}}/db/schema/ai";
+import { and, asc, desc, eq, lte } from "drizzle-orm";
+import { z } from "zod";
+import type { AIEnv } from "./registry";
+import { costs, providers } from "./registry";
+import type { GenerationRequest, Message, Result } from "./types";
+import { AIError, ProviderRejected, decodeMedia, requestSchema } from "./types";
+export { AIError, requestSchema } from "./types";
+export type { GenerationRequest, Kind } from "./types";
+
+type Job = typeof aiJob.$inferSelect;
+type Billing = { charge(userId: string, cost: number, referenceId: string): Promise<void>; refund(userId: string, referenceId: string): Promise<void> };
+type MediaStore = {
+  save(userId: string, input: { name: string; contentType: string; body: Uint8Array }): Promise<{ id: string }>;
+  read(userId: string, id: string): Promise<{ body: ReadableStream<Uint8Array>; contentType: string; name: string }>;
+  remove(userId: string, id: string): Promise<void>;
+};
+const LEASE_MS = 180_000;
+export function createAI({ db, env }: { db: Database; env: AIEnv }) {
+  const gateways = providers(env);
+  let billing: Billing | undefined;
+  let storage: MediaStore | undefined;
+  function fence(job: Job) {
+    if (!job.leaseToken) throw new AIError("busy");
+    return and(eq(aiJob.id, job.id), eq(aiJob.leaseToken, job.leaseToken));
+  }
+  async function renew(job: Job) {
+    const [ownedLease] = await db.update(aiJob).set({ leaseUntil: Date.now() + LEASE_MS }).where(fence(job)).returning({ id: aiJob.id });
+    if (!ownedLease) throw new AIError("busy");
+  }
+  function gateway(id: string) {
+    const found = gateways.find((item) => item.id === id);
+    if (!found) throw new AIError("not_configured");
+    return found;
+  }
+  async function owned(userId: string, id: string): Promise<Job> {
+    const [job] = await db.select().from(aiJob).where(and(eq(aiJob.id, id), eq(aiJob.userId, userId)));
+    if (!job) throw new AIError("not_found");
+    return job;
+  }
+  function view(job: Job) {
+    return { id: job.id, requestId: job.requestId, provider: job.provider, kind: job.kind, model: job.model, prompt: job.prompt, parentId: job.parentId, cost: job.cost, status: job.status, text: job.resultText, error: job.errorCode, createdAt: job.createdAt.toISOString(), mediaUrl: job.status === "completed" && job.contentType ? \`/api/ai/\${job.id}/media\` : null, cancellable: job.status === "running" && !!gateway(job.provider).cancel };
+  }
+  async function refund(job: Job) {
+    if (job.status === "failed" || job.status === "cancelled") await billing?.refund(job.userId, \`ai:\${job.id}\`);
+  }
+  async function terminal(job: Job, status: "failed" | "cancelled", code: string) {
+    const [changed] = await db.update(aiJob).set({ status, errorCode: code, leaseToken: null, leaseUntil: 0, updatedAt: new Date() }).where(fence(job)).returning();
+    if (!changed) throw new AIError("busy");
+    await refund(changed);
+  }
+  async function messages(job: Job): Promise<Message[]> {
+    const history: Message[] = [{ role: "user", content: job.prompt }];
+    let parent = job.parentId;
+    for (let depth = 0; parent && depth < 12; depth++) {
+      const previous = await owned(job.userId, parent);
+      if (previous.kind !== "chat" || previous.status !== "completed" || !previous.resultText) throw new AIError("invalid_request");
+      history.unshift({ role: "user", content: previous.prompt }, { role: "assistant", content: previous.resultText });
+      parent = previous.parentId;
+    }
+    return history;
+  }
+  async function mediaData(id: string) {
+    const chunks = await db.select().from(aiMediaChunk).where(eq(aiMediaChunk.jobId, id)).orderBy(asc(aiMediaChunk.position));
+    if (!chunks.length || chunks.some((chunk, position) => chunk.position !== position)) throw new AIError("provider_error");
+    return decodeMedia(chunks.map((chunk) => chunk.data).join(""));
+  }
+  async function save(job: Job) {
+    await renew(job);
+    if (storage && !job.fileId) {
+      const body = await mediaData(job.id);
+      const extension = job.contentType === "video/mp4" ? "mp4" : job.contentType?.split("/")[1] ?? "bin";
+      const file = await storage.save(job.userId, { name: \`\${job.id}.\${extension}\`, contentType: job.contentType!, body });
+      const [linked] = await db.update(aiJob).set({ fileId: file.id }).where(fence(job)).returning({ id: aiJob.id });
+      if (!linked) { await storage.remove(job.userId, file.id); throw new AIError("busy"); }
+    }
+    const [completed] = await db.update(aiJob).set({ status: "completed", errorCode: null, leaseToken: null, leaseUntil: 0, updatedAt: new Date() }).where(fence(job)).returning({ id: aiJob.id });
+    if (!completed) throw new AIError("busy");
+    if (storage) await db.delete(aiMediaChunk).where(eq(aiMediaChunk.jobId, job.id));
+  }
+  async function accept(job: Job, result: Result) {
+    await renew(job);
+    if (result.status === "failed" || result.status === "cancelled") return terminal(job, result.status, result.status === "failed" ? "provider_error" : "cancelled");
+    if (result.status === "running") {
+      await db.update(aiJob).set({ status: "running", remoteId: result.remoteId, leaseToken: null, leaseUntil: 0, errorCode: null, updatedAt: new Date() }).where(fence(job));
+      return;
+    }
+    if ("text" in result) {
+      await db.update(aiJob).set({ status: "completed", resultText: result.text, remoteId: result.remoteId ?? job.remoteId, leaseToken: null, leaseUntil: 0, errorCode: null, updatedAt: new Date() }).where(fence(job));
+      return;
+    }
+    decodeMedia(result.media.data);
+    // Persist the provider result before storage. A failed upload can be retried
+    // without repeating the paid generation. Chunk rows fit within D1 limits.
+    for (let offset = 0, position = 0; offset < result.media.data.length; offset += 256_000, position++) {
+      await renew(job);
+      await db.insert(aiMediaChunk).values({ id: \`\${job.id}:\${position}\`, jobId: job.id, position, data: result.media.data.slice(offset, offset + 256_000) }).onConflictDoUpdate({ target: aiMediaChunk.id, set: { data: result.media.data.slice(offset, offset + 256_000) } });
+    }
+    const [persisted] = await db.update(aiJob).set({ status: "saving", contentType: result.media.contentType, updatedAt: new Date() }).where(fence(job)).returning({ id: aiJob.id });
+    if (!persisted) throw new AIError("busy");
+    await save({ ...job, status: "saving", contentType: result.media.contentType });
+  }
+  async function advance(job: Job, cancel = false): Promise<Job> {
+    if (job.status === "failed" || job.status === "cancelled") { await refund(job); return job; }
+    if (job.status === "completed" || job.status === "unknown") return job;
+    if (job.status === "starting") {
+      if (job.leaseUntil < Date.now()) {
+        // A crashed POST may have reached the provider. Never send it twice.
+        await db.update(aiJob).set({ status: "unknown", errorCode: "unknown", updatedAt: new Date() }).where(and(eq(aiJob.id, job.id), eq(aiJob.status, "starting"), lte(aiJob.leaseUntil, Date.now())));
+      }
+      return owned(job.userId, job.id);
+    }
+    const token = crypto.randomUUID();
+    const [claimed] = await db.update(aiJob).set({ leaseToken: token, leaseUntil: Date.now() + LEASE_MS, ...(job.status === "queued" ? { status: "starting" as const } : {}), updatedAt: new Date() }).where(and(eq(aiJob.id, job.id), eq(aiJob.status, job.status), lte(aiJob.leaseUntil, Date.now()))).returning();
+    if (!claimed) return owned(job.userId, job.id);
+    const selected = gateway(job.provider);
+    let paidCallStarted = false;
+    // Lease renewal covers slow media storage as well as provider calls. Every
+    // state write is still fenced: a delayed heartbeat cannot revive a new owner.
+    const heartbeat = setInterval(() => { void renew(claimed).catch(() => {}); }, 30_000);
+    try {
+      if (job.status === "saving") await save(claimed);
+      else if (job.status === "running") {
+        if (!job.remoteId || !selected.poll) throw new AIError("provider_error");
+        if (cancel) {
+          if (!selected.cancel) throw new AIError("unsupported");
+          await selected.cancel(job.remoteId);
+          await renew(claimed);
+        }
+        await accept(claimed, await selected.poll(job.remoteId, job.kind));
+      } else {
+        const history = await messages(job);
+        const parentRemoteId = job.parentId ? (await owned(job.userId, job.parentId)).remoteId ?? undefined : undefined;
+        await billing?.charge(job.userId, job.cost, \`ai:\${job.id}\`);
+        await renew(claimed);
+        paidCallStarted = true;
+        await accept(claimed, await selected.generate({ kind: job.kind, model: job.model, prompt: job.prompt, messages: history, requestId: job.id, parentRemoteId }));
+      }
+    } catch (error) {
+      const current = await owned(job.userId, job.id);
+      if (current.status === "failed" || current.status === "cancelled") throw error;
+      if (current.leaseToken !== token) return current;
+      if (current.status === "saving" || job.status === "saving" || job.status === "running") {
+        // Poll transport/storage errors are retryable, not terminal generation failure.
+        await db.update(aiJob).set({ errorCode: "provider_error", leaseToken: null, leaseUntil: 0, updatedAt: new Date() }).where(and(eq(aiJob.id, job.id), eq(aiJob.leaseToken, token)));
+        throw new AIError("provider_error");
+      }
+      if (!paidCallStarted || error instanceof ProviderRejected) {
+        const code = error instanceof AIError ? error.code : "provider_error";
+        await terminal(claimed, "failed", code);
+      } else {
+        await db.update(aiJob).set({ status: "unknown", errorCode: "unknown", leaseToken: null, leaseUntil: 0, updatedAt: new Date() }).where(fence(claimed));
+      }
+    } finally { clearInterval(heartbeat); }
+    return owned(job.userId, job.id);
+  }
+  return {
+    setBilling(value: Billing) { billing = value; },
+    setStorage(value: MediaStore) { storage = value; },
+    capabilities() { return gateways.map((item) => ({ id: item.id, models: item.models, costs })); },
+    async generate(userId: string, input: GenerationRequest): Promise<ReturnType<typeof view>> {
+      const parsed = requestSchema.safeParse(input);
+      if (!parsed.success) throw new AIError("invalid_request");
+      input = parsed.data;
+      const [existing] = await db.select().from(aiJob).where(and(eq(aiJob.userId, userId), eq(aiJob.requestId, input.requestId)));
+      if (existing) {
+        if (existing.provider !== input.provider || existing.kind !== input.kind || existing.prompt !== input.prompt || existing.parentId !== (input.parentId ?? null)) throw new AIError("conflict");
+        return view(await advance(existing));
+      }
+      const selected = gateway(input.provider);
+      const model = selected.models[input.kind];
+      if (!model) throw new AIError("unsupported");
+      if (input.parentId) {
+        const parent = await owned(userId, input.parentId);
+        if (input.kind !== "chat" || parent.kind !== "chat" || parent.status !== "completed" || parent.provider !== input.provider) throw new AIError("invalid_request");
+      }
+      const [inserted] = await db.insert(aiJob).values({ id: crypto.randomUUID(), userId, ...input, model, cost: costs[input.kind] }).onConflictDoNothing().returning();
+      if (!inserted) return this.generate(userId, input);
+      return view(await advance(inserted));
+    },
+    async poll(userId: string, id: string) { return view(await advance(await owned(userId, id))); },
+    async cancel(userId: string, id: string) {
+      const job = await owned(userId, id);
+      if (job.status !== "running" || !gateway(job.provider).cancel) throw new AIError("unsupported");
+      return view(await advance(job, true));
+    },
+    async history(userId: string) {
+      return (await db.select().from(aiJob).where(eq(aiJob.userId, userId)).orderBy(desc(aiJob.createdAt)).limit(100)).map(view);
+    },
+    async media(userId: string, id: string): Promise<{ body: ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>; contentType: string }> {
+      const job = await owned(userId, id);
+      if (job.status !== "completed" || !job.contentType) throw new AIError("not_found");
+      if (job.fileId) {
+        if (!storage) throw new AIError("not_configured");
+        return storage.read(userId, job.fileId);
+      }
+      return { body: await mediaData(job.id), contentType: z.enum(["image/png", "image/jpeg", "image/webp", "video/mp4"]).parse(job.contentType) };
+    },
+  };
+}
+export type AI = ReturnType<typeof createAI>;
+`],
+  ["modules/ai/files/packages/ai/src/registry.ts.hbs", `import { z } from "zod";
+import type { AIProvider } from "./types";
+{{#if (includes module.providers "openai")}}
+import { openai } from "./providers/openai";
+{{/if}}
+{{#if (includes module.providers "google")}}
+import { google } from "./providers/google";
+{{/if}}
+{{#if (includes module.providers "openai-compatible")}}
+import { compatible } from "./providers/openai-compatible";
+{{/if}}
+export type AIEnv = {
+{{#if (includes module.providers "openai")}}
+  OPENAI_API_KEY?: string; OPENAI_CHAT_MODEL?: string; OPENAI_IMAGE_MODEL?: string;
+{{/if}}
+{{#if (includes module.providers "google")}}
+  GEMINI_API_KEY?: string; GEMINI_CHAT_MODEL?: string; GEMINI_IMAGE_MODEL?: string; GEMINI_VIDEO_MODEL?: string;
+{{/if}}
+{{#if (includes module.providers "openai-compatible")}}
+  AI_COMPATIBLE_API_KEY?: string; AI_COMPATIBLE_BASE_URL?: string; AI_COMPATIBLE_CHAT_MODEL?: string;
+{{/if}}
+};
+export function providers(env: AIEnv): AIProvider[] {
+  const selected: (AIProvider | undefined)[] = [
+{{#if (includes module.providers "openai")}}
+    openai(env),
+{{/if}}
+{{#if (includes module.providers "google")}}
+    google(env),
+{{/if}}
+{{#if (includes module.providers "openai-compatible")}}
+    compatible(env),
+{{/if}}
+  ];
+  return selected.filter((provider): provider is AIProvider => provider !== undefined);
+}
+const creditPrice = z.number().int().positive().max(2_147_483_647);
+export const costs = z.object({ chat: creditPrice, image: creditPrice, video: creditPrice }).parse({ chat: {{module.options.chatCost}}, image: {{module.options.imageCost}}, video: {{module.options.videoCost}} });
+`],
+  ["modules/ai/files/packages/ai/src/types.ts", `import { z } from "zod";
+
+export const kindSchema = z.enum(["chat", "image", "video"]);
+export type Kind = z.infer<typeof kindSchema>;
+export const requestSchema = z.object({
+  requestId: z.string().uuid(), provider: z.string().min(1).max(40), kind: kindSchema,
+  prompt: z.string().trim().min(1).max(8000), parentId: z.string().uuid().optional(),
+}).strict();
+export type GenerationRequest = z.infer<typeof requestSchema>;
+export type Message = { role: "user" | "assistant"; content: string };
+export type Result =
+  | { status: "running"; remoteId: string }
+  | { status: "completed"; text: string; remoteId?: string }
+  | { status: "completed"; media: { data: string; contentType: "image/png" | "image/jpeg" | "image/webp" | "video/mp4" } }
+  | { status: "failed" }
+  | { status: "cancelled" };
+export interface AIProvider {
+  id: string;
+  models: Partial<Record<Kind, string>>;
+  generate(input: { kind: Kind; model: string; prompt: string; messages: Message[]; requestId: string; parentRemoteId?: string }): Promise<Result>;
+  poll?(remoteId: string, kind: Kind): Promise<Result>;
+  cancel?(remoteId: string): Promise<void>;
+}
+export class ProviderRejected extends Error {}
+export class AIError extends Error {
+  constructor(readonly code: "invalid_request" | "not_configured" | "unsupported" | "not_found" | "conflict" | "insufficient_credits" | "provider_error" | "busy") { super(code); }
+}
+// Leaves headroom for JSON text, parsed base64 and decoded bytes on Workers.
+export const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
+export function decodeMedia(data: string): Uint8Array<ArrayBuffer> {
+  if (!data || data.length > Math.ceil(MAX_MEDIA_BYTES / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) throw new AIError("provider_error");
+  const decoded = atob(data);
+  if (decoded.length > MAX_MEDIA_BYTES) throw new AIError("provider_error");
+  return Uint8Array.from(decoded, (value) => value.charCodeAt(0));
+}
+type Json = string | number | boolean | null | Json[] | { [key: string]: Json | undefined };
+export async function jsonRequest(url: string, headers: Record<string, string>, body?: Json, method = body === undefined ? "GET" : "POST"): Promise<unknown> {
+  const init: RequestInit = { method, headers: { ...headers, "Content-Type": "application/json" }, redirect: "manual", signal: AbortSignal.timeout(120_000) };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    if (response.status >= 400 && response.status < 500 && response.status !== 408) throw new ProviderRejected("Provider rejected generation");
+    throw new AIError("provider_error");
+  }
+  if (!response.body) throw new AIError("provider_error");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let size = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > 12 * 1024 * 1024) { await reader.cancel(); throw new AIError("provider_error"); }
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally { reader.releaseLock(); }
+  return JSON.parse(text);
+}
+`],
+  ["modules/ai/files/packages/i18n/src/messages/en/ai.ts", `export default {
+  nav: { ai: "AI studio" },
+  title: "AI studio", subtitle: "A private space to think, imagine, and make.",
+  provider: "Provider", kind: "Create", prompt: "Your prompt", generate: "Generate", working: "Working…", history: "Your generations", empty: "Your first idea starts here.", notConfigured: "Add a provider API key on the server to start generating.", cost: "Credits", model: "Model", cancel: "Cancel generation", refresh: "Refresh", download: "Download", continue: "Continue this conversation", newChat: "New conversation", reply: "Replying to the selected conversation", retry: "Retry the same request", error: "We could not complete the request. Refresh to check its persisted status before trying again.",
+  kinds: { chat: "Chat", image: "Image", video: "Video" },
+  statuses: { queued: "Queued", starting: "Submitting", running: "Generating", saving: "Saving media — refresh to retry", unknown: "Provider outcome unknown — contact support; do not resubmit", completed: "Complete", failed: "Failed — credits returned if charged", cancelled: "Cancelled — credits returned" },
+  errors: { insufficient_credits: "Not enough credits. No generation was submitted.", provider_error: "Provider or storage temporarily unavailable.", unknown: "The provider may have accepted the request. Support must reconcile it before any retry or refund.", invalid_request: "Check your prompt and request.", unsupported: "This provider does not support that operation.", not_configured: "This provider is not configured.", conflict: "This request ID belongs to a different prompt.", not_found: "Generation not found.", busy: "This generation is already being processed.", cancelled: "Generation cancelled." },
+} as const;
+`],
+  ["modules/ai/files/packages/i18n/src/messages/zh-CN/ai.ts", `export default {
+  nav: { ai: "AI 工作室" },
+  title: "AI 工作室", subtitle: "思考、想象与创作的私有空间。",
+  provider: "服务商", kind: "创作类型", prompt: "提示词", generate: "开始生成", working: "处理中…", history: "生成记录", empty: "从你的第一个想法开始。", notConfigured: "请在服务端配置服务商 API 密钥后开始生成。", cost: "积分", model: "模型", cancel: "取消生成", refresh: "刷新", download: "下载", continue: "继续此对话", newChat: "新建对话", reply: "正在回复所选对话", retry: "重试相同请求", error: "请求暂未完成，请先刷新确认已保存的状态后再重试。",
+  kinds: { chat: "对话", image: "图片", video: "视频" },
+  statuses: { queued: "排队中", starting: "提交中", running: "生成中", saving: "保存媒体中，可刷新重试", unknown: "服务商结果未知，请联系客服，勿重复提交", completed: "已完成", failed: "失败，已扣积分已退回", cancelled: "已取消，积分已退回" },
+  errors: { insufficient_credits: "积分不足，未向服务商提交生成请求。", provider_error: "服务商或存储暂时不可用。", unknown: "服务商可能已接受请求，需客服核对后才能重试或退款。", invalid_request: "请检查提示词与请求。", unsupported: "此服务商不支持该操作。", not_configured: "此服务商未配置。", conflict: "此请求编号已用于其他提示词。", not_found: "未找到生成记录。", busy: "该任务正在处理中。", cancelled: "已取消生成。" },
+} as const;
+`],
+  ["modules/ai/frameworks/next/apps/web/src/app/[lang]/dashboard/ai/page.tsx.hbs", `import { ai } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+import { AIStudio } from "@/components/ai/studio";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = { params: Promise<{ lang: string }> };
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("ai.title") };
+}
+export default async function AIPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const user = await requireUser(locale, "/dashboard/ai");
+  const t = getTranslator(locale);
+  return <div className="space-y-8"><header className="space-y-2"><h1 className="font-serif text-4xl tracking-tight">{t("ai.title")}</h1><p className="text-muted-foreground">{t("ai.subtitle")}</p></header><AIStudio initialJobs={await ai.history(user.id)} capabilities={ai.capabilities()} /></div>;
+}
+`],
+  ["modules/ai/frameworks/next/apps/web/src/app/api/ai/[id]/media/route.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
+import { getSession } from "@/lib/session";
+import { aiErrorResponse, privateHeaders } from "@/lib/ai-http";
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+  try {
+    const result = await ai.media(session.user.id, (await params).id);
+    return new Response(result.body, { headers: { ...privateHeaders, "Content-Type": result.contentType, "Content-Disposition": "inline", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" } });
+  } catch (error) { return aiErrorResponse(error); }
+}
+`],
+  ["modules/ai/frameworks/next/apps/web/src/app/api/ai/[id]/route.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
+import { getSession } from "@/lib/session";
+import { aiErrorResponse, privateHeaders, requireAIOrigin } from "@/lib/ai-http";
+
+type Context = { params: Promise<{ id: string }> };
+// Polling can finalize a job/refund, so it is an origin-checked POST, not a GET.
+export async function POST(request: Request, { params }: Context) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+  try {
+    requireAIOrigin(request);
+    return Response.json({ job: await ai.poll(session.user.id, (await params).id) }, { headers: privateHeaders });
+  } catch (error) { return aiErrorResponse(error); }
+}
+export async function DELETE(request: Request, { params }: Context) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+  try {
+    requireAIOrigin(request);
+    return Response.json({ job: await ai.cancel(session.user.id, (await params).id) }, { headers: privateHeaders });
+  } catch (error) { return aiErrorResponse(error); }
+}
+`],
+  ["modules/ai/frameworks/next/apps/web/src/app/api/ai/route.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
+import { requestSchema } from "@{{projectName}}/ai";
+import { getSession } from "@/lib/session";
+import { aiErrorResponse, privateHeaders, readAIRequest, requireAIOrigin } from "@/lib/ai-http";
+
+export async function GET() {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+  try { return Response.json({ capabilities: ai.capabilities(), jobs: await ai.history(session.user.id) }, { headers: privateHeaders }); }
+  catch (error) { return aiErrorResponse(error); }
+}
+export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+  try {
+    requireAIOrigin(request);
+    const job = await ai.generate(session.user.id, requestSchema.parse(await readAIRequest(request)));
+    return Response.json({ job }, { headers: privateHeaders, status: job.status === "failed" ? job.error === "insufficient_credits" ? 402 : 422 : job.status === "unknown" ? 503 : 200 });
+  } catch (error) { return aiErrorResponse(error); }
+}
+`],
+  ["modules/ai/frameworks/next/apps/web/src/components/ai/studio.tsx.hbs", `"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import { useT } from "../i18n-provider";
+
+const kind = z.enum(["chat", "image", "video"]);
+const jobSchema = z.object({ id: z.string(), requestId: z.string(), provider: z.string(), kind, model: z.string(), prompt: z.string(), cost: z.number(), status: z.enum(["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"]), text: z.string().nullable(), error: z.string().nullable(), mediaUrl: z.string().nullable(), cancellable: z.boolean() });
+const capabilitySchema = z.object({ id: z.string(), models: z.object({ chat: z.string().optional(), image: z.string().optional(), video: z.string().optional() }), costs: z.object({ chat: z.number(), image: z.number(), video: z.number() }) });
+type Job = z.infer<typeof jobSchema>;
+type Capability = z.infer<typeof capabilitySchema>;
+type Kind = z.infer<typeof kind>;
+const active: Partial<Record<Job["status"], true>> = { queued: true, starting: true, running: true, saving: true };
+
+export function AIStudio({ initialJobs, capabilities }: { initialJobs: Job[]; capabilities: Capability[] }) {
+  const t = useT();
+  const [jobs, setJobs] = useState(initialJobs);
+  const [provider, setProvider] = useState(capabilities[0]?.id ?? "");
+  const [mode, setMode] = useState<Kind>("chat");
+  const [prompt, setPrompt] = useState("");
+  const [parentId, setParentId] = useState<string>();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(false);
+  const request = useRef<{ requestId: string; provider: string; kind: Kind; prompt: string; parentId?: string } | null>(null);
+  const selected = capabilities.find((item) => item.id === provider);
+  function merge(job: Job) { setJobs((current) => [job, ...current.filter((item) => item.id !== job.id)]); }
+  async function update(id: string, cancel = false) {
+    const response = await fetch(\`/api/ai/\${id}\`, { method: cancel ? "DELETE" : "POST" });
+    if (!response.ok) throw new Error("Request failed");
+    merge(z.object({ job: jobSchema }).parse(await response.json()).job);
+  }
+  useEffect(() => {
+    if (!jobs.some((job) => active[job.status])) return;
+    let stopped = false;
+    const timer = setTimeout(async () => {
+      try {
+        for (const job of jobs.filter((item) => active[item.status])) {
+          if (stopped) return;
+          await update(job.id);
+        }
+        if (!stopped) setError(false);
+      } catch { if (!stopped) setError(true); }
+    }, 10_000);
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [jobs]);
+  async function submit(retry = false) {
+    setPending(true); setError(false);
+    if (!retry || !request.current) request.current = { requestId: crypto.randomUUID(), provider, kind: mode, prompt, ...(parentId && mode === "chat" ? { parentId } : {}) };
+    try {
+      const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.current) });
+      const payload: unknown = await response.json();
+      const parsed = z.object({ job: jobSchema }).safeParse(payload);
+      if (!parsed.success) throw new Error("Request failed");
+      merge(parsed.data.job);
+      request.current = null;
+      if (parsed.data.job.status === "completed" && mode === "chat") setParentId(parsed.data.job.id);
+    } catch { setError(true); }
+    finally { setPending(false); }
+  }
+  return <div className="grid gap-10 lg:grid-cols-[minmax(280px,360px)_1fr]">
+    <section className="space-y-6 border-t-4 border-foreground pt-5">
+      {!capabilities.length ? <p role="status">{t("ai.notConfigured")}</p> : <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        <label className="block space-y-2 text-sm"><span>{t("ai.provider")}</span><select className="w-full border bg-background p-3" value={provider} onChange={(event) => { setProvider(event.target.value); setMode("chat"); setParentId(undefined); }} disabled={pending}>{capabilities.map((item) => <option key={item.id}>{item.id}</option>)}</select></label>
+        <fieldset><legend className="mb-2 text-sm">{t("ai.kind")}</legend><div className="flex gap-2">{(["chat", "image", "video"] as const).filter((item) => selected?.models[item]).map((item) => <button key={item} type="button" aria-pressed={mode === item} className={\`flex-1 border px-3 py-2 \${mode === item ? "bg-foreground text-background" : ""}\`} onClick={() => { setMode(item); setParentId(undefined); }}>{t(\`ai.kinds.\${item}\`)}</button>)}</div></fieldset>
+        <p className="text-xs text-muted-foreground">{t("ai.model")}: {selected?.models[mode]} · {t("ai.cost")}: {selected?.costs[mode]}</p>
+        {parentId && <div className="flex justify-between gap-2 text-sm"><span>{t("ai.reply")}</span><button type="button" className="underline" onClick={() => setParentId(undefined)}>{t("ai.newChat")}</button></div>}
+        <label className="block space-y-2 text-sm"><span>{t("ai.prompt")}</span><textarea required maxLength={8000} rows={8} className="w-full resize-y border bg-background p-3 leading-relaxed" value={prompt} onChange={(event) => setPrompt(event.target.value)} disabled={pending} /></label>
+        <button className="w-full bg-foreground px-4 py-3 font-medium text-background disabled:opacity-50" disabled={pending || !prompt.trim()}>{t(pending ? "ai.working" : "ai.generate")}</button>
+      </form>}
+      {error && <div role="alert" className="space-y-2 border-l-2 border-destructive pl-3 text-sm"><p>{t("ai.error")}</p>{request.current && <button disabled={pending} className="underline" onClick={() => void submit(true)}>{t("ai.retry")}</button>}</div>}
+    </section>
+    <section className="space-y-4"><h2 className="font-medium text-lg">{t("ai.history")}</h2>{jobs.length === 0 && <p className="py-16 text-muted-foreground">{t("ai.empty")}</p>}
+      <ol className="space-y-5">{jobs.map((job) => <li key={job.id} className="space-y-3 border p-5">
+        <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{job.provider} / {t(\`ai.kinds.\${job.kind}\`)} / {job.cost} {t("ai.cost")}</span><span role="status">{t(\`ai.statuses.\${job.status}\`)}</span></div>
+        <p className="whitespace-pre-wrap font-medium">{job.prompt}</p>
+        {job.text && <p className="whitespace-pre-wrap border-t pt-3 leading-relaxed">{job.text}</p>}
+        {job.mediaUrl && job.kind === "image" && <img src={job.mediaUrl} alt={job.prompt} className="max-h-[520px] w-full object-contain" />}
+        {job.mediaUrl && job.kind === "video" && <video src={job.mediaUrl} controls preload="metadata" className="w-full" aria-label={job.prompt} />}
+        {job.error && <p className="text-sm text-destructive">{t(\`ai.errors.\${job.error === "insufficient_credits" ? "insufficient_credits" : job.error === "unknown" ? "unknown" : job.error === "cancelled" ? "cancelled" : "provider_error"}\`)}</p>}
+        <div className="flex flex-wrap gap-4 text-sm">
+          {job.mediaUrl && <a href={job.mediaUrl} download className="underline">{t("ai.download")}</a>}
+          {job.kind === "chat" && job.status === "completed" && <button className="underline" onClick={() => { setParentId(job.id); setProvider(job.provider); setMode("chat"); setPrompt(""); }}>{t("ai.continue")}</button>}
+          {active[job.status] && <button className="underline" onClick={() => void update(job.id).catch(() => setError(true))}>{t("ai.refresh")}</button>}
+          {job.cancellable && <button className="underline" onClick={() => void update(job.id, true).catch(() => setError(true))}>{t("ai.cancel")}</button>}
+        </div>
+      </li>)}</ol>
+    </section>
+  </div>;
+}
+`],
+  ["modules/ai/frameworks/next/apps/web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+
+export const privateHeaders = { "Cache-Control": "no-store" };
+export function requireAIOrigin(request: Request) {
+  if (request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new AIError("invalid_request");
+}
+export async function readAIRequest(request: Request): Promise<unknown> {
+  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new AIError("invalid_request");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const item = await reader.read();
+      if (item.done) break;
+      size += item.value.length;
+      if (size > 40_000) { await reader.cancel(); throw new AIError("invalid_request"); }
+      chunks.push(item.value);
+    }
+  } finally { reader.releaseLock(); }
+  const data = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder().decode(data)); } catch { throw new AIError("invalid_request"); }
+}
+export function aiErrorResponse(error: unknown) {
+  const code = error instanceof AIError ? error.code : error instanceof z.ZodError ? "invalid_request" : "provider_error";
+  const status = code === "not_found" ? 404 : code === "insufficient_credits" ? 402 : code === "invalid_request" || code === "unsupported" ? 400 : code === "conflict" || code === "busy" ? 409 : 503;
+  return Response.json({ error: code }, { status, headers: privateHeaders });
+}
+`],
+  ["modules/ai/integrations/credits/apps/web/src/integrations/ai-credits.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
+import { InsufficientCreditsError } from "@{{projectName}}/credits";
+import type { Services } from "../services";
+
+export default function registerAICredits({ ai, credits }: Services) {
+  ai.setBilling({
+    async charge(userId, cost, referenceId) {
+      try { await credits.consume(userId, cost, { referenceId, reason: "AI generation" }); }
+      catch (error) { if (error instanceof InsufficientCreditsError) throw new AIError("insufficient_credits"); throw error; }
+    },
+    async refund(userId, referenceId) { await credits.refund(userId, referenceId); },
+  });
+}
+`],
+  ["modules/ai/integrations/storage/apps/web/src/integrations/ai-storage.ts.hbs", `import type { Services } from "../services";
+
+export default function registerAIStorage({ ai, storage }: Services) {
+  ai.setStorage({
+    save: (userId, input) => storage.storeGenerated(userId, input),
+    read: (userId, id) => storage.readFile(userId, id),
+    remove: (userId, id) => storage.deleteFile(userId, id),
+  });
+}
+`],
+  ["modules/ai/providers/google/packages/ai/src/providers/google.ts", `import { z } from "zod";
+import { AIError, jsonRequest, type AIProvider, type Kind, type Result } from "../types";
+
+const part = z.object({ type: z.string(), text: z.string().optional(), data: z.string().optional(), mime_type: z.enum(["image/png", "image/jpeg", "image/webp", "video/mp4"]).optional() });
+const interaction = z.object({
+  id: z.string().min(1),
+  status: z.enum(["in_progress", "completed", "failed", "cancelled", "requires_action"]),
+  steps: z.array(z.object({ type: z.string(), content: z.array(part).optional() })).optional(),
+});
+export function google(env: { GEMINI_API_KEY?: string; GEMINI_CHAT_MODEL?: string; GEMINI_IMAGE_MODEL?: string; GEMINI_VIDEO_MODEL?: string }): AIProvider | undefined {
+  if (!env.GEMINI_API_KEY) return undefined;
+  const base = "https://generativelanguage.googleapis.com/v1beta/interactions";
+  const headers = { "x-goog-api-key": env.GEMINI_API_KEY, "Api-Revision": "2026-05-20" };
+  function result(parsed: z.infer<typeof interaction>, kind: Kind): Result {
+    if (parsed.status === "in_progress") return { status: "running", remoteId: parsed.id };
+    if (parsed.status === "cancelled") return { status: "cancelled" };
+    if (parsed.status === "failed") return { status: "failed" };
+    if (parsed.status !== "completed") throw new AIError("provider_error");
+    const parts = parsed.steps?.filter((step) => step.type === "model_output").flatMap((step) => step.content ?? []) ?? [];
+    if (kind === "chat") {
+      const text = parts.filter((item) => item.type === "text").map((item) => item.text ?? "").join("");
+      if (!text) throw new AIError("provider_error");
+      return { status: "completed", text, remoteId: parsed.id };
+    }
+    const media = parts.find((item) => item.type === kind && item.data && item.mime_type);
+    if (!media?.data || !media.mime_type || (kind === "video") !== (media.mime_type === "video/mp4")) throw new AIError("provider_error");
+    return { status: "completed", media: { data: media.data, contentType: media.mime_type } };
+  }
+  return {
+    id: "google",
+    models: { chat: env.GEMINI_CHAT_MODEL || "gemini-4-argon", image: env.GEMINI_IMAGE_MODEL || "gemini-nano-banana-2.1", video: env.GEMINI_VIDEO_MODEL || "gemini-omni-1.1-flash" },
+    async generate(input) {
+      return result(interaction.parse(await jsonRequest(base, headers, {
+        model: input.model,
+        background: input.kind === "video", store: true,
+        input: input.prompt,
+        previous_interaction_id: input.parentRemoteId || undefined,
+        response_format: input.kind === "video" ? { type: "video" } : undefined,
+      })), input.kind);
+    },
+    async poll(remoteId, kind) {
+      return result(interaction.parse(await jsonRequest(\`\${base}/\${encodeURIComponent(remoteId)}\`, headers)), kind);
+    },
+    async cancel(remoteId) {
+      const response = await fetch(\`\${base}/\${encodeURIComponent(remoteId)}/cancel\`, { method: "POST", headers, redirect: "manual", signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) throw new AIError("provider_error");
+    },
+  };
+}
+`],
+  ["modules/ai/providers/openai-compatible/packages/ai/src/providers/openai-compatible.ts", `import { z } from "zod";
+import { AIError, jsonRequest, type AIProvider } from "../types";
+
+export function compatible(env: { AI_COMPATIBLE_API_KEY?: string; AI_COMPATIBLE_BASE_URL?: string; AI_COMPATIBLE_CHAT_MODEL?: string }): AIProvider | undefined {
+  if (!env.AI_COMPATIBLE_API_KEY) return undefined;
+  // This server-only endpoint is operator configuration, never request input.
+  const endpoint = new URL(z.string().url().parse(env.AI_COMPATIBLE_BASE_URL || "https://api.deepseek.com"));
+  if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new AIError("not_configured");
+  return {
+    id: "openai-compatible", models: { chat: env.AI_COMPATIBLE_CHAT_MODEL || "deepseek-flash" },
+    async generate(input) {
+      if (input.kind !== "chat") throw new AIError("unsupported");
+      const response = z.object({ choices: z.array(z.object({ message: z.object({ content: z.string().min(1) }) })).min(1) }).parse(await jsonRequest(
+        \`\${endpoint.href.replace(/\\/$/, "")}/chat/completions\`, { Authorization: \`Bearer \${env.AI_COMPATIBLE_API_KEY}\` },
+        { model: input.model, messages: input.messages, max_tokens: 2048, stream: false },
+      ));
+      return { status: "completed", text: response.choices[0]!.message.content };
+    },
+  };
+}
+`],
+  ["modules/ai/providers/openai/packages/ai/src/providers/openai.ts", `import { z } from "zod";
+import { AIError, jsonRequest, type AIProvider } from "../types";
+
+export function openai(env: { OPENAI_API_KEY?: string; OPENAI_CHAT_MODEL?: string; OPENAI_IMAGE_MODEL?: string }): AIProvider | undefined {
+  if (!env.OPENAI_API_KEY) return undefined;
+  const headers = { Authorization: \`Bearer \${env.OPENAI_API_KEY}\` };
+  return {
+    id: "openai",
+    models: { chat: env.OPENAI_CHAT_MODEL || "gpt-4.1-mini", image: env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare" },
+    async generate(input) {
+      if (input.kind === "chat") {
+        const response = z.object({ choices: z.array(z.object({ message: z.object({ content: z.string().min(1) }) })).min(1) }).parse(
+          await jsonRequest("https://api.openai.com/v1/chat/completions", headers, { model: input.model, messages: input.messages, max_completion_tokens: 2048, stream: false }),
+        );
+        return { status: "completed", text: response.choices[0]!.message.content };
+      }
+      if (input.kind !== "image") throw new AIError("unsupported");
+      const response = z.object({ data: z.array(z.object({ b64_json: z.string().min(1) })).min(1) }).parse(
+        await jsonRequest("https://api.openai.com/v1/images/generations", headers, { model: input.model, prompt: input.prompt, n: 1, size: "1024x1024", output_format: "png" }),
+      );
+      return { status: "completed", media: { data: response.data[0]!.b64_json, contentType: "image/png" } };
+    },
+  };
+}
+`],
   ["modules/auth/dialects/postgres/packages/db/src/schema/auth.ts.hbs", `import { defineRelationsPart } from "drizzle-orm";
 import { pgTable, text, timestamp, boolean, index{{#if (includes module.integrations "sms")}}, integer, bigint{{/if}} } from "drizzle-orm/pg-core";
 
@@ -13291,6 +14572,9 @@ export const user = pgTable("user", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
+  {{#if (includes product.features "affiliate")}}
+  affiliateReferralToken: text("affiliate_referral_token"),
+  {{/if}}
   {{#if (includes module.integrations "sms")}}
   phoneNumber: text("phone_number").unique(),
   phoneNumberVerified: boolean("phone_number_verified").default(false).notNull(),
@@ -13418,6 +14702,9 @@ export const user = sqliteTable("user", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: integer("email_verified", { mode: "boolean" }).default(false).notNull(),
+  {{#if (includes product.features "affiliate")}}
+  affiliateReferralToken: text("affiliate_referral_token"),
+  {{/if}}
   {{#if (includes module.integrations "sms")}}
   phoneNumber: text("phone_number").unique(),
   phoneNumberVerified: integer("phone_number_verified", { mode: "boolean" }).default(false).notNull(),
@@ -13567,6 +14854,9 @@ Built on [Better Auth](https://better-auth.com). The \`packages/auth\` package e
 {{/each}}
 - Roles (\`user\`, \`admin\`) through the Better Auth admin plugin
 - Account settings at \`/dashboard/settings\`
+{{#if (includes product.features "captcha")}}
+- Mandatory server-verified Turnstile for password login/signup/reset and phone OTP sending. Configure keys before using these forms; see [Bot protection / 人机验证](captcha.md). OAuth callbacks and sessions do not require captcha.
+{{/if}}
 
 ## Configuration
 
@@ -13669,6 +14959,9 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import type { Database } from "@{{projectName}}/db";
 import * as schema from "@{{projectName}}/db/schema/auth";
 import type { EventBus } from "@{{projectName}}/events";
+{{#if (includes product.features "captcha")}}
+import { createCaptchaBeforeHook, type CaptchaConfig } from "@{{projectName}}/captcha";
+{{/if}}
 {{#if (includes module.integrations "email")}}
 import { localeFromHeaders } from "@{{projectName}}/i18n";
 {{/if}}
@@ -13681,7 +14974,7 @@ import "./events";
 import { createPhoneAuth } from "./phone";
 {{/if}}
 
-export type AuthConfig = {
+export type AuthConfig = {{#if (includes product.features "captcha")}}CaptchaConfig & {{/if}}{
   BETTER_AUTH_URL: string;
   BETTER_AUTH_SECRET: string;
   ADMIN_EMAILS?: string;
@@ -13719,10 +15012,23 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
     database: drizzleAdapter(database, {
       provider: "{{#if (eq database "postgres")}}pg{{else}}sqlite{{/if}}",
       schema,
+      {{#if (eq dbSetup "d1")}}
+      transaction: false,
+      {{/if}}
     }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     trustedOrigins: [env.BETTER_AUTH_URL],
+    {{#if (includes product.features "affiliate")}}
+    user: {
+      additionalFields: {
+        affiliateReferralToken: { type: "string", required: false, input: false, returned: false },
+      },
+    },
+    {{/if}}
+{{#if (includes product.features "captcha")}}
+    hooks: { before: createCaptchaBeforeHook(env) },
+{{/if}}
 {{#if (includes module.integrations "sms")}}
     rateLimit: {
       enabled: true,
@@ -13810,9 +15116,20 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
 {{/if}}
       user: {
         create: {
-          before: async (user) => ({
-            data: { ...user, role: {{#if (includes module.integrations "sms")}}!user.email.toLowerCase().endsWith("@phone.invalid") && {{/if}}{{#if (includes module.providers "wechat")}}!user.email.toLowerCase().endsWith("@wechat.invalid") && {{/if}}adminEmails.has(user.email.toLowerCase()) ? "admin" : "user" },
-          }),
+          before: async (user{{#if (includes product.features "affiliate")}}, context{{/if}}) => {
+            {{#if (includes product.features "affiliate")}}
+            const token = (context?.headers?.get("cookie") ?? context?.request?.headers.get("cookie"))
+              ?.split(";").map((part) => part.trim()).find((part) => part.startsWith("xstack_referral="))
+              ?.slice("xstack_referral=".length);
+            {{/if}}
+            return { data: {
+              ...user,
+              role: {{#if (includes module.integrations "sms")}}!user.email.toLowerCase().endsWith("@phone.invalid") && {{/if}}{{#if (includes module.providers "wechat")}}!user.email.toLowerCase().endsWith("@wechat.invalid") && {{/if}}adminEmails.has(user.email.toLowerCase()) ? "admin" : "user",
+              {{#if (includes product.features "affiliate")}}
+              affiliateReferralToken: token && token.length <= 1024 ? token : null,
+              {{/if}}
+            } };
+          },
           after: async (user) => {
             await events.emit("auth.user_created", {
               userId: user.id,
@@ -14059,6 +15376,8 @@ export type Session = Auth["$Infer"]["Session"];
 import { resolveLocale } from "@/lib/i18n/server";
 import { requireUser } from "@/lib/session";
 
+export const metadata = { robots: { index: false, follow: false } };
+
 export default async function DashboardLayout({
   children,
   params,
@@ -14136,6 +15455,9 @@ export default async function SettingsPage({ params }: Props) {
   );
 }
 `],
+  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/login/layout.tsx", `export const metadata = { robots: { index: false, follow: false } };
+export default function PrivateLayout({ children }: { children: React.ReactNode }) { return children; }
+`],
   ["modules/auth/frameworks/next/apps/web/src/app/[lang]/login/page.tsx.hbs", `import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -14194,6 +15516,9 @@ export default async function LoginPage({ params, searchParams }: Props) {
     </AuthCard>
   );
 }
+`],
+  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/signup/layout.tsx", `export const metadata = { robots: { index: false, follow: false } };
+export default function PrivateLayout({ children }: { children: React.ReactNode }) { return children; }
 `],
   ["modules/auth/frameworks/next/apps/web/src/app/[lang]/signup/page.tsx.hbs", `import type { Metadata } from "next";
 import Link from "next/link";
@@ -14419,6 +15744,9 @@ import type { SocialProvider } from "@/lib/social-providers";
 import { useLocale, useT } from "../i18n-provider";
 import { Field, formValue } from "./field";
 import { SocialButtons } from "./social-buttons";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
 
 export default function SignInForm({
   next,
@@ -14432,16 +15760,22 @@ export default function SignInForm({
   const locale = useLocale();
   const t = useT();
   const [pending, setPending] = useState(false);
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
     const form = new FormData(event.currentTarget);
     setPending(true);
     const { error } = await authClient.signIn.email({
       email: formValue(form, "email"),
       password: formValue(form, "password"),
       callbackURL: next,
-    });
+    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
     setPending(false);
     if (error) {
       toast.error(error.message ?? t("auth.errors.generic"));
@@ -14470,7 +15804,10 @@ export default function SignInForm({
             {t("auth.signIn.forgot")}
           </Link>
         )}
-        <Button type="submit" disabled={pending}>
+{{#if (includes product.features "captcha")}}
+        <Captcha action="login" challenge={captcha} />
+{{/if}}
+        <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
           {t("auth.signIn.submit")}
         </Button>
       </form>
@@ -14490,6 +15827,9 @@ import type { SocialProvider } from "@/lib/social-providers";
 import { useT } from "../i18n-provider";
 import { Field, formValue } from "./field";
 import { SocialButtons } from "./social-buttons";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
 
 export default function SignUpForm({
   next,
@@ -14504,9 +15844,15 @@ export default function SignUpForm({
   const t = useT();
   const [pending, setPending] = useState(false);
   const [sentTo, setSentTo] = useState<string>();
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
     const form = new FormData(event.currentTarget);
     const email = formValue(form, "email");
     setPending(true);
@@ -14515,7 +15861,7 @@ export default function SignUpForm({
       email,
       password: formValue(form, "password"),
       callbackURL: next,
-    });
+    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
     setPending(false);
     if (error) {
       toast.error(error.message ?? t("auth.errors.generic"));
@@ -14542,7 +15888,10 @@ export default function SignUpForm({
           autoComplete="new-password"
           minLength={8}
         />
-        <Button type="submit" disabled={pending}>
+{{#if (includes product.features "captcha")}}
+        <Captcha action="signup" challenge={captcha} />
+{{/if}}
+        <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
           {t("auth.signUp.submit")}
         </Button>
       </form>
@@ -14816,21 +16165,30 @@ import { localePath } from "@/lib/i18n/paths";
 
 import { useLocale, useT } from "../i18n-provider";
 import { Field, formValue } from "./field";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
 
 export function ForgotPasswordForm() {
   const locale = useLocale();
   const t = useT();
   const [pending, setPending] = useState(false);
   const [sentTo, setSentTo] = useState<string>();
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
     const email = formValue(new FormData(event.currentTarget), "email");
     setPending(true);
     const { error } = await authClient.requestPasswordReset({
       email,
       redirectTo: localePath(locale, "/reset-password"),
-    });
+    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
     setPending(false);
     if (error) {
       toast.error(error.message ?? t("auth.errors.generic"));
@@ -14844,7 +16202,10 @@ export function ForgotPasswordForm() {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
-      <Button type="submit" disabled={pending}>
+{{#if (includes product.features "captcha")}}
+      <Captcha action="password_reset_request" challenge={captcha} />
+{{/if}}
+      <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
         {t("auth.forgot.submit")}
       </Button>
     </form>
@@ -14855,14 +16216,20 @@ export function ResetPasswordForm({ token }: { token: string }) {
   const locale = useLocale();
   const t = useT();
   const [pending, setPending] = useState(false);
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
     setPending(true);
     const { error } = await authClient.resetPassword({
       token,
       newPassword: formValue(new FormData(event.currentTarget), "newPassword"),
-    });
+    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
     setPending(false);
     if (error) {
       toast.error(error.message ?? t("auth.errors.generic"));
@@ -14881,7 +16248,10 @@ export function ResetPasswordForm({ token }: { token: string }) {
         autoComplete="new-password"
         minLength={8}
       />
-      <Button type="submit" disabled={pending}>
+{{#if (includes product.features "captcha")}}
+      <Captcha action="password_reset" challenge={captcha} />
+{{/if}}
+      <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
         {t("auth.reset.submit")}
       </Button>
     </form>
@@ -14939,6 +16309,9 @@ import { authClient } from "@/lib/auth-client";
 
 import { useT } from "../i18n-provider";
 import { Field } from "./field";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
 
 export default function PhoneSignInForm({ next }: { next: string }) {
   const t = useT();
@@ -14949,6 +16322,9 @@ export default function PhoneSignInForm({ next }: { next: string }) {
   const [error, setError] = useState<string>();
   const [cooldown, setCooldown] = useState({ phone: "", until: 0 });
   const [now, setNow] = useState(0);
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
   const remaining = cooldown.phone === phone.trim() ? Math.max(0, Math.ceil((cooldown.until - now) / 1000)) : 0;
 
   useEffect(() => {
@@ -14969,6 +16345,9 @@ export default function PhoneSignInForm({ next }: { next: string }) {
 
   async function sendCode() {
     if (pending || remaining > 0) return;
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token) return;
+{{/if}}
     const value = phone.trim();
     if (!/^\\+[1-9]\\d{7,14}$/.test(value)) {
       setError(t("auth.phone.invalidPhone"));
@@ -14980,6 +16359,9 @@ export default function PhoneSignInForm({ next }: { next: string }) {
     let retryAfter: string | null = null;
     try {
       const result = await authClient.phoneNumber.sendOtp({ phoneNumber: value }, {
+{{#if (includes product.features "captcha")}}
+        headers: captcha.headers,
+{{/if}}
         onError: ({ response }) => {
           retryAfter = response.headers.get("Retry-After") ?? response.headers.get("X-Retry-After");
         },
@@ -15004,6 +16386,9 @@ export default function PhoneSignInForm({ next }: { next: string }) {
       setError(t("auth.phone.deliveryFailed"));
     } finally {
       setPending(undefined);
+      {{#if (includes product.features "captcha")}}
+      captcha.reset();
+      {{/if}}
     }
   }
 
@@ -15083,12 +16468,15 @@ export default function PhoneSignInForm({ next }: { next: string }) {
           />
         </>
       )}
+{{#if (includes product.features "captcha")}}
+      <Captcha action="phone_otp" challenge={captcha} />
+{{/if}}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <Button type="submit" disabled={Boolean(pending) || (!sentTo && remaining > 0)}>
+      <Button type="submit" disabled={Boolean(pending) || (!sentTo && (remaining > 0{{#if (includes product.features "captcha")}} || !captcha.token{{/if}}))}>
         {pending === "send" ? t("auth.phone.sending") : pending === "verify" ? t("auth.phone.verifying") : sentTo ? t("auth.phone.verify") : t("auth.phone.send")}
       </Button>
       {sentTo && (
-        <Button type="button" variant="outline" disabled={Boolean(pending) || remaining > 0} onClick={() => void sendCode()}>
+        <Button type="button" variant="outline" disabled={Boolean(pending) || remaining > 0{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} } onClick={() => void sendCode()}>
           {t("auth.phone.resend")}
         </Button>
       )}
@@ -25971,6 +27359,869 @@ export const startInstance = createStart(() => {
 	}
 })
 `],
+  ["modules/blog/dialects/postgres/packages/db/src/schema/blog.ts", `import { pgTable, text, integer, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
+
+export const blogPost = pgTable("blog_post", {
+  id: text("id").primaryKey(),
+  translationKey: text("translation_key").notNull(),
+  locale: text("locale").notNull(),
+  slug: text("slug").notNull(),
+  title: text("title").notNull(),
+  excerpt: text("excerpt").notNull(),
+  body: text("body").notNull(),
+  status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
+  authorId: text("author_id").notNull(),
+  authorName: text("author_name").notNull(),
+  revision: integer("revision").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("blog_locale_slug_unique").on(table.locale, table.slug),
+  uniqueIndex("blog_translation_locale_unique").on(table.translationKey, table.locale),
+  index("blog_publication_idx").on(table.locale, table.status, table.publishedAt),
+]);
+`],
+  ["modules/blog/dialects/sqlite/packages/db/src/schema/blog.ts", `import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+
+export const blogPost = sqliteTable("blog_post", {
+  id: text("id").primaryKey(),
+  translationKey: text("translation_key").notNull(),
+  locale: text("locale").notNull(),
+  slug: text("slug").notNull(),
+  title: text("title").notNull(),
+  excerpt: text("excerpt").notNull(),
+  body: text("body").notNull(),
+  status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
+  authorId: text("author_id").notNull(),
+  authorName: text("author_name").notNull(),
+  revision: integer("revision").notNull().default(1),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  publishedAt: integer("published_at", { mode: "timestamp_ms" }),
+}, (table) => [
+  uniqueIndex("blog_locale_slug_unique").on(table.locale, table.slug),
+  uniqueIndex("blog_translation_locale_unique").on(table.translationKey, table.locale),
+  index("blog_publication_idx").on(table.locale, table.status, table.publishedAt),
+]);
+`],
+  ["modules/blog/files/docs/modules/blog.md.hbs", `# Blog publishing
+
+Blog requires auth and the admin console, but does not require SEO. No articles are seeded. Migrate the generated \`blog_post\` schema before opening the authoring UI. SQLite and Cloudflare D1 use the same schema and single-statement writes; PostgreSQL uses timezone-aware timestamps. No transaction API is needed.
+
+Sign in as an administrator, open \`/{locale}/admin/blog\`, and create a draft. Complete title, summary, Markdown and a lowercase ASCII URL slug, then save. Drafts must be created before publishing. Edit the saved draft and choose Published. Changing it back to Draft removes it immediately from public pages and the sitemap. Deletion is permanent. Updates and deletions use revision checks, so a stale editor receives 409 instead of silently overwriting another editor. A published edit becomes public immediately; to prepare private revisions, first unpublish the article. The first publication timestamp and original author display name are preserved across later edits/republication.
+
+Create each translation as a separate post with its configured language, localized title/body and locale-specific slug. Copy the original post's Translation group ID to connect alternate languages. Unique database indexes enforce one slug per locale and one locale per translation group. Only published translations receive hreflang links. Do not reuse a translation group for unrelated content.
+
+Public listing and detail routes are \`/{locale}/blog\` and \`/{locale}/blog/{slug}\`. Listing pages use \`?page=2\` pagination with self-canonical URLs. Draft detail requests return 404 even for signed-in administrators; private previews exist only in the guarded editor. Markdown is rendered using react-markdown without raw HTML, unsafe URL schemes or remote images. Inline HTML is dropped, not injected. JSON-LD is escaped before embedding and reports the real saved headline, author, first publication date and last modification date.
+
+Without SEO, metadata uses \`BETTER_AUTH_URL\` as its canonical public origin. With SEO, set \`SITE_URL\` and the blog integration uses it for both metadata and sitemap URLs. SEO dynamically includes published posts and populated blog index pages. No private routes are listed. The blog works independently without adding robots/sitemap routes.
+
+## HTTP authoring API
+
+All \`/api/blog\` routes require an authenticated administrator. Writes additionally require an Origin header matching \`BETTER_AUTH_URL\`; body parsing is bounded to 512KB and validated with Zod. No API response is publicly cached.
+
+- \`GET /api/blog?page=1\`: paginated private records, including drafts.
+- \`POST /api/blog\`: \`{ locale, slug, title, excerpt, body, translationKey?, status: "draft" }\`; returns the new record (201).
+- \`GET /api/blog/:id\`: private record.
+- \`PUT /api/blog/:id\`: \`{ revision, post: { locale, slug, title, excerpt, body, translationKey?, status } }\`.
+- \`DELETE /api/blog/:id\`: \`{ revision }\`, returns 204.
+
+## Runtime verification
+
+From the xstack repository, run \`bun apps/cli/live-tests/content.ts apps/cli/.smoke/<project> http://localhost:<port>\` against a disposable running generated app. Supply \`CONTENT_ADMIN_COOKIE\` and \`CONTENT_USER_COOKIE\` from real admin and ordinary-user sessions. The script creates and deletes its own posts via the generated API and checks authentication/authorization, draft privacy, publish/edit/unpublish, unique slugs, translations, safe Markdown, sitemap lifecycle and optimistic concurrency. It does not mock persistence or helper functions. No external paid services are used. The cookies allow testing captcha-enabled apps without bypassing captcha or authentication.
+`],
+  ["modules/blog/files/packages/blog/src/index.ts.hbs", `import type { Database } from "@{{projectName}}/db";
+import { blogPost } from "@{{projectName}}/db/schema/blog";
+import { isLocale } from "@{{projectName}}/i18n";
+import { defineAbilityFor, type Actor } from "@{{projectName}}/permissions";
+import { and, count, desc, eq, sql } from "drizzle-orm";
+import { z } from "zod";
+
+declare module "@{{projectName}}/permissions" { interface SubjectMap { BlogPost: true } }
+export type BlogPost = typeof blogPost.$inferSelect;
+export type BlogActor = Actor & { name: string };
+const localeSchema = z.string().refine(isLocale, "Unsupported locale");
+export const postInput = z.object({
+  locale: localeSchema,
+  slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  title: z.string().trim().min(1).max(200),
+  excerpt: z.string().trim().min(1).max(500),
+  body: z.string().trim().min(1).max(100_000),
+  translationKey: z.string().uuid().optional(),
+  status: z.enum(["draft", "published"]).default("draft"),
+}).strict();
+export const revisionInput = z.number().int().positive();
+export class BlogError extends Error {
+  constructor(readonly code: "forbidden" | "not_found" | "conflict") { super(code); }
+}
+function authorize(actor: BlogActor) {
+  const ability = defineAbilityFor(actor);
+  if (ability.cannot("access", "Admin") || ability.cannot("manage", "BlogPost")) throw new BlogError("forbidden");
+}
+function constraintError(error: unknown): never {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5; depth++) {
+    const parsed = z.object({ code: z.union([z.string(), z.number()]).optional(), message: z.string().optional(), cause: z.unknown().optional() }).safeParse(current);
+    if (!parsed.success) break;
+    if (parsed.data.code === "23505" || /unique constraint|UNIQUE constraint|SQLITE_CONSTRAINT_UNIQUE/.test(parsed.data.message ?? "")) throw new BlogError("conflict");
+    current = parsed.data.cause;
+  }
+  throw error;
+}
+const paging = z.object({ page: z.number().int().min(1).max(100_000).default(1), limit: z.number().int().min(1).max(100).default(12) });
+export function createBlog(db: Database) {
+  const published = (locale?: string) => and(eq(blogPost.status, "published"), locale ? eq(blogPost.locale, localeSchema.parse(locale)) : undefined);
+  return {
+    async listPublished(locale: string, options: { page?: number; limit?: number } = {}) {
+      const { page, limit } = paging.parse(options);
+      const where = published(locale);
+      const [posts, [total]] = await Promise.all([
+        db.select().from(blogPost).where(where).orderBy(desc(blogPost.publishedAt), desc(blogPost.id)).limit(limit).offset((page - 1) * limit),
+        db.select({ value: count() }).from(blogPost).where(where),
+      ]);
+      return { posts, total: total?.value ?? 0, page, limit };
+    },
+    async getPublished(locale: string, slug: string) {
+      const [post] = await db.select().from(blogPost).where(and(published(locale), eq(blogPost.slug, slug))).limit(1);
+      return post ?? null;
+    },
+    async translations(translationKey: string) {
+      return db.select({ locale: blogPost.locale, slug: blogPost.slug }).from(blogPost).where(and(published(), eq(blogPost.translationKey, translationKey)));
+    },
+    async sitemapPosts() {
+      return db.select({ locale: blogPost.locale, slug: blogPost.slug, translationKey: blogPost.translationKey, updatedAt: blogPost.updatedAt }).from(blogPost).where(published());
+    },
+    async listAdmin(actor: BlogActor, options: { page?: number; limit?: number } = {}) {
+      authorize(actor);
+      const { page, limit } = paging.parse(options);
+      const [posts, [total]] = await Promise.all([
+        db.select().from(blogPost).orderBy(desc(blogPost.updatedAt), desc(blogPost.id)).limit(limit).offset((page - 1) * limit),
+        db.select({ value: count() }).from(blogPost),
+      ]);
+      return { posts, total: total?.value ?? 0, page, limit };
+    },
+    async getAdmin(actor: BlogActor, id: string) {
+      authorize(actor);
+      const [post] = await db.select().from(blogPost).where(eq(blogPost.id, z.string().uuid().parse(id))).limit(1);
+      if (!post) throw new BlogError("not_found");
+      return post;
+    },
+    async create(actor: BlogActor, input: unknown) {
+      authorize(actor);
+      const data = postInput.parse(input);
+      if (data.status !== "draft") throw new z.ZodError([{ code: "custom", path: ["status"], message: "Create a draft before publishing" }]);
+      try {
+        const [post] = await db.insert(blogPost).values({ ...data, id: crypto.randomUUID(), translationKey: data.translationKey ?? crypto.randomUUID(), authorId: actor.id, authorName: z.string().trim().min(1).parse(actor.name) }).returning();
+        return post!;
+      } catch (error) { return constraintError(error); }
+    },
+    async update(actor: BlogActor, id: string, revision: number, input: unknown) {
+      authorize(actor);
+      const data = postInput.parse(input);
+      const now = new Date();
+      const [existing] = await db.select({ publishedAt: blogPost.publishedAt }).from(blogPost).where(and(eq(blogPost.id, z.string().uuid().parse(id)), eq(blogPost.revision, revisionInput.parse(revision)))).limit(1);
+      if (!existing) throw new BlogError("conflict");
+      try {
+        const [post] = await db.update(blogPost).set({ ...data, updatedAt: now, revision: sql\`\${blogPost.revision} + 1\`, ...(data.status === "published" ? { publishedAt: existing.publishedAt ?? now } : {}) }).where(and(eq(blogPost.id, id), eq(blogPost.revision, revision))).returning();
+        if (!post) throw new BlogError("conflict");
+        return post;
+      } catch (error) { return constraintError(error); }
+    },
+    async delete(actor: BlogActor, id: string, revision: number) {
+      authorize(actor);
+      const deleted = await db.delete(blogPost).where(and(eq(blogPost.id, z.string().uuid().parse(id)), eq(blogPost.revision, revisionInput.parse(revision)))).returning({ id: blogPost.id });
+      if (!deleted.length) throw new BlogError("conflict");
+    },
+  };
+}
+export type Blog = ReturnType<typeof createBlog>;
+`],
+  ["modules/blog/files/packages/i18n/src/messages/en/blog.ts", `export default {
+  "nav": {
+    "blog": "Blog"
+  },
+  "title": "The journal",
+  "journal": "Notes & perspectives",
+  "description": "Articles, ideas and updates from our team.",
+  "empty": "No articles have been published yet.",
+  "adminEmpty": "No posts yet. Create your first draft.",
+  "back": "All articles",
+  "manage": "Manage articles",
+  "draft": "Draft",
+  "published": "Published",
+  "pagination": "Article pages",
+  "previous": "Previous",
+  "next": "Next",
+  "editor": {
+    "locale": "Language",
+    "slug": "URL slug",
+    "title": "Title",
+    "excerpt": "Summary",
+    "body": "Markdown content",
+    "markdownHelp": "Headings, lists, links and code are supported. Raw HTML is disabled; image syntax renders its text description only. Save before opening the preview.",
+    "translation": "Translation group ID",
+    "translationHelp": "Leave blank for a new article. To connect a translation, copy the original article’s group ID. Each group supports one article per language.",
+    "status": "Publication status",
+    "conflict": "The slug or translation already exists, or this post changed elsewhere. Reload before saving.",
+    "failed": "The change could not be saved. Check your permissions and input.",
+    "saved": "Saved.",
+    "saving": "Saving…",
+    "save": "Save changes",
+    "create": "Create draft",
+    "edit": "Edit article",
+    "delete": "Delete article",
+    "confirmDelete": "Delete this article permanently?",
+    "preview": "Preview saved content"
+  }
+} as const;
+`],
+  ["modules/blog/files/packages/i18n/src/messages/zh-CN/blog.ts", `export default {
+  "nav": {
+    "blog": "博客"
+  },
+  "title": "团队日志",
+  "journal": "观点与记录",
+  "description": "来自我们团队的文章、想法与最新动态。",
+  "empty": "暂时没有已发布的文章。",
+  "adminEmpty": "暂无文章，创建第一篇草稿吧。",
+  "back": "全部文章",
+  "manage": "管理文章",
+  "draft": "草稿",
+  "published": "已发布",
+  "pagination": "文章分页",
+  "previous": "上一页",
+  "next": "下一页",
+  "editor": {
+    "locale": "语言",
+    "slug": "网址标识",
+    "title": "标题",
+    "excerpt": "摘要",
+    "body": "Markdown 正文",
+    "markdownHelp": "支持标题、列表、链接和代码。不执行原始 HTML；图片语法只显示文字描述。保存后可打开预览。",
+    "translation": "翻译组 ID",
+    "translationHelp": "新文章可留空。关联翻译时，请复制原文的翻译组 ID。每组每种语言只能有一篇文章。",
+    "status": "发布状态",
+    "conflict": "网址或翻译已存在，或文章已被他人修改，请刷新后重试。",
+    "failed": "无法保存，请检查权限和输入内容。",
+    "saved": "已保存。",
+    "saving": "保存中…",
+    "save": "保存修改",
+    "create": "创建草稿",
+    "edit": "编辑文章",
+    "delete": "删除文章",
+    "confirmDelete": "确定永久删除此文章？",
+    "preview": "预览已保存内容"
+  }
+} as const;
+`],
+  ["modules/blog/frameworks/next/apps/web/src/app/[lang]/admin/blog/[id]/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
+import { BlogError } from "@{{projectName}}/blog";
+import { notFound } from "next/navigation";
+import { z } from "zod";
+import BlogEditor from "@/components/blog/editor";
+import Markdown from "@/components/blog/markdown";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+export default async function EditBlogPost({ params }: { params: Promise<{ lang: string; id: string }> }) {
+  const { lang, id } = await params;
+  const locale = resolveLocale(lang);
+  const { user } = await requireAdmin(locale);
+  if (!z.string().uuid().safeParse(id).success) notFound();
+  const post = await blog.getAdmin(user, id).catch((error: unknown) => { if (error instanceof BlogError && error.code === "not_found") notFound(); throw error; });
+  const t = getTranslator(locale);
+  return <section><h1 className="mb-8 text-2xl font-semibold">{t("blog.editor.edit")}</h1><BlogEditor key={\`\${post.id}:\${post.revision}\`} locale={locale} post={ { id: post.id, locale: post.locale, slug: post.slug, title: post.title, excerpt: post.excerpt, body: post.body, translationKey: post.translationKey, status: post.status, revision: post.revision } } /><details className="mt-12 border-t pt-6"><summary className="mb-8 cursor-pointer font-medium">{t("blog.editor.preview")}</summary><Markdown>{post.body}</Markdown></details></section>;
+}
+`],
+  ["modules/blog/frameworks/next/apps/web/src/app/[lang]/admin/blog/new/page.tsx.hbs", `import BlogEditor from "@/components/blog/editor";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+export default async function NewBlogPost({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = resolveLocale((await params).lang);
+  await requireAdmin(locale);
+  return <section><h1 className="mb-8 text-2xl font-semibold">{getTranslator(locale)("blog.editor.create")}</h1><BlogEditor locale={locale} /></section>;
+}
+`],
+  ["modules/blog/frameworks/next/apps/web/src/app/[lang]/admin/blog/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
+import Link from "next/link";
+import { requireAdmin } from "@/lib/admin";
+import { blogPage } from "@/lib/blog-page";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+export default async function BlogAdmin({ params, searchParams }: { params: Promise<{ lang: string }>; searchParams: Promise<{ page?: string }> }) {
+  const locale = resolveLocale((await params).lang);
+  const { user } = await requireAdmin(locale);
+  const t = getTranslator(locale);
+  const result = await blog.listAdmin(user, { page: blogPage((await searchParams).page) });
+  return <section><header className="mb-8 flex items-center justify-between"><h1 className="text-2xl font-semibold">{t("blog.manage")}</h1><Link className="rounded border px-4 py-2" href={localePath(locale, "/admin/blog/new")}>{t("blog.editor.create")}</Link></header>
+    {!result.posts.length && <p>{t("blog.adminEmpty")}</p>}
+    <ul className="divide-y">{result.posts.map((post) => <li key={post.id} className="flex justify-between gap-4 py-5"><div><Link className="font-medium underline" href={localePath(locale, \`/admin/blog/\${post.id}\`)}>{post.title}</Link><p className="mt-1 text-sm text-muted-foreground">{post.locale} / {post.slug}</p></div><span>{post.status === "published" ? t("blog.published") : t("blog.draft")}</span></li>)}</ul>
+    <nav className="mt-8 flex justify-between" aria-label={t("blog.pagination")}>{result.page > 1 ? <Link href={localePath(locale, \`/admin/blog?page=\${result.page - 1}\`)}>{t("blog.previous")}</Link> : <span />}{result.page * result.limit < result.total && <Link href={localePath(locale, \`/admin/blog?page=\${result.page + 1}\`)}>{t("blog.next")}</Link>}</nav>
+  </section>;
+}
+`],
+  ["modules/blog/frameworks/next/apps/web/src/app/[lang]/blog/[slug]/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import Markdown from "@/components/blog/markdown";
+import { blogMetadata, blogPosting, safeJsonLd } from "@/lib/blog-metadata";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+export const dynamic = "force-dynamic";
+type Props = { params: Promise<{ lang: string; slug: string }> };
+export async function generateMetadata({ params }: Props) {
+  const { lang, slug } = await params;
+  const locale = resolveLocale(lang);
+  const post = await blog.getPublished(locale, slug);
+  if (!post) notFound();
+  return blogMetadata({ locale, slug, title: post.title, description: post.excerpt, translations: await blog.translations(post.translationKey) });
+}
+export default async function BlogPostPage({ params }: Props) {
+  const { lang, slug } = await params;
+  const locale = resolveLocale(lang);
+  const t = getTranslator(locale);
+  const post = await blog.getPublished(locale, slug);
+  if (!post) notFound();
+  return <article className="container mx-auto max-w-3xl px-6 py-16">
+    <Link className="text-sm underline" href={localePath(locale, "/blog")}>{t("blog.back")}</Link>
+    <header className="mb-10 mt-10 border-b pb-10"><h1 className="font-serif text-4xl tracking-tight sm:text-5xl">{post.title}</h1><p className="mt-6 text-lg text-muted-foreground">{post.excerpt}</p><div className="mt-6 flex flex-wrap gap-4 text-sm"><span>{post.authorName}</span><time dateTime={post.publishedAt!.toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(post.publishedAt!)}</time></div></header>
+    <Markdown>{post.body}</Markdown>
+    <script type="application/ld+json" dangerouslySetInnerHTML={ { __html: safeJsonLd(blogPosting(post)) } } />
+  </article>;
+}
+`],
+  ["modules/blog/frameworks/next/apps/web/src/app/[lang]/blog/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { blogMetadata } from "@/lib/blog-metadata";
+import { blogPage } from "@/lib/blog-page";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+export const dynamic = "force-dynamic";
+type Props = { params: Promise<{ lang: string }>; searchParams: Promise<{ page?: string }> };
+export async function generateMetadata({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  return blogMetadata({ locale, title: t("blog.title"), description: t("blog.description"), page: blogPage((await searchParams).page) });
+}
+export default async function BlogPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const result = await blog.listPublished(locale, { page: blogPage((await searchParams).page) });
+  if (result.page > 1 && !result.posts.length) notFound();
+  return <div className="container mx-auto max-w-5xl px-6 py-16">
+    <header className="mb-12 border-b pb-10"><p className="mb-4 text-xs uppercase tracking-[0.25em]">{t("blog.journal")}</p><h1 className="font-serif text-5xl tracking-tight">{t("blog.title")}</h1><p className="mt-5 max-w-xl text-muted-foreground">{t("blog.description")}</p></header>
+    {!result.posts.length && <p>{t("blog.empty")}</p>}
+    <div className="divide-y">{result.posts.map((post) => <article key={post.id} className="grid gap-4 py-8 md:grid-cols-[10rem_1fr]">
+      <div className="text-sm text-muted-foreground"><time dateTime={post.publishedAt!.toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(post.publishedAt!)}</time><p className="mt-2">{post.authorName}</p></div>
+      <div><h2 className="font-serif text-3xl"><Link href={localePath(locale, \`/blog/\${post.slug}\`)}>{post.title}</Link></h2><p className="mt-4 text-muted-foreground">{post.excerpt}</p></div>
+    </article>)}</div>
+    <nav aria-label={t("blog.pagination")} className="mt-10 flex justify-between border-t pt-6">
+      {result.page > 1 ? <Link href={localePath(locale, \`/blog?page=\${result.page - 1}\`)}>{t("blog.previous")}</Link> : <span />}
+      {result.page * result.limit < result.total && <Link href={localePath(locale, \`/blog?page=\${result.page + 1}\`)}>{t("blog.next")}</Link>}
+    </nav>
+  </div>;
+}
+`],
+  ["modules/blog/frameworks/next/apps/web/src/app/api/blog/[id]/route.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
+import { revisionInput } from "@{{projectName}}/blog";
+import { z } from "zod";
+import { blogActor, blogFailure, blogResponse, readBlogJson } from "@/lib/blog-http";
+
+type Context = { params: Promise<{ id: string }> };
+export async function GET(request: Request, { params }: Context) {
+  try { return blogResponse(await blog.getAdmin(await blogActor(request), (await params).id)); }
+  catch (error) { return blogFailure(error); }
+}
+export async function PUT(request: Request, { params }: Context) {
+  try {
+    const actor = await blogActor(request, true);
+    const input = z.object({ revision: revisionInput, post: z.unknown() }).strict().parse(await readBlogJson(request));
+    return blogResponse(await blog.update(actor, (await params).id, input.revision, input.post));
+  } catch (error) { return blogFailure(error); }
+}
+export async function DELETE(request: Request, { params }: Context) {
+  try {
+    const actor = await blogActor(request, true);
+    const input = z.object({ revision: revisionInput }).strict().parse(await readBlogJson(request));
+    await blog.delete(actor, (await params).id, input.revision);
+    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return blogFailure(error); }
+}
+`],
+  ["modules/blog/frameworks/next/apps/web/src/app/api/blog/route.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
+import { z } from "zod";
+import { blogActor, blogFailure, blogResponse, readBlogJson } from "@/lib/blog-http";
+
+export async function GET(request: Request) {
+  try {
+    const actor = await blogActor(request);
+    const page = z.coerce.number().int().min(1).max(100_000).parse(new URL(request.url).searchParams.get("page") ?? 1);
+    return blogResponse(await blog.listAdmin(actor, { page }));
+  } catch (error) { return blogFailure(error); }
+}
+export async function POST(request: Request) {
+  try {
+    const actor = await blogActor(request, true);
+    return blogResponse(await blog.create(actor, await readBlogJson(request)), 201);
+  } catch (error) { return blogFailure(error); }
+}
+`],
+  ["modules/blog/frameworks/next/apps/web/src/components/blog/editor.tsx.hbs", `"use client";
+
+import { locales } from "@{{projectName}}/i18n";
+import type { Locale } from "@{{projectName}}/i18n";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import { localePath } from "@/lib/i18n/paths";
+
+type Editable = { id: string; locale: string; slug: string; title: string; excerpt: string; body: string; translationKey: string; status: "draft" | "published"; revision: number };
+export default function BlogEditor({ locale, post }: { locale: Locale; post?: Editable }) {
+  const t = useT();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  async function save(form: HTMLFormElement) {
+    setBusy(true); setMessage("");
+    const values = new FormData(form);
+    const data = { locale: String(values.get("locale")), slug: String(values.get("slug")), title: String(values.get("title")), excerpt: String(values.get("excerpt")), body: String(values.get("body")), translationKey: String(values.get("translationKey") ?? "") || undefined, status: String(values.get("status") ?? "draft") };
+    try {
+      const response = await fetch(post ? \`/api/blog/\${post.id}\` : "/api/blog", { method: post ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(post ? { revision: post.revision, post: data } : data) });
+      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
+      const result = z.object({ id: z.string().uuid() }).parse(await response.json());
+      router.push(localePath(locale, \`/admin/blog/\${result.id}\`)); router.refresh(); setMessage(t("blog.editor.saved"));
+    } catch { setMessage(t("blog.editor.failed")); }
+    finally { setBusy(false); }
+  }
+  async function remove() {
+    if (!post || !window.confirm(t("blog.editor.confirmDelete"))) return;
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch(\`/api/blog/\${post.id}\`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: post.revision }) });
+      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
+      router.push(localePath(locale, "/admin/blog")); router.refresh();
+    } catch { setMessage(t("blog.editor.failed")); }
+    finally { setBusy(false); }
+  }
+  const field = "mt-2 w-full rounded border bg-background px-3 py-2";
+  return <form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void save(event.currentTarget); }}>
+    <fieldset disabled={busy} className="space-y-6">
+      <div className="grid gap-6 sm:grid-cols-2"><label>{t("blog.editor.locale")}<select name="locale" defaultValue={post?.locale ?? locale} className={field}>{locales.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label>{t("blog.editor.slug")}<input className={field} name="slug" required maxLength={160} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={post?.slug} /></label></div>
+      <label className="block">{t("blog.editor.title")}<input className={field} name="title" required maxLength={200} defaultValue={post?.title} /></label>
+      <label className="block">{t("blog.editor.excerpt")}<textarea className={field} name="excerpt" required maxLength={500} rows={3} defaultValue={post?.excerpt} /></label>
+      <label className="block">{t("blog.editor.body")}<textarea className={\`\${field} font-mono text-sm\`} name="body" required maxLength={100000} rows={20} defaultValue={post?.body} /></label>
+      <p className="text-sm text-muted-foreground">{t("blog.editor.markdownHelp")}</p>
+      <label className="block">{t("blog.editor.translation")}<input className={\`\${field} font-mono text-sm\`} name="translationKey" defaultValue={post?.translationKey} /><span className="mt-2 block text-sm text-muted-foreground">{t("blog.editor.translationHelp")}</span></label>
+      {post && <label className="block">{t("blog.editor.status")}<select name="status" className={field} defaultValue={post.status}><option value="draft">{t("blog.draft")}</option><option value="published">{t("blog.published")}</option></select></label>}
+      <div className="flex gap-4"><button type="submit" className="rounded bg-primary px-5 py-2 text-primary-foreground">{busy ? t("blog.editor.saving") : post ? t("blog.editor.save") : t("blog.editor.create")}</button>{post && <button type="button" onClick={() => void remove()} className="rounded border border-destructive px-5 py-2 text-destructive">{t("blog.editor.delete")}</button>}</div>
+    </fieldset><p role="status" aria-live="polite">{message}</p>
+  </form>;
+}
+`],
+  ["modules/blog/frameworks/next/apps/web/src/components/blog/markdown.tsx", `import ReactMarkdown from "react-markdown";
+
+/** Raw HTML is never interpreted. react-markdown also rejects unsafe URL schemes. */
+export default function Markdown({ children }: { children: string }) {
+  return <div className="space-y-5 text-base leading-8 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-5 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:font-serif [&_h1]:text-3xl [&_h2]:mt-10 [&_h2]:font-serif [&_h2]:text-2xl [&_h3]:text-xl [&_li]:ml-6 [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:bg-muted [&_pre]:p-5 [&_ul]:list-disc"><ReactMarkdown skipHtml components={{ img: ({ alt }) => <span className="text-muted-foreground">{alt}</span> }}>{children}</ReactMarkdown></div>;
+}
+`],
+  ["modules/blog/frameworks/next/apps/web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+import { BlogError, type BlogActor } from "@{{projectName}}/blog";
+import { defineAbilityFor } from "@{{projectName}}/permissions";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+
+class RequestError extends Error {
+  constructor(readonly status: number, readonly code: string) { super(code); }
+}
+export async function blogActor(request: Request, mutate = false): Promise<BlogActor> {
+  if (mutate && request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new RequestError(403, "forbidden");
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) throw new RequestError(401, "unauthorized");
+  const actor = session.user;
+  if (defineAbilityFor(actor).cannot("access", "Admin")) throw new RequestError(403, "forbidden");
+  return actor;
+}
+export async function readBlogJson(request: Request): Promise<unknown> {
+  if (!/^application\\/json(?:;|$)/i.test(request.headers.get("content-type") ?? "")) throw new RequestError(400, "invalid_input");
+  if (!request.body) throw new RequestError(400, "invalid_input");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      size += part.value.byteLength;
+      if (size > 512_000) { await reader.cancel(); throw new RequestError(413, "too_large"); }
+      chunks.push(part.value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder().decode(bytes)) as unknown; }
+  catch { throw new RequestError(400, "invalid_input"); }
+}
+export function blogResponse(data: unknown, status = 200) {
+  return Response.json(data, { status, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
+}
+export function blogFailure(error: unknown) {
+  if (error instanceof RequestError) return blogResponse({ error: error.code }, error.status);
+  if (error instanceof z.ZodError) return blogResponse({ error: "invalid_input" }, 400);
+  if (error instanceof BlogError) return blogResponse({ error: error.code }, error.code === "forbidden" ? 403 : error.code === "not_found" ? 404 : 409);
+  console.error("Blog request failed", error);
+  return blogResponse({ error: "server_error" }, 500);
+}
+`],
+  ["modules/blog/frameworks/next/apps/web/src/lib/blog-metadata.ts.hbs", `import type { BlogPost } from "@{{projectName}}/blog";
+import { defaultLocale } from "@{{projectName}}/i18n";
+import type { Metadata } from "next";
+import { blogOrigin } from "./blog-origin";
+
+export function blogUrl(locale: string, slug?: string) {
+  return new URL(\`/\${locale}/blog\${slug ? \`/\${slug}\` : ""}\`, blogOrigin()).href;
+}
+export function blogMetadata(input: { locale: string; title: string; description: string; slug?: string; page?: number; translations?: { locale: string; slug: string }[] }): Metadata {
+  const url = \`\${blogUrl(input.locale, input.slug)}\${input.page && input.page > 1 ? \`?page=\${input.page}\` : ""}\`;
+  const languages = Object.fromEntries((input.translations ?? []).map((post) => [post.locale, blogUrl(post.locale, post.slug)]));
+  if (languages[defaultLocale]) languages["x-default"] = languages[defaultLocale]!;
+  return { title: input.title, description: input.description, alternates: { canonical: url, ...(Object.keys(languages).length ? { languages } : {}) }, openGraph: { title: input.title, description: input.description, url, locale: input.locale.replaceAll("-", "_"), type: input.slug ? "article" : "website" }, twitter: { card: "summary", title: input.title, description: input.description } };
+}
+export function blogPosting(post: BlogPost) {
+  return { "@context": "https://schema.org", "@type": "BlogPosting", headline: post.title, description: post.excerpt, inLanguage: post.locale, author: { "@type": "Person", name: post.authorName }, datePublished: post.publishedAt?.toISOString(), dateModified: post.updatedAt.toISOString(), mainEntityOfPage: blogUrl(post.locale, post.slug), url: blogUrl(post.locale, post.slug) };
+}
+export function safeJsonLd(value: unknown) { return JSON.stringify(value).replace(/</g, "\\\\u003c").replace(/>/g, "\\\\u003e").replace(/&/g, "\\\\u0026"); }
+`],
+  ["modules/blog/frameworks/next/apps/web/src/lib/blog-origin.ts.hbs", `import { ENV } from "@/env.server";
+export function blogOrigin() { return new URL(ENV.BETTER_AUTH_URL).origin; }
+`],
+  ["modules/blog/frameworks/next/apps/web/src/lib/blog-page.ts", `import { notFound } from "next/navigation";
+import { z } from "zod";
+export function blogPage(value: string | string[] | undefined) {
+  const result = z.coerce.number().int().min(1).max(100_000).safeParse(value ?? 1);
+  if (!result.success) notFound();
+  return result.data;
+}
+`],
+  ["modules/blog/integrations/seo/apps/web/src/integrations/blog-seo.ts.hbs", `import type { Services } from "../services";
+
+export default function registerBlogSeo({ blog, seo }: Services) {
+  seo.registerSitemap("blog", async () => {
+    const posts = await blog.sitemapPosts();
+    const translations = new Map<string, Record<string, string>>();
+    for (const post of posts) {
+      const group = translations.get(post.translationKey) ?? {};
+      group[post.locale] = seo.url(\`/\${post.locale}/blog/\${post.slug}\`);
+      translations.set(post.translationKey, group);
+    }
+    return [
+      ...[...new Set(posts.map((post) => post.locale))].map((locale) => ({ url: seo.url(\`/\${locale}/blog\`) })),
+      ...posts.map((post) => ({ url: seo.url(\`/\${post.locale}/blog/\${post.slug}\`), lastModified: post.updatedAt, alternates: { languages: translations.get(post.translationKey)! } })),
+    ];
+  });
+}
+`],
+  ["modules/blog/integrations/seo/apps/web/src/lib/blog-origin.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+export function blogOrigin() { return seo.origin; }
+`],
+  ["modules/captcha/files/docs/modules/captcha.md.hbs", `# Bot protection / 人机验证
+
+Cloudflare Turnstile protects the actual Better Auth **before** hook, not only forms. Selecting \`captcha\` automatically includes native \`auth\` and its database prerequisites. OAuth callbacks, session reads and payment webhooks remain unaffected.
+
+## Production configuration
+
+Create a widget at <https://dash.cloudflare.com/?to=/:account/turnstile>, authorize your production hostname, and configure server environment:
+
+\`\`\`dotenv
+TURNSTILE_SITE_KEY=your-widget-site-key
+TURNSTILE_SECRET_KEY=your-widget-secret
+TURNSTILE_TEST_MODE=false
+\`\`\`
+
+\`BETTER_AUTH_URL\` supplies both the trusted Origin and the exact expected hostname (no wildcard/subdomain matching). Missing keys, accidental public dummy keys, inaccessible Siteverify, malformed responses and failed challenges **fail closed**. Unconfigured protected actions return \`503 CAPTCHA_NOT_CONFIGURED\`; missing tokens return \`400 CAPTCHA_REQUIRED\`; rejected/expired/spent tokens return \`400 CAPTCHA_INVALID\`. Tokens are valid for at most 300 seconds and single-use according to Siteverify. Do not retry requests with a consumed token, including requests whose auth validation failed after verification. No forwarding header is trusted as an IP; the optional Siteverify \`remoteip\` is deliberately omitted.
+
+Only the site key is returned by \`/api/captcha/config\` at runtime, avoiding build-time public environment substitution. Never expose the secret through a \`NEXT_PUBLIC_\` variable. Allow \`https://challenges.cloudflare.com\` in your CSP \`script-src\` and \`frame-src\`; do not self-host or cache the widget script. Keep the provider reachable from the server (including Workers).
+
+| Better Auth endpoint | Widget action |
+| --- | --- |
+| \`/sign-up/email\` | \`signup\` |
+| \`/sign-in/email\` | \`login\` |
+| \`/request-password-reset\` | \`password_reset_request\` |
+| \`/reset-password\` | \`password_reset\` |
+| \`/send-verification-email\` | \`email_verification\` |
+| \`/phone-number/send-otp\` | \`phone_otp\` |
+
+Generated login/signup/reset/phone-send forms render the widget and send \`x-captcha-token\` with the auth request. Buttons remain disabled until a token is available; expiry/error clears it; each completed request resets the widget. Phone OTP verification itself uses its existing bounded, single-use challenge and does not require a second captcha. Any custom resend-verification UI must render \`Captcha\` with \`email_verification\` and pass its token header. Internal server calls to these mutations must also supply the configured Origin and a valid token; calling the raw HTTP endpoint or Better Auth server API does not bypass the hook.
+
+## Explicit local development
+
+Only on \`NODE_ENV=development\` **and** a loopback \`BETTER_AUTH_URL\`, set \`TURNSTILE_TEST_MODE=true\` and leave both keys empty. This explicitly selects Cloudflare's public always-pass pair:
+
+- Site key: \`1x00000000000000000000AA\`
+- Secret: \`1x0000000000000000000000000000000AA\`
+
+The real widget and Siteverify are still used. Public dummy tokens do not carry meaningful production hostname/action/timestamp bindings and do not establish replay resistance; those checks are only relaxed in this explicitly enabled, local development mode. It is rejected in production or on non-loopback domains. Never use it as evidence of production bot protection. Production verification requires real keys and real browser-issued tokens, including expired and replayed token checks.
+
+## Local protocol verification
+
+The source repository includes \`apps/cli/live-tests/captcha-provider.ts\` (a local signed HTTP Siteverify fixture), \`captcha-preload.mjs\` (test-process-only routing of the exact Cloudflare URL), and \`captcha.ts\` (requests through the generated auth HTTP boundary plus SQLite assertions). See its live-test README for commands. These verify missing/forged/wrong-action/wrong-host/stale/replayed tokens, origin binding, actual account creation, actual login/session and secret-free public configuration. No test URL or interceptor is generated into this application. This protocol fixture is not Cloudflare network acceptance. Verify the widget, CSP, configured hostname, invalid/replayed token rejection and a successful actual login on your deployment with real keys.
+
+## 中文说明
+
+选择 \`captcha\` 会自动引入认证依赖，并在 Better Auth 的服务端 before hook 中强制校验，直接调用 HTTP 或服务端 API 也不能绕过。注册、邮箱登录、重置密码申请与提交、验证邮件重发、手机验证码发送均受保护；OAuth 回调、会话读取和支付 webhook 不受影响。
+
+生产环境必须配置真实的 \`TURNSTILE_SITE_KEY\`、\`TURNSTILE_SECRET_KEY\` 与正确的 \`BETTER_AUTH_URL\`，密钥缺失时受保护操作关闭并返回明确配置错误。服务端必须验证 success、准确 hostname、action、五分钟时效，过期或重复 token 不能再次使用；每次提交后前端重置挑战。公开配置接口只返回 site key，secret 永不传给浏览器。不信任任意转发 IP 头。
+
+仅当 \`NODE_ENV=development\`、认证地址为本机回环地址且显式设置 \`TURNSTILE_TEST_MODE=true\` 时才启用 Cloudflare 公开测试密钥。此模式仍调用真实 Siteverify，但测试 token 不具备生产绑定和防重放保证，不能作为上线安全验收。部署前用真实密钥验证成功、过期、重复、错误 hostname/action、CSP 及 Workers 出站网络。本地签名 HTTP 夹具仅验证协议与实际认证边界，不代表已通过真实 Cloudflare 验收。
+`],
+  ["modules/captcha/files/packages/captcha/src/index.ts.hbs", `import { APIError, createAuthMiddleware } from "better-auth/api";
+import { z } from "zod";
+
+export type CaptchaConfig = {
+  BETTER_AUTH_URL: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
+  TURNSTILE_TEST_MODE?: boolean;
+};
+
+const testSiteKey = "1x00000000000000000000AA";
+const testSecretKey = "1x0000000000000000000000000000000AA";
+const actions: Readonly<Record<string, string>> = {
+  "/sign-up/email": "signup",
+  "/sign-in/email": "login",
+  "/request-password-reset": "password_reset_request",
+  "/reset-password": "password_reset",
+  "/send-verification-email": "email_verification",
+  "/phone-number/send-otp": "phone_otp",
+};
+const responseSchema = z.object({
+  success: z.boolean(),
+  hostname: z.string().optional(),
+  action: z.string().optional(),
+  challenge_ts: z.string().optional(),
+  "error-codes": z.array(z.string()).optional(),
+});
+const tokenSchema = z.string().trim().min(1).max(2048);
+
+function configuration(env: CaptchaConfig) {
+  const origin = new URL(env.BETTER_AUTH_URL);
+  const test = env.TURNSTILE_TEST_MODE === true;
+  if (test && (process.env.NODE_ENV !== "development" || !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname))) {
+    throw new APIError("SERVICE_UNAVAILABLE", { code: "CAPTCHA_NOT_CONFIGURED", message: "Turnstile test mode requires development and a loopback BETTER_AUTH_URL" });
+  }
+  const siteKey = env.TURNSTILE_SITE_KEY?.trim() || (test ? testSiteKey : "");
+  const secretKey = env.TURNSTILE_SECRET_KEY?.trim() || (test ? testSecretKey : "");
+  if (!siteKey || !secretKey || (!test && (/^[123]x0+/.test(siteKey) || /^[123]x0+/.test(secretKey)))) {
+    throw new APIError("SERVICE_UNAVAILABLE", { code: "CAPTCHA_NOT_CONFIGURED", message: "Configure TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY before using protected authentication" });
+  }
+  if (test && (siteKey !== testSiteKey || secretKey !== testSecretKey)) {
+    throw new APIError("SERVICE_UNAVAILABLE", { code: "CAPTCHA_NOT_CONFIGURED", message: "Test mode only accepts the documented public always-pass key pair" });
+  }
+  return { origin, test, siteKey, secretKey };
+}
+
+/** Only the public site key crosses the server/client boundary. */
+export function captchaPublicConfig(env: CaptchaConfig) {
+  try {
+    return { siteKey: configuration(env).siteKey };
+  } catch {
+    return { siteKey: null };
+  }
+}
+
+export function createCaptchaBeforeHook(env: CaptchaConfig) {
+  return createAuthMiddleware(async (ctx) => {
+    const action = actions[ctx.path];
+    if (!action) return; // OAuth callbacks, sessions and webhooks are not challenges.
+    const config = configuration(env);
+    const headers = ctx.headers ?? ctx.request?.headers;
+    if (headers?.get("origin") !== config.origin.origin) {
+      throw new APIError("FORBIDDEN", { code: "CAPTCHA_ORIGIN_REJECTED", message: "A trusted Origin is required" });
+    }
+    const token = tokenSchema.safeParse(headers.get("x-captcha-token"));
+    if (!token.success) {
+      throw new APIError("BAD_REQUEST", { code: "CAPTCHA_REQUIRED", message: "Complete the verification challenge" });
+    }
+    let result: z.infer<typeof responseSchema>;
+    try {
+      // No remoteip: forwarded headers are caller-controlled outside a verified proxy boundary.
+      // Never retry a single-use token after a timeout; the provider may have consumed it.
+      const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ secret: config.secretKey, response: token.data }),
+        signal: AbortSignal.timeout(10_000),
+        redirect: "manual",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Siteverify unavailable");
+      result = responseSchema.parse(await response.json());
+    } catch {
+      throw new APIError("SERVICE_UNAVAILABLE", { code: "CAPTCHA_UNAVAILABLE", message: "Verification is unavailable; please try a new challenge" });
+    }
+    const timestamp = result.challenge_ts ? Date.parse(result.challenge_ts) : NaN;
+    // Public dummy tokens do not bind hostname/action/time. This explicit development-only
+    // mode still calls Siteverify; production always validates every binding below.
+    const validBinding = config.test || (
+      result.hostname === config.origin.hostname && result.action === action &&
+      Number.isFinite(timestamp) && timestamp <= Date.now() + 30_000 && Date.now() - timestamp <= 300_000
+    );
+    if (!result.success || result["error-codes"]?.length || !validBinding) {
+      throw new APIError("BAD_REQUEST", { code: "CAPTCHA_INVALID", message: "Verification expired or was rejected; complete a new challenge" });
+    }
+  });
+}
+`],
+  ["modules/captcha/files/packages/i18n/src/messages/en/captcha.ts", `export default {
+  loading: "Loading verification…",
+  configuration: "Verification is not configured. Contact the site administrator.",
+  error: "Verification failed or expired. Complete a new challenge to continue.",
+  retry: "Try verification again",
+};
+`],
+  ["modules/captcha/files/packages/i18n/src/messages/zh-CN/captcha.ts", `export default {
+  loading: "正在加载人机验证…",
+  configuration: "人机验证尚未配置，请联系网站管理员。",
+  error: "人机验证失败或已过期，请重新完成验证后继续。",
+  retry: "重新验证",
+};
+`],
+  ["modules/captcha/frameworks/next/apps/web/src/app/api/captcha/config/route.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
+import { ENV } from "@/env.server";
+
+export const dynamic = "force-dynamic";
+
+export function GET() {
+  return Response.json(captchaPublicConfig(ENV), { headers: { "Cache-Control": "no-store" } });
+}
+`],
+  ["modules/captcha/frameworks/next/apps/web/src/components/auth/captcha.tsx.hbs", `"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import { useLocale, useT } from "../i18n-provider";
+
+type Turnstile = {
+  render(container: HTMLElement, options: {
+    sitekey: string;
+    action: string;
+    language: "en" | "zh-CN";
+    callback(token: string): void;
+    "expired-callback"(): void;
+    "error-callback"(): void;
+    "timeout-callback"(): void;
+    "response-field": false;
+  }): string;
+  remove(id: string): void;
+};
+declare global { interface Window { turnstile?: Turnstile } }
+let scriptPromise: Promise<Turnstile> | undefined;
+function loadTurnstile(): Promise<Turnstile> {
+  if (window.turnstile) return Promise.resolve(window.turnstile);
+  if (scriptPromise) return scriptPromise;
+  scriptPromise = new Promise<Turnstile>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    const timeout = window.setTimeout(() => fail(), 15_000);
+    function fail() {
+      window.clearTimeout(timeout);
+      script.remove();
+      reject(new Error("Turnstile unavailable"));
+    }
+    script.onerror = fail;
+    script.onload = () => {
+      window.clearTimeout(timeout);
+      if (window.turnstile) resolve(window.turnstile);
+      else fail();
+    };
+    document.head.appendChild(script);
+  }).catch((error: unknown) => {
+    scriptPromise = undefined;
+    throw error;
+  });
+  return scriptPromise;
+}
+
+export function useCaptcha() {
+  const [token, setToken] = useState("");
+  const [generation, setGeneration] = useState(0);
+  const reset = useCallback(() => {
+    setToken("");
+    setGeneration((current) => current + 1);
+  }, []);
+  return { token, setToken, generation, reset, headers: { "x-captcha-token": token } };
+}
+
+export function Captcha({ action, challenge }: {
+  action: "signup" | "login" | "password_reset_request" | "password_reset" | "email_verification" | "phone_otp";
+  challenge: ReturnType<typeof useCaptcha>;
+}) {
+  const t = useT();
+  const locale = useLocale();
+  const container = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "configuration">("loading");
+  const { setToken, generation, reset } = challenge;
+  useEffect(() => {
+    const controller = new AbortController();
+    let disposed = false;
+    let widget: { api: Turnstile; id: string } | undefined;
+    setToken("");
+    setStatus("loading");
+    async function render() {
+      try {
+        const response = await fetch("/api/captcha/config", { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Configuration unavailable");
+        const config = z.object({ siteKey: z.string().min(1).nullable() }).parse(await response.json());
+        if (disposed) return;
+        if (!config.siteKey) { setStatus("configuration"); return; }
+        const api = await loadTurnstile();
+        if (disposed || !container.current) return;
+        const invalidate = () => { if (!disposed) { setToken(""); setStatus("error"); } };
+        const id = api.render(container.current, {
+          sitekey: config.siteKey,
+          action,
+          language: locale,
+          "response-field": false,
+          callback: (token) => { if (!disposed) { setToken(token); setStatus("ready"); } },
+          "expired-callback": invalidate,
+          "error-callback": invalidate,
+          "timeout-callback": invalidate,
+        });
+        widget = { api, id };
+      } catch {
+        if (!disposed) { setToken(""); setStatus("error"); }
+      }
+    }
+    void render();
+    return () => {
+      disposed = true;
+      controller.abort();
+      if (widget) widget.api.remove(widget.id);
+    };
+  }, [action, generation, locale, setToken]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div ref={container} />
+      {status === "loading" && <p role="status" className="text-xs text-muted-foreground">{t("captcha.loading")}</p>}
+      {status === "configuration" && <p role="alert" className="text-sm text-destructive">{t("captcha.configuration")}</p>}
+      {status === "error" && (
+        <div role="alert" className="text-sm text-destructive">
+          <p>{t("captcha.error")}</p>
+          <button type="button" className="underline underline-offset-4" onClick={reset}>{t("captcha.retry")}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+`],
   ["modules/core/files/docs/modules/core.md", `# Product shell
 
 The shell every feature module plugs into.
@@ -26182,6 +28433,13 @@ import Link from "next/link";
 import { localePath } from "@/lib/i18n/paths";
 {{/if}}
 import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { site } from "@/config/site";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }) {
+  const locale = resolveLocale((await params).lang);
+  return pageMetadata({ locale, path: "/", title: site.name, description: getTranslator(locale)("core.site.description") });
+}
 
 const features = ["modular", "portable", "deploy"] as const;
 
@@ -26364,6 +28622,13 @@ export default function SiteHeader() {
   name: "{{projectName}}",
 };
 `],
+  ["modules/core/frameworks/next/apps/web/src/lib/page-metadata.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+import type { Metadata } from "next";
+
+export function pageMetadata(input: { locale: Locale; path: \`/\${string}\`; title: string; description: string }): Metadata {
+  return { title: input.title, description: input.description };
+}
+`],
   ["modules/credits/dialects/postgres/packages/db/src/schema/credits.ts", `import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
@@ -26376,6 +28641,7 @@ export const creditTransactionTypes = [
   "consume",
   "refund",
   "adjust",
+  "affiliate",
 ] as const;
 
 export const creditBalance = pgTable("credit_balance", {
@@ -26417,6 +28683,7 @@ export const creditTransactionTypes = [
   "consume",
   "refund",
   "adjust",
+  "affiliate",
 ] as const;
 
 export const creditBalance = sqliteTable("credit_balance", {
@@ -26471,7 +28738,7 @@ export default function registerCreditsSignup(_services: Services) {}
 `],
   ["modules/credits/files/docs/modules/credits.md.hbs", `# Credits
 
-\`packages/credits\` keeps a balance per user (\`credit_balance\`) and an append-only ledger (\`credit_transaction\`). Every change goes through one transaction that updates the balance and records the entry together.
+\`packages/credits\` keeps a balance per user (\`credit_balance\`) and an append-only ledger (\`credit_transaction\`). Every change updates the balance and ledger atomically: serialized account transactions on PostgreSQL, or atomic batches on SQLite/libSQL/D1. SQLite never holds an interactive write transaction across JavaScript await boundaries. Amounts and resulting balances are bounded to signed 32-bit integers for consistent dialect behavior.
 
 ## API
 
@@ -26481,12 +28748,14 @@ import { credits } from "@{{projectName}}/app-services";
 await credits.getBalance(userId);
 await credits.grant(userId, 100, { type: "grant", reason: "beta tester", referenceId: "beta:2026" });
 await credits.consume(userId, 5, { reason: "image generation", referenceId: \`job:\${jobId}\` });
+await credits.refund(userId, \`job:\${jobId}\`); // derives the amount from the debit; refunds at most once
 await credits.adjust(userId, -20, "manual correction");
 \`\`\`
 
 - \`consume\` throws \`InsufficientCreditsError\` and changes nothing if the balance is too low.
-- A \`referenceId\` is applied at most once. Pass one whenever the caller can retry.
+- A \`referenceId\` is applied at most once, including concurrent retries. Reuse with a different owner, amount, or type rejects. Pass a stable reference whenever the caller can retry.
 - Every applied change emits \`credits.changed\`.
+- \`refund(userId, debitReference)\` returns null if no debit was committed; otherwise it returns the unique compensating entry. A refund cannot exceed or belong to another user's debit.
 
 ## Sources
 
@@ -26523,7 +28792,7 @@ import {
   type creditTransactionTypes,
 } from "@{{projectName}}/db/schema/credits";
 import type { EventBus } from "@{{projectName}}/events";
-import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, count, desc, eq, {{#if (eq database "postgres")}}gte, {{/if}}sql } from "drizzle-orm";
 
 import "./events";
 
@@ -26558,18 +28827,57 @@ export function createCredits(db: Database, events: EventBus) {
 
   /** Applies a signed change to the balance and records it, atomically. */
   async function apply(userId: string, amount: number, entry: CreditEntry) {
-    if (!Number.isInteger(amount) || amount === 0) {
-      throw new RangeError("Credit amounts must be non-zero integers");
+    if (!Number.isSafeInteger(amount) || amount === 0 || Math.abs(amount) > 2_147_483_647) {
+      throw new RangeError("Credit amounts must be non-zero 32-bit integers");
     }
+    const referenceId = entry.referenceId ?? crypto.randomUUID();
+    const verifyReplay = (existing: CreditTransaction) => {
+      if (existing.userId !== userId || existing.amount !== amount || existing.type !== entry.type) {
+        throw new Error("Credit reference was reused with different parameters");
+      }
+      return existing;
+    };
+
+{{#if (eq database "sqlite")}}
+    const id = crypto.randomUUID();
+    // D1 and libSQL batch execute one atomic SQLite transaction without
+    // yielding an interactive write lock between statements.
+    let inserted: CreditTransaction[];
+    try {
+      const result = await db.batch([
+        db.insert(creditBalance).values({ userId, balance: 0 }).onConflictDoNothing(),
+        db.insert(creditTransaction).values({
+          id, userId, amount, type: entry.type, reason: entry.reason, referenceId,
+          balanceAfter: sql\`(select balance + \${amount} from credit_balance where user_id = \${userId} and balance + \${amount} between 0 and 2147483647)\`,
+        }).onConflictDoNothing({ target: creditTransaction.referenceId }).returning(),
+        db.update(creditBalance).set({
+          balance: sql\`\${creditBalance.balance} + \${amount}\`, updatedAt: new Date(),
+        }).where(and(eq(creditBalance.userId, userId), sql\`exists (select 1 from credit_transaction where id = \${id})\`)),
+      ]);
+      inserted = result[1];
+    } catch (error) {
+      const [existing] = await db.select().from(creditTransaction).where(eq(creditTransaction.referenceId, referenceId));
+      if (existing) return verifyReplay(existing);
+      const balance = await getBalance(userId);
+      if (amount < 0 && balance < -amount) throw new InsufficientCreditsError(balance, -amount);
+      if (balance + amount > 2_147_483_647) throw new RangeError("Credit balance exceeds the supported limit");
+      throw error;
+    }
+    const transaction = inserted[0] ?? (await db.select().from(creditTransaction).where(eq(creditTransaction.referenceId, referenceId)))[0];
+    if (!transaction) throw new Error("Credit mutation returned no ledger entry");
+    const result = { transaction: verifyReplay(transaction), applied: inserted.length > 0 };
+{{else}}
 
     const result = await db.transaction(async (tx) => {
-      if (entry.referenceId) {
-        const [existing] = await tx
-          .select()
-          .from(creditTransaction)
-          .where(eq(creditTransaction.referenceId, entry.referenceId));
-        if (existing) return { transaction: existing, applied: false };
-      }
+      // Lock the PostgreSQL account before checking the idempotency reference.
+      // Waiting transactions see the committed ledger and current balance.
+      await tx.insert(creditBalance).values({ userId, balance: 0 }).onConflictDoNothing();
+      await tx.update(creditBalance).set({ balance: sql\`\${creditBalance.balance}\` }).where(eq(creditBalance.userId, userId));
+      const [existing] = await tx.select().from(creditTransaction).where(eq(creditTransaction.referenceId, referenceId));
+      if (existing) return { transaction: verifyReplay(existing), applied: false };
+      const [current] = await tx.select().from(creditBalance).where(eq(creditBalance.userId, userId));
+      if (!current) throw new Error("Missing credit balance");
+      if (current.balance + amount > 2_147_483_647) throw new RangeError("Credit balance exceeds the supported limit");
 
       const [row] =
         amount > 0
@@ -26586,7 +28894,7 @@ export function createCredits(db: Database, events: EventBus) {
               .set({ balance: sql\`\${creditBalance.balance} - \${-amount}\`, updatedAt: new Date() })
               .where(and(eq(creditBalance.userId, userId), gte(creditBalance.balance, -amount)))
               .returning();
-      if (!row) throw new InsufficientCreditsError(await getBalance(userId), -amount);
+      if (!row) throw new InsufficientCreditsError(current.balance, -amount);
 
       const [transaction] = await tx
         .insert(creditTransaction)
@@ -26597,11 +28905,12 @@ export function createCredits(db: Database, events: EventBus) {
           balanceAfter: row.balance,
           type: entry.type,
           reason: entry.reason,
-          referenceId: entry.referenceId,
+          referenceId,
         })
         .returning();
       return { transaction: transaction!, applied: true };
     });
+{{/if}}
 
     if (result.applied) {
       await events.emit("credits.changed", {
@@ -26626,6 +28935,15 @@ export function createCredits(db: Database, events: EventBus) {
       return apply(userId, -Math.abs(amount), { ...entry, type: "consume" });
     },
 
+    /** Refund a specific debit once; callers cannot refund more than was charged. */
+    async refund(userId: string, referenceId: string) {
+      const [debit] = await db.select().from(creditTransaction).where(and(
+        eq(creditTransaction.userId, userId), eq(creditTransaction.referenceId, referenceId),
+      ));
+      if (!debit) return null;
+      if (debit.amount >= 0 || debit.type !== "consume") throw new Error("Reference is not a debit");
+      return apply(userId, -debit.amount, { type: "refund", referenceId: \`refund:\${referenceId}\`, reason: debit.reason ?? undefined });
+    },
     /** Signed manual correction, e.g. from the admin console. */
     adjust(userId: string, amount: number, reason: string) {
       return apply(userId, amount, { type: "adjust", reason });
@@ -26678,6 +28996,7 @@ export type Credits = ReturnType<typeof createCredits>;
     consume: "Usage",
     refund: "Refund",
     adjust: "Adjustment",
+    affiliate: "Referral reward",
   },
   admin: {
     title: "Credits",
@@ -26724,6 +29043,7 @@ export type Credits = ReturnType<typeof createCredits>;
     consume: "消耗",
     refund: "退款",
     adjust: "人工调整",
+    affiliate: "推荐奖励",
   },
   admin: {
     title: "积分",
@@ -28571,6 +30891,7 @@ import type { Metadata } from "next";
 
 import { formatMoney } from "@/lib/format";
 import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { pageMetadata } from "@/lib/page-metadata";
 
 import { startCheckout } from "./actions";
 
@@ -28580,8 +30901,9 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const t = getTranslator(resolveLocale((await params).lang));
-  return { title: t("payment.pricing.title") };
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  return pageMetadata({ locale, path: "/pricing", title: t("payment.pricing.title"), description: t("payment.pricing.subtitle") });
 }
 
 export default async function PricingPage({ params, searchParams }: Props) {
@@ -29229,7 +31551,7 @@ export function createProvider({ env }: ProviderOptions<ProviderConfig>): Paymen
     if (!env.STRIPE_SECRET_KEY) {
       throw new Error("STRIPE_SECRET_KEY is not set; see docs/modules/payment.md");
     }
-    client ??= new Stripe(env.STRIPE_SECRET_KEY);
+    client ??= new Stripe(env.STRIPE_SECRET_KEY, { httpClient: Stripe.createFetchHttpClient() });
     return client;
   };
 
@@ -29278,6 +31600,8 @@ export function createProvider({ env }: ProviderOptions<ProviderConfig>): Paymen
         await request.text(),
         signature,
         env.STRIPE_WEBHOOK_SECRET,
+        undefined,
+        Stripe.createSubtleCryptoProvider(),
       );
 
       switch (event.type) {
@@ -29512,7 +31836,7 @@ export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>
       ).toString("base64");
       const response = await fetch(\`https://api.mch.weixin.qq.com\${NATIVE_PATH}\`, {
         method: "POST",
-        redirect: "error",
+        redirect: "manual",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
@@ -29567,6 +31891,85 @@ export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>
       ];
     },
   };
+}
+`],
+  ["modules/seo/files/docs/modules/seo.md", `# Search metadata
+
+Set \`SITE_URL\` to the public HTTPS origin before deployment. Do not use preview URLs as canonical production URLs. \`pageMetadata\` supplies homepage and payment pricing page canonical, configured-locale hreflang, Open Graph and Twitter metadata; use it on additional translated public pages. For content that is not available in every configured locale, pass only actual translations to \`seo.metadata\` instead of accepting its same-path defaults. Optional \`image\` must identify a real public image; absolute HTTP(S) URLs and relative public paths are supported, while unsafe schemes and credential-bearing URLs are rejected. Metadata helpers do not fetch image URLs.
+
+\`/robots.txt\` excludes authentication, dashboard, admin and API paths. \`/sitemap.xml\` is computed per request and initially includes only localized homepages. Modules register live contributors through \`seo.registerSitemap\`; the payment integration adds localized pricing URLs, and the blog integration includes published posts and populated blog indexes, never drafts. Sitemap/robots are discovery controls, not authorization. All private routes must retain their session/permission guards.
+
+The module does not invent review claims, organization facts, social images or sample articles. BlogPosting data comes from the blog's persisted publication record. No external SEO service or paid data is required.
+`],
+  ["modules/seo/files/packages/seo/src/index.ts", `export type SitemapEntry = { url: string; lastModified?: Date; alternates?: { languages: Record<string, string> } };
+export type MetadataInput = { title: string; description: string; locale: string; path: \`/\${string}\`; translations?: Record<string, string>; image?: string; type?: "website" | "article" };
+
+export function createSeo(config: { origin: string; locales: readonly string[]; defaultLocale: string }) {
+  const origin = new URL(config.origin).origin;
+  const contributors = new Map<string, () => Promise<SitemapEntry[]>>();
+  function url(path: string) {
+    const result = new URL(path, origin);
+    if (!["http:", "https:"].includes(result.protocol) || result.username || result.password) throw new Error("SEO URLs must be public HTTP(S) URLs without credentials");
+    return result.href;
+  }
+  function metadata(input: MetadataInput) {
+    const canonical = url(\`/\${input.locale}\${input.path === "/" ? "" : input.path}\`);
+    const translations = input.translations ?? Object.fromEntries(config.locales.map((locale) => [locale, \`/\${locale}\${input.path === "/" ? "" : input.path}\`]));
+    const languages = Object.fromEntries(Object.entries(translations).map(([locale, path]) => [locale, url(path)]));
+    if (languages[config.defaultLocale]) languages["x-default"] = languages[config.defaultLocale]!;
+    const images = input.image ? [url(input.image)] : undefined;
+    return { title: input.title, description: input.description, alternates: { canonical, languages }, openGraph: { title: input.title, description: input.description, url: canonical, locale: input.locale.replaceAll("-", "_"), alternateLocale: Object.keys(translations).filter((locale) => locale !== input.locale).map((locale) => locale.replaceAll("-", "_")), type: input.type ?? "website", images }, twitter: { card: images ? "summary_large_image" as const : "summary" as const, title: input.title, description: input.description, images } };
+  }
+  return {
+    origin, url, metadata,
+    registerSitemap(name: string, contributor: () => Promise<SitemapEntry[]>) {
+      if (contributors.has(name)) throw new Error(\`Duplicate sitemap contributor: \${name}\`);
+      contributors.set(name, contributor);
+    },
+    async sitemap(): Promise<SitemapEntry[]> {
+      const languages = Object.fromEntries(config.locales.map((locale) => [locale, url(\`/\${locale}\`)]));
+      languages["x-default"] = url(\`/\${config.defaultLocale}\`);
+      const home = config.locales.map((locale) => ({ url: url(\`/\${locale}\`), alternates: { languages } }));
+      return [...home, ...(await Promise.all([...contributors.values()].map((load) => load()))).flat()];
+    },
+  };
+}
+export type Seo = ReturnType<typeof createSeo>;
+`],
+  ["modules/seo/frameworks/next/apps/web/src/app/robots.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+import { locales } from "@{{projectName}}/i18n";
+import type { MetadataRoute } from "next";
+
+export default function robots(): MetadataRoute.Robots {
+  const privatePaths = ["/login", "/signup", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/verify-email", "/dashboard", "/admin", "/api"];
+  return { rules: { userAgent: "*", allow: "/", disallow: [...privatePaths, ...locales.flatMap((locale) => privatePaths.map((path) => \`/\${locale}\${path}\`))] }, sitemap: seo.url("/sitemap.xml") };
+}
+`],
+  ["modules/seo/frameworks/next/apps/web/src/app/sitemap.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+import type { MetadataRoute } from "next";
+
+export const dynamic = "force-dynamic";
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  return seo.sitemap();
+}
+`],
+  ["modules/seo/integrations/core/apps/web/src/lib/page-metadata.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+import type { Locale } from "@{{projectName}}/i18n";
+import type { Metadata } from "next";
+
+export function pageMetadata(input: { locale: Locale; path: \`/\${string}\`; title: string; description: string }): Metadata {
+  return seo.metadata(input);
+}
+`],
+  ["modules/seo/integrations/payment/apps/web/src/integrations/seo-payment.ts.hbs", `import { defaultLocale, locales } from "@{{projectName}}/i18n";
+import type { Services } from "../services";
+
+export default function registerSeoPayment({ seo }: Services) {
+  seo.registerSitemap("pricing", async () => {
+    const languages = Object.fromEntries(locales.map((locale) => [locale, seo.url(\`/\${locale}/pricing\`)]));
+    languages["x-default"] = seo.url(\`/\${defaultLocale}/pricing\`);
+    return locales.map((locale) => ({ url: seo.url(\`/\${locale}/pricing\`), alternates: { languages } }));
+  });
 }
 `],
   ["modules/sms/files/docs/modules/sms.md.hbs", `# SMS
@@ -29651,7 +32054,7 @@ A successful HTTP response is not sufficient: the adapter requires exactly one r
 | \`TWILIO_AUTH_TOKEN\` | Matching account auth token |
 | \`TWILIO_FROM_NUMBER\` | SMS-capable Twilio sender number belonging to that account, in E.164 format |
 
-Use Node.js 20 or later. Configure an SMS-capable sender, balance, and geographic permissions in the [Twilio Console](https://console.twilio.com/). Trial accounts restrict recipients. Destination-specific sender registration, A2P requirements, consent, and carrier restrictions still apply; selecting Twilio does not guarantee service in mainland China or any other country.
+The adapter uses the Twilio HTTPS API with standard fetch on Node.js and Cloudflare Workers; no Node-only Twilio SDK is bundled. Configure an SMS-capable sender, balance, and geographic permissions in the [Twilio Console](https://console.twilio.com/). Trial accounts restrict recipients. Destination-specific sender registration, A2P requirements, consent, and carrier restrictions still apply; selecting Twilio does not guarantee service in mainland China or any other country.
 
 The adapter uses Programmable Messaging, not Twilio Verify. It sends \`Your verification code is CODE. It expires in 5 minutes.\` with a 300-second queue validity period. Auth (or your standalone caller) remains responsible for actually expiring the code. The adapter accepts only a phone-number sender, not an alphanumeric sender or Messaging Service SID.
 
@@ -29881,7 +32284,7 @@ export function createTransport(env: ProviderConfig): Sms | undefined {
   };
 }
 `],
-  ["modules/sms/providers/twilio/packages/sms/src/providers/twilio.ts", `import twilio from "twilio";
+  ["modules/sms/providers/twilio/packages/sms/src/providers/twilio.ts", `import { z } from "zod";
 
 import type { Sms } from "../types";
 
@@ -29890,50 +32293,1130 @@ export type ProviderConfig = {
   TWILIO_AUTH_TOKEN?: string;
   TWILIO_FROM_NUMBER?: string;
 };
+const configuration = z.object({
+  accountSid: z.string().regex(/^AC[a-fA-F0-9]{32}$/),
+  authToken: z.string().regex(/^[a-fA-F0-9]{32}$/),
+  from: z.string().regex(/^\\+[1-9]\\d{1,14}$/),
+});
+const messageResult = z.object({
+  sid: z.string().min(1),
+  status: z.enum(["accepted", "queued", "sending", "sent", "delivered"]),
+  error_code: z.number().nullable().optional(),
+});
 
 export function createTransport(env: ProviderConfig): Sms | undefined {
-  const {
-    TWILIO_ACCOUNT_SID: accountSid,
-    TWILIO_AUTH_TOKEN: authToken,
-    TWILIO_FROM_NUMBER: from,
-  } = env;
-  if (
-    !accountSid?.trim() ||
-    !authToken?.trim() ||
-    !from ||
-    from.trim() !== from ||
-    !/^\\+[1-9]\\d{1,14}$/.test(from)
-  ) {
-    return undefined;
-  }
-
-  const client = twilio(accountSid, authToken, { autoRetry: false, maxRetries: 0 });
-
+  const parsed = configuration.safeParse({
+    accountSid: env.TWILIO_ACCOUNT_SID, authToken: env.TWILIO_AUTH_TOKEN, from: env.TWILIO_FROM_NUMBER,
+  });
+  if (!parsed.success) return undefined;
+  const { accountSid, authToken, from } = parsed.data;
   return {
     async sendOtp({ phoneNumber, code }) {
       try {
-        const message = await client.messages.create({
-          to: phoneNumber,
-          from,
-          body: \`Your verification code is \${code}. It expires in 5 minutes.\`,
-          validityPeriod: 300,
+        const response = await fetch(\`https://api.twilio.com/2010-04-01/Accounts/\${accountSid}/Messages.json\`, {
+          method: "POST",
+          headers: {
+            authorization: \`Basic \${btoa(\`\${accountSid}:\${authToken}\`)}\`,
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            To: phoneNumber, From: from,
+            Body: \`Your verification code is \${code}. It expires in 5 minutes.\`,
+            ValidityPeriod: "300",
+          }),
+          redirect: "manual",
+          signal: AbortSignal.timeout(15_000),
         });
-        // Accepted/queued is not delivery; reject errors and unexpected outbound states.
-        if (
-          (message.errorCode != null && message.errorCode !== 0) ||
-          (message.status !== "accepted" &&
-            message.status !== "queued" &&
-            message.status !== "sending" &&
-            message.status !== "sent" &&
-            message.status !== "delivered")
-        ) {
-          throw new Error("SMS request rejected");
-        }
+        if (!response.ok) throw new Error("SMS request rejected");
+        const message = messageResult.parse(await response.json());
+        if (message.error_code != null && message.error_code !== 0) throw new Error("SMS request rejected");
       } catch {
+        // Never automatically retry a paid send with an ambiguous network outcome.
         throw new Error("Twilio SMS request failed; check the provider console");
       }
     },
   };
+}
+`],
+  ["modules/storage/dialects/postgres/packages/db/src/schema/storage.ts", `import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+
+import { user } from "./auth";
+
+export const storageFile = pgTable(
+  "storage_file",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    provider: text("provider", { enum: ["oss", "cos", "s3", "r2", "r2-binding"] }).notNull(),
+    objectKey: text("object_key").notNull().unique(),
+    name: text("name").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("storage_file_user_idx").on(table.userId, table.createdAt)],
+);
+`],
+  ["modules/storage/dialects/sqlite/packages/db/src/schema/storage.ts", `import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+
+import { user } from "./auth";
+
+export const storageFile = sqliteTable(
+  "storage_file",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    provider: text("provider", { enum: ["oss", "cos", "s3", "r2", "r2-binding"] }).notNull(),
+    objectKey: text("object_key").notNull().unique(),
+    name: text("name").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [index("storage_file_user_idx").on(table.userId, table.createdAt)],
+);
+`],
+  ["modules/storage/files/docs/modules/storage.md.hbs", `# Private files
+
+The storage module uses exactly one private provider: S3, Cloudflare R2 (S3 API or Workers binding), Alibaba Cloud OSS or Tencent Cloud COS. \`/dashboard/files\` lets each signed-in user upload, list, download and delete only their own files. The database stores ownership and metadata in \`storage_file\`; the objects live in your bucket. There is no public bucket, mock provider or administrator file browser.
+
+Selecting storage automatically includes the authentication module. The file list shows all files owned by the signed-in user, newest first, without a pagination limit; it never includes another user's files.
+
+## Configure the selected provider
+
+{{#if (includes module.providers "s3")}}
+Use the official AWS SDK v3. Configure \`S3_REGION\`, \`S3_BUCKET\`, \`S3_ACCESS_KEY_ID\`, \`S3_SECRET_ACCESS_KEY\` and optional \`S3_SESSION_TOKEN\`. Create a private bucket with Block Public Access and BucketOwnerEnforced ownership. The adapter intentionally omits ACL headers (required for BucketOwnerEnforced) and never grants public read. Grant only \`s3:PutObject\`, \`s3:GetObject\`, \`s3:DeleteObject\` on the application object prefix; no bucket administration or public bucket policy. Downloads use SigV4 URLs expiring after 60 seconds with signed attachment response headers.
+{{/if}}
+{{#if (includes module.providers "r2")}}
+Use the official AWS SDK v3 against \`https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com\` with region \`auto\`. Configure \`R2_ACCOUNT_ID\`, \`R2_BUCKET\`, \`R2_ACCESS_KEY_ID\`, \`R2_SECRET_ACCESS_KEY\`. Create a private bucket, disable r2.dev and custom public domains, and issue a bucket-scoped Object Read & Write API token. R2 does not support ACL headers; none are sent. Downloads use 60-second SigV4 signed attachment URLs. This adapter targets Node deployments; select \`r2-binding\` for Workers.
+{{/if}}
+{{#if (includes module.providers "r2-binding")}}
+The generated OpenNext adapter obtains \`STORAGE_BUCKET\` from \`getCloudflareContext({ async: true })\` per request. No Node SDK or S3 credentials are used. Alchemy provisions a private R2 bucket; wrangler.jsonc supplies its local equivalent. Keep public access disabled. See [Cloudflare setup](../cloudflare.md) for D1 migrations, local dev and deployment.
+
+\`downloadUrl\` returns an application-relative \`/api/storage/:id\` URL, **not** a signed bearer URL. Every GET requires the current owner's authenticated session, checks ownership, and streams an attachment with \`private, no-store\` and \`nosniff\` headers. Sharing the URL does not share the file, and logout revokes access. The application does not support anonymous expiring links for this provider.
+{{/if}}
+{{#if (includes module.providers "oss")}}
+The generated package uses the official \`ali-oss\` SDK and \`@types/ali-oss\` development types.
+
+1. Create an OSS bucket in your selected region. Set its ACL to **private** and enable the account/bucket block-public-access controls. Do not add anonymous read policies.
+2. Set \`OSS_REGION\` (for example \`oss-cn-hangzhou\`), \`OSS_BUCKET\`, \`OSS_ACCESS_KEY_ID\` and \`OSS_ACCESS_KEY_SECRET\` in \`apps/web/.env\` or your server's secret manager. \`OSS_SECURITY_TOKEN\` is optional for temporary credentials; rotate all temporary credentials before expiration.
+3. Use a dedicated RAM identity. Grant only \`oss:PutObject\`, \`oss:GetObject\` and \`oss:DeleteObject\` on this bucket's application objects (\`acs:oss:*:*:<bucket>/*\`, narrowed to the generated application object prefix when deploying). Do not grant bucket administration, ACL administration, public access or wildcard-account permissions. Bucket enumeration is not needed: the application lists its own database rows.
+
+See [OSS Node.js SDK documentation](https://www.alibabacloud.com/help/en/oss/developer-reference/node-js) and [RAM policies for OSS](https://www.alibabacloud.com/help/en/oss/user-guide/overview-10).
+{{/if}}
+{{#if (includes module.providers "cos")}}
+The generated package uses the official \`cos-nodejs-sdk-v5\` SDK, which includes its TypeScript declarations.
+
+1. Create a COS bucket and choose **private read/write**. Keep public access disabled and do not add anonymous read policies.
+2. Set \`COS_REGION\` (for example \`ap-guangzhou\`), \`COS_BUCKET\` (including the APPID suffix), \`COS_SECRET_ID\` and \`COS_SECRET_KEY\` in \`apps/web/.env\` or your server's secret manager. \`COS_SECURITY_TOKEN\` is optional for temporary credentials; rotate all temporary credentials before expiration.
+3. Use a dedicated CAM identity. Grant only \`name/cos:PutObject\`, \`name/cos:GetObject\` and \`name/cos:DeleteObject\` on this bucket's application objects (\`qcs::cos:<region>:uid/<APPID>:<bucket>/*\`, narrowed to the generated application object prefix when deploying). Do not grant bucket administration, ACL administration, public access or wildcard-account permissions. Bucket enumeration is not needed: the application lists its own database rows.
+
+See [COS Node.js SDK documentation](https://www.tencentcloud.com/document/product/436/8629) and [COS access management](https://www.tencentcloud.com/document/product/436/10313).
+{{/if}}
+
+Create \`storage_file\` with \`db:push\` on local SQLite/Postgres, or \`db:generate\` then \`db:migrate:local\` on D1. Configure \`BETTER_AUTH_URL\` to the exact application URL. API-provider credentials are optional at startup: missing credentials disable operations and produce \`503\`; binding misconfiguration produces \`503\` when used. No files are silently stored elsewhere. Configuration completeness is not a cloud connectivity or IAM check.
+
+## Runtime and limits
+
+- S3/R2 API, OSS and COS use Node.js. R2 binding supports Cloudflare Workers through OpenNext's Node compatibility runtime; \`runtime = "nodejs"\` is intentional, not the unsupported Next Edge runtime.
+- The application cap is **4 MiB per file** (\`4 * 1024 * 1024\` bytes). The route counts actual request-stream bytes **before** parsing multipart form data and allows only another 64 KiB of multipart overhead. Chunked uploads are bounded too; missing \`Content-Length\` is supported, while malformed lengths are rejected. A hosting provider or reverse proxy may impose a lower total body limit; configure it appropriately or accept that lower limit.
+- The upload form accepts exactly one non-empty \`file\` part. Names are limited to 255 UTF-8 bytes and cannot contain path separators or control characters. Object keys are random and independent of filenames.
+- Browser files use \`application/octet-stream\`; user MIME types are not trusted. Downloads force \`Content-Disposition: attachment\`. Trusted server-generated image/video content can use \`storeGenerated(userId, {name, contentType, body})\` up to **64 MiB**; only supported image/video types are accepted. No malware scanning is provided.
+- Uploads go through the authenticated application server, not directly from the browser to the bucket. **No browser CORS policy is needed on the bucket.** Downloads are regular navigations to signed URLs, not browser cross-origin fetches.
+- Provider secrets remain on the server; they are not passed to client components. Do not add them to \`NEXT_PUBLIC_*\` variables.
+
+## API and security
+
+\`\`\`ts
+import { storage } from "@{{projectName}}/app-services";
+
+storage.configured;
+await storage.upload(userId, file);
+await storage.listFiles(userId);
+await storage.downloadUrl(userId, fileId);
+await storage.deleteFile(userId, fileId);
+await storage.storeGenerated(userId, { name: "image.png", contentType: "image/png", body: bytes });
+const { body, contentType, name } = await storage.readFile(userId, fileId);
+\`\`\`
+
+The service checks the owning user's database row before download/read/delete operations. Never accept a client-supplied \`userId\`; derive it from the session. S3/API private download URLs expire after **60 seconds** and act as bearer credentials until expiry; do not log/share them. R2 binding links are instead authenticated application URLs with an ownership check on **every request**. Redirects, streamed downloads and errors use \`Cache-Control: no-store\`.
+
+| Route | Behavior |
+| --- | --- |
+| \`POST /api/storage\` | Authenticated multipart upload, returns \`201\` and \`{ "id": "…" }\` |
+| \`GET /api/storage/:id\` | Authenticated owner lookup; \`307\` signed attachment redirect for API providers, \`200\` attachment stream for R2 binding |
+| \`DELETE /api/storage/:id\` | Authenticated owner deletion, returns \`204\` |
+
+Mutations require an \`Origin\` header matching the origin of configured \`BETTER_AUTH_URL\`, including scheme and port. Missing or mismatched origins return \`403\`; forwarded host headers cannot authorize a mutation. Unauthenticated requests return \`401\`, invalid files \`400\`, oversize bodies/files \`413\`, missing or another user's files \`404\`, and unavailable provider operations \`503\`. Provider errors do not expose credentials, keys or raw SDK messages.
+
+## Cloud acceptance
+
+Local checks do not prove cloud IAM behavior. On Workers, \`bun apps/cli/live-tests/storage.ts <generated-project> http://localhost:8787 r2-binding\` (from the generator repository, fixture under apps/cli/.smoke) exercises real local D1/R2 ownership, attachment bytes and deletion. Before production, verify the same flows in a private staging bucket, signed-link expiry for API adapters, unsigned URL rejection, least-privilege IAM and host request-size limits. No live cloud acceptance is claimed by the generated module.
+`],
+  ["modules/storage/files/packages/i18n/src/messages/en/storage.ts", `export default {
+  nav: { files: "Files" },
+  page: {
+    title: "Private files",
+    description: "Your files, visible only to you. Uploads stay in a private bucket; download links expire after 60 seconds.",
+    limits: "Maximum 4 MiB per file. Files download as attachments, never as embedded content.",
+    unavailable: "File storage is not configured. Ask the site operator to configure the private storage provider.",
+    uploadTitle: "Upload a file",
+    fileLabel: "Choose a file (up to 4 MiB)",
+    upload: "Upload file",
+    uploading: "Uploading…",
+    listTitle: "Your files",
+    empty: "No files yet. Upload your first private file above.",
+    download: "Download",
+    delete: "Delete",
+    deleting: "Deleting…",
+    deleteConfirm: "Permanently delete this file? This cannot be undone.",
+    uploaded: "File uploaded.",
+    deleted: "File deleted.",
+  },
+  errors: {
+    unauthorized: "Your session has expired. Sign in again to continue.",
+    forbidden: "This request was blocked. Reload this page from the site's configured address.",
+    tooLarge: "Choose a file no larger than 4 MiB.",
+    invalidFile: "Choose one non-empty file with a name up to 255 UTF-8 bytes, without path separators or control characters.",
+    notFound: "This file is no longer available. Refresh the page.",
+    unavailable: "Storage is unavailable. Please try again later.",
+    generic: "The request failed. Please try again.",
+  },
+} as const;
+`],
+  ["modules/storage/files/packages/i18n/src/messages/zh-CN/storage.ts", `export default {
+  nav: { files: "文件" },
+  page: {
+    title: "私有文件",
+    description: "文件仅对你可见。所有上传保存在私有存储桶中，下载链接将在 60 秒后失效。",
+    limits: "每个文件最大 4 MiB。文件始终以附件形式下载，不会在网页中直接展示。",
+    unavailable: "文件存储尚未配置，请联系站点管理员配置私有存储服务。",
+    uploadTitle: "上传文件",
+    fileLabel: "选择文件（最大 4 MiB）",
+    upload: "上传文件",
+    uploading: "正在上传…",
+    listTitle: "我的文件",
+    empty: "暂无文件，可在上方上传第一个私有文件。",
+    download: "下载",
+    delete: "删除",
+    deleting: "正在删除…",
+    deleteConfirm: "确定永久删除此文件？此操作无法撤销。",
+    uploaded: "文件已上传。",
+    deleted: "文件已删除。",
+  },
+  errors: {
+    unauthorized: "登录状态已失效，请重新登录后继续。",
+    forbidden: "请求已被拦截，请通过站点配置的地址重新打开此页面。",
+    tooLarge: "请选择不超过 4 MiB 的文件。",
+    invalidFile: "请选择一个非空文件，文件名不超过 255 个 UTF-8 字节，且不含路径分隔符或控制字符。",
+    notFound: "此文件已不可用，请刷新页面。",
+    unavailable: "文件存储暂时不可用，请稍后重试。",
+    generic: "操作失败，请重试。",
+  },
+} as const;
+`],
+  ["modules/storage/files/packages/storage/src/errors.ts", `import { z } from "zod";
+
+export type StorageErrorCode = "not_configured" | "invalid_file" | "not_found" | "provider_error";
+
+export class StorageError extends Error {
+  constructor(
+    readonly code: StorageErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "StorageError";
+  }
+}
+
+const remoteFailure = z.object({
+  code: z
+    .enum([
+      "AccessDenied",
+      "InvalidAccessKeyId",
+      "SignatureDoesNotMatch",
+      "SecurityTokenExpired",
+      "InvalidSecurityToken",
+      "ExpiredToken",
+      "NoSuchBucket",
+      "NoSuchKey",
+      "RequestTimeout",
+      "InternalError",
+      "ServiceUnavailable",
+      "SlowDown",
+      "ETIMEDOUT",
+      "ECONNRESET",
+      "ECONNREFUSED",
+      "ENOTFOUND",
+      "EAI_AGAIN",
+    ])
+    .optional()
+    .catch(undefined),
+  status: z.number().int().min(100).max(599).optional().catch(undefined),
+  statusCode: z.number().int().min(100).max(599).optional().catch(undefined),
+});
+
+/** SDK errors can contain signed URLs, credentials and request bodies. Keep only safe diagnostics. */
+export function safeCause(cause: unknown, operation: string): Error {
+  const parsed = remoteFailure.safeParse(cause);
+  const code = parsed.success ? parsed.data.code : undefined;
+  const status = parsed.success ? (parsed.data.statusCode ?? parsed.data.status) : undefined;
+  return new Error(
+    \`\${operation} failed\${code ? \` (\${code})\` : ""}\${status ? \` [HTTP \${status}]\` : ""}\`,
+  );
+}
+`],
+  ["modules/storage/files/packages/storage/src/index.ts.hbs", `import type { Database } from "@{{projectName}}/db";
+import { storageFile } from "@{{projectName}}/db/schema/storage";
+import { and, desc, eq } from "drizzle-orm";
+import { z } from "zod";
+
+import { safeCause, StorageError } from "./errors";
+import { CONTENT_TYPE, createProvider, type StorageEnv } from "./provider";
+
+export { StorageError } from "./errors";
+export type { StorageErrorCode } from "./errors";
+export type { StorageEnv } from "./provider";
+export type StorageFile = typeof storageFile.$inferSelect;
+export type GeneratedFile = { name: string; contentType: string; body: Uint8Array };
+export type StoredFileBody = { body: ReadableStream<Uint8Array>; contentType: string; name: string };
+export interface Storage {
+  readonly configured: boolean;
+  upload(userId: string, file: File): Promise<StorageFile>;
+  storeGenerated(userId: string, input: GeneratedFile): Promise<StorageFile>;
+  readFile(userId: string, fileId: string): Promise<StoredFileBody>;
+  listFiles(userId: string): Promise<StorageFile[]>;
+  downloadUrl(userId: string, fileId: string): Promise<string>;
+  deleteFile(userId: string, fileId: string): Promise<void>;
+}
+
+export const MAX_FILE_BYTES = 4 * 1024 * 1024;
+export const MAX_GENERATED_BYTES = 64 * 1024 * 1024;
+
+const filename = z.string().min(1).max(255).refine(
+  (name) => name.trim().length > 0
+    && name !== "." && name !== ".."
+    && new TextEncoder().encode(name).byteLength <= 255
+    && !/[\\u0000-\\u001f\\u007f-\\u009f/\\\\]/u.test(name)
+    && !/[\\ud800-\\udfff]/u.test(name),
+  "Filename must be at most 255 UTF-8 bytes without control characters or path separators",
+);
+const metadata = z.object({
+  name: filename,
+  size: z.number().int().min(1).max(MAX_FILE_BYTES),
+});
+const signedUrl = z.string().url().refine((value) => new URL(value).protocol === "https:");
+
+/** ASCII fallback plus RFC 5987 preserves Unicode names without allowing header injection. */
+function attachment(name: string): string {
+  const encoded = encodeURIComponent(name).replace(/[!'()*]/g, (character) =>
+    \`%\${character.charCodeAt(0).toString(16).toUpperCase()}\`,
+  );
+  return \`attachment; filename="download"; filename*=UTF-8''\${encoded}\`;
+}
+
+export function createStorage({ env, db }: { env: StorageEnv; db: Database }): Storage {
+  const provider = createProvider(env);
+
+  function configuredProvider() {
+    if (!provider) throw new StorageError("not_configured", "Storage is not configured");
+    return provider;
+  }
+
+  async function ownedFile(userId: string, fileId: string): Promise<StorageFile> {
+    let row: StorageFile | undefined;
+    try {
+      [row] = await db.select().from(storageFile).where(and(
+        eq(storageFile.id, fileId),
+        eq(storageFile.userId, userId),
+      )).limit(1);
+    } catch (cause) {
+      throw new StorageError("provider_error", "Could not read file metadata", {
+        cause: safeCause(cause, "Metadata lookup"),
+      });
+    }
+    if (!row) throw new StorageError("not_found", "File not found");
+    return row;
+  }
+
+  function fileProvider(row: StorageFile) {
+    const selected = configuredProvider();
+    if (row.provider !== selected.id) {
+      throw new StorageError("provider_error", "The stored file belongs to a different storage provider");
+    }
+    return selected;
+  }
+
+  async function persist(userId: string, name: string, body: Uint8Array, contentType: string): Promise<StorageFile> {
+    const selected = configuredProvider();
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(userId));
+    const prefix = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const objectKey = \`\${prefix}/\${crypto.randomUUID()}\`;
+    try {
+      await selected.upload(objectKey, body, attachment(name), contentType);
+    } catch (cause) {
+      throw new StorageError("provider_error", "The storage provider could not upload the file", { cause: safeCause(cause, "Object upload") });
+    }
+    try {
+      const [row] = await db.insert(storageFile).values({
+        id: crypto.randomUUID(), userId, provider: selected.id, objectKey, name, contentType, size: body.byteLength,
+      }).returning();
+      if (!row) throw new Error("Metadata insertion returned no row");
+      return row;
+    } catch (cause) {
+      const persistenceCause = safeCause(cause, "Metadata persistence");
+      try { await selected.delete(objectKey); }
+      catch (cleanupCause) {
+        throw new StorageError("provider_error", "File metadata could not be saved and uploaded-object cleanup failed", {
+          cause: new AggregateError([persistenceCause, safeCause(cleanupCause, "Uploaded-object cleanup")]),
+        });
+      }
+      throw new StorageError("provider_error", "File metadata could not be saved; the uploaded object was removed", { cause: persistenceCause });
+    }
+  }
+
+  return {
+    configured: provider !== undefined,
+
+    async upload(userId: string, file: File): Promise<StorageFile> {
+      configuredProvider();
+      const validatedFile = z.instanceof(File).safeParse(file);
+      const parsed = validatedFile.success ? metadata.safeParse(validatedFile.data) : undefined;
+      if (!parsed?.success) {
+        throw new StorageError("invalid_file", "Choose a non-empty file up to 4 MiB with a safe filename");
+      }
+      const { name, size } = parsed.data;
+      let body: Uint8Array;
+      try {
+        // Validate declared size before allocating or reading the file body.
+        body = new Uint8Array(await file.arrayBuffer());
+      } catch (cause) {
+        throw new StorageError("invalid_file", "Could not read the uploaded file", {
+          cause: safeCause(cause, "File read"),
+        });
+      }
+      if (body.byteLength !== size) {
+        throw new StorageError("invalid_file", "The file size does not match its contents");
+      }
+      return persist(userId, name, body, CONTENT_TYPE);
+    },
+
+    /** Trusted server-generated media only; browser uploads retain the 4 MiB octet-stream policy. */
+    async storeGenerated(userId: string, input: { name: string; contentType: string; body: Uint8Array }): Promise<StorageFile> {
+      const parsed = z.object({
+        name: filename,
+        contentType: z.enum(["image/png", "image/jpeg", "image/webp", "image/gif", "video/mp4", "video/webm"]),
+        body: z.instanceof(Uint8Array).refine((body) => body.byteLength > 0 && body.byteLength <= MAX_GENERATED_BYTES),
+      }).safeParse(input);
+      if (!parsed.success) throw new StorageError("invalid_file", "Generated media must be a supported image/video up to 64 MiB");
+      return persist(userId, parsed.data.name, parsed.data.body, parsed.data.contentType);
+    },
+
+    async readFile(userId: string, fileId: string) {
+      const row = await ownedFile(userId, fileId);
+      const selected = fileProvider(row);
+      try {
+        let body: ReadableStream<Uint8Array> | null;
+        if (selected.read) body = await selected.read(row.objectKey);
+        else {
+          const response = await fetch(signedUrl.parse(await selected.downloadUrl(row.objectKey, attachment(filename.parse(row.name)))), { redirect: "manual" });
+          if (!response.ok) throw new Error("Stored object read failed");
+          body = response.body;
+        }
+        if (!body) throw new Error("Stored object has no body");
+        return { body, contentType: row.contentType, name: filename.parse(row.name) };
+      } catch (cause) {
+        throw new StorageError("provider_error", "The storage provider could not read the file", { cause: safeCause(cause, "Object read") });
+      }
+    },
+
+    /** Returns the signed-in user's files, newest first; no cross-user bucket listing is exposed. */
+    async listFiles(userId: string): Promise<StorageFile[]> {
+      try {
+        return await db.select().from(storageFile)
+          .where(eq(storageFile.userId, userId))
+          .orderBy(desc(storageFile.createdAt), desc(storageFile.id));
+      } catch (cause) {
+        throw new StorageError("provider_error", "Could not list file metadata", {
+          cause: safeCause(cause, "Metadata listing"),
+        });
+      }
+    },
+
+    async downloadUrl(userId: string, fileId: string): Promise<string> {
+      const row = await ownedFile(userId, fileId);
+      const selected = fileProvider(row);
+      if (selected.id === "r2-binding") return \`/api/storage/\${encodeURIComponent(row.id)}\`;
+      try {
+        return signedUrl.parse(await selected.downloadUrl(row.objectKey, attachment(filename.parse(row.name))));
+      } catch (cause) {
+        throw new StorageError("provider_error", "The storage provider could not sign the download", {
+          cause: safeCause(cause, "Download signing"),
+        });
+      }
+    },
+
+    async deleteFile(userId: string, fileId: string): Promise<void> {
+      const row = await ownedFile(userId, fileId);
+      const selected = fileProvider(row);
+      try {
+        // Preserve metadata when remote deletion fails so the owner can retry.
+        await selected.delete(row.objectKey);
+      } catch (cause) {
+        throw new StorageError("provider_error", "The storage provider could not delete the file", {
+          cause: safeCause(cause, "Object deletion"),
+        });
+      }
+      try {
+        await db.delete(storageFile).where(and(
+          eq(storageFile.id, fileId),
+          eq(storageFile.userId, userId),
+        ));
+      } catch (cause) {
+        throw new StorageError("provider_error", "The object was removed but its metadata could not be deleted", {
+          cause: safeCause(cause, "Metadata deletion"),
+        });
+      }
+    },
+  };
+}
+`],
+  ["modules/storage/files/packages/storage/src/provider.ts.hbs", `{{#if (or (includes module.providers "oss") (includes module.providers "cos"))}}
+import { Buffer } from "node:buffer";
+{{/if}}
+{{#if (includes module.providers "oss")}}
+import OSS from "ali-oss";
+{{/if}}
+{{#if (includes module.providers "cos")}}
+import COS from "cos-nodejs-sdk-v5";
+{{/if}}
+{{#if (or (includes module.providers "s3") (includes module.providers "r2"))}}
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+{{/if}}
+{{#if (includes module.providers "r2-binding")}}
+/// <reference types="@cloudflare/workers-types" />
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+{{/if}}
+{{#unless (includes module.providers "r2-binding")}}
+import { z } from "zod";
+{{/unless}}
+
+export const CONTENT_TYPE = "application/octet-stream";
+
+{{#unless (includes module.providers "r2-binding")}}
+const environment = z.object({
+{{#if (includes module.providers "oss")}}
+  OSS_REGION: z.string().trim().regex(/^oss-[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  OSS_BUCKET: z.string().trim().regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/),
+  OSS_ACCESS_KEY_ID: z.string().trim().min(1),
+  OSS_ACCESS_KEY_SECRET: z.string().trim().min(1),
+  OSS_SECURITY_TOKEN: z.string().trim().optional(),
+{{/if}}
+{{#if (includes module.providers "cos")}}
+  COS_REGION: z.string().trim().regex(/^[a-z]+(?:-[a-z0-9]+)+$/),
+  COS_BUCKET: z.string().trim().regex(/^[a-z0-9][a-z0-9-]*-[0-9]+$/),
+  COS_SECRET_ID: z.string().trim().min(1),
+  COS_SECRET_KEY: z.string().trim().min(1),
+  COS_SECURITY_TOKEN: z.string().trim().optional(),
+{{/if}}
+{{#if (includes module.providers "s3")}}
+  S3_REGION: z.string().trim().regex(/^[a-z0-9-]+$/),
+  S3_BUCKET: z.string().trim().min(3).max(63),
+  S3_ACCESS_KEY_ID: z.string().trim().min(1),
+  S3_SECRET_ACCESS_KEY: z.string().trim().min(1),
+  S3_SESSION_TOKEN: z.string().trim().optional(),
+{{/if}}
+{{#if (includes module.providers "r2")}}
+  R2_ACCOUNT_ID: z.string().trim().regex(/^[a-f0-9]{32}$/),
+  R2_BUCKET: z.string().trim().min(3).max(63),
+  R2_ACCESS_KEY_ID: z.string().trim().min(1),
+  R2_SECRET_ACCESS_KEY: z.string().trim().min(1),
+{{/if}}
+});
+{{/unless}}
+
+export type StorageEnv = {{#if (includes module.providers "r2-binding")}}object{{else}}Partial<z.input<typeof environment>>{{/if}};
+export interface StorageProvider {
+  readonly id: "oss" | "cos" | "s3" | "r2" | "r2-binding";
+  upload(key: string, body: Uint8Array, disposition: string, contentType: string): Promise<void>;
+  downloadUrl(key: string, disposition: string): Promise<string>;
+  read?(key: string): Promise<ReadableStream<Uint8Array> | null>;
+  delete(key: string): Promise<void>;
+}
+
+/** Missing credentials disable API storage. Bindings are resolved per request, never at module load. */
+export function createProvider({{#if (includes module.providers "r2-binding")}}_env{{else}}env{{/if}}: StorageEnv): StorageProvider | undefined {
+{{#if (includes module.providers "r2-binding")}}
+  async function bucket() {
+    const context = await getCloudflareContext({ async: true });
+    const binding = (context.env as unknown as { STORAGE_BUCKET?: R2Bucket }).STORAGE_BUCKET;
+    if (!binding) throw new Error("STORAGE_BUCKET binding is missing");
+    return binding;
+  }
+  return {
+    id: "r2-binding",
+    async upload(key, body, disposition, contentType) {
+      await (await bucket()).put(key, body, {
+        httpMetadata: { contentType, contentDisposition: disposition },
+      });
+    },
+    async downloadUrl() {
+      throw new Error("R2 binding downloads require an authenticated application route");
+    },
+    async read(key) {
+      const object = await (await bucket()).get(key);
+      return object ? object.body as unknown as ReadableStream<Uint8Array> : null;
+    },
+    async delete(key) { await (await bucket()).delete(key); },
+  };
+{{else}}
+  // Varlock exposes a non-enumerable proxy; explicitly access every selected key.
+  const parsed = environment.safeParse({
+{{#if (includes module.providers "oss")}}
+    OSS_REGION: env.OSS_REGION, OSS_BUCKET: env.OSS_BUCKET,
+    OSS_ACCESS_KEY_ID: env.OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET: env.OSS_ACCESS_KEY_SECRET,
+    OSS_SECURITY_TOKEN: env.OSS_SECURITY_TOKEN,
+{{/if}}
+{{#if (includes module.providers "cos")}}
+    COS_REGION: env.COS_REGION, COS_BUCKET: env.COS_BUCKET,
+    COS_SECRET_ID: env.COS_SECRET_ID, COS_SECRET_KEY: env.COS_SECRET_KEY,
+    COS_SECURITY_TOKEN: env.COS_SECURITY_TOKEN,
+{{/if}}
+{{#if (includes module.providers "s3")}}
+    S3_REGION: env.S3_REGION, S3_BUCKET: env.S3_BUCKET,
+    S3_ACCESS_KEY_ID: env.S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY: env.S3_SECRET_ACCESS_KEY,
+    S3_SESSION_TOKEN: env.S3_SESSION_TOKEN,
+{{/if}}
+{{#if (includes module.providers "r2")}}
+    R2_ACCOUNT_ID: env.R2_ACCOUNT_ID, R2_BUCKET: env.R2_BUCKET,
+    R2_ACCESS_KEY_ID: env.R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY: env.R2_SECRET_ACCESS_KEY,
+{{/if}}
+  });
+  if (!parsed.success) return undefined;
+  const config = parsed.data;
+{{#if (includes module.providers "oss")}}
+  const client = new OSS({
+    region: config.OSS_REGION, bucket: config.OSS_BUCKET,
+    accessKeyId: config.OSS_ACCESS_KEY_ID, accessKeySecret: config.OSS_ACCESS_KEY_SECRET,
+    stsToken: config.OSS_SECURITY_TOKEN || undefined, secure: true,
+  });
+  return {
+    id: "oss",
+    async upload(key, body, disposition, contentType) {
+      await client.put(key, Buffer.from(body.buffer, body.byteOffset, body.byteLength), {
+        mime: contentType,
+        headers: { "x-oss-object-acl": "private", "Content-Disposition": disposition },
+      });
+    },
+    async downloadUrl(key, disposition) {
+      return client.signatureUrl(key, {
+        method: "GET", expires: 60,
+        response: { "content-type": CONTENT_TYPE, "content-disposition": disposition },
+      });
+    },
+    async delete(key) { await client.delete(key); },
+  };
+{{/if}}
+{{#if (includes module.providers "cos")}}
+  const client = new COS({
+    SecretId: config.COS_SECRET_ID, SecretKey: config.COS_SECRET_KEY,
+    SecurityToken: config.COS_SECURITY_TOKEN || undefined, Protocol: "https:",
+  });
+  const location = { Bucket: config.COS_BUCKET, Region: config.COS_REGION };
+  return {
+    id: "cos",
+    async upload(key, body, disposition, contentType) {
+      await client.putObject({
+        ...location, Key: key, Body: Buffer.from(body.buffer, body.byteOffset, body.byteLength),
+        ContentLength: body.byteLength, ContentType: contentType,
+        ContentDisposition: disposition, ACL: "private",
+      });
+    },
+    async downloadUrl(key, disposition) {
+      return new Promise<string>((resolve, reject) => {
+        client.getObjectUrl({
+          ...location, Key: key, Method: "GET", Sign: true, Expires: 60, Protocol: "https:",
+          Query: { "response-content-type": CONTENT_TYPE, "response-content-disposition": disposition },
+        }, (error, result) => { if (error) reject(error); else resolve(result.Url); });
+      });
+    },
+    async delete(key) { await client.deleteObject({ ...location, Key: key }); },
+  };
+{{/if}}
+{{#if (or (includes module.providers "s3") (includes module.providers "r2"))}}
+  const client = new S3Client({
+{{#if (includes module.providers "r2")}}
+    region: "auto", endpoint: \`https://\${config.R2_ACCOUNT_ID}.r2.cloudflarestorage.com\`,
+    credentials: { accessKeyId: config.R2_ACCESS_KEY_ID, secretAccessKey: config.R2_SECRET_ACCESS_KEY },
+{{else}}
+    region: config.S3_REGION,
+    credentials: { accessKeyId: config.S3_ACCESS_KEY_ID, secretAccessKey: config.S3_SECRET_ACCESS_KEY, sessionToken: config.S3_SESSION_TOKEN || undefined },
+{{/if}}
+  });
+  const Bucket = config.{{#if (includes module.providers "r2")}}R2_BUCKET{{else}}S3_BUCKET{{/if}};
+  return {
+    id: "{{#if (includes module.providers "r2")}}r2{{else}}s3{{/if}}",
+    async upload(Key, Body, ContentDisposition, ContentType) {
+      // Omit ACL: S3 BucketOwnerEnforced and R2 reject ACL headers. Buckets must be private.
+      await client.send(new PutObjectCommand({ Bucket, Key, Body, ContentDisposition, ContentType }));
+    },
+    async downloadUrl(Key, ResponseContentDisposition) {
+      return getSignedUrl(client, new GetObjectCommand({
+        Bucket, Key, ResponseContentDisposition, ResponseContentType: CONTENT_TYPE,
+      }), { expiresIn: 60 });
+    },
+    async read(Key) {
+      const result = await client.send(new GetObjectCommand({ Bucket, Key }));
+      return result.Body?.transformToWebStream() ?? null;
+    },
+    async delete(Key) { await client.send(new DeleteObjectCommand({ Bucket, Key })); },
+  };
+{{/if}}
+{{/if}}
+}
+`],
+  ["modules/storage/frameworks/next/apps/web/src/app/[lang]/dashboard/files/page.tsx.hbs", `import { storage } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+
+import { FileManager, type StorageLabels } from "@/components/storage/file-manager";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+export const runtime = "nodejs";
+
+type Props = { params: Promise<{ lang: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = getTranslator(resolveLocale((await params).lang));
+  return { title: t("storage.page.title") };
+}
+
+export default async function FilesPage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const user = await requireUser(locale, "/dashboard/files");
+  const files = await storage.listFiles(user.id);
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+  const size = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
+  const labels: StorageLabels = {
+    uploadTitle: t("storage.page.uploadTitle"),
+    fileLabel: t("storage.page.fileLabel"),
+    upload: t("storage.page.upload"),
+    uploading: t("storage.page.uploading"),
+    listTitle: t("storage.page.listTitle"),
+    empty: t("storage.page.empty"),
+    download: t("storage.page.download"),
+    delete: t("storage.page.delete"),
+    deleting: t("storage.page.deleting"),
+    deleteConfirm: t("storage.page.deleteConfirm"),
+    uploaded: t("storage.page.uploaded"),
+    deleted: t("storage.page.deleted"),
+    errors: {
+      unauthorized: t("storage.errors.unauthorized"),
+      forbidden: t("storage.errors.forbidden"),
+      tooLarge: t("storage.errors.tooLarge"),
+      invalidFile: t("storage.errors.invalidFile"),
+      notFound: t("storage.errors.notFound"),
+      unavailable: t("storage.errors.unavailable"),
+      generic: t("storage.errors.generic"),
+    },
+  };
+
+  return (
+    <div className="flex flex-col gap-8">
+      <header className="flex max-w-2xl flex-col gap-3">
+        <h1 className="font-semibold text-2xl">{t("storage.page.title")}</h1>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("storage.page.description")}</p>
+        <p id="storage-limits" className="text-muted-foreground text-xs">{t("storage.page.limits")}</p>
+      </header>
+      {!storage.configured && (
+        <p role="status" className="border border-dashed p-4 text-muted-foreground text-sm">
+          {t("storage.page.unavailable")}
+        </p>
+      )}
+      <FileManager
+        configured={storage.configured}
+        labels={labels}
+        files={files.map((file) => ({
+          id: file.id,
+          name: file.name,
+          size: \`\${size.format(file.size / 1024)} KiB\`,
+          createdAt: date.format(file.createdAt),
+        }))}
+      />
+    </div>
+  );
+}
+`],
+  ["modules/storage/frameworks/next/apps/web/src/app/api/storage/[id]/route.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
+import { z } from "zod";
+
+import { getSession } from "@/lib/session";
+import { requireStorageOrigin, storageErrorResponse, StorageRequestError } from "@/lib/storage-http";
+
+export const runtime = "nodejs";
+
+type Context = { params: Promise<{ id: string }> };
+const idSchema = z.string().min(1).max(255).regex(/^[a-zA-Z0-9_-]+$/);
+
+async function fileId(context: Context): Promise<string> {
+  const parsed = idSchema.safeParse((await context.params).id);
+  if (!parsed.success) throw new StorageRequestError(404, "not_found");
+  return parsed.data;
+}
+
+export async function GET(_request: Request, context: Context) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  try {
+{{#if (includes module.providers "r2-binding")}}
+    const file = await storage.readFile(session.user.id, await fileId(context));
+    const encoded = encodeURIComponent(file.name).replace(/[!'()*]/g, (character) => \`%\${character.charCodeAt(0).toString(16).toUpperCase()}\`);
+    return new Response(file.body, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": \`attachment; filename="download"; filename*=UTF-8''\${encoded}\`,
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+{{else}}
+    const url = await storage.downloadUrl(session.user.id, await fileId(context));
+    return new Response(null, {
+      status: 307,
+      headers: { Location: url, "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" },
+    });
+{{/if}}
+  } catch (error) {
+    return storageErrorResponse(error);
+  }
+}
+
+export async function DELETE(request: Request, context: Context) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  try {
+    requireStorageOrigin(request);
+    await storage.deleteFile(session.user.id, await fileId(context));
+    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return storageErrorResponse(error);
+  }
+}
+`],
+  ["modules/storage/frameworks/next/apps/web/src/app/api/storage/route.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
+
+import { getSession } from "@/lib/session";
+import { readStorageFile, requireStorageOrigin, storageErrorResponse } from "@/lib/storage-http";
+
+export const runtime = "nodejs";
+
+export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  try {
+    requireStorageOrigin(request);
+    if (!storage.configured) {
+      return Response.json({ error: "not_configured" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    }
+    const file = await readStorageFile(request);
+    const stored = await storage.upload(session.user.id, file);
+    return Response.json({ id: stored.id }, { status: 201, headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return storageErrorResponse(error);
+  }
+}
+`],
+  ["modules/storage/frameworks/next/apps/web/src/components/storage/file-manager.tsx.hbs", `"use client";
+
+import { Button, buttonVariants } from "@{{projectName}}/ui/components/button";
+import { useRouter } from "next/navigation";
+import { type FormEvent, useState, useTransition } from "react";
+
+export type StorageFileEntry = {
+  id: string;
+  name: string;
+  size: string;
+  createdAt: string;
+};
+
+export type StorageLabels = {
+  uploadTitle: string;
+  fileLabel: string;
+  upload: string;
+  uploading: string;
+  listTitle: string;
+  empty: string;
+  download: string;
+  delete: string;
+  deleting: string;
+  deleteConfirm: string;
+  uploaded: string;
+  deleted: string;
+  errors: {
+    unauthorized: string;
+    forbidden: string;
+    tooLarge: string;
+    invalidFile: string;
+    notFound: string;
+    unavailable: string;
+    generic: string;
+  };
+};
+
+export function FileManager({
+  files,
+  configured,
+  labels,
+}: {
+  files: StorageFileEntry[];
+  configured: boolean;
+  labels: StorageLabels;
+}) {
+  const router = useRouter();
+  const [active, setActive] = useState<string | null>(null);
+  const [refreshing, startTransition] = useTransition();
+  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
+  const pending = active !== null || refreshing;
+
+  function responseError(status: number): string {
+    switch (status) {
+      case 400: return labels.errors.invalidFile;
+      case 401: return labels.errors.unauthorized;
+      case 403: return labels.errors.forbidden;
+      case 404: return labels.errors.notFound;
+      case 413: return labels.errors.tooLarge;
+      case 503: return labels.errors.unavailable;
+      default: return labels.errors.generic;
+    }
+  }
+
+  async function upload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending || !configured) return;
+    const form = event.currentTarget;
+    setActive("upload");
+    setNotice(null);
+    try {
+      const response = await fetch("/api/storage", {
+        method: "POST",
+        credentials: "same-origin",
+        body: new FormData(form),
+      });
+      if (!response.ok) {
+        setNotice({ text: responseError(response.status), error: true });
+        return;
+      }
+      form.reset();
+      setNotice({ text: labels.uploaded, error: false });
+      startTransition(() => router.refresh());
+    } catch {
+      setNotice({ text: labels.errors.generic, error: true });
+    } finally {
+      setActive(null);
+    }
+  }
+
+  async function deleteFile(id: string) {
+    if (pending || !configured || !window.confirm(labels.deleteConfirm)) return;
+    setActive(id);
+    setNotice(null);
+    try {
+      const response = await fetch(\`/api/storage/\${encodeURIComponent(id)}\`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      if (!response.ok) {
+        setNotice({ text: responseError(response.status), error: true });
+        return;
+      }
+      setNotice({ text: labels.deleted, error: false });
+      startTransition(() => router.refresh());
+    } catch {
+      setNotice({ text: labels.errors.generic, error: true });
+    } finally {
+      setActive(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-8" aria-busy={pending}>
+      <section aria-labelledby="storage-upload-title" className="border p-5 sm:p-6">
+        <h2 id="storage-upload-title" className="mb-4 font-medium">{labels.uploadTitle}</h2>
+        <form onSubmit={upload} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <label htmlFor="storage-file" className="text-sm">{labels.fileLabel}</label>
+            <input
+              id="storage-file"
+              name="file"
+              type="file"
+              required
+              disabled={pending || !configured}
+              aria-describedby="storage-limits"
+              className="min-w-0 w-full rounded-md border px-3 py-2 text-sm file:mr-4 file:font-medium disabled:opacity-50"
+            />
+          </div>
+          <Button type="submit" disabled={pending || !configured}>
+            {active === "upload" ? labels.uploading : labels.upload}
+          </Button>
+        </form>
+      </section>
+
+      {notice && (
+        <p role={notice.error ? "alert" : "status"} className={notice.error ? "text-destructive text-sm" : "text-sm"}>
+          {notice.text}
+        </p>
+      )}
+
+      <section aria-labelledby="storage-list-title" className="flex flex-col gap-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="storage-list-title" className="font-medium">{labels.listTitle}</h2>
+          <span className="text-muted-foreground text-sm tabular-nums">{files.length}</span>
+        </div>
+        {files.length === 0 ? (
+          <p className="border border-dashed px-5 py-10 text-muted-foreground text-sm">{labels.empty}</p>
+        ) : (
+          <ul className="divide-y border">
+            {files.map((file) => (
+              <li key={file.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="break-words font-medium text-sm">{file.name}</p>
+                  <p className="mt-1 text-muted-foreground text-xs tabular-nums">{file.size} · {file.createdAt}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {configured && !pending ? (
+                    <a
+                      href={\`/api/storage/\${encodeURIComponent(file.id)}\`}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                      aria-label={\`\${labels.download}: \${file.name}\`}
+                    >
+                      {labels.download}
+                    </a>
+                  ) : (
+                    <Button type="button" variant="outline" size="sm" disabled>
+                      {labels.download}
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={pending || !configured}
+                    onClick={() => deleteFile(file.id)}
+                    aria-label={\`\${labels.delete}: \${file.name}\`}
+                  >
+                    {active === file.id ? labels.deleting : labels.delete}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+`],
+  ["modules/storage/frameworks/next/apps/web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
+import { z } from "zod";
+
+import { ENV } from "@/env.server";
+
+const MAX_BODY_BYTES = MAX_FILE_BYTES + 64 * 1024;
+const contentLengthSchema = z.string().regex(/^\\d+$/).transform(Number).pipe(z.number().int().nonnegative().safe());
+const fileSchema = z.instanceof(File);
+
+export class StorageRequestError extends Error {
+  constructor(public readonly status: number, public readonly code: string) {
+    super(code);
+  }
+}
+
+export function requireStorageOrigin(request: Request): void {
+  // The auth module configures this same URL as its sole trusted origin.
+  // Do not trust forwarded/Host headers to authorize cookie-authenticated mutations.
+  const trustedOrigin = new URL(ENV.BETTER_AUTH_URL).origin;
+  if (request.headers.get("origin") !== trustedOrigin) {
+    throw new StorageRequestError(403, "forbidden");
+  }
+}
+
+export function storageErrorResponse(error: unknown): Response {
+  if (error instanceof StorageRequestError) {
+    return Response.json({ error: error.code }, { status: error.status, headers: { "Cache-Control": "no-store" } });
+  }
+  if (error instanceof StorageError) {
+    const status = error.code === "not_found" ? 404 : error.code === "invalid_file" ? 400 : 503;
+    return Response.json({ error: error.code }, { status, headers: { "Cache-Control": "no-store" } });
+  }
+  return Response.json({ error: "provider_error" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+}
+
+export async function readStorageFile(request: Request): Promise<File> {
+  if (!/^multipart\\/form-data(?:;|$)/i.test(request.headers.get("content-type") ?? "")) {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const header = request.headers.get("content-length");
+  if (header !== null) {
+    const length = contentLengthSchema.safeParse(header);
+    if (!length.success) throw new StorageRequestError(400, "invalid_file");
+    if (length.data > MAX_BODY_BYTES) throw new StorageRequestError(413, "too_large");
+  }
+  if (!request.body) throw new StorageRequestError(400, "invalid_file");
+
+  // Count actual bytes before formData() buffers/parses multipart data. This also
+  // bounds chunked requests and requests with an understated Content-Length.
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      length += chunk.value.byteLength;
+      if (length > MAX_BODY_BYTES) {
+        await reader.cancel();
+        throw new StorageRequestError(413, "too_large");
+      }
+      chunks.push(chunk.value);
+    }
+  } catch (error) {
+    if (error instanceof StorageRequestError) throw error;
+    throw new StorageRequestError(400, "invalid_file");
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  let form: FormData;
+  try {
+    form = await new Response(bytes, {
+      headers: { "Content-Type": request.headers.get("content-type")! },
+    }).formData();
+  } catch {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const entries = [...form.entries()];
+  if (entries.length !== 1 || entries[0]?.[0] !== "file") {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const parsed = fileSchema.safeParse(entries[0][1]);
+  if (!parsed.success || parsed.data.size === 0) throw new StorageRequestError(400, "invalid_file");
+  if (parsed.data.size > MAX_FILE_BYTES) throw new StorageRequestError(413, "too_large");
+  return parsed.data;
 }
 `],
   ["packages/config/package.json.hbs", `{
@@ -31772,4 +35255,4 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 `]
 ]);
 
-export const TEMPLATE_COUNT = 591;
+export const TEMPLATE_COUNT = 673;

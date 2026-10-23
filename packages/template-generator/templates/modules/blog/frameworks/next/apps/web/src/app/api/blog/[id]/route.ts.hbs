@@ -1,0 +1,25 @@
+import { blog } from "@{{projectName}}/app-services";
+import { revisionInput } from "@{{projectName}}/blog";
+import { z } from "zod";
+import { blogActor, blogFailure, blogResponse, readBlogJson } from "@/lib/blog-http";
+
+type Context = { params: Promise<{ id: string }> };
+export async function GET(request: Request, { params }: Context) {
+  try { return blogResponse(await blog.getAdmin(await blogActor(request), (await params).id)); }
+  catch (error) { return blogFailure(error); }
+}
+export async function PUT(request: Request, { params }: Context) {
+  try {
+    const actor = await blogActor(request, true);
+    const input = z.object({ revision: revisionInput, post: z.unknown() }).strict().parse(await readBlogJson(request));
+    return blogResponse(await blog.update(actor, (await params).id, input.revision, input.post));
+  } catch (error) { return blogFailure(error); }
+}
+export async function DELETE(request: Request, { params }: Context) {
+  try {
+    const actor = await blogActor(request, true);
+    const input = z.object({ revision: revisionInput }).strict().parse(await readBlogJson(request));
+    await blog.delete(actor, (await params).id, input.revision);
+    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return blogFailure(error); }
+}

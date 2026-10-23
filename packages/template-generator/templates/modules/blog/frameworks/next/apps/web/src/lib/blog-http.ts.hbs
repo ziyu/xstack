@@ -1,0 +1,48 @@
+import { auth } from "@{{projectName}}/app-services";
+import { BlogError, type BlogActor } from "@{{projectName}}/blog";
+import { defineAbilityFor } from "@{{projectName}}/permissions";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+
+class RequestError extends Error {
+  constructor(readonly status: number, readonly code: string) { super(code); }
+}
+export async function blogActor(request: Request, mutate = false): Promise<BlogActor> {
+  if (mutate && request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new RequestError(403, "forbidden");
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) throw new RequestError(401, "unauthorized");
+  const actor = session.user;
+  if (defineAbilityFor(actor).cannot("access", "Admin")) throw new RequestError(403, "forbidden");
+  return actor;
+}
+export async function readBlogJson(request: Request): Promise<unknown> {
+  if (!/^application\/json(?:;|$)/i.test(request.headers.get("content-type") ?? "")) throw new RequestError(400, "invalid_input");
+  if (!request.body) throw new RequestError(400, "invalid_input");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      size += part.value.byteLength;
+      if (size > 512_000) { await reader.cancel(); throw new RequestError(413, "too_large"); }
+      chunks.push(part.value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder().decode(bytes)) as unknown; }
+  catch { throw new RequestError(400, "invalid_input"); }
+}
+export function blogResponse(data: unknown, status = 200) {
+  return Response.json(data, { status, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
+}
+export function blogFailure(error: unknown) {
+  if (error instanceof RequestError) return blogResponse({ error: error.code }, error.status);
+  if (error instanceof z.ZodError) return blogResponse({ error: "invalid_input" }, 400);
+  if (error instanceof BlogError) return blogResponse({ error: error.code }, error.code === "forbidden" ? 403 : error.code === "not_found" ? 404 : 409);
+  console.error("Blog request failed", error);
+  return blogResponse({ error: "server_error" }, 500);
+}

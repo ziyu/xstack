@@ -1,0 +1,33 @@
+import { blog } from "@{{projectName}}/app-services";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { blogMetadata } from "@/lib/blog-metadata";
+import { blogPage } from "@/lib/blog-page";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+export const dynamic = "force-dynamic";
+type Props = { params: Promise<{ lang: string }>; searchParams: Promise<{ page?: string }> };
+export async function generateMetadata({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  return blogMetadata({ locale, title: t("blog.title"), description: t("blog.description"), page: blogPage((await searchParams).page) });
+}
+export default async function BlogPage({ params, searchParams }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const result = await blog.listPublished(locale, { page: blogPage((await searchParams).page) });
+  if (result.page > 1 && !result.posts.length) notFound();
+  return <div className="container mx-auto max-w-5xl px-6 py-16">
+    <header className="mb-12 border-b pb-10"><p className="mb-4 text-xs uppercase tracking-[0.25em]">{t("blog.journal")}</p><h1 className="font-serif text-5xl tracking-tight">{t("blog.title")}</h1><p className="mt-5 max-w-xl text-muted-foreground">{t("blog.description")}</p></header>
+    {!result.posts.length && <p>{t("blog.empty")}</p>}
+    <div className="divide-y">{result.posts.map((post) => <article key={post.id} className="grid gap-4 py-8 md:grid-cols-[10rem_1fr]">
+      <div className="text-sm text-muted-foreground"><time dateTime={post.publishedAt!.toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(post.publishedAt!)}</time><p className="mt-2">{post.authorName}</p></div>
+      <div><h2 className="font-serif text-3xl"><Link href={localePath(locale, `/blog/${post.slug}`)}>{post.title}</Link></h2><p className="mt-4 text-muted-foreground">{post.excerpt}</p></div>
+    </article>)}</div>
+    <nav aria-label={t("blog.pagination")} className="mt-10 flex justify-between border-t pt-6">
+      {result.page > 1 ? <Link href={localePath(locale, `/blog?page=${result.page - 1}`)}>{t("blog.previous")}</Link> : <span />}
+      {result.page * result.limit < result.total && <Link href={localePath(locale, `/blog?page=${result.page + 1}`)}>{t("blog.next")}</Link>}
+    </nav>
+  </div>;
+}

@@ -74,7 +74,7 @@ const VALUE_LABELS = {
   evlog: "evlog",
   axiom: "Axiom",
   todo: "Todo app",
-  ai: "AI chat",
+  ai: "AI studio",
   turso: "Turso",
   neon: "Neon",
   planetscale: "PlanetScale",

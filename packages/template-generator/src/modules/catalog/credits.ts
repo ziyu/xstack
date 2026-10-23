@@ -18,6 +18,8 @@ export default defineModule({
       type: "number",
       default: 0,
       min: 0,
+      integer: true,
+      max: 2_147_483_647,
       description: "Credits granted to every new account",
     },
   },

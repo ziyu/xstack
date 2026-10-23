@@ -293,6 +293,12 @@ Business capabilities such as authentication and payments are feature modules, n
 - `admin`: Role-based admin console (native stack only)
 - `payment`: Pricing, one-time payments and subscriptions (native stack only)
 - `credits`: Usage credits with an auditable ledger (native stack only)
+- `storage`: Private S3, R2 S3 API, R2 Workers binding, OSS or COS files; includes authentication automatically
+- `ai`: Private chat, image/video jobs and history; integrates optional credits (charge/refund) and storage
+- `seo`: Localized canonical/hreflang, social metadata, robots and public sitemap
+- `blog`: Database-backed multilingual Markdown publishing with admin authoring and draft isolation
+- `affiliate`: Signed referral attribution and idempotent purchase rewards in application credits, not cash
+- `captcha`: Server-enforced Turnstile protection on authentication mutations
 - `none`: Only the product shell, or a bare stack outside Next.js
 
 ```bash
@@ -302,7 +308,7 @@ xstack --features none
 
 ### `--preset <name>`
 
-Selects a curated feature set: `starter` (auth) or `saas-global` (auth, email, admin, payment and credits). `--features` adds to the preset.
+Selects a curated feature set: `starter` (auth), `saas-global` (auth, email, admin, payment and credits), or `full` (all modules, including SMS, storage, AI, SEO, blog, affiliate and captcha). `--features` adds to the preset. `full` requires configuration of real providers; captcha fails closed until configured, and email verification remains enabled.
 
 ### `--providers <feature:provider...>`
 
@@ -312,6 +318,9 @@ Chooses the providers a module uses, for example `--providers payment:stripe,moc
 - `auth`: `google`, `github`, `wechat`, or `auth:none` to keep email/password authentication without OAuth providers. WeChat requires the native Next.js/Better Auth implementation. Do not combine `none` with named providers for the same module.
 - `email`: choose exactly one of `resend` or `smtp`.
 - `sms`: choose exactly one of `aliyun` (default), `tencent`, or `twilio`. Provider credentials and approved sign/template settings belong in the generated environment.
+- `storage`: choose one of `s3` (Node default), `r2` (S3 API), `r2-binding` (Cloudflare default), `oss`, or `cos`. API adapters use 60-second signed attachment downloads; binding downloads stream through authenticated owner-only routes. Browser uploads are limited to 4 MiB.
+- `ai`: `openai` (chat/image), `google` (chat/image/video), or `openai-compatible` (chat; includes DeepSeek). Provider capabilities determine visible actions. Models are configurable; generated documentation records current upstream API references.
+- `captcha`: `turnstile`. Configure public site key, secret key and allowed hostname. Explicit test mode is restricted to loopback development.
 
 ### `--module-options <module.key=value...>`
 
@@ -321,6 +330,11 @@ Sets module options, for example `--module-options auth.engine=clerk i18n.locale
 - with `--backend convex`, Better Auth supports `react-router`, `tanstack-router`, `tanstack-start`, `next`, and native Expo frontends
 - `i18n.locales`: `en,zh-CN`, `zh-CN,en`, `en`, or `zh-CN`; the first locale is the default.
 - `credits.signupBonus`: a non-negative number of credits granted when an account is created.
+- `ai.chatCost`, `ai.imageCost`, `ai.videoCost`: positive integer credit costs, snapshotted on each job.
+- `affiliate.commissionPercent`: 0–100 percent of purchased plan credits; renewals excluded.
+- `affiliate.cookieDays`: 1–90 whole days for first-touch referral attribution.
+
+Cloudflare native database modules require `--database sqlite --db-setup d1 --web-deploy cloudflare`. For the full preset, explicitly override its S3 selection with `--providers storage:r2-binding`. Explicit incompatible choices are rejected rather than silently removed. Generated `docs/cloudflare.md` covers local migrations, OpenNext/workerd preview, private R2 and Alchemy deployment.
 
 The [Template Builder](/new) uses these same module manifests for presets, provider controls, dependency resolution, command output, and generated-file previews. Share links and saved preferences include provider choices and module options. Provider credentials are configured in the generated project's environment, never entered into the builder.
 

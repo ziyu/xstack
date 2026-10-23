@@ -1,0 +1,9 @@
+import type { Services } from "../services";
+
+export default function registerAIStorage({ ai, storage }: Services) {
+  ai.setStorage({
+    save: (userId, input) => storage.storeGenerated(userId, input),
+    read: (userId, id) => storage.readFile(userId, id),
+    remove: (userId, id) => storage.deleteFile(userId, id),
+  });
+}

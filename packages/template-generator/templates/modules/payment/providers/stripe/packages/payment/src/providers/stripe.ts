@@ -27,7 +27,7 @@ export function createProvider({ env }: ProviderOptions<ProviderConfig>): Paymen
     if (!env.STRIPE_SECRET_KEY) {
       throw new Error("STRIPE_SECRET_KEY is not set; see docs/modules/payment.md");
     }
-    client ??= new Stripe(env.STRIPE_SECRET_KEY);
+    client ??= new Stripe(env.STRIPE_SECRET_KEY, { httpClient: Stripe.createFetchHttpClient() });
     return client;
   };
 
@@ -76,6 +76,8 @@ export function createProvider({ env }: ProviderOptions<ProviderConfig>): Paymen
         await request.text(),
         signature,
         env.STRIPE_WEBHOOK_SECRET,
+        undefined,
+        Stripe.createSubtleCryptoProvider(),
       );
 
       switch (event.type) {

@@ -52,7 +52,7 @@ node "$XSTACK_CLI" my-app \
   --package-manager bun --no-install --no-git
 ```
 
-Choose one example per output folder. `auth:none` disables OAuth, not email/password login. Use `--preset saas-global` for authentication, email, admin, payments and credits, or `--features` for individual modules. Omitted options may still be prompted for. Do not combine `--yes` with custom stack flags.
+Choose one example per output folder. `auth:none` disables OAuth, not email/password login. Use `--preset saas-global` for authentication, email, admin, payments and credits, `--preset full` for all modules including AI, storage, SEO/blog, referral credits and Turnstile, or `--features` for individual modules. Full signup requires configured email verification and captcha. Omitted options may still be prompted for. Do not combine `--yes` with custom stack flags.
 
 ### Run the generated project
 
@@ -110,7 +110,7 @@ Then ask: _"create a fullstack app with Next, Hono, Postgres and Better Auth"_, 
 - Runtime: Bun, Node.js, or Cloudflare Workers
 - Databases: SQLite, PostgreSQL, MySQL, MongoDB (or none)
 - ORMs: Drizzle, Prisma, Mongoose (or none)
-- Product modules: authentication, transactional email, admin console, payments, and credits; native product templates use Next.js full-stack, Drizzle, SQLite or PostgreSQL, and no separate API layer
+- Product modules: authentication, email/SMS, admin, payments, credits, S3/R2/OSS/COS storage, AI chat/image/video, SEO, blog, referral credit rewards and Turnstile. Native modules use Next.js full-stack with Drizzle and SQLite/PostgreSQL; Cloudflare requires D1 and compatible providers such as `storage:r2-binding`.
 - Addons: Turborepo, Nx, PWA, Tauri, Electrobun, Biome, Lefthook, Husky, Starlight, Fumadocs, Ultracite, Oxlint, MCP, OpenTUI, WXT, Skills
 - DB Setup: Turso, Neon, Supabase, Prisma PostgreSQL, MongoDB Atlas, Cloudflare D1, Docker
 - Deployment choices: local Node hosting, Docker, Vercel, Cloudflare, or Prisma, subject to stack compatibility

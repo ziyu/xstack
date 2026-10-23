@@ -1,0 +1,10 @@
+import { affiliate } from "@{{projectName}}/app-services";
+
+import { getSession } from "@/lib/session";
+
+export async function GET() {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  const [code, report] = await Promise.all([affiliate.getCode(session.user.id), affiliate.report(session.user.id)]);
+  return Response.json({ code, commissionPercent: affiliate.commissionPercent, ...report }, { headers: { "Cache-Control": "no-store" } });
+}

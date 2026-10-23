@@ -1,0 +1,17 @@
+import { blog } from "@{{projectName}}/app-services";
+import { BlogError } from "@{{projectName}}/blog";
+import { notFound } from "next/navigation";
+import { z } from "zod";
+import BlogEditor from "@/components/blog/editor";
+import Markdown from "@/components/blog/markdown";
+import { requireAdmin } from "@/lib/admin";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+export default async function EditBlogPost({ params }: { params: Promise<{ lang: string; id: string }> }) {
+  const { lang, id } = await params;
+  const locale = resolveLocale(lang);
+  const { user } = await requireAdmin(locale);
+  if (!z.string().uuid().safeParse(id).success) notFound();
+  const post = await blog.getAdmin(user, id).catch((error: unknown) => { if (error instanceof BlogError && error.code === "not_found") notFound(); throw error; });
+  const t = getTranslator(locale);
+  return <section><h1 className="mb-8 text-2xl font-semibold">{t("blog.editor.edit")}</h1><BlogEditor key={`${post.id}:${post.revision}`} locale={locale} post={ { id: post.id, locale: post.locale, slug: post.slug, title: post.title, excerpt: post.excerpt, body: post.body, translationKey: post.translationKey, status: post.status, revision: post.revision } } /><details className="mt-12 border-t pt-6"><summary className="mb-8 cursor-pointer font-medium">{t("blog.editor.preview")}</summary><Markdown>{post.body}</Markdown></details></section>;
+}

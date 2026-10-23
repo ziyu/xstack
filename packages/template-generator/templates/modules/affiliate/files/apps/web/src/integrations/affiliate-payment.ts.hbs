@@ -1,0 +1,20 @@
+import type { Services } from "../services";
+
+/** Only verified payment events can earn credits; there is no client award endpoint. */
+export default function registerAffiliatePayment({ events, payment, affiliate, credits }: Services) {
+  events.on("payment.order_paid", async ({ orderId, userId, plan, amount, renewal }) => {
+    if (renewal) return;
+    const order = await payment.getOrder(userId, orderId);
+    if (!order || order.status !== "paid" || order.amount !== amount || order.planId !== plan.id) {
+      throw new Error("Affiliate settlement requires the persisted paid order");
+    }
+    const commission = await affiliate.prepareCommission({ orderId, userId, planCredits: plan.credits ?? 0, amount, renewal });
+    if (!commission || commission.status === "granted") return;
+    // The immutable intent survives a process failure. Replaying the webhook resumes it;
+    // the unique credit reference handles a failure after grant but before markGranted.
+    await credits.grant(commission.referrerId, commission.credits, {
+      type: "affiliate", reason: `Referral purchase ${orderId}`, referenceId: `affiliate:${orderId}`,
+    });
+    await affiliate.markGranted(orderId);
+  });
+}

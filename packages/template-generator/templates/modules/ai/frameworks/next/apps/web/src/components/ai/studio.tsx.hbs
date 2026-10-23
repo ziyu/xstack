@@ -1,0 +1,89 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import { useT } from "../i18n-provider";
+
+const kind = z.enum(["chat", "image", "video"]);
+const jobSchema = z.object({ id: z.string(), requestId: z.string(), provider: z.string(), kind, model: z.string(), prompt: z.string(), cost: z.number(), status: z.enum(["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"]), text: z.string().nullable(), error: z.string().nullable(), mediaUrl: z.string().nullable(), cancellable: z.boolean() });
+const capabilitySchema = z.object({ id: z.string(), models: z.object({ chat: z.string().optional(), image: z.string().optional(), video: z.string().optional() }), costs: z.object({ chat: z.number(), image: z.number(), video: z.number() }) });
+type Job = z.infer<typeof jobSchema>;
+type Capability = z.infer<typeof capabilitySchema>;
+type Kind = z.infer<typeof kind>;
+const active: Partial<Record<Job["status"], true>> = { queued: true, starting: true, running: true, saving: true };
+
+export function AIStudio({ initialJobs, capabilities }: { initialJobs: Job[]; capabilities: Capability[] }) {
+  const t = useT();
+  const [jobs, setJobs] = useState(initialJobs);
+  const [provider, setProvider] = useState(capabilities[0]?.id ?? "");
+  const [mode, setMode] = useState<Kind>("chat");
+  const [prompt, setPrompt] = useState("");
+  const [parentId, setParentId] = useState<string>();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(false);
+  const request = useRef<{ requestId: string; provider: string; kind: Kind; prompt: string; parentId?: string } | null>(null);
+  const selected = capabilities.find((item) => item.id === provider);
+  function merge(job: Job) { setJobs((current) => [job, ...current.filter((item) => item.id !== job.id)]); }
+  async function update(id: string, cancel = false) {
+    const response = await fetch(`/api/ai/${id}`, { method: cancel ? "DELETE" : "POST" });
+    if (!response.ok) throw new Error("Request failed");
+    merge(z.object({ job: jobSchema }).parse(await response.json()).job);
+  }
+  useEffect(() => {
+    if (!jobs.some((job) => active[job.status])) return;
+    let stopped = false;
+    const timer = setTimeout(async () => {
+      try {
+        for (const job of jobs.filter((item) => active[item.status])) {
+          if (stopped) return;
+          await update(job.id);
+        }
+        if (!stopped) setError(false);
+      } catch { if (!stopped) setError(true); }
+    }, 10_000);
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [jobs]);
+  async function submit(retry = false) {
+    setPending(true); setError(false);
+    if (!retry || !request.current) request.current = { requestId: crypto.randomUUID(), provider, kind: mode, prompt, ...(parentId && mode === "chat" ? { parentId } : {}) };
+    try {
+      const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.current) });
+      const payload: unknown = await response.json();
+      const parsed = z.object({ job: jobSchema }).safeParse(payload);
+      if (!parsed.success) throw new Error("Request failed");
+      merge(parsed.data.job);
+      request.current = null;
+      if (parsed.data.job.status === "completed" && mode === "chat") setParentId(parsed.data.job.id);
+    } catch { setError(true); }
+    finally { setPending(false); }
+  }
+  return <div className="grid gap-10 lg:grid-cols-[minmax(280px,360px)_1fr]">
+    <section className="space-y-6 border-t-4 border-foreground pt-5">
+      {!capabilities.length ? <p role="status">{t("ai.notConfigured")}</p> : <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        <label className="block space-y-2 text-sm"><span>{t("ai.provider")}</span><select className="w-full border bg-background p-3" value={provider} onChange={(event) => { setProvider(event.target.value); setMode("chat"); setParentId(undefined); }} disabled={pending}>{capabilities.map((item) => <option key={item.id}>{item.id}</option>)}</select></label>
+        <fieldset><legend className="mb-2 text-sm">{t("ai.kind")}</legend><div className="flex gap-2">{(["chat", "image", "video"] as const).filter((item) => selected?.models[item]).map((item) => <button key={item} type="button" aria-pressed={mode === item} className={`flex-1 border px-3 py-2 ${mode === item ? "bg-foreground text-background" : ""}`} onClick={() => { setMode(item); setParentId(undefined); }}>{t(`ai.kinds.${item}`)}</button>)}</div></fieldset>
+        <p className="text-xs text-muted-foreground">{t("ai.model")}: {selected?.models[mode]} · {t("ai.cost")}: {selected?.costs[mode]}</p>
+        {parentId && <div className="flex justify-between gap-2 text-sm"><span>{t("ai.reply")}</span><button type="button" className="underline" onClick={() => setParentId(undefined)}>{t("ai.newChat")}</button></div>}
+        <label className="block space-y-2 text-sm"><span>{t("ai.prompt")}</span><textarea required maxLength={8000} rows={8} className="w-full resize-y border bg-background p-3 leading-relaxed" value={prompt} onChange={(event) => setPrompt(event.target.value)} disabled={pending} /></label>
+        <button className="w-full bg-foreground px-4 py-3 font-medium text-background disabled:opacity-50" disabled={pending || !prompt.trim()}>{t(pending ? "ai.working" : "ai.generate")}</button>
+      </form>}
+      {error && <div role="alert" className="space-y-2 border-l-2 border-destructive pl-3 text-sm"><p>{t("ai.error")}</p>{request.current && <button disabled={pending} className="underline" onClick={() => void submit(true)}>{t("ai.retry")}</button>}</div>}
+    </section>
+    <section className="space-y-4"><h2 className="font-medium text-lg">{t("ai.history")}</h2>{jobs.length === 0 && <p className="py-16 text-muted-foreground">{t("ai.empty")}</p>}
+      <ol className="space-y-5">{jobs.map((job) => <li key={job.id} className="space-y-3 border p-5">
+        <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{job.provider} / {t(`ai.kinds.${job.kind}`)} / {job.cost} {t("ai.cost")}</span><span role="status">{t(`ai.statuses.${job.status}`)}</span></div>
+        <p className="whitespace-pre-wrap font-medium">{job.prompt}</p>
+        {job.text && <p className="whitespace-pre-wrap border-t pt-3 leading-relaxed">{job.text}</p>}
+        {job.mediaUrl && job.kind === "image" && <img src={job.mediaUrl} alt={job.prompt} className="max-h-[520px] w-full object-contain" />}
+        {job.mediaUrl && job.kind === "video" && <video src={job.mediaUrl} controls preload="metadata" className="w-full" aria-label={job.prompt} />}
+        {job.error && <p className="text-sm text-destructive">{t(`ai.errors.${job.error === "insufficient_credits" ? "insufficient_credits" : job.error === "unknown" ? "unknown" : job.error === "cancelled" ? "cancelled" : "provider_error"}`)}</p>}
+        <div className="flex flex-wrap gap-4 text-sm">
+          {job.mediaUrl && <a href={job.mediaUrl} download className="underline">{t("ai.download")}</a>}
+          {job.kind === "chat" && job.status === "completed" && <button className="underline" onClick={() => { setParentId(job.id); setProvider(job.provider); setMode("chat"); setPrompt(""); }}>{t("ai.continue")}</button>}
+          {active[job.status] && <button className="underline" onClick={() => void update(job.id).catch(() => setError(true))}>{t("ai.refresh")}</button>}
+          {job.cancellable && <button className="underline" onClick={() => void update(job.id, true).catch(() => setError(true))}>{t("ai.cancel")}</button>}
+        </div>
+      </li>)}</ol>
+    </section>
+  </div>;
+}

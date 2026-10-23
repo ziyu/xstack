@@ -1,0 +1,202 @@
+import type { Database } from "@{{projectName}}/db";
+import { aiJob, aiMediaChunk } from "@{{projectName}}/db/schema/ai";
+import { and, asc, desc, eq, lte } from "drizzle-orm";
+import { z } from "zod";
+import type { AIEnv } from "./registry";
+import { costs, providers } from "./registry";
+import type { GenerationRequest, Message, Result } from "./types";
+import { AIError, ProviderRejected, decodeMedia, requestSchema } from "./types";
+export { AIError, requestSchema } from "./types";
+export type { GenerationRequest, Kind } from "./types";
+
+type Job = typeof aiJob.$inferSelect;
+type Billing = { charge(userId: string, cost: number, referenceId: string): Promise<void>; refund(userId: string, referenceId: string): Promise<void> };
+type MediaStore = {
+  save(userId: string, input: { name: string; contentType: string; body: Uint8Array }): Promise<{ id: string }>;
+  read(userId: string, id: string): Promise<{ body: ReadableStream<Uint8Array>; contentType: string; name: string }>;
+  remove(userId: string, id: string): Promise<void>;
+};
+const LEASE_MS = 180_000;
+export function createAI({ db, env }: { db: Database; env: AIEnv }) {
+  const gateways = providers(env);
+  let billing: Billing | undefined;
+  let storage: MediaStore | undefined;
+  function fence(job: Job) {
+    if (!job.leaseToken) throw new AIError("busy");
+    return and(eq(aiJob.id, job.id), eq(aiJob.leaseToken, job.leaseToken));
+  }
+  async function renew(job: Job) {
+    const [ownedLease] = await db.update(aiJob).set({ leaseUntil: Date.now() + LEASE_MS }).where(fence(job)).returning({ id: aiJob.id });
+    if (!ownedLease) throw new AIError("busy");
+  }
+  function gateway(id: string) {
+    const found = gateways.find((item) => item.id === id);
+    if (!found) throw new AIError("not_configured");
+    return found;
+  }
+  async function owned(userId: string, id: string): Promise<Job> {
+    const [job] = await db.select().from(aiJob).where(and(eq(aiJob.id, id), eq(aiJob.userId, userId)));
+    if (!job) throw new AIError("not_found");
+    return job;
+  }
+  function view(job: Job) {
+    return { id: job.id, requestId: job.requestId, provider: job.provider, kind: job.kind, model: job.model, prompt: job.prompt, parentId: job.parentId, cost: job.cost, status: job.status, text: job.resultText, error: job.errorCode, createdAt: job.createdAt.toISOString(), mediaUrl: job.status === "completed" && job.contentType ? `/api/ai/${job.id}/media` : null, cancellable: job.status === "running" && !!gateway(job.provider).cancel };
+  }
+  async function refund(job: Job) {
+    if (job.status === "failed" || job.status === "cancelled") await billing?.refund(job.userId, `ai:${job.id}`);
+  }
+  async function terminal(job: Job, status: "failed" | "cancelled", code: string) {
+    const [changed] = await db.update(aiJob).set({ status, errorCode: code, leaseToken: null, leaseUntil: 0, updatedAt: new Date() }).where(fence(job)).returning();
+    if (!changed) throw new AIError("busy");
+    await refund(changed);
+  }
+  async function messages(job: Job): Promise<Message[]> {
+    const history: Message[] = [{ role: "user", content: job.prompt }];
+    let parent = job.parentId;
+    for (let depth = 0; parent && depth < 12; depth++) {
+      const previous = await owned(job.userId, parent);
+      if (previous.kind !== "chat" || previous.status !== "completed" || !previous.resultText) throw new AIError("invalid_request");
+      history.unshift({ role: "user", content: previous.prompt }, { role: "assistant", content: previous.resultText });
+      parent = previous.parentId;
+    }
+    return history;
+  }
+  async function mediaData(id: string) {
+    const chunks = await db.select().from(aiMediaChunk).where(eq(aiMediaChunk.jobId, id)).orderBy(asc(aiMediaChunk.position));
+    if (!chunks.length || chunks.some((chunk, position) => chunk.position !== position)) throw new AIError("provider_error");
+    return decodeMedia(chunks.map((chunk) => chunk.data).join(""));
+  }
+  async function save(job: Job) {
+    await renew(job);
+    if (storage && !job.fileId) {
+      const body = await mediaData(job.id);
+      const extension = job.contentType === "video/mp4" ? "mp4" : job.contentType?.split("/")[1] ?? "bin";
+      const file = await storage.save(job.userId, { name: `${job.id}.${extension}`, contentType: job.contentType!, body });
+      const [linked] = await db.update(aiJob).set({ fileId: file.id }).where(fence(job)).returning({ id: aiJob.id });
+      if (!linked) { await storage.remove(job.userId, file.id); throw new AIError("busy"); }
+    }
+    const [completed] = await db.update(aiJob).set({ status: "completed", errorCode: null, leaseToken: null, leaseUntil: 0, updatedAt: new Date() }).where(fence(job)).returning({ id: aiJob.id });
+    if (!completed) throw new AIError("busy");
+    if (storage) await db.delete(aiMediaChunk).where(eq(aiMediaChunk.jobId, job.id));
+  }
+  async function accept(job: Job, result: Result) {
+    await renew(job);
+    if (result.status === "failed" || result.status === "cancelled") return terminal(job, result.status, result.status === "failed" ? "provider_error" : "cancelled");
+    if (result.status === "running") {
+      await db.update(aiJob).set({ status: "running", remoteId: result.remoteId, leaseToken: null, leaseUntil: 0, errorCode: null, updatedAt: new Date() }).where(fence(job));
+      return;
+    }
+    if ("text" in result) {
+      await db.update(aiJob).set({ status: "completed", resultText: result.text, remoteId: result.remoteId ?? job.remoteId, leaseToken: null, leaseUntil: 0, errorCode: null, updatedAt: new Date() }).where(fence(job));
+      return;
+    }
+    decodeMedia(result.media.data);
+    // Persist the provider result before storage. A failed upload can be retried
+    // without repeating the paid generation. Chunk rows fit within D1 limits.
+    for (let offset = 0, position = 0; offset < result.media.data.length; offset += 256_000, position++) {
+      await renew(job);
+      await db.insert(aiMediaChunk).values({ id: `${job.id}:${position}`, jobId: job.id, position, data: result.media.data.slice(offset, offset + 256_000) }).onConflictDoUpdate({ target: aiMediaChunk.id, set: { data: result.media.data.slice(offset, offset + 256_000) } });
+    }
+    const [persisted] = await db.update(aiJob).set({ status: "saving", contentType: result.media.contentType, updatedAt: new Date() }).where(fence(job)).returning({ id: aiJob.id });
+    if (!persisted) throw new AIError("busy");
+    await save({ ...job, status: "saving", contentType: result.media.contentType });
+  }
+  async function advance(job: Job, cancel = false): Promise<Job> {
+    if (job.status === "failed" || job.status === "cancelled") { await refund(job); return job; }
+    if (job.status === "completed" || job.status === "unknown") return job;
+    if (job.status === "starting") {
+      if (job.leaseUntil < Date.now()) {
+        // A crashed POST may have reached the provider. Never send it twice.
+        await db.update(aiJob).set({ status: "unknown", errorCode: "unknown", updatedAt: new Date() }).where(and(eq(aiJob.id, job.id), eq(aiJob.status, "starting"), lte(aiJob.leaseUntil, Date.now())));
+      }
+      return owned(job.userId, job.id);
+    }
+    const token = crypto.randomUUID();
+    const [claimed] = await db.update(aiJob).set({ leaseToken: token, leaseUntil: Date.now() + LEASE_MS, ...(job.status === "queued" ? { status: "starting" as const } : {}), updatedAt: new Date() }).where(and(eq(aiJob.id, job.id), eq(aiJob.status, job.status), lte(aiJob.leaseUntil, Date.now()))).returning();
+    if (!claimed) return owned(job.userId, job.id);
+    const selected = gateway(job.provider);
+    let paidCallStarted = false;
+    // Lease renewal covers slow media storage as well as provider calls. Every
+    // state write is still fenced: a delayed heartbeat cannot revive a new owner.
+    const heartbeat = setInterval(() => { void renew(claimed).catch(() => {}); }, 30_000);
+    try {
+      if (job.status === "saving") await save(claimed);
+      else if (job.status === "running") {
+        if (!job.remoteId || !selected.poll) throw new AIError("provider_error");
+        if (cancel) {
+          if (!selected.cancel) throw new AIError("unsupported");
+          await selected.cancel(job.remoteId);
+          await renew(claimed);
+        }
+        await accept(claimed, await selected.poll(job.remoteId, job.kind));
+      } else {
+        const history = await messages(job);
+        const parentRemoteId = job.parentId ? (await owned(job.userId, job.parentId)).remoteId ?? undefined : undefined;
+        await billing?.charge(job.userId, job.cost, `ai:${job.id}`);
+        await renew(claimed);
+        paidCallStarted = true;
+        await accept(claimed, await selected.generate({ kind: job.kind, model: job.model, prompt: job.prompt, messages: history, requestId: job.id, parentRemoteId }));
+      }
+    } catch (error) {
+      const current = await owned(job.userId, job.id);
+      if (current.status === "failed" || current.status === "cancelled") throw error;
+      if (current.leaseToken !== token) return current;
+      if (current.status === "saving" || job.status === "saving" || job.status === "running") {
+        // Poll transport/storage errors are retryable, not terminal generation failure.
+        await db.update(aiJob).set({ errorCode: "provider_error", leaseToken: null, leaseUntil: 0, updatedAt: new Date() }).where(and(eq(aiJob.id, job.id), eq(aiJob.leaseToken, token)));
+        throw new AIError("provider_error");
+      }
+      if (!paidCallStarted || error instanceof ProviderRejected) {
+        const code = error instanceof AIError ? error.code : "provider_error";
+        await terminal(claimed, "failed", code);
+      } else {
+        await db.update(aiJob).set({ status: "unknown", errorCode: "unknown", leaseToken: null, leaseUntil: 0, updatedAt: new Date() }).where(fence(claimed));
+      }
+    } finally { clearInterval(heartbeat); }
+    return owned(job.userId, job.id);
+  }
+  return {
+    setBilling(value: Billing) { billing = value; },
+    setStorage(value: MediaStore) { storage = value; },
+    capabilities() { return gateways.map((item) => ({ id: item.id, models: item.models, costs })); },
+    async generate(userId: string, input: GenerationRequest): Promise<ReturnType<typeof view>> {
+      const parsed = requestSchema.safeParse(input);
+      if (!parsed.success) throw new AIError("invalid_request");
+      input = parsed.data;
+      const [existing] = await db.select().from(aiJob).where(and(eq(aiJob.userId, userId), eq(aiJob.requestId, input.requestId)));
+      if (existing) {
+        if (existing.provider !== input.provider || existing.kind !== input.kind || existing.prompt !== input.prompt || existing.parentId !== (input.parentId ?? null)) throw new AIError("conflict");
+        return view(await advance(existing));
+      }
+      const selected = gateway(input.provider);
+      const model = selected.models[input.kind];
+      if (!model) throw new AIError("unsupported");
+      if (input.parentId) {
+        const parent = await owned(userId, input.parentId);
+        if (input.kind !== "chat" || parent.kind !== "chat" || parent.status !== "completed" || parent.provider !== input.provider) throw new AIError("invalid_request");
+      }
+      const [inserted] = await db.insert(aiJob).values({ id: crypto.randomUUID(), userId, ...input, model, cost: costs[input.kind] }).onConflictDoNothing().returning();
+      if (!inserted) return this.generate(userId, input);
+      return view(await advance(inserted));
+    },
+    async poll(userId: string, id: string) { return view(await advance(await owned(userId, id))); },
+    async cancel(userId: string, id: string) {
+      const job = await owned(userId, id);
+      if (job.status !== "running" || !gateway(job.provider).cancel) throw new AIError("unsupported");
+      return view(await advance(job, true));
+    },
+    async history(userId: string) {
+      return (await db.select().from(aiJob).where(eq(aiJob.userId, userId)).orderBy(desc(aiJob.createdAt)).limit(100)).map(view);
+    },
+    async media(userId: string, id: string): Promise<{ body: ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>; contentType: string }> {
+      const job = await owned(userId, id);
+      if (job.status !== "completed" || !job.contentType) throw new AIError("not_found");
+      if (job.fileId) {
+        if (!storage) throw new AIError("not_configured");
+        return storage.read(userId, job.fileId);
+      }
+      return { body: await mediaData(job.id), contentType: z.enum(["image/png", "image/jpeg", "image/webp", "video/mp4"]).parse(job.contentType) };
+    },
+  };
+}
+export type AI = ReturnType<typeof createAI>;

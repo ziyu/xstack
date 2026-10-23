@@ -1,3 +1,4 @@
+import { isCancel, multiselect, select } from "@clack/prompts";
 import {
   hasErrors,
   MODULE_CATALOG,
@@ -7,7 +8,6 @@ import {
   type ResolvedPlan,
   type StackContext,
 } from "@xstack/template-generator";
-import { isCancel, multiselect, select } from "@clack/prompts";
 
 import type { Auth, ProductConfig } from "../types";
 import { isSilent, markPromptShown } from "../utils/context";
@@ -131,7 +131,17 @@ export async function completeProduct(
     const resolved = planFor({ features, providers, options }, stack).modules.find(
       (m) => m.manifest.id === id,
     );
-    const choices = providerChoices(module, resolved?.variant !== "stack");
+    const choices = providerChoices(module, resolved?.variant !== "stack").filter((provider) => {
+      const candidate = planFor(
+        {
+          features,
+          providers: { ...providers, [id]: [provider] },
+          options,
+        },
+        stack,
+      );
+      return !candidate.issues.some((issue) => issue.level === "error" && issue.module === id);
+    });
     if (choices.length) providers[id] = await getProvidersChoice(module, choices);
   }
 

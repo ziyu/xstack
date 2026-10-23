@@ -17,6 +17,7 @@ export default {
     consume: "Usage",
     refund: "Refund",
     adjust: "Adjustment",
+    affiliate: "Referral reward",
   },
   admin: {
     title: "Credits",

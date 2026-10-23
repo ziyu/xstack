@@ -1,0 +1,22 @@
+import { ai } from "@{{projectName}}/app-services";
+import { getSession } from "@/lib/session";
+import { aiErrorResponse, privateHeaders, requireAIOrigin } from "@/lib/ai-http";
+
+type Context = { params: Promise<{ id: string }> };
+// Polling can finalize a job/refund, so it is an origin-checked POST, not a GET.
+export async function POST(request: Request, { params }: Context) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+  try {
+    requireAIOrigin(request);
+    return Response.json({ job: await ai.poll(session.user.id, (await params).id) }, { headers: privateHeaders });
+  } catch (error) { return aiErrorResponse(error); }
+}
+export async function DELETE(request: Request, { params }: Context) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+  try {
+    requireAIOrigin(request);
+    return Response.json({ job: await ai.cancel(session.user.id, (await params).id) }, { headers: privateHeaders });
+  } catch (error) { return aiErrorResponse(error); }
+}

@@ -1,0 +1,31 @@
+# Referral credit rewards
+
+This module requires `auth`, `payment`, and `credits`. It awards **application credits, not cash**, and has no cash payout or withdrawal capability. The default reward is {{module.options.commissionPercent}}% of a paid checkout's plan credits, rounded down. A zero-credit/free order, a zero rounded reward, or a subscription renewal earns nothing. Each distinct qualifying checkout earns once; repeated webhook deliveries never create another reward. Multi-account/self-referral abuse is prohibited; identity or household uniqueness is not automatically verified.
+
+## Referral flow
+
+1. Sign in and open `/<locale>/dashboard/affiliate`. The page creates an unguessable, stable invitation code and displays the owned report and shareable `/<locale>/ref/<code>` link.
+2. The visitor opens that localized link and explicitly accepts the invitation. This same-origin POST to `/api/affiliate/capture?code=<code>&lang=<locale>` validates a real, non-banned inviter and refuses signed-in accounts. No attribution is written by an external GET. The first valid cookie wins.
+3. Capture sets a host-only, HttpOnly, SameSite=Lax cookie, Secure on HTTPS, signed with a domain-separated WebCrypto HMAC using `BETTER_AUTH_SECRET`. It expires after {{module.options.cookieDays}} days. Rotating the auth secret invalidates unbound invitations.
+4. The auth database **before** hook stores the bounded token on the new account in `affiliate_referral_token`. Better Auth marks this field `input: false, returned: false`: clients cannot choose it or retrieve it. The new-user event validates the signature and time window at the persisted account creation time, rejects self-referrals, and inserts the immutable referrer under a unique account key. Existing accounts never gain a referrer by signing in with a new cookie. OAuth and phone signup use the same new-user hook.
+5. A verified `payment.order_paid` event checks the persisted paid order and creates a unique commission intent. Only server-selected plan credits determine its amount. The integration grants credits under `affiliate:<orderId>` and then marks the intent granted.
+
+## Failure and concurrency behavior
+
+A signup attribution failure is logged without incorrectly reporting that the committed account failed to register. The immutable private token remains recoverable; a subsequent paid event reconstructs the same attribution using the original signup time, even if the browser cookie has since expired. The referral's unique account key makes the first binding permanent.
+
+A unique commission order key freezes beneficiary and reward amount before any credit grant. Concurrent events reuse that intent. The credits service applies a unique reference atomically. If grant succeeds but commission finalization fails, the verified provider webhook retry safely reuses the grant and completes the report. Failure propagates to the webhook so the provider can retry; configure provider retry/alerting and replay failed verified events. No client-facing award or ownership override endpoint exists. The operations use unique inserts and conditional updates, not a D1-incompatible interactive transaction.
+
+The policy is configured at generation with `affiliate.commissionPercent` (0–100) and `affiliate.cookieDays` (1–90). Commission uses the server plan credits and commission percentage in effect when its first verified settlement creates the commission intent, not a purchase-time pricing snapshot. The persisted intent then freezes that amount and beneficiary across retries and later policy changes. Payment's public event supplies the selected server plan; this module does not accept a client plan, user, or credit amount.
+
+## Reports and access
+
+`GET /api/affiliate` returns the authenticated account's code, referral count, conversion count, granted/pending credit totals, and latest 50 conversions. It never uses a requested user ID. `/<locale>/admin/affiliate` is generated only with `admin` and authorizes administrators before querying all commission intents. No invitee email is exposed in the owned report. Both English and Simplified Chinese pages label rewards as credits.
+
+## Refunds and chargebacks
+
+The payment service currently has no refund/chargeback domain event. **There is no automatic commission reversal.** Administrators must reconcile refunds/chargebacks with the provider and apply an audited negative credit adjustment in the credits console. Do not promise automatic clawbacks, a refund hold period, or cash payouts. The protocol regression explicitly verifies that an unsupported refund webhook is a no-op, not a fabricated refund integration.
+
+## Local verification
+
+In the xstack repository, generate a disposable SQLite fixture under `apps/cli/.smoke` with affiliate and Stripe, migrate it, and run `bun apps/cli/live-tests/affiliate.ts <fixture>`. This invokes the generated auth handler, affiliate service, payment Stripe signature verifier, credit ledger, and integrations against the actual local database. It uses local signed Stripe event payloads, not real purchases or Stripe API calls. It covers immutable attribution, tampering/expiry/self-referral, parallel replay, failure-after-grant recovery, renewals, and unsupported refund behavior. If captcha is generated, its Siteverify response is explicitly a local transport fixture; use the separate captcha HTTP/browser regression for widget validation. Parent full-preset HTTP validation additionally exercises the public capture and owned/admin pages.

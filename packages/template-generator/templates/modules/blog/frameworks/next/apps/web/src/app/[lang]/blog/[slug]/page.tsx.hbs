@@ -1,0 +1,30 @@
+import { blog } from "@{{projectName}}/app-services";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import Markdown from "@/components/blog/markdown";
+import { blogMetadata, blogPosting, safeJsonLd } from "@/lib/blog-metadata";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+export const dynamic = "force-dynamic";
+type Props = { params: Promise<{ lang: string; slug: string }> };
+export async function generateMetadata({ params }: Props) {
+  const { lang, slug } = await params;
+  const locale = resolveLocale(lang);
+  const post = await blog.getPublished(locale, slug);
+  if (!post) notFound();
+  return blogMetadata({ locale, slug, title: post.title, description: post.excerpt, translations: await blog.translations(post.translationKey) });
+}
+export default async function BlogPostPage({ params }: Props) {
+  const { lang, slug } = await params;
+  const locale = resolveLocale(lang);
+  const t = getTranslator(locale);
+  const post = await blog.getPublished(locale, slug);
+  if (!post) notFound();
+  return <article className="container mx-auto max-w-3xl px-6 py-16">
+    <Link className="text-sm underline" href={localePath(locale, "/blog")}>{t("blog.back")}</Link>
+    <header className="mb-10 mt-10 border-b pb-10"><h1 className="font-serif text-4xl tracking-tight sm:text-5xl">{post.title}</h1><p className="mt-6 text-lg text-muted-foreground">{post.excerpt}</p><div className="mt-6 flex flex-wrap gap-4 text-sm"><span>{post.authorName}</span><time dateTime={post.publishedAt!.toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(post.publishedAt!)}</time></div></header>
+    <Markdown>{post.body}</Markdown>
+    <script type="application/ld+json" dangerouslySetInnerHTML={ { __html: safeJsonLd(blogPosting(post)) } } />
+  </article>;
+}

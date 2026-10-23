@@ -17,6 +17,7 @@ export default {
     consume: "消耗",
     refund: "退款",
     adjust: "人工调整",
+    affiliate: "推荐奖励",
   },
   admin: {
     title: "积分",

@@ -1,0 +1,60 @@
+import { affiliate } from "@{{projectName}}/app-services";
+import type { Metadata } from "next";
+
+import { ENV } from "@/env.server";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { requireUser } from "@/lib/session";
+
+type Props = { params: Promise<{ lang: string }> };
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  return { title: getTranslator(resolveLocale((await params).lang))("affiliate.title") };
+}
+
+export default async function AffiliatePage({ params }: Props) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const user = await requireUser(locale, "/dashboard/affiliate");
+  const [code, report] = await Promise.all([affiliate.getCode(user.id), affiliate.report(user.id)]);
+  const link = new URL(`/${locale}/ref/${code}`, ENV.BETTER_AUTH_URL).toString();
+  const number = new Intl.NumberFormat(locale);
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+  return (
+    <div className="flex flex-col gap-8">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold">{t("affiliate.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("affiliate.policy", { percent: affiliate.commissionPercent })}</p>
+      </header>
+      <section className="border p-5">
+        <label className="mb-2 block text-sm font-medium" htmlFor="referral-link">{t("affiliate.link")}</label>
+        <input id="referral-link" className="w-full border bg-background p-3 text-sm" value={link} readOnly />
+        <p className="mt-2 text-xs text-muted-foreground">{t("affiliate.linkHint")}</p>
+      </section>
+      <dl className="grid gap-px border bg-border sm:grid-cols-4">
+        {([
+          ["signups", report.referredSignups], ["conversions", report.convertedOrders],
+          ["earned", report.earnedCredits], ["pending", report.pendingCredits],
+        ] as const).map(([label, value]) => (
+          <div key={label} className="bg-background p-5">
+            <dt className="text-sm text-muted-foreground">{t(`affiliate.stats.${label}`)}</dt>
+            <dd className="mt-2 text-3xl font-semibold tabular-nums">{number.format(value)}</dd>
+          </div>
+        ))}
+      </dl>
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium">{t("affiliate.history")}</h2>
+        {report.conversions.length === 0 ? <p className="text-sm text-muted-foreground">{t("affiliate.empty")}</p> : (
+          <ul className="divide-y border">
+            {report.conversions.map((row) => (
+              <li key={row.orderId} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+                <div><time dateTime={row.createdAt.toISOString()}>{date.format(row.createdAt)}</time><p className="font-mono text-xs text-muted-foreground">{row.orderId}</p></div>
+                <span>{t(`affiliate.status.${row.status}`)}</span>
+                <span className="font-medium tabular-nums">{number.format(row.credits)} {t("affiliate.creditUnit")}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <p className="text-xs text-muted-foreground">{t("affiliate.refundPolicy")}</p>
+    </div>
+  );
+}

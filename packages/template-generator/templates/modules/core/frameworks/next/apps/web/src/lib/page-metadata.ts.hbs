@@ -1,0 +1,6 @@
+import type { Locale } from "@{{projectName}}/i18n";
+import type { Metadata } from "next";
+
+export function pageMetadata(input: { locale: Locale; path: `/${string}`; title: string; description: string }): Metadata {
+  return { title: input.title, description: input.description };
+}

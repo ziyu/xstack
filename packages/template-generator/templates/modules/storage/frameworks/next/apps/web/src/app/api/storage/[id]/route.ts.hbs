@@ -1,0 +1,55 @@
+import { storage } from "@{{projectName}}/app-services";
+import { z } from "zod";
+
+import { getSession } from "@/lib/session";
+import { requireStorageOrigin, storageErrorResponse, StorageRequestError } from "@/lib/storage-http";
+
+export const runtime = "nodejs";
+
+type Context = { params: Promise<{ id: string }> };
+const idSchema = z.string().min(1).max(255).regex(/^[a-zA-Z0-9_-]+$/);
+
+async function fileId(context: Context): Promise<string> {
+  const parsed = idSchema.safeParse((await context.params).id);
+  if (!parsed.success) throw new StorageRequestError(404, "not_found");
+  return parsed.data;
+}
+
+export async function GET(_request: Request, context: Context) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  try {
+{{#if (includes module.providers "r2-binding")}}
+    const file = await storage.readFile(session.user.id, await fileId(context));
+    const encoded = encodeURIComponent(file.name).replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+    return new Response(file.body, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="download"; filename*=UTF-8''${encoded}`,
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+{{else}}
+    const url = await storage.downloadUrl(session.user.id, await fileId(context));
+    return new Response(null, {
+      status: 307,
+      headers: { Location: url, "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" },
+    });
+{{/if}}
+  } catch (error) {
+    return storageErrorResponse(error);
+  }
+}
+
+export async function DELETE(request: Request, context: Context) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  try {
+    requireStorageOrigin(request);
+    await storage.deleteFile(session.user.id, await fileId(context));
+    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return storageErrorResponse(error);
+  }
+}

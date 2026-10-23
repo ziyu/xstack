@@ -1,0 +1,22 @@
+import { storage } from "@{{projectName}}/app-services";
+
+import { getSession } from "@/lib/session";
+import { readStorageFile, requireStorageOrigin, storageErrorResponse } from "@/lib/storage-http";
+
+export const runtime = "nodejs";
+
+export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  try {
+    requireStorageOrigin(request);
+    if (!storage.configured) {
+      return Response.json({ error: "not_configured" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    }
+    const file = await readStorageFile(request);
+    const stored = await storage.upload(session.user.id, file);
+    return Response.json({ id: stored.id }, { status: 201, headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return storageErrorResponse(error);
+  }
+}

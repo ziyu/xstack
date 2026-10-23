@@ -1,0 +1,52 @@
+"use client";
+
+import { locales } from "@{{projectName}}/i18n";
+import type { Locale } from "@{{projectName}}/i18n";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import { localePath } from "@/lib/i18n/paths";
+
+type Editable = { id: string; locale: string; slug: string; title: string; excerpt: string; body: string; translationKey: string; status: "draft" | "published"; revision: number };
+export default function BlogEditor({ locale, post }: { locale: Locale; post?: Editable }) {
+  const t = useT();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  async function save(form: HTMLFormElement) {
+    setBusy(true); setMessage("");
+    const values = new FormData(form);
+    const data = { locale: String(values.get("locale")), slug: String(values.get("slug")), title: String(values.get("title")), excerpt: String(values.get("excerpt")), body: String(values.get("body")), translationKey: String(values.get("translationKey") ?? "") || undefined, status: String(values.get("status") ?? "draft") };
+    try {
+      const response = await fetch(post ? `/api/blog/${post.id}` : "/api/blog", { method: post ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(post ? { revision: post.revision, post: data } : data) });
+      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
+      const result = z.object({ id: z.string().uuid() }).parse(await response.json());
+      router.push(localePath(locale, `/admin/blog/${result.id}`)); router.refresh(); setMessage(t("blog.editor.saved"));
+    } catch { setMessage(t("blog.editor.failed")); }
+    finally { setBusy(false); }
+  }
+  async function remove() {
+    if (!post || !window.confirm(t("blog.editor.confirmDelete"))) return;
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch(`/api/blog/${post.id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: post.revision }) });
+      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
+      router.push(localePath(locale, "/admin/blog")); router.refresh();
+    } catch { setMessage(t("blog.editor.failed")); }
+    finally { setBusy(false); }
+  }
+  const field = "mt-2 w-full rounded border bg-background px-3 py-2";
+  return <form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void save(event.currentTarget); }}>
+    <fieldset disabled={busy} className="space-y-6">
+      <div className="grid gap-6 sm:grid-cols-2"><label>{t("blog.editor.locale")}<select name="locale" defaultValue={post?.locale ?? locale} className={field}>{locales.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label>{t("blog.editor.slug")}<input className={field} name="slug" required maxLength={160} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={post?.slug} /></label></div>
+      <label className="block">{t("blog.editor.title")}<input className={field} name="title" required maxLength={200} defaultValue={post?.title} /></label>
+      <label className="block">{t("blog.editor.excerpt")}<textarea className={field} name="excerpt" required maxLength={500} rows={3} defaultValue={post?.excerpt} /></label>
+      <label className="block">{t("blog.editor.body")}<textarea className={`${field} font-mono text-sm`} name="body" required maxLength={100000} rows={20} defaultValue={post?.body} /></label>
+      <p className="text-sm text-muted-foreground">{t("blog.editor.markdownHelp")}</p>
+      <label className="block">{t("blog.editor.translation")}<input className={`${field} font-mono text-sm`} name="translationKey" defaultValue={post?.translationKey} /><span className="mt-2 block text-sm text-muted-foreground">{t("blog.editor.translationHelp")}</span></label>
+      {post && <label className="block">{t("blog.editor.status")}<select name="status" className={field} defaultValue={post.status}><option value="draft">{t("blog.draft")}</option><option value="published">{t("blog.published")}</option></select></label>}
+      <div className="flex gap-4"><button type="submit" className="rounded bg-primary px-5 py-2 text-primary-foreground">{busy ? t("blog.editor.saving") : post ? t("blog.editor.save") : t("blog.editor.create")}</button>{post && <button type="button" onClick={() => void remove()} className="rounded border border-destructive px-5 py-2 text-destructive">{t("blog.editor.delete")}</button>}</div>
+    </fieldset><p role="status" aria-live="polite">{message}</p>
+  </form>;
+}

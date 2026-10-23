@@ -10,6 +10,9 @@ import type { SocialProvider } from "@/lib/social-providers";
 import { useT } from "../i18n-provider";
 import { Field, formValue } from "./field";
 import { SocialButtons } from "./social-buttons";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
 
 export default function SignUpForm({
   next,
@@ -24,9 +27,15 @@ export default function SignUpForm({
   const t = useT();
   const [pending, setPending] = useState(false);
   const [sentTo, setSentTo] = useState<string>();
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
     const form = new FormData(event.currentTarget);
     const email = formValue(form, "email");
     setPending(true);
@@ -35,7 +44,7 @@ export default function SignUpForm({
       email,
       password: formValue(form, "password"),
       callbackURL: next,
-    });
+    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
     setPending(false);
     if (error) {
       toast.error(error.message ?? t("auth.errors.generic"));
@@ -62,7 +71,10 @@ export default function SignUpForm({
           autoComplete="new-password"
           minLength={8}
         />
-        <Button type="submit" disabled={pending}>
+{{#if (includes product.features "captcha")}}
+        <Captcha action="signup" challenge={captcha} />
+{{/if}}
+        <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
           {t("auth.signUp.submit")}
         </Button>
       </form>

@@ -1,0 +1,105 @@
+import type { Database } from "@{{projectName}}/db";
+import { blogPost } from "@{{projectName}}/db/schema/blog";
+import { isLocale } from "@{{projectName}}/i18n";
+import { defineAbilityFor, type Actor } from "@{{projectName}}/permissions";
+import { and, count, desc, eq, sql } from "drizzle-orm";
+import { z } from "zod";
+
+declare module "@{{projectName}}/permissions" { interface SubjectMap { BlogPost: true } }
+export type BlogPost = typeof blogPost.$inferSelect;
+export type BlogActor = Actor & { name: string };
+const localeSchema = z.string().refine(isLocale, "Unsupported locale");
+export const postInput = z.object({
+  locale: localeSchema,
+  slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  title: z.string().trim().min(1).max(200),
+  excerpt: z.string().trim().min(1).max(500),
+  body: z.string().trim().min(1).max(100_000),
+  translationKey: z.string().uuid().optional(),
+  status: z.enum(["draft", "published"]).default("draft"),
+}).strict();
+export const revisionInput = z.number().int().positive();
+export class BlogError extends Error {
+  constructor(readonly code: "forbidden" | "not_found" | "conflict") { super(code); }
+}
+function authorize(actor: BlogActor) {
+  const ability = defineAbilityFor(actor);
+  if (ability.cannot("access", "Admin") || ability.cannot("manage", "BlogPost")) throw new BlogError("forbidden");
+}
+function constraintError(error: unknown): never {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5; depth++) {
+    const parsed = z.object({ code: z.union([z.string(), z.number()]).optional(), message: z.string().optional(), cause: z.unknown().optional() }).safeParse(current);
+    if (!parsed.success) break;
+    if (parsed.data.code === "23505" || /unique constraint|UNIQUE constraint|SQLITE_CONSTRAINT_UNIQUE/.test(parsed.data.message ?? "")) throw new BlogError("conflict");
+    current = parsed.data.cause;
+  }
+  throw error;
+}
+const paging = z.object({ page: z.number().int().min(1).max(100_000).default(1), limit: z.number().int().min(1).max(100).default(12) });
+export function createBlog(db: Database) {
+  const published = (locale?: string) => and(eq(blogPost.status, "published"), locale ? eq(blogPost.locale, localeSchema.parse(locale)) : undefined);
+  return {
+    async listPublished(locale: string, options: { page?: number; limit?: number } = {}) {
+      const { page, limit } = paging.parse(options);
+      const where = published(locale);
+      const [posts, [total]] = await Promise.all([
+        db.select().from(blogPost).where(where).orderBy(desc(blogPost.publishedAt), desc(blogPost.id)).limit(limit).offset((page - 1) * limit),
+        db.select({ value: count() }).from(blogPost).where(where),
+      ]);
+      return { posts, total: total?.value ?? 0, page, limit };
+    },
+    async getPublished(locale: string, slug: string) {
+      const [post] = await db.select().from(blogPost).where(and(published(locale), eq(blogPost.slug, slug))).limit(1);
+      return post ?? null;
+    },
+    async translations(translationKey: string) {
+      return db.select({ locale: blogPost.locale, slug: blogPost.slug }).from(blogPost).where(and(published(), eq(blogPost.translationKey, translationKey)));
+    },
+    async sitemapPosts() {
+      return db.select({ locale: blogPost.locale, slug: blogPost.slug, translationKey: blogPost.translationKey, updatedAt: blogPost.updatedAt }).from(blogPost).where(published());
+    },
+    async listAdmin(actor: BlogActor, options: { page?: number; limit?: number } = {}) {
+      authorize(actor);
+      const { page, limit } = paging.parse(options);
+      const [posts, [total]] = await Promise.all([
+        db.select().from(blogPost).orderBy(desc(blogPost.updatedAt), desc(blogPost.id)).limit(limit).offset((page - 1) * limit),
+        db.select({ value: count() }).from(blogPost),
+      ]);
+      return { posts, total: total?.value ?? 0, page, limit };
+    },
+    async getAdmin(actor: BlogActor, id: string) {
+      authorize(actor);
+      const [post] = await db.select().from(blogPost).where(eq(blogPost.id, z.string().uuid().parse(id))).limit(1);
+      if (!post) throw new BlogError("not_found");
+      return post;
+    },
+    async create(actor: BlogActor, input: unknown) {
+      authorize(actor);
+      const data = postInput.parse(input);
+      if (data.status !== "draft") throw new z.ZodError([{ code: "custom", path: ["status"], message: "Create a draft before publishing" }]);
+      try {
+        const [post] = await db.insert(blogPost).values({ ...data, id: crypto.randomUUID(), translationKey: data.translationKey ?? crypto.randomUUID(), authorId: actor.id, authorName: z.string().trim().min(1).parse(actor.name) }).returning();
+        return post!;
+      } catch (error) { return constraintError(error); }
+    },
+    async update(actor: BlogActor, id: string, revision: number, input: unknown) {
+      authorize(actor);
+      const data = postInput.parse(input);
+      const now = new Date();
+      const [existing] = await db.select({ publishedAt: blogPost.publishedAt }).from(blogPost).where(and(eq(blogPost.id, z.string().uuid().parse(id)), eq(blogPost.revision, revisionInput.parse(revision)))).limit(1);
+      if (!existing) throw new BlogError("conflict");
+      try {
+        const [post] = await db.update(blogPost).set({ ...data, updatedAt: now, revision: sql`${blogPost.revision} + 1`, ...(data.status === "published" ? { publishedAt: existing.publishedAt ?? now } : {}) }).where(and(eq(blogPost.id, id), eq(blogPost.revision, revision))).returning();
+        if (!post) throw new BlogError("conflict");
+        return post;
+      } catch (error) { return constraintError(error); }
+    },
+    async delete(actor: BlogActor, id: string, revision: number) {
+      authorize(actor);
+      const deleted = await db.delete(blogPost).where(and(eq(blogPost.id, z.string().uuid().parse(id)), eq(blogPost.revision, revisionInput.parse(revision)))).returning({ id: blogPost.id });
+      if (!deleted.length) throw new BlogError("conflict");
+    },
+  };
+}
+export type Blog = ReturnType<typeof createBlog>;

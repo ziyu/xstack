@@ -1,0 +1,10 @@
+import { defaultLocale, locales } from "@{{projectName}}/i18n";
+import type { Services } from "../services";
+
+export default function registerSeoPayment({ seo }: Services) {
+  seo.registerSitemap("pricing", async () => {
+    const languages = Object.fromEntries(locales.map((locale) => [locale, seo.url(`/${locale}/pricing`)]));
+    languages["x-default"] = seo.url(`/${defaultLocale}/pricing`);
+    return locales.map((locale) => ({ url: seo.url(`/${locale}/pricing`), alternates: { languages } }));
+  });
+}

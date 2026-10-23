@@ -1,0 +1,189 @@
+"use client";
+
+import { Button, buttonVariants } from "@{{projectName}}/ui/components/button";
+import { useRouter } from "next/navigation";
+import { type FormEvent, useState, useTransition } from "react";
+
+export type StorageFileEntry = {
+  id: string;
+  name: string;
+  size: string;
+  createdAt: string;
+};
+
+export type StorageLabels = {
+  uploadTitle: string;
+  fileLabel: string;
+  upload: string;
+  uploading: string;
+  listTitle: string;
+  empty: string;
+  download: string;
+  delete: string;
+  deleting: string;
+  deleteConfirm: string;
+  uploaded: string;
+  deleted: string;
+  errors: {
+    unauthorized: string;
+    forbidden: string;
+    tooLarge: string;
+    invalidFile: string;
+    notFound: string;
+    unavailable: string;
+    generic: string;
+  };
+};
+
+export function FileManager({
+  files,
+  configured,
+  labels,
+}: {
+  files: StorageFileEntry[];
+  configured: boolean;
+  labels: StorageLabels;
+}) {
+  const router = useRouter();
+  const [active, setActive] = useState<string | null>(null);
+  const [refreshing, startTransition] = useTransition();
+  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
+  const pending = active !== null || refreshing;
+
+  function responseError(status: number): string {
+    switch (status) {
+      case 400: return labels.errors.invalidFile;
+      case 401: return labels.errors.unauthorized;
+      case 403: return labels.errors.forbidden;
+      case 404: return labels.errors.notFound;
+      case 413: return labels.errors.tooLarge;
+      case 503: return labels.errors.unavailable;
+      default: return labels.errors.generic;
+    }
+  }
+
+  async function upload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending || !configured) return;
+    const form = event.currentTarget;
+    setActive("upload");
+    setNotice(null);
+    try {
+      const response = await fetch("/api/storage", {
+        method: "POST",
+        credentials: "same-origin",
+        body: new FormData(form),
+      });
+      if (!response.ok) {
+        setNotice({ text: responseError(response.status), error: true });
+        return;
+      }
+      form.reset();
+      setNotice({ text: labels.uploaded, error: false });
+      startTransition(() => router.refresh());
+    } catch {
+      setNotice({ text: labels.errors.generic, error: true });
+    } finally {
+      setActive(null);
+    }
+  }
+
+  async function deleteFile(id: string) {
+    if (pending || !configured || !window.confirm(labels.deleteConfirm)) return;
+    setActive(id);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/storage/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      if (!response.ok) {
+        setNotice({ text: responseError(response.status), error: true });
+        return;
+      }
+      setNotice({ text: labels.deleted, error: false });
+      startTransition(() => router.refresh());
+    } catch {
+      setNotice({ text: labels.errors.generic, error: true });
+    } finally {
+      setActive(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-8" aria-busy={pending}>
+      <section aria-labelledby="storage-upload-title" className="border p-5 sm:p-6">
+        <h2 id="storage-upload-title" className="mb-4 font-medium">{labels.uploadTitle}</h2>
+        <form onSubmit={upload} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <label htmlFor="storage-file" className="text-sm">{labels.fileLabel}</label>
+            <input
+              id="storage-file"
+              name="file"
+              type="file"
+              required
+              disabled={pending || !configured}
+              aria-describedby="storage-limits"
+              className="min-w-0 w-full rounded-md border px-3 py-2 text-sm file:mr-4 file:font-medium disabled:opacity-50"
+            />
+          </div>
+          <Button type="submit" disabled={pending || !configured}>
+            {active === "upload" ? labels.uploading : labels.upload}
+          </Button>
+        </form>
+      </section>
+
+      {notice && (
+        <p role={notice.error ? "alert" : "status"} className={notice.error ? "text-destructive text-sm" : "text-sm"}>
+          {notice.text}
+        </p>
+      )}
+
+      <section aria-labelledby="storage-list-title" className="flex flex-col gap-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="storage-list-title" className="font-medium">{labels.listTitle}</h2>
+          <span className="text-muted-foreground text-sm tabular-nums">{files.length}</span>
+        </div>
+        {files.length === 0 ? (
+          <p className="border border-dashed px-5 py-10 text-muted-foreground text-sm">{labels.empty}</p>
+        ) : (
+          <ul className="divide-y border">
+            {files.map((file) => (
+              <li key={file.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="break-words font-medium text-sm">{file.name}</p>
+                  <p className="mt-1 text-muted-foreground text-xs tabular-nums">{file.size} · {file.createdAt}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {configured && !pending ? (
+                    <a
+                      href={`/api/storage/${encodeURIComponent(file.id)}`}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                      aria-label={`${labels.download}: ${file.name}`}
+                    >
+                      {labels.download}
+                    </a>
+                  ) : (
+                    <Button type="button" variant="outline" size="sm" disabled>
+                      {labels.download}
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={pending || !configured}
+                    onClick={() => deleteFile(file.id)}
+                    aria-label={`${labels.delete}: ${file.name}`}
+                  >
+                    {active === file.id ? labels.deleting : labels.delete}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}

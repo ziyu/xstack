@@ -1,0 +1,18 @@
+import { blog } from "@{{projectName}}/app-services";
+import Link from "next/link";
+import { requireAdmin } from "@/lib/admin";
+import { blogPage } from "@/lib/blog-page";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+export default async function BlogAdmin({ params, searchParams }: { params: Promise<{ lang: string }>; searchParams: Promise<{ page?: string }> }) {
+  const locale = resolveLocale((await params).lang);
+  const { user } = await requireAdmin(locale);
+  const t = getTranslator(locale);
+  const result = await blog.listAdmin(user, { page: blogPage((await searchParams).page) });
+  return <section><header className="mb-8 flex items-center justify-between"><h1 className="text-2xl font-semibold">{t("blog.manage")}</h1><Link className="rounded border px-4 py-2" href={localePath(locale, "/admin/blog/new")}>{t("blog.editor.create")}</Link></header>
+    {!result.posts.length && <p>{t("blog.adminEmpty")}</p>}
+    <ul className="divide-y">{result.posts.map((post) => <li key={post.id} className="flex justify-between gap-4 py-5"><div><Link className="font-medium underline" href={localePath(locale, `/admin/blog/${post.id}`)}>{post.title}</Link><p className="mt-1 text-sm text-muted-foreground">{post.locale} / {post.slug}</p></div><span>{post.status === "published" ? t("blog.published") : t("blog.draft")}</span></li>)}</ul>
+    <nav className="mt-8 flex justify-between" aria-label={t("blog.pagination")}>{result.page > 1 ? <Link href={localePath(locale, `/admin/blog?page=${result.page - 1}`)}>{t("blog.previous")}</Link> : <span />}{result.page * result.limit < result.total && <Link href={localePath(locale, `/admin/blog?page=${result.page + 1}`)}>{t("blog.next")}</Link>}</nav>
+  </section>;
+}

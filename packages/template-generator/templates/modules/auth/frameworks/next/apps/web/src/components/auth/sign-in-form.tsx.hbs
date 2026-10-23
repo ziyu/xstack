@@ -12,6 +12,9 @@ import type { SocialProvider } from "@/lib/social-providers";
 import { useLocale, useT } from "../i18n-provider";
 import { Field, formValue } from "./field";
 import { SocialButtons } from "./social-buttons";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
 
 export default function SignInForm({
   next,
@@ -25,16 +28,22 @@ export default function SignInForm({
   const locale = useLocale();
   const t = useT();
   const [pending, setPending] = useState(false);
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
     const form = new FormData(event.currentTarget);
     setPending(true);
     const { error } = await authClient.signIn.email({
       email: formValue(form, "email"),
       password: formValue(form, "password"),
       callbackURL: next,
-    });
+    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
     setPending(false);
     if (error) {
       toast.error(error.message ?? t("auth.errors.generic"));
@@ -63,7 +72,10 @@ export default function SignInForm({
             {t("auth.signIn.forgot")}
           </Link>
         )}
-        <Button type="submit" disabled={pending}>
+{{#if (includes product.features "captcha")}}
+        <Captcha action="login" challenge={captcha} />
+{{/if}}
+        <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
           {t("auth.signIn.submit")}
         </Button>
       </form>

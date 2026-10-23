@@ -1,0 +1,62 @@
+# AI studio
+
+Open `/en/dashboard/ai` or `/zh-CN/dashboard/ai` after signing in. The studio offers only configured providers and supported modalities, complete-text conversational replies, images, asynchronous video, private history, cancellation where supported, and owned downloads. No API key is sent to the browser.
+
+## Configuration and current provider capabilities
+
+Documentation checked on 2026-10-23. Model availability, access verification, region restrictions and upstream prices remain provider-controlled. Configure keys only on the server, and enable billing/access in each provider console before sending a real request.
+
+| Provider | Server environment | Default models | Capabilities |
+| --- | --- | --- | --- |
+| OpenAI | `OPENAI_API_KEY`, `OPENAI_CHAT_MODEL`, `OPENAI_IMAGE_MODEL` | `gpt-4.1-mini`, `gpt-image-2.5-flare` | Chat, PNG image; no video |
+| Google | `GEMINI_API_KEY`, `GEMINI_CHAT_MODEL`, `GEMINI_IMAGE_MODEL`, `GEMINI_VIDEO_MODEL` | `gemini-4-argon`, `gemini-nano-banana-2.1`, `gemini-omni-1.1-flash` | Chat, image, asynchronous MP4 video, cancellation |
+| OpenAI-compatible | `AI_COMPATIBLE_API_KEY`, `AI_COMPATIBLE_BASE_URL`, `AI_COMPATIBLE_CHAT_MODEL` | `https://api.deepseek.com`, `deepseek-flash` | Chat only |
+
+Only selected providers' environment variables and implementation files are generated. A custom compatible base URL is a trusted **operator-owned HTTPS server setting**, including an optional `/v1` path; it is never accepted from a user request. Chat compatibility alone does not imply support for image/video APIs.
+
+Official references and exact protocol:
+
+- [OpenAI chat completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create): `POST /v1/chat/completions`, messages, non-streaming text, output capped at 2048 tokens. [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini).
+- [OpenAI image generation](https://developers.openai.com/api/docs/guides/image-generation): `gpt-image-2.5-flare`, `POST /v1/images/generations`, one 1024×1024 PNG, `data[].b64_json`.
+- [OpenAI video notice](https://developers.openai.com/api/docs/guides/video-generation): **“The Sora 2 models and Videos API were shut down on September 24, 2026 and are no longer available. No one-to-one replacement API is available.”** This adapter intentionally does not advertise or call Sora.
+- [Gemini 4 Argon](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon), [Nano Banana image generation](https://ai.google.dev/gemini-api/docs/image-generation), [Omni video generation](https://ai.google.dev/gemini-api/docs/omni) document the exact Google model identifiers above. [Google video overview](https://ai.google.dev/gemini-api/docs/video) states that Veo 3.1 Preview has shut down; Omni is used instead.
+- [Google Interactions](https://ai.google.dev/gemini-api/docs/interactions-overview) and [background execution](https://ai.google.dev/gemini-api/docs/background-execution): `POST /v1beta/interactions`, `background:true` for video; `GET /v1beta/interactions/{id}` to poll; `POST /v1beta/interactions/{id}/cancel` to request cancellation. The REST response is parsed from `steps[type=model_output].content`, **not** SDK-only `output_video`/`output_image` accessors. Polling returns inline base64 video as documented by the Omni guide. Cancellation is final only when the provider reports `cancelled`; if generation wins the race, the completed result is retained and charged. Chat continues using the stored `previous_interaction_id`, preserving provider thought state. Google retains stored interactions according to its paid/free retention policies; an expired conversation may require a new chat.
+- [DeepSeek chat](https://api-docs.deepseek.com/api/create-chat-completion): `deepseek-flash`, `POST /chat/completions`, `messages`, `max_tokens`, `stream:false`.
+
+## Credits and costs
+
+Generated fixed product prices: chat **{{module.options.chatCost}}**, image **{{module.options.imageCost}}**, video **{{module.options.videoCost}}** credits per request. Change the module options before generating, or edit `packages/ai/src/registry.ts`. These are product credit prices, **not estimates of provider currency charges**. Each job snapshots its model and cost so changing configuration does not change a pending job's charge.
+
+When credits is selected, `ai-credits` registers billing after all services exist. A unique job is claimed with a conditional database update, then `credits.consume` commits before contacting the provider. An insufficient balance prevents the provider call. `(userId, requestId)` is unique; replaying the same UUID and identical payload returns/advances the same job, while changing a payload rejects the replay. Concurrent replays cannot make a second paid submission. Credits uses account serialization on PostgreSQL and atomic batch statements on SQLite/libSQL/D1, avoiding interactive SQLite write locks across JavaScript awaits.
+
+A definite rejection or a provider-reported asynchronous failure/cancellation refunds the matching debit once. Refunds derive the amount from the original ledger debit, not request input. Terminal job polling retries an interrupted refund safely. A failed media upload does **not** refund a successful generation: the result is persisted and `saving` can be retried without another model call.
+
+A network timeout, unexpected provider response, or crash between submission and persistence is **not proof the model failed**. Such jobs become `unknown`; their original debit remains held and automatic resubmission is forbidden. Reconcile these with provider request logs before any manual refund. For a confirmed failed request, use the server-only credits API `credits.refund(userId, 'ai:' + jobId)` and mark that specific job failed in the database after reconciliation. For Google, a recovered interaction ID can be saved to that job's `remote_id` and status changed from `unknown` to `running`; the normal authenticated poll retrieves its real result. Never reset a submitted job to `queued`.
+
+## Media and persistence
+
+`ai_job` stores owned request history, model/cost snapshots, status, leases, and provider IDs. `ai_media_chunk` persists base64 in 256,000-character rows to stay below D1 row limits. Only validated image PNG/JPEG/WebP and MP4 media are served, with a maximum of **8 MiB decoded bytes**; provider JSON is bounded while streaming at **12 MiB before parsing** to leave memory headroom on Workers. Oversized provider output is not false success: a submitted synchronous request becomes `unknown`, while an async job keeps its provider ID for operator reconciliation. Configure suitable short/small media models for this limit. Generated images are displayed without rendering provider text as HTML. Without storage, private media remains in the database. With storage, `ai-storage` calls `storage.storeGenerated(userId,{name,contentType,body})`, retains the returned file ID, and reads through ownership-checked `storage.readFile`; temporary database media is deleted after successful completion. Configure the selected storage provider before generating media.
+
+Media downloads accept **only an owned local job ID**, never client-supplied URLs. Provider output is inline base64: no arbitrary remote media URL is fetched. `/api/ai/{id}/media` authenticates every request and sends private/no-store responses. All mutation and polling requests enforce `BETTER_AUTH_URL` as their exact trusted Origin. JSON bodies are bounded at 40 KB, prompts at 8,000 characters, and chat history sent to OpenAI-compatible providers at 12 prior turns. The dashboard displays the newest 100 jobs.
+
+All job transitions are fenced by an owner token; a 30-second heartbeat renews the 180-second lease. External calls have bounded timeouts, and each media persistence stage renews ownership. A worker that loses its token cannot overwrite another worker's completion/refund. If an upload finishes after losing ownership, its unlinked storage object is removed. There is no cross-system transaction: a process crash after storage upload but before recording the returned file ID may leave an orphaned private storage file, visible in the owner's files list for cleanup. A crash during partial chunk persistence before `saving` is an unknown result for synchronous providers, not an automatically recoverable completed upload; asynchronous jobs with a saved provider ID can re-fetch their result. Do not claim exactly-once external delivery across an unknown network/crash boundary.
+
+## HTTP API
+
+- `GET /api/ai`: own history and configured capabilities.
+- `POST /api/ai`: `{requestId: UUID, provider, kind: 'chat'|'image'|'video', prompt, parentId?: UUID}` → `{job}`. Use the same UUID when retrying an uncertain HTTP response. `parentId` must be an owned completed chat from the same provider.
+- `POST /api/ai/{id}`: advance/poll; intentionally POST because completion can store media/refund credits.
+- `DELETE /api/ai/{id}`: request supported provider cancellation and poll its actual state.
+- `GET /api/ai/{id}/media`: owned image/video bytes.
+
+Video progress is reported as honest lifecycle states (the upstream interaction API does not expose a percentage). Poll at about 10 seconds, not continuously. Worker/host request deadlines must accommodate the 120-second outbound timeout for synchronous chat/image calls; video polling is resumable across requests. No queue/cron or browser-open requirement exists for job persistence, but a logged-in poll is needed to finalize asynchronous work.
+
+## Verification
+
+In the generator repository, after generating an all-provider AI+credits SQLite fixture and applying migrations:
+
+```sh
+bun apps/cli/live-tests/ai.ts apps/cli/.smoke/<project> apps/cli/.smoke/<project>/<database-file>
+```
+
+This permanent protocol regression executes generated services and a real SQLite database; only remote HTTP transport is a clearly labeled fixture. It covers concurrency, replay mismatch, ownership, insufficient balance before submission, failure/refund replay, image bytes, asynchronous video completion/error/cancellation, unknown-outcome safety, and compatible chat. It is **not cloud acceptance**. Real provider generation and cloud storage acceptance require dedicated credentials and explicit authorization for paid requests.

@@ -1,0 +1,27 @@
+import { referralCodeSchema, referralCookieFromHeader, referralCookieName, referralCookieSeconds } from "@{{projectName}}/affiliate";
+import { affiliate } from "@{{projectName}}/app-services";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { ENV } from "@/env.server";
+import { getSession } from "@/lib/session";
+
+const inputSchema = z.object({ code: referralCodeSchema, lang: z.enum(["en", "zh-CN"]) }).strict();
+
+export async function POST(request: Request) {
+  const trusted = new URL(ENV.BETTER_AUTH_URL);
+  const failure = (status: number, error: string) => Response.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
+  if (request.headers.get("origin") !== trusted.origin) return failure(403, "forbidden");
+  const input = inputSchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if (!input.success) return failure(400, "invalid_referral");
+  // Referrals are only for new signups. Existing accounts cannot attach an inviter.
+  if (await getSession()) return failure(409, "existing_account");
+  const value = await affiliate.capture(input.data.code, referralCookieFromHeader(request.headers.get("cookie") ?? undefined));
+  if (!value) return failure(404, "unknown_referrer");
+  const response = NextResponse.redirect(new URL(`/${input.data.lang}/signup`, trusted.origin), 303);
+  response.headers.set("Cache-Control", "no-store");
+  response.cookies.set(referralCookieName, value, {
+    httpOnly: true, secure: trusted.protocol === "https:", sameSite: "lax", path: "/", maxAge: referralCookieSeconds,
+  });
+  return response;
+}

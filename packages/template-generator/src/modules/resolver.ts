@@ -59,7 +59,7 @@ function supportGaps(support: Support | undefined, stack: StackContext, subject:
     gaps.push(`${subject} requires one of these databases: ${support.dialects.join(", ")}`);
   }
   const target = toDeployTarget(stack.webDeploy);
-  if (support.targets && target !== "none" && !support.targets.includes(target)) {
+  if (support.targets && !support.targets.includes(target)) {
     gaps.push(
       `${subject} cannot be deployed to ${target} (supported: ${support.targets.join(", ")})`,
     );
@@ -217,7 +217,7 @@ function resolveEntry(
   const id = manifest.id;
   const requested = selection.providers[id];
   const options = resolveOptions(manifest, selection.options[id] ?? {}, issues);
-  const candidates = pickProviders(manifest, requested, issues);
+  const candidates = pickProviders(manifest, requested, stack, issues);
   const input = { providers: candidates, options };
 
   const nativeGaps = forceStack
@@ -236,6 +236,17 @@ function resolveEntry(
   const fallback = manifest.domain?.stack;
 
   if (!forceStack && !nativeGaps.length && nativeFits) {
+    if (
+      stack.webDeploy === "cloudflare" &&
+      manifest.supports?.dialects &&
+      (stack.database !== "sqlite" || (stack.dbSetup !== undefined && stack.dbSetup !== "d1"))
+    ) {
+      issues.push({
+        level: "error",
+        module: id,
+        message: `Native module "${id}" on Cloudflare requires database sqlite and dbSetup d1; selected database ${stack.database}${stack.dbSetup === undefined ? "" : ` and dbSetup ${stack.dbSetup}`}`,
+      });
+    }
     checkProviderCount(manifest, candidates, issues);
     if (requested === undefined && candidates.length) {
       notes.push(`Using default providers for "${id}": ${candidates.join(", ")}`);
@@ -287,6 +298,7 @@ function resolveEntry(
 function pickProviders(
   manifest: ModuleManifest,
   requested: string[] | undefined,
+  stack: StackContext,
   issues: ResolveIssue[],
 ): string[] {
   const spec = manifest.providers;
@@ -301,7 +313,9 @@ function pickProviders(
     return [];
   }
 
-  const providers = requested ? [...new Set(requested)] : [...(spec.default?.global ?? [])];
+  const defaults =
+    spec.targetDefaults?.[toDeployTarget(stack.webDeploy)] ?? spec.default?.global ?? [];
+  const providers = requested === undefined ? [...defaults] : [...new Set(requested)];
   for (const id of providers) {
     if (!spec.options[id]) {
       issues.push({
@@ -356,11 +370,16 @@ function resolveOptions(
     let value = requested[key] ?? spec.default;
     if (spec.type === "number") {
       value = Number(value);
-      if (!Number.isFinite(value) || (spec.min !== undefined && value < spec.min)) {
+      if (
+        !Number.isFinite(value) ||
+        (spec.integer && !Number.isSafeInteger(value)) ||
+        (spec.min !== undefined && value < spec.min) ||
+        (spec.max !== undefined && value > spec.max)
+      ) {
         issues.push({
           level: "error",
           module: manifest.id,
-          message: `Option "${manifest.id}.${key}" must be a number${spec.min === undefined ? "" : ` >= ${spec.min}`}`,
+          message: `Option "${manifest.id}.${key}" must be ${spec.integer ? "an integer" : "a number"}${spec.min === undefined ? "" : ` >= ${spec.min}`}${spec.max === undefined ? "" : ` <= ${spec.max}`}`,
         });
       }
     }

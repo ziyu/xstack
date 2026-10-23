@@ -14,6 +14,13 @@ The complete matrix has millions of core cases before addon and example subsets.
 
 `--limit N` bounds a run for development; a limited run reports incomplete coverage and exits nonzero. Zero matching cases also exits nonzero. An enumerated case only passes after its runtime checks and resource cleanup succeed. Missing adapters or credentials are blocked, never passed.
 
+### Native Cloudflare D1 and R2 binding
+
+Generate a disposable Next/self/Drizzle project with `--web-deploy cloudflare --database sqlite --db-setup d1`, storage provider `r2-binding`, and compatible full providers (`email=resend`, `sms=twilio`, `payment=stripe`). Explicit Node-only provider selections are errors, not automatic substitutions. From the generated root, run `db:generate` then `db:migrate:local`. Set the app origin/credentials in `.env`, copy them to `apps/web/.dev.vars`, and run `build:cloudflare` then `preview:cloudflare` from `apps/web`. This uses real local workerd/D1/R2 without a Cloudflare account; it does not verify deployed cloud IAM or paid providers.
+
+For an auth+storage fixture under `apps/cli/.smoke`, run `bun apps/cli/live-tests/storage.ts <fixture> http://localhost:8787 r2-binding`. This checks local attachment bytes, ownership, mutation origins, upload bounds and deletion. Full fixtures additionally require their configured verification-email and Turnstile signup flow; do not disable those controls to claim full-preset acceptance. Full end-to-end module tests remain separate from this focused storage check.
+
+
 ## Accounts
 
 Supply credentials in the local process environment or use the provider CLI's existing login. Do not commit credentials here.
@@ -84,6 +91,40 @@ Generate an `auth` + `auth:wechat` Next.js/SQLite fixture under `apps/cli/.smoke
 Generate an auth/payment/credits SQLite fixture under `apps/cli/.smoke` with `auth:none` and `payment:wechat,alipay`, install dependencies, and apply its schema to `<fixture>/local.db`. Run `bun apps/cli/live-tests/payments.ts apps/cli/.smoke/<fixture>`. It exercises real generated payment services and credit ledger with ephemeral RSA keys and a controlled WeChat HTTP boundary. Checks cover signed checkout/response, Alipay page URL signatures, bad signatures/timestamps/key IDs, wrong app/merchant/amount/currency, provider/order binding, private QR ownership and repeat notifications granting credits once.
 
 This does not contact payment providers or transfer money. Live acceptance still requires approved Native/desktop payment products, matching credentials, reachable HTTPS notifications, a real scan/payment and settlement reconciliation. Generated build samples use `XSTACK_BUILD_SAMPLES=1 XSTACK_BUILD_SAMPLE_FILTER=product-domestic-payment bun test apps/cli/test/generated-builds.test.ts`.
+
+## Private object storage checks
+
+Generate a native SQLite project under `apps/cli/.smoke` with `--features storage --providers auth:none storage:oss` or `storage:cos`. Install, apply the database schema, configure a dedicated private test bucket and start the app with `BETTER_AUTH_URL` matching its loopback origin. Run `bun apps/cli/live-tests/storage.ts apps/cli/.smoke/<fixture> http://localhost:<port>`. This creates disposable accounts and uploads/deletes files; never use production credentials. It checks authentication, cross-origin rejection, empty/oversized/duplicate file rejection, ownership isolation, signed attachment redirects and deletion.
+
+The provider SDK may be intercepted at its HTTP boundary for local protocol verification, but that is not cloud acceptance. Real acceptance must confirm private ACL/IAM, downloaded bytes, expiry and deletion against a dedicated OSS/COS bucket. Avoid interceptors that replace global Fetch/Request/Headers: they can interfere with Better Auth SSR; the local SDK fixture used HTTP-only interception. Build matrix: `XSTACK_BUILD_SAMPLES=1 XSTACK_BUILD_SAMPLE_FILTER=product-storage bun test apps/cli/test/generated-builds.test.ts` covers both providers with SQLite/PostgreSQL.
+
+## Captcha HTTP protocol checks
+
+Generate native Next.js/SQLite `captcha` (optionally full preset) under `apps/cli/.smoke`, install dependencies and apply schema to `local.db`. Set `TURNSTILE_SITE_KEY=captcha-fixture-site`, `TURNSTILE_SECRET_KEY=captcha-fixture-secret`, `TURNSTILE_TEST_MODE=false`, and `BETTER_AUTH_URL` to the exact loopback application origin. If email is selected, configure a disposable email delivery fixture too; successful signup must still execute its real email/event integrations.
+
+Start the signed local protocol server separately:
+
+```sh
+CAPTCHA_FIXTURE_SIGNING_KEY=disposable-local-signing-key-32-characters bun apps/cli/live-tests/captcha-provider.ts 4399
+```
+
+Start the generated Next development or production server with `CAPTCHA_FIXTURE_ORIGIN=http://127.0.0.1:4399` and `NODE_OPTIONS="--import /absolute/repo/apps/cli/live-tests/captcha-preload.mjs"`. The preload refuses non-`.smoke` working directories and non-loopback fixture addresses, redirects only the exact Siteverify URL, and is not copied into generated code. Run:
+
+```sh
+bun apps/cli/live-tests/captcha.ts apps/cli/.smoke/captcha-app http://127.0.0.1:3001 http://127.0.0.1:4399
+```
+
+This exercises generated auth via HTTP and checks the actual SQLite user table: missing/forged tokens, host/action/time mismatch, single-use replay, trusted Origin, account creation, login/session, and public-only configuration. To obtain tokens for combined module checks, POST `{ "action": "signup", "hostname": "127.0.0.1" }` to the fixture's `/issue` endpoint; send the returned `token` as `x-captcha-token` and the exact application Origin with auth requests. Browser protocol checks may replace only the external widget script with a local widget that requests signed fixture tokens using the supplied `render` action; they must not bypass the server hook. This is **not real Cloudflare validation**. Live acceptance uses real keys, browser-issued tokens, expiry/replay cases and a deployed hostname. Published dummy keys are only allowed with explicit local development test mode and are not proof of production binding/replay protection.
+
+## P3 combined verification
+
+Build samples: `XSTACK_BUILD_SAMPLES=1 XSTACK_BUILD_SAMPLE_FILTER=product-p3 bun test apps/cli/test/generated-builds.test.ts` covers full SQLite/PostgreSQL, standalone AI/SEO/blog/affiliate/captcha, and S3/R2 API projects.
+
+- `bun apps/cli/live-tests/ai.ts <fixture> <fixture>/local.db`: generated AI and real SQLite ledger; concurrent replay, insufficient credits, definite/async failure refunds, cancellation, image/video bytes and ambiguous-outcome safety. External model HTTP is intercepted; no paid generation occurs.
+- `bun apps/cli/live-tests/affiliate.ts <fixture>`: actual auth, signed Stripe notifications and credit ledger; attribution, private-field rejection, self-referral, concurrent/repeated settlement, retry recovery and renewal exclusion.
+- `CONTENT_ADMIN_COOKIE=… CONTENT_USER_COOKIE=… bun apps/cli/live-tests/content.ts <fixture> <origin>`: actual admin/public HTTP CRUD, drafts, locale translations, optimistic revisions, safe Markdown/JSON-LD and live sitemap. Supply real sessions from the captcha/email-protected auth flow.
+
+Cloudflare: generate full with D1 and `storage:r2-binding`, install, `db:generate`, `db:migrate:local`, then `build:cloudflare` and `preview:cloudflare`. Local workerd uses real D1/R2. Combined provider tests may intercept exact outbound service URLs in a throwaway Miniflare harness; all other outbound calls must be rejected. This is not live cloud/model/payment acceptance. Do not put fixture transports or credentials into generated production code.
 
 ## Selected validation run
 

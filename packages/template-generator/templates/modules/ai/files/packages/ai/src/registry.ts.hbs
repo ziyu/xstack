@@ -1,0 +1,38 @@
+import { z } from "zod";
+import type { AIProvider } from "./types";
+{{#if (includes module.providers "openai")}}
+import { openai } from "./providers/openai";
+{{/if}}
+{{#if (includes module.providers "google")}}
+import { google } from "./providers/google";
+{{/if}}
+{{#if (includes module.providers "openai-compatible")}}
+import { compatible } from "./providers/openai-compatible";
+{{/if}}
+export type AIEnv = {
+{{#if (includes module.providers "openai")}}
+  OPENAI_API_KEY?: string; OPENAI_CHAT_MODEL?: string; OPENAI_IMAGE_MODEL?: string;
+{{/if}}
+{{#if (includes module.providers "google")}}
+  GEMINI_API_KEY?: string; GEMINI_CHAT_MODEL?: string; GEMINI_IMAGE_MODEL?: string; GEMINI_VIDEO_MODEL?: string;
+{{/if}}
+{{#if (includes module.providers "openai-compatible")}}
+  AI_COMPATIBLE_API_KEY?: string; AI_COMPATIBLE_BASE_URL?: string; AI_COMPATIBLE_CHAT_MODEL?: string;
+{{/if}}
+};
+export function providers(env: AIEnv): AIProvider[] {
+  const selected: (AIProvider | undefined)[] = [
+{{#if (includes module.providers "openai")}}
+    openai(env),
+{{/if}}
+{{#if (includes module.providers "google")}}
+    google(env),
+{{/if}}
+{{#if (includes module.providers "openai-compatible")}}
+    compatible(env),
+{{/if}}
+  ];
+  return selected.filter((provider): provider is AIProvider => provider !== undefined);
+}
+const creditPrice = z.number().int().positive().max(2_147_483_647);
+export const costs = z.object({ chat: creditPrice, image: creditPrice, video: creditPrice }).parse({ chat: {{module.options.chatCost}}, image: {{module.options.imageCost}}, video: {{module.options.videoCost}} });

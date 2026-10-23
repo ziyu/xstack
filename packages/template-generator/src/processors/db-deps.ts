@@ -111,10 +111,10 @@ function processDrizzleDeps(
     addPackageDependency({
       vfs,
       packagePath: dbPkgPath,
-      dependencies: ["drizzle-orm", "@libsql/client", "libsql"],
-      devDependencies: ["drizzle-kit"],
+      dependencies: dbSetup === "d1" ? ["drizzle-orm"] : ["drizzle-orm", "@libsql/client", "libsql"],
+      devDependencies: dbSetup === "d1" ? ["drizzle-kit", "@cloudflare/workers-types"] : ["drizzle-kit"],
     });
-    if (webExists) {
+    if (webExists && dbSetup !== "d1") {
       addPackageDependency({
         vfs,
         packagePath: webPkgPath,

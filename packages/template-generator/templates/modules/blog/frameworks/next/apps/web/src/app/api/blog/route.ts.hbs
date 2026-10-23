@@ -1,0 +1,17 @@
+import { blog } from "@{{projectName}}/app-services";
+import { z } from "zod";
+import { blogActor, blogFailure, blogResponse, readBlogJson } from "@/lib/blog-http";
+
+export async function GET(request: Request) {
+  try {
+    const actor = await blogActor(request);
+    const page = z.coerce.number().int().min(1).max(100_000).parse(new URL(request.url).searchParams.get("page") ?? 1);
+    return blogResponse(await blog.listAdmin(actor, { page }));
+  } catch (error) { return blogFailure(error); }
+}
+export async function POST(request: Request) {
+  try {
+    const actor = await blogActor(request, true);
+    return blogResponse(await blog.create(actor, await readBlogJson(request)), 201);
+  } catch (error) { return blogFailure(error); }
+}

@@ -23,6 +23,7 @@ function stackContext(stack: StackState): StackContext {
     orm: stack.orm,
     api: stack.api,
     webDeploy: stack.webDeploy,
+    dbSetup: stack.dbSetup,
   };
 }
 

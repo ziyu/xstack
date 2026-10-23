@@ -6,7 +6,7 @@ import {
   type creditTransactionTypes,
 } from "@{{projectName}}/db/schema/credits";
 import type { EventBus } from "@{{projectName}}/events";
-import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, count, desc, eq, {{#if (eq database "postgres")}}gte, {{/if}}sql } from "drizzle-orm";
 
 import "./events";
 
@@ -41,18 +41,57 @@ export function createCredits(db: Database, events: EventBus) {
 
   /** Applies a signed change to the balance and records it, atomically. */
   async function apply(userId: string, amount: number, entry: CreditEntry) {
-    if (!Number.isInteger(amount) || amount === 0) {
-      throw new RangeError("Credit amounts must be non-zero integers");
+    if (!Number.isSafeInteger(amount) || amount === 0 || Math.abs(amount) > 2_147_483_647) {
+      throw new RangeError("Credit amounts must be non-zero 32-bit integers");
     }
+    const referenceId = entry.referenceId ?? crypto.randomUUID();
+    const verifyReplay = (existing: CreditTransaction) => {
+      if (existing.userId !== userId || existing.amount !== amount || existing.type !== entry.type) {
+        throw new Error("Credit reference was reused with different parameters");
+      }
+      return existing;
+    };
+
+{{#if (eq database "sqlite")}}
+    const id = crypto.randomUUID();
+    // D1 and libSQL batch execute one atomic SQLite transaction without
+    // yielding an interactive write lock between statements.
+    let inserted: CreditTransaction[];
+    try {
+      const result = await db.batch([
+        db.insert(creditBalance).values({ userId, balance: 0 }).onConflictDoNothing(),
+        db.insert(creditTransaction).values({
+          id, userId, amount, type: entry.type, reason: entry.reason, referenceId,
+          balanceAfter: sql`(select balance + ${amount} from credit_balance where user_id = ${userId} and balance + ${amount} between 0 and 2147483647)`,
+        }).onConflictDoNothing({ target: creditTransaction.referenceId }).returning(),
+        db.update(creditBalance).set({
+          balance: sql`${creditBalance.balance} + ${amount}`, updatedAt: new Date(),
+        }).where(and(eq(creditBalance.userId, userId), sql`exists (select 1 from credit_transaction where id = ${id})`)),
+      ]);
+      inserted = result[1];
+    } catch (error) {
+      const [existing] = await db.select().from(creditTransaction).where(eq(creditTransaction.referenceId, referenceId));
+      if (existing) return verifyReplay(existing);
+      const balance = await getBalance(userId);
+      if (amount < 0 && balance < -amount) throw new InsufficientCreditsError(balance, -amount);
+      if (balance + amount > 2_147_483_647) throw new RangeError("Credit balance exceeds the supported limit");
+      throw error;
+    }
+    const transaction = inserted[0] ?? (await db.select().from(creditTransaction).where(eq(creditTransaction.referenceId, referenceId)))[0];
+    if (!transaction) throw new Error("Credit mutation returned no ledger entry");
+    const result = { transaction: verifyReplay(transaction), applied: inserted.length > 0 };
+{{else}}
 
     const result = await db.transaction(async (tx) => {
-      if (entry.referenceId) {
-        const [existing] = await tx
-          .select()
-          .from(creditTransaction)
-          .where(eq(creditTransaction.referenceId, entry.referenceId));
-        if (existing) return { transaction: existing, applied: false };
-      }
+      // Lock the PostgreSQL account before checking the idempotency reference.
+      // Waiting transactions see the committed ledger and current balance.
+      await tx.insert(creditBalance).values({ userId, balance: 0 }).onConflictDoNothing();
+      await tx.update(creditBalance).set({ balance: sql`${creditBalance.balance}` }).where(eq(creditBalance.userId, userId));
+      const [existing] = await tx.select().from(creditTransaction).where(eq(creditTransaction.referenceId, referenceId));
+      if (existing) return { transaction: verifyReplay(existing), applied: false };
+      const [current] = await tx.select().from(creditBalance).where(eq(creditBalance.userId, userId));
+      if (!current) throw new Error("Missing credit balance");
+      if (current.balance + amount > 2_147_483_647) throw new RangeError("Credit balance exceeds the supported limit");
 
       const [row] =
         amount > 0
@@ -69,7 +108,7 @@ export function createCredits(db: Database, events: EventBus) {
               .set({ balance: sql`${creditBalance.balance} - ${-amount}`, updatedAt: new Date() })
               .where(and(eq(creditBalance.userId, userId), gte(creditBalance.balance, -amount)))
               .returning();
-      if (!row) throw new InsufficientCreditsError(await getBalance(userId), -amount);
+      if (!row) throw new InsufficientCreditsError(current.balance, -amount);
 
       const [transaction] = await tx
         .insert(creditTransaction)
@@ -80,11 +119,12 @@ export function createCredits(db: Database, events: EventBus) {
           balanceAfter: row.balance,
           type: entry.type,
           reason: entry.reason,
-          referenceId: entry.referenceId,
+          referenceId,
         })
         .returning();
       return { transaction: transaction!, applied: true };
     });
+{{/if}}
 
     if (result.applied) {
       await events.emit("credits.changed", {
@@ -109,6 +149,15 @@ export function createCredits(db: Database, events: EventBus) {
       return apply(userId, -Math.abs(amount), { ...entry, type: "consume" });
     },
 
+    /** Refund a specific debit once; callers cannot refund more than was charged. */
+    async refund(userId: string, referenceId: string) {
+      const [debit] = await db.select().from(creditTransaction).where(and(
+        eq(creditTransaction.userId, userId), eq(creditTransaction.referenceId, referenceId),
+      ));
+      if (!debit) return null;
+      if (debit.amount >= 0 || debit.type !== "consume") throw new Error("Reference is not a debit");
+      return apply(userId, -debit.amount, { type: "refund", referenceId: `refund:${referenceId}`, reason: debit.reason ?? undefined });
+    },
     /** Signed manual correction, e.g. from the admin console. */
     adjust(userId: string, amount: number, reason: string) {
       return apply(userId, amount, { type: "adjust", reason });

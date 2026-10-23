@@ -1,0 +1,12 @@
+import { ai } from "@{{projectName}}/app-services";
+import { getSession } from "@/lib/session";
+import { aiErrorResponse, privateHeaders } from "@/lib/ai-http";
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "unauthorized" }, { status: 401, headers: privateHeaders });
+  try {
+    const result = await ai.media(session.user.id, (await params).id);
+    return new Response(result.body, { headers: { ...privateHeaders, "Content-Type": result.contentType, "Content-Disposition": "inline", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" } });
+  } catch (error) { return aiErrorResponse(error); }
+}

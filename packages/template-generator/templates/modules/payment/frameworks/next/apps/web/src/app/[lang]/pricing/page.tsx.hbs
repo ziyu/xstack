@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 
 import { formatMoney } from "@/lib/format";
 import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { pageMetadata } from "@/lib/page-metadata";
 
 import { startCheckout } from "./actions";
 
@@ -14,8 +15,9 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const t = getTranslator(resolveLocale((await params).lang));
-  return { title: t("payment.pricing.title") };
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  return pageMetadata({ locale, path: "/pricing", title: t("payment.pricing.title"), description: t("payment.pricing.subtitle") });
 }
 
 export default async function PricingPage({ params, searchParams }: Props) {

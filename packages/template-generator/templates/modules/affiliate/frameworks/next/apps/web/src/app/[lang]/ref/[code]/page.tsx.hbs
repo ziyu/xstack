@@ -1,0 +1,28 @@
+import { affiliate } from "@{{projectName}}/app-services";
+import { Button } from "@{{projectName}}/ui/components/button";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
+
+type Props = { params: Promise<{ lang: string; code: string }> };
+
+export default async function ReferralPage({ params }: Props) {
+  const { lang, code } = await params;
+  const locale = resolveLocale(lang);
+  const t = getTranslator(locale);
+  if (!await affiliate.findInviter(code)) notFound();
+  return (
+    <main className="mx-auto flex max-w-xl flex-col gap-6 px-6 py-24">
+      <p className="text-sm uppercase tracking-widest text-muted-foreground">{t("affiliate.invite.eyebrow")}</p>
+      <h1 className="text-4xl font-semibold tracking-tight">{t("affiliate.invite.title")}</h1>
+      <p className="text-muted-foreground">{t("affiliate.invite.description")}</p>
+      <form action={`/api/affiliate/capture?${new URLSearchParams({ code, lang: locale })}`} method="post">
+        <Button type="submit">{t("affiliate.invite.accept")}</Button>
+      </form>
+      <p className="border-t pt-4 text-sm text-muted-foreground">{t("affiliate.policy", { percent: affiliate.commissionPercent })}</p>
+    </main>
+  );
+}

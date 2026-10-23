@@ -6,9 +6,11 @@ import type { TemplateData } from "../template-handlers/utils";
 import { GeneratorError, type RenderConfig } from "../types";
 import { dependencyVersionMap } from "../utils/add-deps";
 import { MODULE_CATALOG } from "./catalog";
+import { finalizeCloudflareModules } from "./cloudflare";
 import { hasErrors, resolveModules, toSelection } from "./resolver";
 import {
   addAppDependencies,
+  addServerExternalPackages,
   appendEnv,
   camel,
   declareEnvSchema,
@@ -234,6 +236,7 @@ export function processModuleTemplates(
     if (manifest.appDependencies) addAppDependencies(vfs, manifest.appDependencies);
     for (const spec of providerSpecs) {
       if (spec.appDependencies) addAppDependencies(vfs, spec.appDependencies);
+      if (spec.serverExternalPackages) addServerExternalPackages(vfs, spec.serverExternalPackages);
     }
   }
 
@@ -272,6 +275,7 @@ export function finalizeModules(vfs: VirtualFileSystem, config: ProjectConfig): 
     config,
     plan.modules.flatMap((m) => m.manifest.services ?? []),
   );
+  finalizeCloudflareModules(vfs, config, plan);
 }
 
 /** README section describing the feature modules and their first-run steps. */
@@ -290,7 +294,9 @@ export function moduleReadmeSection(config: ProjectConfig): string {
     ids.has("admin")
       ? "Add your email to `ADMIN_EMAILS` before signing up so your account gets the admin role."
       : "",
-    `Create the tables with \`${run} db:push\`.`,
+    config.dbSetup === "d1"
+      ? `Create tables with \`${run} db:generate\` then \`${run} db:migrate:local\`; see [Cloudflare deployment](docs/cloudflare.md).`
+      : `Create the tables with \`${run} db:push\`.`,
     `Start the app with \`${run} dev\`.`,
     ids.has("email")
       ? "Without an email provider key, development emails (verification, password reset) are printed to the server console."

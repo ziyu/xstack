@@ -1,0 +1,49 @@
+# Bot protection / 人机验证
+
+Cloudflare Turnstile protects the actual Better Auth **before** hook, not only forms. Selecting `captcha` automatically includes native `auth` and its database prerequisites. OAuth callbacks, session reads and payment webhooks remain unaffected.
+
+## Production configuration
+
+Create a widget at <https://dash.cloudflare.com/?to=/:account/turnstile>, authorize your production hostname, and configure server environment:
+
+```dotenv
+TURNSTILE_SITE_KEY=your-widget-site-key
+TURNSTILE_SECRET_KEY=your-widget-secret
+TURNSTILE_TEST_MODE=false
+```
+
+`BETTER_AUTH_URL` supplies both the trusted Origin and the exact expected hostname (no wildcard/subdomain matching). Missing keys, accidental public dummy keys, inaccessible Siteverify, malformed responses and failed challenges **fail closed**. Unconfigured protected actions return `503 CAPTCHA_NOT_CONFIGURED`; missing tokens return `400 CAPTCHA_REQUIRED`; rejected/expired/spent tokens return `400 CAPTCHA_INVALID`. Tokens are valid for at most 300 seconds and single-use according to Siteverify. Do not retry requests with a consumed token, including requests whose auth validation failed after verification. No forwarding header is trusted as an IP; the optional Siteverify `remoteip` is deliberately omitted.
+
+Only the site key is returned by `/api/captcha/config` at runtime, avoiding build-time public environment substitution. Never expose the secret through a `NEXT_PUBLIC_` variable. Allow `https://challenges.cloudflare.com` in your CSP `script-src` and `frame-src`; do not self-host or cache the widget script. Keep the provider reachable from the server (including Workers).
+
+| Better Auth endpoint | Widget action |
+| --- | --- |
+| `/sign-up/email` | `signup` |
+| `/sign-in/email` | `login` |
+| `/request-password-reset` | `password_reset_request` |
+| `/reset-password` | `password_reset` |
+| `/send-verification-email` | `email_verification` |
+| `/phone-number/send-otp` | `phone_otp` |
+
+Generated login/signup/reset/phone-send forms render the widget and send `x-captcha-token` with the auth request. Buttons remain disabled until a token is available; expiry/error clears it; each completed request resets the widget. Phone OTP verification itself uses its existing bounded, single-use challenge and does not require a second captcha. Any custom resend-verification UI must render `Captcha` with `email_verification` and pass its token header. Internal server calls to these mutations must also supply the configured Origin and a valid token; calling the raw HTTP endpoint or Better Auth server API does not bypass the hook.
+
+## Explicit local development
+
+Only on `NODE_ENV=development` **and** a loopback `BETTER_AUTH_URL`, set `TURNSTILE_TEST_MODE=true` and leave both keys empty. This explicitly selects Cloudflare's public always-pass pair:
+
+- Site key: `1x00000000000000000000AA`
+- Secret: `1x0000000000000000000000000000000AA`
+
+The real widget and Siteverify are still used. Public dummy tokens do not carry meaningful production hostname/action/timestamp bindings and do not establish replay resistance; those checks are only relaxed in this explicitly enabled, local development mode. It is rejected in production or on non-loopback domains. Never use it as evidence of production bot protection. Production verification requires real keys and real browser-issued tokens, including expired and replayed token checks.
+
+## Local protocol verification
+
+The source repository includes `apps/cli/live-tests/captcha-provider.ts` (a local signed HTTP Siteverify fixture), `captcha-preload.mjs` (test-process-only routing of the exact Cloudflare URL), and `captcha.ts` (requests through the generated auth HTTP boundary plus SQLite assertions). See its live-test README for commands. These verify missing/forged/wrong-action/wrong-host/stale/replayed tokens, origin binding, actual account creation, actual login/session and secret-free public configuration. No test URL or interceptor is generated into this application. This protocol fixture is not Cloudflare network acceptance. Verify the widget, CSP, configured hostname, invalid/replayed token rejection and a successful actual login on your deployment with real keys.
+
+## 中文说明
+
+选择 `captcha` 会自动引入认证依赖，并在 Better Auth 的服务端 before hook 中强制校验，直接调用 HTTP 或服务端 API 也不能绕过。注册、邮箱登录、重置密码申请与提交、验证邮件重发、手机验证码发送均受保护；OAuth 回调、会话读取和支付 webhook 不受影响。
+
+生产环境必须配置真实的 `TURNSTILE_SITE_KEY`、`TURNSTILE_SECRET_KEY` 与正确的 `BETTER_AUTH_URL`，密钥缺失时受保护操作关闭并返回明确配置错误。服务端必须验证 success、准确 hostname、action、五分钟时效，过期或重复 token 不能再次使用；每次提交后前端重置挑战。公开配置接口只返回 site key，secret 永不传给浏览器。不信任任意转发 IP 头。
+
+仅当 `NODE_ENV=development`、认证地址为本机回环地址且显式设置 `TURNSTILE_TEST_MODE=true` 时才启用 Cloudflare 公开测试密钥。此模式仍调用真实 Siteverify，但测试 token 不具备生产绑定和防重放保证，不能作为上线安全验收。部署前用真实密钥验证成功、过期、重复、错误 hostname/action、CSP 及 Workers 出站网络。本地签名 HTTP 夹具仅验证协议与实际认证边界，不代表已通过真实 Cloudflare 验收。

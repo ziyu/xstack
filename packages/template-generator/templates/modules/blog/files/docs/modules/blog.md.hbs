@@ -1,0 +1,25 @@
+# Blog publishing
+
+Blog requires auth and the admin console, but does not require SEO. No articles are seeded. Migrate the generated `blog_post` schema before opening the authoring UI. SQLite and Cloudflare D1 use the same schema and single-statement writes; PostgreSQL uses timezone-aware timestamps. No transaction API is needed.
+
+Sign in as an administrator, open `/{locale}/admin/blog`, and create a draft. Complete title, summary, Markdown and a lowercase ASCII URL slug, then save. Drafts must be created before publishing. Edit the saved draft and choose Published. Changing it back to Draft removes it immediately from public pages and the sitemap. Deletion is permanent. Updates and deletions use revision checks, so a stale editor receives 409 instead of silently overwriting another editor. A published edit becomes public immediately; to prepare private revisions, first unpublish the article. The first publication timestamp and original author display name are preserved across later edits/republication.
+
+Create each translation as a separate post with its configured language, localized title/body and locale-specific slug. Copy the original post's Translation group ID to connect alternate languages. Unique database indexes enforce one slug per locale and one locale per translation group. Only published translations receive hreflang links. Do not reuse a translation group for unrelated content.
+
+Public listing and detail routes are `/{locale}/blog` and `/{locale}/blog/{slug}`. Listing pages use `?page=2` pagination with self-canonical URLs. Draft detail requests return 404 even for signed-in administrators; private previews exist only in the guarded editor. Markdown is rendered using react-markdown without raw HTML, unsafe URL schemes or remote images. Inline HTML is dropped, not injected. JSON-LD is escaped before embedding and reports the real saved headline, author, first publication date and last modification date.
+
+Without SEO, metadata uses `BETTER_AUTH_URL` as its canonical public origin. With SEO, set `SITE_URL` and the blog integration uses it for both metadata and sitemap URLs. SEO dynamically includes published posts and populated blog index pages. No private routes are listed. The blog works independently without adding robots/sitemap routes.
+
+## HTTP authoring API
+
+All `/api/blog` routes require an authenticated administrator. Writes additionally require an Origin header matching `BETTER_AUTH_URL`; body parsing is bounded to 512KB and validated with Zod. No API response is publicly cached.
+
+- `GET /api/blog?page=1`: paginated private records, including drafts.
+- `POST /api/blog`: `{ locale, slug, title, excerpt, body, translationKey?, status: "draft" }`; returns the new record (201).
+- `GET /api/blog/:id`: private record.
+- `PUT /api/blog/:id`: `{ revision, post: { locale, slug, title, excerpt, body, translationKey?, status } }`.
+- `DELETE /api/blog/:id`: `{ revision }`, returns 204.
+
+## Runtime verification
+
+From the xstack repository, run `bun apps/cli/live-tests/content.ts apps/cli/.smoke/<project> http://localhost:<port>` against a disposable running generated app. Supply `CONTENT_ADMIN_COOKIE` and `CONTENT_USER_COOKIE` from real admin and ordinary-user sessions. The script creates and deletes its own posts via the generated API and checks authentication/authorization, draft privacy, publish/edit/unpublish, unique slugs, translations, safe Markdown, sitemap lifecycle and optimistic concurrency. It does not mock persistence or helper functions. No external paid services are used. The cookies allow testing captcha-enabled apps without bypassing captcha or authentication.
