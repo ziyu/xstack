@@ -126,6 +126,12 @@ Build samples: `XSTACK_BUILD_SAMPLES=1 XSTACK_BUILD_SAMPLE_FILTER=product-p3 bun
 
 Cloudflare: generate full with D1 and `storage:r2-binding`, install, `db:generate`, `db:migrate:local`, then `build:cloudflare` and `preview:cloudflare`. Local workerd uses real D1/R2. Combined provider tests may intercept exact outbound service URLs in a throwaway Miniflare harness; all other outbound calls must be rejected. This is not live cloud/model/payment acceptance. Do not put fixture transports or credentials into generated production code.
 
+## Module addition checks
+
+Run `bun apps/cli/live-tests/module-add.ts apps/cli/.smoke/<new-fixture>` against an absent disposable path. It creates an auth project through the real CLI API, customizes its homepage/guidance/environment, dry-runs and applies credits, verifies repeated no-op behavior, then appends payment and checks local changes and secrets survived. No provider accounts are contacted. Install and run all workspace typechecks/build in that fixture afterward; review and apply its schema only to a disposable database.
+
+MCP coverage in `apps/cli/test/mcp.test.ts` exercises the same plan/apply APIs. Conflict, baseline adoption, interrupted-write recovery and symlink rejection must also be exercised when changing the merge engine. Do not use helper-source snapshots as evidence of safe project evolution.
+
 ## Selected validation run
 
 The [2026-10-02 verification record](./verification-2026-10-02.md) lists the 19 local, five Postgres, and two Vercel fixtures that passed, including production and protected preview stages.

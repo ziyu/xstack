@@ -18,6 +18,7 @@ const formatOptions: FormatConfig = {
 const ignoredDirectories = new Set([
   "node_modules",
   ".git",
+  ".xstack",
   ".next",
   ".nuxt",
   ".output",

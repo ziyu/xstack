@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { intro, log, outro } from "@clack/prompts";
 import {
   EMBEDDED_TEMPLATES,
   processAddonTemplates,
@@ -17,7 +18,6 @@ import {
   VirtualFileSystem,
 } from "@xstack/template-generator";
 import { writeTree } from "@xstack/template-generator/fs-writer";
-import { intro, log, outro } from "@clack/prompts";
 import { Result } from "better-result";
 import fs from "fs-extra";
 import pc from "picocolors";
@@ -25,7 +25,6 @@ import z from "zod";
 
 import { getAddonsToAdd } from "../../prompts/addons";
 import type { AddInput, Addons, AddonOptions, AnalyticsMode, ProjectConfig } from "../../types";
-import { updateXStackConfig } from "../../utils/xstack-config";
 import { TASK_RUNNER_ADDONS, validateAddonsAgainstConfig } from "../../utils/compatibility-rules";
 import { isSilent, resolveInvocationMode, runWithContextAsync } from "../../utils/context";
 import { errorClass, failureStage, reportDiagnostic, scrubReason } from "../../utils/diagnostics";
@@ -35,9 +34,12 @@ import { validateAgentSafePathInput } from "../../utils/input-hardening";
 import { beginInterruptibleScope, endInterruptibleScope } from "../../utils/interrupt";
 import { renderTitle } from "../../utils/render-title";
 import { checkLocalRequirements } from "../../utils/requirements";
+import { updateXStackConfig } from "../../utils/xstack-config";
 import { setupAddons } from "../addons/addons-setup";
+import { addFeatureModules, type ModuleConflict, type ModuleFileStatus } from "./add-modules";
 import { detectProjectConfig } from "./detect-project-config";
 import { installDependencies } from "./install-dependencies";
+import { assertSafePath } from "./module-baseline";
 import { stackDomains } from "./product-mode";
 
 export interface AddHandlerOptions {
@@ -52,6 +54,10 @@ export interface AddResult {
   dryRun?: boolean;
   plannedFileCount?: number;
   addedPackage?: string;
+  addedFeatures?: string[];
+  files?: ModuleFileStatus[];
+  conflicts?: ModuleConflict[];
+  initializedBaseline?: boolean;
   error?: string;
 }
 
@@ -374,6 +380,79 @@ async function addHandlerInternal(
   }
 
   const projectDir = path.resolve(projectDirInput);
+  if (input.product) {
+    const moduleResult = await addFeatureModules(projectDir, input);
+    if (moduleResult.isErr())
+      return Result.err(
+        new CLIError({ message: moduleResult.error.message, cause: moduleResult.error }),
+      );
+    const outcome = moduleResult.value;
+    if (outcome.conflicts.length) {
+      if (!isSilent()) {
+        log.error(
+          `Module conflicts: ${outcome.conflicts.map((conflict) => conflict.path).join(", ")}. No project files changed.`,
+        );
+        for (const conflict of outcome.conflicts)
+          log.info(`${conflict.path}: ${conflict.resolution}`);
+      }
+      return Result.ok({
+        success: false,
+        addedAddons: [],
+        projectDir,
+        ...outcome,
+        plannedFileCount: outcome.files.length,
+        error: `Module merge conflicts: ${outcome.conflicts.map((conflict) => conflict.path).join(", ")}`,
+      });
+    }
+    if (!input.dryRun && input.install) {
+      beginInterruptibleScope();
+      const installedConfig = await detectProjectConfig(projectDir);
+      if (!installedConfig)
+        return Result.err(
+          new CLIError({
+            message:
+              "Modules were applied, but configuration disappeared before dependency installation.",
+          }),
+        );
+      const installResult = await installDependencies({
+        projectDir,
+        packageManager: installedConfig.packageManager,
+      });
+      if (installResult.isErr())
+        return Result.err(
+          new CLIError({
+            message: `Modules were applied, but dependency installation failed: ${installResult.error.message}`,
+            cause: installResult.error,
+          }),
+        );
+    }
+    if (!isSilent()) {
+      for (const file of outcome.files) log.info(`${file.status}: ${file.path}`);
+      log.success(
+        input.dryRun
+          ? "Dry run passed · no files written"
+          : outcome.files.length
+            ? "Feature modules updated"
+            : "Project unchanged",
+      );
+    }
+    return Result.ok({
+      success: true,
+      addedAddons: [],
+      projectDir,
+      ...outcome,
+      plannedFileCount: outcome.files.length,
+    });
+  }
+  const safeConfig = await Result.tryPromise({
+    try: async () => {
+      for (const filePath of ["xstack.jsonc", "package.json", "packages/config/package.json"])
+        await assertSafePath(projectDir, filePath);
+    },
+    catch: (cause) =>
+      new CLIError({ message: cause instanceof Error ? cause.message : String(cause), cause }),
+  });
+  if (safeConfig.isErr()) return Result.err(safeConfig.error);
 
   if (!isSilent()) {
     renderTitle();

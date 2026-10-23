@@ -576,6 +576,13 @@ export const AddInputSchema = z
     addons: AddonsListSchema.optional(),
     package: WorkspacePackageNameSchema.optional(),
     addonOptions: AddonOptionsSchema.optional(),
+    product: ProductConfigSchema.optional().describe(
+      "Feature modules and provider overrides to add",
+    ),
+    initializeBaseline: z
+      .boolean()
+      .optional()
+      .describe("Adopt an unchanged generated project as the merge baseline"),
     webDeploy: WebDeploySchema.optional(),
     serverDeploy: ServerDeploySchema.optional(),
     projectDir: z.string().optional(),
@@ -584,7 +591,28 @@ export const AddInputSchema = z
     dryRun: z.boolean().optional(),
     disableAnalytics: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) =>
+      !(
+        input.product &&
+        (input.addons?.length ||
+          input.package ||
+          input.addonOptions ||
+          input.webDeploy ||
+          input.serverDeploy)
+      ),
+    {
+      message:
+        "Feature module additions cannot be combined with addons, packages, or deployment changes; run separate commands.",
+      path: ["product"],
+    },
+  )
+  .refine((input) => !input.initializeBaseline || !!input.product, {
+    message:
+      "initializeBaseline requires product (use { features: [] } to adopt without adding modules).",
+    path: ["initializeBaseline"],
+  });
 
 export const CLIInputSchema = CreateInputSchema.safeExtend({
   projectDirectory: z.string().optional(),

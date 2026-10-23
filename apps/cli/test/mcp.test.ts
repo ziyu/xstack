@@ -483,6 +483,45 @@ describe("MCP server", () => {
     expect(after).toEqual(before);
   });
 
+  it("adds feature modules through MCP without overwriting project edits", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+    const projectPath = path.join(SMOKE_DIR, "mcp-add-features");
+    const result = await create(projectPath, {
+      product: { features: ["auth"], providers: { auth: [] } },
+      git: false,
+      install: false,
+      packageManager: "bun",
+      disableAnalytics: true,
+    });
+    expect(result.isOk()).toBe(true);
+    const homepage = path.join(projectPath, "apps/web/src/app/[lang]/page.tsx");
+    const original = await fs.readFile(homepage, "utf8");
+    const edited = `${original}\n// Keep the project owner's customization.\n`;
+    await fs.writeFile(homepage, edited);
+    const plan = await client.callTool({
+      name: "xstack_plan_addons",
+      arguments: {
+        projectDir: projectPath,
+        product: { features: ["credits"] },
+        install: false,
+      },
+    });
+    expect(plan.isError).not.toBe(true);
+    expect((await readXStackConfig(projectPath))?.product?.features).toEqual(["auth"]);
+    const added = await client.callTool({
+      name: "xstack_add_addons",
+      arguments: {
+        projectDir: projectPath,
+        product: { features: ["credits"] },
+        install: false,
+      },
+    });
+    expect(added.isError).not.toBe(true);
+    expect((await readXStackConfig(projectPath))?.product?.features).toEqual(["auth", "credits"]);
+    expect(await fs.readFile(homepage, "utf8")).toBe(edited);
+  });
+
   it("adds addons and workspace packages through MCP", async () => {
     const { client, cleanup } = await connectInMemoryClient();
     cleanups.push(cleanup);
@@ -558,7 +597,11 @@ describe("MCP server", () => {
 
     const tools = await client.listTools();
     expect(tools.tools.map((tool) => tool.name)).toEqual(
-      expect.arrayContaining(["xstack_get_stack_guidance", "xstack_plan_project", "xstack_add_addons"]),
+      expect.arrayContaining([
+        "xstack_get_stack_guidance",
+        "xstack_plan_project",
+        "xstack_add_addons",
+      ]),
     );
 
     const guidance = await client.callTool({

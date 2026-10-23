@@ -1,5 +1,5 @@
-import { getAllJsonSchemas } from "@xstack/types/json-schema";
 import { os } from "@orpc/server";
+import { getAllJsonSchemas } from "@xstack/types/json-schema";
 import { Result } from "better-result";
 import { createCli, type TrpcCli, type TrpcCliMeta } from "trpc-cli";
 import z from "zod";
@@ -237,20 +237,35 @@ export const router = os.router({
   sponsors: command
     .meta({ description: "Show xstack sponsors" })
     .handler(() => showSponsorsCommand()),
-  docs: command
-    .meta({ description: "Open xstack documentation" })
-    .handler(() => openDocsCommand()),
+  docs: command.meta({ description: "Open xstack documentation" }).handler(() => openDocsCommand()),
   builder: command
     .meta({ description: "Open the web-based stack builder" })
     .handler(() => openBuilderCommand()),
   add: command
     .meta({
-      description: "Add addons or a workspace package to an existing xstack project",
+      description:
+        "Add feature modules, addons, or a workspace package to an existing xstack project",
     })
     .input(
       z.object({
         addons: z.array(AddonsSchema).optional().describe("Addons to add"),
         package: WorkspacePackageNameSchema.optional(),
+        features: z
+          .array(z.string())
+          .optional()
+          .describe("Feature modules to add (comma-separated or repeated)"),
+        providers: z
+          .array(z.string())
+          .optional()
+          .describe("Provider overrides as feature:provider"),
+        moduleOptions: z
+          .array(z.string())
+          .optional()
+          .describe("Module options as module.key=value"),
+        initializeBaseline: z
+          .boolean()
+          .optional()
+          .describe("Adopt unchanged generated files as merge ancestry"),
         install: z
           .boolean()
           .optional()
@@ -262,16 +277,23 @@ export const router = os.router({
           .boolean()
           .optional()
           .default(false)
-          .describe("Preview addon changes without writing files"),
+          .describe("Preview changes without writing files"),
         disableAnalytics: z.boolean().optional().default(false).describe("Disable analytics"),
       }),
     )
     .handler(async ({ input }) => {
-      await addHandler(input);
+      const { features, providers, moduleOptions, ...options } = input;
+      const product = productFromFlags({ features, providers, moduleOptions });
+      if (product.isErr()) throw product.error;
+      const parsed = AddInputSchema.parse({ ...options, product: product.value });
+      const result = await addHandler(parsed);
+      if (result && !result.success)
+        throw new CLIError({ message: result.error ?? "Addition failed" });
     }),
   addJson: command
     .meta({
-      description: "Add addons or a workspace package from a raw JSON payload (agent-friendly)",
+      description:
+        "Add feature modules, addons, or a workspace package from a raw JSON payload (agent-friendly)",
       jsonInput: "always",
     })
     .input(AddInputSchema)
@@ -282,7 +304,13 @@ export const router = os.router({
       }
       if (!result.success) {
         throw new CLIError({
-          message: result.error || "Unknown error occurred",
+          message: result.conflicts?.length
+            ? JSON.stringify({
+                error: result.error,
+                conflicts: result.conflicts,
+                files: result.files,
+              })
+            : result.error || "Unknown error occurred",
         });
       }
       return result;
@@ -544,20 +572,10 @@ export { ProjectLauncherSchema };
 
 export type { AddResult };
 
-export type AddOptions = Pick<
-  AddInput,
-  | "addons"
-  | "addonOptions"
-  | "package"
-  | "install"
-  | "packageManager"
-  | "projectDir"
-  | "dryRun"
-  | "disableAnalytics"
->;
+export type AddOptions = AddInput;
 
 /**
- * Programmatic API to add addons or a workspace package to an existing xstack project.
+ * Programmatic API to add feature modules, addons, or a workspace package to an existing xstack project.
  *
  * @example
  * ```typescript
@@ -608,3 +626,10 @@ export {
   DirectoryConflictError,
   DatabaseSetupError,
 } from "./utils/errors";
+export { ModuleAddError } from "./helpers/core/module-baseline";
+export { addFeatureModules } from "./helpers/core/add-modules";
+export type {
+  ModuleAddOutcome,
+  ModuleConflict,
+  ModuleFileStatus,
+} from "./helpers/core/add-modules";

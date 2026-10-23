@@ -317,7 +317,7 @@ export function createXStackMcpServer() {
     {
       title: "Plan xstack Project Additions",
       description:
-        "Validate and preview addon installation or workspace package scaffolding for an existing xstack project without writing files. Always use this before xstack_add_addons.",
+        "Validate and preview feature module additions, addon installation, or workspace package scaffolding for an existing xstack project without writing files. Feature modules use product (features/providers/options); initializeBaseline explicitly adopts unchanged pre-baseline projects. Always use this before xstack_add_addons.",
       inputSchema: AddInputSchema,
       outputSchema: ToolResponseSchema,
       annotations: {
@@ -336,7 +336,10 @@ export function createXStackMcpServer() {
         });
 
         if (!result?.success) {
-          return formatToolError(result?.error ?? "Failed to plan project additions");
+          return {
+            ...formatToolError(result?.error ?? "Failed to plan project additions"),
+            structuredContent: { ok: false, error: result?.error, data: result },
+          };
         }
 
         return formatToolSuccess(result);
@@ -351,7 +354,7 @@ export function createXStackMcpServer() {
     {
       title: "Apply xstack Project Additions",
       description:
-        "Install addons or scaffold a workspace package in an existing xstack project using the same silent flow as add-json. Call this only after xstack_plan_addons succeeds and the planned changes match the user's intent.",
+        "Apply feature modules with safe three-way merging, install addons, or scaffold a workspace package in an existing xstack project using the same silent flow as add-json. Call this only after xstack_plan_addons succeeds and planned changes match the user's intent. Do not combine product with addon/package/deployment operations.",
       inputSchema: AddInputSchema,
       outputSchema: ToolResponseSchema,
       annotations: {
@@ -366,7 +369,10 @@ export function createXStackMcpServer() {
         const result = await add(input);
 
         if (!result?.success) {
-          return formatToolError(result?.error ?? "Failed to update project");
+          return {
+            ...formatToolError(result?.error ?? "Failed to update project"),
+            structuredContent: { ok: false, error: result?.error, data: result },
+          };
         }
 
         return formatToolSuccess(result);

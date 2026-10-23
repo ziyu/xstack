@@ -1,7 +1,7 @@
 "use client";
 
 import type { VirtualFile, VirtualDirectory } from "@xstack/template-generator";
-import { useMemo } from "react";
+import { useMemo, type ComponentProps } from "react";
 
 import { Tree, Folder, File } from "@/components/ui/file-tree";
 export type { VirtualFile, VirtualDirectory } from "@xstack/template-generator";
@@ -25,14 +25,29 @@ function collectInitialExpandedItems(node: VirtualDirectory, depth: number = 0):
   return result;
 }
 
+function treeElement(
+  node: VirtualFile | VirtualDirectory,
+): NonNullable<ComponentProps<typeof Tree>["elements"]>[number] {
+  const element: NonNullable<ComponentProps<typeof Tree>["elements"]>[number] = {
+    id: node.path,
+    name: node.name,
+  };
+  if (node.type === "directory") {
+    element.children = node.children.map(treeElement);
+  }
+  return element;
+}
+
 export function FileExplorer({ root, selectedPath, onSelectFile }: FileExplorerProps) {
   const initialExpandedItems = useMemo(() => collectInitialExpandedItems(root), [root]);
+  const elements = useMemo(() => [treeElement(root)], [root]);
 
   return (
     <div className="h-full overflow-auto font-mono text-[13px]">
       <Tree
         initialExpandedItems={initialExpandedItems}
         initialSelectedId={selectedPath ?? undefined}
+        elements={elements}
         indicator={false}
         className="p-2"
       >

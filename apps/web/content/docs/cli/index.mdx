@@ -69,7 +69,7 @@ xstack my-app --yes --dry-run
 
 ## `add`
 
-Adds addons or scaffolds a workspace package in an existing xstack project.
+Adds feature modules with a three-way merge, installs addons, or scaffolds a workspace package in an existing xstack project. Run feature additions separately from addon/package/deployment changes.
 
 ```bash
 xstack add [options]
@@ -77,6 +77,10 @@ xstack add [options]
 
 ### Options
 
+- `--features <modules...>`: Feature modules to append; automatic dependencies and integrations are resolved
+- `--providers <feature:provider...>`: Explicit provider overrides for the resulting project
+- `--module-options <module.key=value...>`: Merge module options with existing selections
+- `--initialize-baseline`: Adopt a clean current-generator reproduction when no baseline exists
 - `--addons <types...>`: Addons to add (see [Addons](/docs/cli/options#addons))
 - `--package <name>`: Scaffold `packages/<name>` with a package manifest, shared TypeScript config, and `src/index.ts`
 - `--project-dir <path>`: Project directory (defaults to current directory)
@@ -99,7 +103,20 @@ xstack add --project-dir ./my-app --addons mcp skills
 
 # Scaffold @my-app/shared in packages/shared
 xstack add --package shared
+
+# Preview and then append product modules
+xstack add --features credits payment --providers payment:stripe --dry-run
+xstack add --features credits payment --providers payment:stripe --install
 ```
+
+Fresh CLI-created projects store generated merge ancestry in `.xstack/baseline/manifest.json`; commit it with the project. Add compares that baseline, your current files, and the new generated output. Non-overlapping source/JSON changes preserve customizations. Conflicts return affected paths and resolution instructions with a nonzero CLI exit, without changing project files, `xstack.jsonc`, or the baseline. Resolve the overlap and rerun; do not edit baseline metadata or discard user changes automatically.
+
+`.env` and `.dev.vars` values are excluded from ancestry. Existing values remain unchanged; missing variable declarations are appended. Environment schemas merge normally. Symlinked write paths are rejected. A local lock and staged transaction journal prevent concurrent generator operations and support recovery after interrupted writes. Dry-run performs no writes, including recovery.
+
+Older projects need explicit adoption: `xstack add --features none --initialize-baseline --dry-run`, followed by the same command without dry-run. Adoption accepts only matching clean generated files; keep local edits backed up and restore original scaffold portions before adopting, then reapply edits. The tool never treats modified live files as ancestry. Addon/deployment changes that diverge from the saved config require reconciliation before module additions; they are not silently reinterpreted.
+
+After applying modules, install dependencies, regenerate environment types and review/apply new database migrations. The add operation never provisions services or runs production migrations automatically.
+
 
 ## `create-json`
 
@@ -113,7 +130,7 @@ Use this when you want a single machine-readable input object instead of many fl
 
 ## `add-json`
 
-Add addons from a raw JSON payload.
+Add feature modules, addons or a package from a raw JSON payload. Feature additions use `product`, for example `{"projectDir":"./my-app","product":{"features":["credits"]},"dryRun":true}`.
 
 ```bash
 xstack add-json --json '{"projectDir":"./my-app","addons":["wxt"],"addonOptions":{"wxt":{"template":"react"}}}'

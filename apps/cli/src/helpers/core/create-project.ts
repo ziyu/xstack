@@ -1,5 +1,4 @@
-import path from "node:path";
-
+import { log } from "@clack/prompts";
 import {
   generate,
   EMBEDDED_TEMPLATES,
@@ -7,7 +6,6 @@ import {
   toRenderConfig,
 } from "@xstack/template-generator";
 import { writeTree } from "@xstack/template-generator/fs-writer";
-import { log } from "@clack/prompts";
 import { Result } from "better-result";
 import fs from "fs-extra";
 import pc from "picocolors";
@@ -31,6 +29,7 @@ import { setupAddons } from "../addons/addons-setup";
 import { setupDatabase } from "../core/db-setup";
 import { initializeGit } from "./git";
 import { installDependencies } from "./install-dependencies";
+import { prepareGeneratedTree, saveCreationBaseline } from "./module-baseline";
 import { displayPostInstallInstructions } from "./post-installation";
 
 export interface CreateProjectOptions {
@@ -87,6 +86,17 @@ export async function createProject(
         ),
       ),
     );
+    yield* Result.await(
+      Result.tryPromise({
+        try: () => prepareGeneratedTree(tree, cliInput.packageManagerVersion),
+        catch: (cause) =>
+          new ProjectCreationError({
+            phase: "formatting",
+            message: cause instanceof Error ? cause.message : String(cause),
+            cause,
+          }),
+      }),
+    );
 
     yield* Result.await(
       writeTree(tree, projectDir).then((result) =>
@@ -102,7 +112,15 @@ export async function createProject(
     );
 
     yield* Result.await(
-      setPackageManagerVersion(projectDir, options.packageManager, cliInput.packageManagerVersion),
+      Result.tryPromise({
+        try: () => saveCreationBaseline(tree, getLatestCLIVersion()),
+        catch: (cause) =>
+          new ProjectCreationError({
+            phase: "baseline",
+            message: cause instanceof Error ? cause.message : String(cause),
+            cause,
+          }),
+      }),
     );
 
     // Files are on disk from here: Ctrl-C only stops the current step
@@ -183,30 +201,4 @@ async function* runPostScaffoldSteps(
   }
 
   return Result.ok({ projectDir, install, installError, interrupted: wasAnyStepInterrupted() });
-}
-
-async function setPackageManagerVersion(
-  projectDir: string,
-  packageManager: ProjectConfig["packageManager"],
-  version: string,
-): Promise<Result<void, ProjectCreationError>> {
-  const pkgJsonPath = path.join(projectDir, "package.json");
-
-  if (!(await fs.pathExists(pkgJsonPath))) {
-    return Result.ok(undefined);
-  }
-
-  return Result.tryPromise({
-    try: async () => {
-      const pkgJson = await fs.readJson(pkgJsonPath);
-      pkgJson.packageManager = `${packageManager}@${version}`;
-      await fs.writeJson(pkgJsonPath, pkgJson, { spaces: 2 });
-    },
-    catch: (e) =>
-      new ProjectCreationError({
-        phase: "package-manager-version",
-        message: `Failed to set package manager version: ${e instanceof Error ? e.message : String(e)}`,
-        cause: e,
-      }),
-  });
 }

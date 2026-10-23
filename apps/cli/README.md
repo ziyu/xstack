@@ -49,6 +49,10 @@ P3 modules: `ai` provides chat/image/video jobs with provider capabilities, opti
 
 For Cloudflare full: select `--preset full --database sqlite --db-setup d1 --web-deploy cloudflare --providers storage:r2-binding`. Generated docs describe local D1 migrations, OpenNext build/preview and production Alchemy provisioning. Node-only providers are rejected on Workers; selected features are never silently omitted.
 
+Generated projects now include root `AGENTS.md` and `.agents/skills/xstack-project/SKILL.md`, derived from selected modules and actual commands. Append project-specific rules in their final notes sections. CLI creation also records secret-free generation ancestry in `.xstack/baseline/manifest.json`.
+
+Add modules later with `xstack add --features credits payment --providers payment:stripe --dry-run`, then repeat without dry-run. Non-overlapping user changes are preserved; conflicts stop before project/config/baseline writes. Keep the baseline in version control. `.env` values are preserved and missing declarations appended. Existing projects without ancestry require explicit clean-scaffold adoption with `xstack add --features none --initialize-baseline`. Feature additions are separate from addon/package/deployment changes; install dependencies and review/apply schema migrations afterward.
+
 ## Requirements
 
 - Node.js 22.12 or newer to run the CLI with Node.js. The selected framework may require a newer release; the CLI checks the exact stack before writing files.

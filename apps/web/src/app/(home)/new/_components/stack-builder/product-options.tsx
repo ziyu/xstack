@@ -133,10 +133,13 @@ export function ProductOptions({
 }) {
   const plan = productPlan(stack);
 
-  function setProviders(moduleId: string, providers: string[]) {
+  function setProviders(moduleId: string, providers: string[] | undefined) {
+    const nextProviders = { ...stack.providers };
+    if (providers === undefined) delete nextProviders[moduleId];
+    else nextProviders[moduleId] = providers;
     onChange({
       features: stack.features,
-      providers: { ...stack.providers, [moduleId]: providers },
+      providers: nextProviders,
       moduleOptions: stack.moduleOptions,
     });
   }
@@ -203,6 +206,12 @@ export function ProductOptions({
         const moduleId = `${idPrefix}-${manifest.id}`;
         const providerSpec = manifest.providers;
         const providers = stack.providers[manifest.id] ?? module.providers;
+        const explicitProviders = Object.hasOwn(stack.providers, manifest.id);
+        const providerIndependentIssues = new Set(
+          productPlan({ ...stack, providers: { ...stack.providers, [manifest.id]: [] } })
+            .issues.filter((issue) => issue.level === "error")
+            .map((issue) => issue.message),
+        );
         const environment =
           module.variant === "native"
             ? [
@@ -264,6 +273,20 @@ export function ProductOptions({
                     providers.includes("wechat") &&
                     " WeChat requires an approved Open Platform website application and a public callback domain. Set its AppID/AppSecret only in the generated server environment."}
                 </p>
+                <p className="text-[11px] text-fd-muted-foreground">
+                  {explicitProviders ? "Explicit configuration" : "Catalog default for this target"}
+                  {" · "}
+                  {providers.length ? providers.join(", ") : "No providers"}
+                </p>
+                {explicitProviders && (
+                  <button
+                    type="button"
+                    className="builder-focus-ring text-[11px] text-fd-muted-foreground underline underline-offset-4 hover:text-fd-foreground"
+                    onClick={() => setProviders(manifest.id, undefined)}
+                  >
+                    Use target defaults
+                  </button>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(providerSpec.options).map(([providerId, provider]) => {
                     const checked = providers.includes(providerId);
@@ -271,46 +294,83 @@ export function ProductOptions({
                       ...stack,
                       providers: { ...stack.providers, [manifest.id]: [providerId] },
                     }).issues.find(
-                      (issue) => issue.level === "error" && issue.module === manifest.id,
+                      (issue) =>
+                        issue.level === "error" && !providerIndependentIssues.has(issue.message),
                     );
                     const disabled =
                       (!checked && !!providerIssue) ||
                       (providerSpec.max !== 1 &&
-                        ((checked && providers.length <= (providerSpec.min ?? 0)) ||
+                        ((checked &&
+                          !providerIssue &&
+                          providers.length <= (providerSpec.min ?? 0)) ||
                           (!checked &&
                             providerSpec.max !== undefined &&
                             providers.length >= providerSpec.max)));
                     const id = `${moduleId}-provider-${providerId}`;
                     return (
-                      <label
-                        key={providerId}
-                        htmlFor={id}
-                        title={providerIssue?.message}
-                        className={`flex min-h-9 items-center gap-2 rounded-[4px] border px-2.5 py-2 text-xs ${checked ? "border-primary text-primary" : "border-fd-border"}`}
-                      >
-                        <input
-                          id={id}
-                          name={`${moduleId}-providers`}
-                          type={providerSpec.max === 1 ? "radio" : "checkbox"}
-                          className="builder-focus-ring size-3.5 accent-primary disabled:cursor-not-allowed"
-                          checked={checked}
-                          disabled={disabled}
-                          onChange={() =>
-                            setProviders(
-                              manifest.id,
-                              providerSpec.max === 1
-                                ? [providerId]
-                                : checked
-                                  ? providers.filter((id) => id !== providerId)
-                                  : [...providers, providerId],
-                            )
-                          }
-                        />
-                        {provider.name}
-                      </label>
+                      <div key={providerId} className="max-w-full space-y-1">
+                        <label
+                          htmlFor={id}
+                          className={`flex min-h-9 items-center gap-2 rounded-[4px] border px-2.5 py-2 text-xs ${checked ? "border-primary text-primary" : "border-fd-border"} ${disabled ? "opacity-60" : ""}`}
+                        >
+                          <input
+                            id={id}
+                            name={`${moduleId}-providers`}
+                            type={providerSpec.max === 1 ? "radio" : "checkbox"}
+                            className="builder-focus-ring size-3.5 accent-primary disabled:cursor-not-allowed"
+                            checked={checked}
+                            disabled={disabled}
+                            aria-describedby={providerIssue ? `${id}-issue` : undefined}
+                            onChange={() =>
+                              setProviders(
+                                manifest.id,
+                                providerSpec.max === 1
+                                  ? [providerId]
+                                  : checked
+                                    ? providers.filter((id) => id !== providerId)
+                                    : [...providers, providerId],
+                              )
+                            }
+                          />
+                          {provider.name}
+                          {providerIssue && <span className="text-[10px]">Unavailable</span>}
+                        </label>
+                        {providerIssue && (
+                          <p
+                            id={`${id}-issue`}
+                            className="max-w-64 text-[10px] leading-relaxed text-fd-muted-foreground"
+                          >
+                            {providerIssue.message}
+                          </p>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
+                {providers
+                  .filter((provider) => !Object.hasOwn(providerSpec.options, provider))
+                  .map((provider) => (
+                    <div
+                      key={provider}
+                      className="flex flex-wrap items-center gap-2 text-[11px] text-destructive"
+                    >
+                      <span>
+                        Unknown provider: {provider}. This explicit value has been preserved.
+                      </span>
+                      <button
+                        type="button"
+                        className="builder-focus-ring underline underline-offset-4"
+                        onClick={() =>
+                          setProviders(
+                            manifest.id,
+                            providers.filter((id) => id !== provider),
+                          )
+                        }
+                      >
+                        Remove {provider}
+                      </button>
+                    </div>
+                  ))}
                 {module.variant === "stack" && (
                   <p className="text-[11px] leading-relaxed text-fd-muted-foreground">
                     This module currently uses stack templates, not its native product

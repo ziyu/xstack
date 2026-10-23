@@ -586,3 +586,15 @@ P3 功能代码已实现，`full` 预设通过共享清单接入 CLI、Builder�
 - 模块/求解器测试 17 项、Builder 测试 12 项通过；主站类型检查、CLI `full` + D1/R2 dry-run 通过。
 
 验收修复：Handlebars/JSX 结束边界、独立模块 unused context、Cloudflare 环境/导出类型、lazy proxy 的 `has` 行为、workerd 不支持 `redirect:error`（改 manual 且检查非成功状态）、SQLite 并发交互事务锁冲突（改原子 batch）。PostgreSQL 本轮做生成/类型/构建验证，未跑真实 PG 并发账本；云 IAM、真实付费模型、邮件/SMS 送达、支付收款和远端 Cloudflare 部署仍需专用账号验收。AI 供应商结果不确定时须人工核对；上传成功但链接写入前进程崩溃可能产生可追踪的孤立文件。
+
+## 23. P4 生成后演进与代理协作
+
+P3 已提交为 `2c510f1`。P4 在原 addon/package add 入口之外新增 `--features`、`--providers`、`--module-options` 和 `--initialize-baseline`；程序化 `add()`、JSON 与现有 MCP add/plan 工具共用 `AddInput.product`，返回文件计划和结构化冲突。
+
+CLI 新项目在确定性格式化后保存 `.xstack/baseline/manifest.json`，内容来自生成树而非用户目录，带配置、版本与内容校验；排除 `.env`/`.dev.vars`，环境 schema 正常跟踪。追加时重新生成完整目标配置，逐文件三方合并；JSON 按对象字段合并，文本按行合并，二进制/删除/重叠修改冲突保守拒绝。没有冲突才提交文件、配置和新基线；日志、锁、独占文件创建与回滚支持中断恢复，符号链接路径拒绝。Dry-run 不创建基线、锁或恢复状态。
+
+旧项目不能伪造祖先：显式采用基线仅接受与当前生成器干净重现匹配的文件；有修改时先保存定制并恢复原始 scaffold，再采用与重新应用修改。既有 addon/deploy 操作造成基线配置差异时明确要求协调，不静默改写祖先；模块追加与这些操作分开执行。不自动运行数据库迁移或云部署。
+
+Builder 预览按当前配置键和请求轮次绑定，取消过时请求，重生成保留仍存在的文件选择；新增 guidance/module docs 入口、复制/下载状态及失败反馈，树展示点文件和真实模块产物。根 AGENTS 与项目 skill 根据实际模块、providers、命令、环境和部署生成，保留框架子目录说明，并用稳定的末尾用户备注区避免新增文档与用户追加规则冲突。
+
+验收：实际新建 auth 项目，自定义首页/AGENTS/本地密钥后，经 API 连续追加 credits/payment，再经真实 CLI 追加 seo；dry-run 零写入、重复 no-op、定制和秘密保留，通过安装、全部工作区类型检查、生产构建、公开页面/定价/robots/sitemap HTTP 200 和积分页未登录跳转。真实冲突未改文件/配置，恢复后重试通过；符号链接拒绝、缺基线拒绝、干净采用基线、替换中断恢复通过。MCP 测试 19 项、Builder 测试 12 项通过。最小/full/Cloudflare guidance 命令和文档链接验证通过；浏览器选择 AGENTS、更改配置保持选择、快速改名只显示最新产物、下载文件内容与当前配置一致。

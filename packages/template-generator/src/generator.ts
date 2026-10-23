@@ -1,6 +1,5 @@
 import { Result } from "better-result";
 
-import { writeXStackConfigToVfs } from "./xstack-config";
 import { VirtualFileSystem } from "./core/virtual-fs";
 import {
   finalizeModules,
@@ -23,6 +22,7 @@ import {
   processPwaPlugins,
   processEnvVariables,
 } from "./processors";
+import { processAgentGuidance } from "./processors/agent-guidance";
 import { processVarlock } from "./processors/varlock";
 import {
   type TemplateData,
@@ -40,6 +40,7 @@ import {
 import type { GeneratorOptions, VirtualFileTree } from "./types";
 import { GeneratorError } from "./types";
 import { generateReproducibleCommand } from "./utils/reproducible-command";
+import { writeXStackConfigToVfs } from "./xstack-config";
 
 export type { TemplateData };
 
@@ -105,6 +106,7 @@ export async function generate(
         const reproducibleCommand = generateReproducibleCommand(config);
         writeXStackConfigToVfs(vfs, config, options.version, reproducibleCommand);
       }
+      processAgentGuidance(vfs, config);
 
       const tree: VirtualFileTree = {
         root: vfs.toTree(config.projectName),

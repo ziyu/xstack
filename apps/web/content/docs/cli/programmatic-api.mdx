@@ -67,13 +67,15 @@ Notes:
 
 ### `add(options?)`
 
-Add addons or scaffold a workspace package in an existing xstack project.
+Add feature modules with safe three-way merging, install addons, or scaffold a workspace package. Feature additions must be separate from addon/package/deployment changes.
 
 ```typescript
 function add(options?: {
   addons?: Addons[];
   addonOptions?: AddonOptions;
   package?: string;
+  product?: ProductConfig;
+  initializeBaseline?: boolean;
   install?: boolean;
   packageManager?: PackageManager;
   projectDir?: string;
@@ -108,6 +110,8 @@ if (result.success) {
 
 `add()` validates its input at runtime and always returns an `AddResult`. Invalid input and
 addon or package scaffolding failures return `{ success: false, error }` instead of throwing or exiting the process.
+
+For modules, use `add({ projectDir: "./my-app", product: { features: ["credits", "payment"], providers: { payment: ["stripe"] } }, dryRun: true })`. A conflict returns `success: false` plus `conflicts`/`files` without applying project changes. Repeat without `dryRun` only after reviewing the plan. Fresh CLI projects have `.xstack/baseline/manifest.json`; older clean projects may explicitly adopt one with `product: { features: [] }, initializeBaseline: true`. Preserve and commit baseline ancestry, never local secrets.
 
 ### `createVirtual(options)`
 
@@ -175,6 +179,10 @@ type AddResult = {
   dryRun?: boolean;
   plannedFileCount?: number;
   addedPackage?: string;
+  addedFeatures?: string[];
+  initializedBaseline?: boolean;
+  files?: { path: string; status: "added" | "modified" | "deleted" | "conflict" }[];
+  conflicts?: { path: string; reason: string; resolution: string }[];
   error?: string;
 };
 ```

@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, FolderTree, FileCode2, Info, ChevronLeft } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { scrubMessage, track } from "@/lib/analytics";
@@ -19,9 +19,12 @@ import { FileExplorer, type VirtualFile, type VirtualDirectory } from "./file-ex
 type Preview = Awaited<ReturnType<typeof orpc.preview>>;
 
 export function useStackPreview(stack: StackState, enabled: boolean) {
-  const [data, setData] = useState<Preview | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    key: string;
+    attempt: number;
+    data: Preview | null;
+    error: string | null;
+  } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const nameError =
     validateProjectName(formatProjectName(stack.projectName)) ||
@@ -30,37 +33,36 @@ export function useStackPreview(stack: StackState, enabled: boolean) {
       .map((issue) => issue.message)
       .join("\n") ||
     null;
-  const requestKey = enabled && !nameError ? JSON.stringify(stack) : null;
+  const requestKey = !nameError ? JSON.stringify(stack) : null;
+  const currentResult = result?.key === requestKey && result.attempt === attempt ? result : null;
 
   useEffect(() => {
-    if (!requestKey) return;
+    if (!enabled || !requestKey) return;
     const controller = new AbortController();
-    setIsLoading(true);
-    setError(null);
     const timeout = setTimeout(async () => {
       try {
         const input = StackStateSchema.parse(JSON.parse(requestKey));
         const preview = await orpc.preview(input, { signal: controller.signal });
-        if (!controller.signal.aborted) setData(preview);
+        if (!controller.signal.aborted) {
+          setResult({ key: requestKey, attempt, data: preview, error: null });
+        }
       } catch (cause) {
         if (controller.signal.aborted) return;
         const message = cause instanceof Error ? cause.message : "Unable to load preview";
-        setError(message);
+        setResult({ key: requestKey, attempt, data: null, error: message });
         track("preview_error", { message: scrubMessage(message) });
-      } finally {
-        if (!controller.signal.aborted) setIsLoading(false);
       }
     }, 300);
     return () => {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [requestKey, attempt]);
+  }, [enabled, requestKey, attempt]);
 
   return {
-    data,
-    isLoading: !nameError && isLoading,
-    error: nameError ?? error,
+    data: currentResult?.data ?? null,
+    isLoading: enabled && !!requestKey && !currentResult,
+    error: nameError ?? currentResult?.error ?? null,
     canRetry: !nameError,
     retry: () => setAttempt((value) => value + 1),
   };
@@ -83,6 +85,18 @@ function findFileByPath(node: VirtualDirectory, path: string): VirtualFile | nul
   return null;
 }
 
+function documentationFiles(node: VirtualDirectory): VirtualFile[] {
+  return node.children.flatMap((child) => {
+    if (child.type === "directory") return documentationFiles(child);
+    return child.name === "AGENTS.md" ||
+      (child.path.startsWith(".agents/skills/") && child.name === "SKILL.md") ||
+      (child.path.startsWith("docs/modules/") && child.extension === "md") ||
+      child.path === "docs/cloudflare.md"
+      ? [child]
+      : [];
+  });
+}
+
 export function PreviewPanel({ preview, selectedFilePath, onSelectFile }: PreviewPanelProps) {
   const { data, isLoading, error, canRetry, retry } = preview;
   const tree = data?.root ?? null;
@@ -90,6 +104,8 @@ export function PreviewPanel({ preview, selectedFilePath, onSelectFile }: Previe
   const directoryCount = data?.directoryCount ?? 0;
   const selectedFile = tree && selectedFilePath ? findFileByPath(tree, selectedFilePath) : null;
   const [mobileView, setMobileView] = useState<"tree" | "code">("tree");
+  const documentationId = useId();
+  const documentation = useMemo(() => (tree ? documentationFiles(tree) : []), [tree]);
 
   useEffect(() => {
     setMobileView(selectedFilePath ? "code" : "tree");
@@ -111,10 +127,14 @@ export function PreviewPanel({ preview, selectedFilePath, onSelectFile }: Previe
 
   if (isLoading && !tree) {
     return (
-      <div className="flex h-full items-center justify-center rounded-[4px] border bg-fd-background">
+      <div
+        role="status"
+        aria-busy="true"
+        className="flex h-full items-center justify-center rounded-[4px] border bg-fd-background"
+      >
         <div className="flex items-center gap-2 rounded-[4px] border px-3 py-2 font-mono text-[11px] text-fd-muted-foreground uppercase tracking-[0.08em]">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Rendering file tree
+          Generating files for current configuration
         </div>
       </div>
     );
@@ -191,7 +211,7 @@ export function PreviewPanel({ preview, selectedFilePath, onSelectFile }: Previe
             "@lg:inline-flex hidden font-mono text-[10px] text-fd-muted-foreground uppercase tracking-[0.10em]",
           )}
         >
-          {mobileView === "code" ? "Code view" : "Tree view"}
+          Generated from current configuration
         </span>
         {/* Current file name, shown when the tree is hidden */}
         {mobileView === "code" && selectedFile && (
@@ -207,20 +227,43 @@ export function PreviewPanel({ preview, selectedFilePath, onSelectFile }: Previe
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-xs">
               <p>
-                This is a static template preview. Files are not formatted. Some features like
-                database provider setup (Turso, Neon, Supabase, etc.) and certain addons (Fumadocs,
-                Starlight, Tauri, etc.) require CLI execution and are not shown here.
+                Generated by the same template engine as the CLI, including module files, dotfiles
+                and agent guidance. Files are not formatted. Database provisioning and addons that
+                run external CLIs require CLI execution and are not shown here.
               </p>
             </TooltipContent>
           </Tooltip>
-          {isLoading && (
-            <span role="status" className="flex items-center gap-1 text-xs">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-fd-muted-foreground" />
-              Updating preview
-            </span>
-          )}
         </div>
       </div>
+      {documentation.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 font-mono text-[11px]">
+          <label htmlFor={documentationId} className="shrink-0 text-fd-muted-foreground">
+            Guidance & module docs
+          </label>
+          <select
+            id={documentationId}
+            className="builder-focus-ring min-w-0 flex-1 rounded border border-fd-border bg-fd-background px-2 py-1"
+            value={
+              documentation.some((file) => file.path === selectedFilePath)
+                ? (selectedFilePath ?? "")
+                : ""
+            }
+            onChange={(event) => {
+              const file = documentation.find((file) => file.path === event.target.value);
+              if (file) handleSelectFile(file);
+            }}
+          >
+            <option value="" disabled>
+              Open generated documentation…
+            </option>
+            {documentation.map((file) => (
+              <option key={file.path} value={file.path}>
+                {file.path}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Split view once the panel is wide enough, toggle while it is narrow */}
       <div className="flex flex-1 overflow-hidden">
@@ -248,6 +291,7 @@ export function PreviewPanel({ preview, selectedFilePath, onSelectFile }: Previe
         >
           {selectedFile ? (
             <CodeViewer
+              key={selectedFile.path}
               filePath={selectedFile.path}
               content={selectedFile.content}
               extension={selectedFile.extension}
