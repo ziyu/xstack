@@ -1,0 +1,70 @@
+import { z } from "zod";
+{{#if (includes product.features "auth")}}
+import { auth } from "@{{projectName}}/app-services";
+import { enabledSocialProviders } from "./social-providers.server";
+{{/if}}
+{{#if (or (includes product.features "auth") (includes product.features "seo"))}}
+import { ENV } from "@/env.server";
+{{/if}}
+{{#each product.features}}
+{{#if (or (eq this "storage") (eq this "ai") (eq this "blog") (eq this "affiliate") (eq this "payment") (eq this "credits") (eq this "admin") (eq this "captcha") (eq this "seo"))}}
+import { handle as handle_{{this}} } from "./native/{{this}}";
+{{/if}}
+{{/each}}
+
+export const privateHeaders = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" };
+export function json<T>(data: T, status = 200) { return Response.json(data, { status, headers: privateHeaders }); }
+export class HttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
+export function pageOf(request: Request) { return z.coerce.number().int().min(1).max(100000).parse(new URL(request.url).searchParams.get("page") ?? 1); }
+{{#if (includes product.features "auth")}}
+export function requireOrigin(request: Request) {
+  if (request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new HttpError(403, "forbidden");
+}
+export async function requireSession(request: Request) {
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) throw new HttpError(401, "unauthorized");
+  return session;
+}
+export async function requireAdministrator(request: Request) {
+  const session = await requireSession(request);
+  if (!session.user.role?.split(",").includes("admin")) throw new HttpError(403, "forbidden");
+  return session;
+}
+{{/if}}
+/** The request body is bounded before parsing; callers still validate their exact input schema. */
+export async function readJson(request: Request): Promise<unknown> {
+  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new HttpError(400, "invalid_input");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = []; let size = 0;
+  try { while (true) { const part = await reader.read(); if (part.done) break; size += part.value.byteLength; if (size > 40000) { await reader.cancel(); throw new HttpError(413, "too_large"); } chunks.push(part.value); } }
+  finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size); let offset = 0;
+  for (const part of chunks) { bytes.set(part, offset); offset += part.byteLength; }
+  try { return JSON.parse(new TextDecoder().decode(bytes)) as unknown; } catch { throw new HttpError(400, "invalid_input"); }
+}
+
+/** Shared native service boundary. Framework adapters must forward original headers and body. */
+export async function handleProductRequest(request: Request): Promise<Response> {
+  const path = new URL(request.url).pathname.replace(/\/$/, "");
+  try {
+{{#if (includes product.features "auth")}}
+    if (path.startsWith("/api/auth/")) return auth.handler(request);
+    if (path === "/api/product/config" && request.method === "GET") return json({ socialProviders: enabledSocialProviders(), siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}ENV.BETTER_AUTH_URL{{/if}}, verifyEmail: {{#if (includes product.features "email")}}true{{else}}false{{/if}}, canResetPassword: {{#if (includes product.features "email")}}true{{else}}false{{/if}} });
+    if (path === "/api/product/session" && request.method === "GET") return json(await auth.api.getSession({ headers: request.headers }));
+{{/if}}
+{{#unless (includes product.features "auth")}}
+    if (path === "/api/product/config" && request.method === "GET") return json({ socialProviders: [], siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}new URL(request.url).origin{{/if}}, verifyEmail: false, canResetPassword: false });
+{{/unless}}
+{{#each product.features}}
+{{#if (or (eq this "storage") (eq this "ai") (eq this "blog") (eq this "affiliate") (eq this "payment") (eq this "credits") (eq this "admin") (eq this "captcha") (eq this "seo"))}}
+    { const response = await handle_{{this}}(request, path); if (response) return response; }
+{{/if}}
+{{/each}}
+    return json({ error: "not_found" }, 404);
+  } catch (error) {
+    if (error instanceof HttpError) return json({ error: error.message }, error.status);
+    if (error instanceof z.ZodError) return json({ error: "invalid_input" }, 400);
+    console.error("Product request failed");
+    return json({ error: "server_error" }, 500);
+  }
+}

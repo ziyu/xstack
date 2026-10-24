@@ -1,5 +1,5 @@
 import { defineModule } from "../define";
-import { NEXT_SHELL } from "./stack";
+import { NATIVE_SHELL } from "./stack";
 
 export default defineModule({
   id: "seo",
@@ -11,7 +11,11 @@ export default defineModule({
   category: "content",
   requires: ["core", "i18n"],
   enhances: ["core", "payment"],
-  supports: NEXT_SHELL,
+  supports: NATIVE_SHELL,
+  frameworkReplaces: {
+    "tanstack-start": ["apps/web/public/robots.txt"],
+    nuxt: ["apps/web/public/robots.txt"],
+  },
   env: [
     {
       key: "SITE_URL",

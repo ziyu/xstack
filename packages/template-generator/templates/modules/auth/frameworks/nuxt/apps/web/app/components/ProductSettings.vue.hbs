@@ -1,0 +1,15 @@
+<script setup lang="ts">
+const props = defineProps<{ user: { name: string; email: string; emailVerified: boolean } }>();
+const { label, path } = useProductLocale();
+const { pending, error, notice, run } = useProductAction();
+const name = ref(props.user.name); const currentPassword = ref(""); const newPassword = ref("");
+async function saveProfile() { await run(async () => { await productRequest("/api/auth/update-user", productJson({ name: name.value.trim() })); await refreshNuxtData("product-session"); notice.value = label("Profile updated.", "资料已更新。"); }); }
+async function changePassword() { await run(async () => { await productRequest("/api/auth/change-password", productJson({ currentPassword: currentPassword.value, newPassword: newPassword.value, revokeOtherSessions: true })); currentPassword.value = ""; newPassword.value = ""; notice.value = label("Password updated and other sessions revoked.", "密码已更新，其他会话已退出。"); }); }
+</script>
+<template>
+  <p v-if="error" class="error" role="alert">\{{ error }}</p><p v-if="notice" class="notice" role="status">\{{ notice }}</p>
+  <form class="panel" @submit.prevent="saveProfile"><h2>\{{ label('Profile', '个人资料') }}</h2><label>\{{ label('Email', '邮箱') }}<input :value="user.email" readonly type="email" /></label><label>\{{ label('Name', '姓名') }}<input v-model="name" autocomplete="name" required maxlength="100" /></label><button :disabled="pending">\{{ label('Save profile', '保存资料') }}</button>
+    {{#if (includes product.features "email")}}<NuxtLink v-if="!user.emailVerified" :to="path('verify-email')">\{{ label('Verify your email address', '验证你的邮箱') }}</NuxtLink>{{/if}}
+  </form>
+  <form class="panel" @submit.prevent="changePassword"><h2>\{{ label('Change password', '修改密码') }}</h2><label>\{{ label('Current password', '当前密码') }}<input v-model="currentPassword" type="password" autocomplete="current-password" required /></label><label>\{{ label('New password', '新密码') }}<input v-model="newPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required /></label><button :disabled="pending">\{{ label('Update password', '更新密码') }}</button></form>
+</template>

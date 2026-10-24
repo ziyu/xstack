@@ -1,6 +1,6 @@
 import { dependencyVersionMap } from "../../utils/add-deps";
 import { defineModule } from "../define";
-import { NEXT_SHELL_DB } from "./stack";
+import { NATIVE_SHELL_DB } from "./stack";
 
 export default defineModule({
   id: "blog",
@@ -12,7 +12,7 @@ export default defineModule({
   category: "content",
   requires: ["admin"],
   enhances: ["seo"],
-  supports: NEXT_SHELL_DB,
+  supports: NATIVE_SHELL_DB,
   packages: [
     {
       dir: "blog",
@@ -23,7 +23,11 @@ export default defineModule({
       workspaceDependencies: ["db", "i18n", "permissions"],
     },
   ],
-  appDependencies: { "react-markdown": "^10.1.0" },
+  frameworkAppDependencies: {
+    next: { "react-markdown": "^10.1.0" },
+    "tanstack-start": { "react-markdown": "^10.1.0" },
+    nuxt: { "markdown-it": "^14.1.0", "@types/markdown-it": "^14.1.2" },
+  },
   services: [
     {
       name: "blog",

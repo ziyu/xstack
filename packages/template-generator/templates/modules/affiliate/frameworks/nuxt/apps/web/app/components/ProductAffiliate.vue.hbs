@@ -1,0 +1,13 @@
+<script setup lang="ts">
+const { label, locale } = useProductLocale();
+const { data, error } = await useFetch<{ code: string; origin: string; commissionPercent: number; referredSignups: number; convertedOrders: number; earnedCredits: number; pendingCredits: number; conversions: { orderId: string; credits: number; status: string; createdAt: string }[] }>("/api/product/affiliate");
+const link = computed(() => data.value ? `${data.value.origin}/${locale.value}/ref/${data.value.code}` : "");
+const { notice, run, error: copyError } = useProductAction();
+async function copy() { await run(async () => { await navigator.clipboard.writeText(link.value); notice.value = label("Link copied.", "链接已复制。"); }); }
+</script>
+<template>
+  <p v-if="error || copyError" role="alert" class="error">\{{ error?.message || copyError }}</p><p v-if="notice" role="status">\{{ notice }}</p>
+  <div class="panel stack"><p>\{{ label('Share your invitation link. Eligible paid orders earn', '分享邀请链接。符合条件的付费订单可获得') }} \{{ data?.commissionPercent }}% \{{ label('of the plan credits.', '方案积分。') }}</p><label>\{{ label('Your invitation link', '你的邀请链接') }}<input :value="link" readonly /></label><button @click="copy">\{{ label('Copy link', '复制链接') }}</button></div>
+  <div class="grid"><div class="panel"><h2>\{{ data?.referredSignups ?? 0 }}</h2><p>\{{ label('Referred signups', '推荐注册') }}</p></div><div class="panel"><h2>\{{ data?.convertedOrders ?? 0 }}</h2><p>\{{ label('Converted orders', '转化订单') }}</p></div><div class="panel"><h2>\{{ data?.earnedCredits ?? 0 }}</h2><p>\{{ label('Earned credits', '已获得积分') }}</p></div><div class="panel"><h2>\{{ data?.pendingCredits ?? 0 }}</h2><p>\{{ label('Pending credits', '待发放积分') }}</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>\{{ label('Order', '订单') }}</th><th>\{{ label('Credits', '积分') }}</th><th>\{{ label('Status', '状态') }}</th><th>\{{ label('Date', '日期') }}</th></tr></thead><tbody><tr v-for="entry in data?.conversions ?? []" :key="entry.orderId"><td>\{{ entry.orderId }}</td><td>\{{ entry.credits }}</td><td>\{{ entry.status }}</td><td>\{{ entry.createdAt.slice(0, 10) }}</td></tr></tbody></table></div>
+</template>

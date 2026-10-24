@@ -1,0 +1,15 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { createTranslator, getMessages, isLocale } from "@{{projectName}}/i18n";
+import { z } from "zod";
+import { {{#if (includes product.features "auth")}}useLocale, {{/if}}useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { productHead } from "@/lib/product-head";
+export const Route = createFileRoute("/$lang/")({
+  loader: ({ params }) => loadProduct("/api/product/config", params.lang, z.object({ siteUrl: z.string().url() })),
+  head: ({ params, loaderData }) => {
+    if (!loaderData || !isLocale(params.lang)) return {};
+    const t = createTranslator(getMessages(params.lang));
+    return productHead({ siteUrl: loaderData.siteUrl, locale: params.lang, path: "/", title: t("core.landing.title"), description: t("core.site.description") });
+  }, component: Home,
+});
+function Home() { {{#if (includes product.features "auth")}}const locale = useLocale(); {{/if}}const t = useT(); return <section className="mx-auto max-w-5xl px-6 py-24"><p className="mb-8 text-xs uppercase tracking-[0.3em]">{{projectName}}</p><h1 className="max-w-3xl font-serif text-6xl leading-tight tracking-tight">{t("core.landing.title")}</h1><p className="mt-8 max-w-xl text-lg leading-relaxed text-muted-foreground">{t("core.landing.subtitle")}</p>{{#if (includes product.features "auth")}}<a href={`/${locale}/dashboard`} className="mt-10 inline-block border bg-foreground px-6 py-3 text-background">{t("core.landing.cta")}</a>{{else}}<p className="mt-10 border-t pt-8">{t("core.landing.features.modular.body")}</p>{{/if}}</section>; }

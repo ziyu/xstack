@@ -1,0 +1,8 @@
+import { createFileRoute } from "@tanstack/react-router";
+import BlogEditor from "@/components/blog/editor";
+import Markdown from "@/components/blog/markdown";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { postSchema } from "@/lib/blog-data";
+export const Route = createFileRoute("/$lang/admin/blog/$id")({ loader: ({ params }) => loadProduct(`/api/blog/${encodeURIComponent(params.id)}`, params.lang, postSchema), component: EditPost });
+function EditPost() { const post = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section><h1 className="mb-8 font-serif text-4xl">{t("blog.editor.edit")}</h1><BlogEditor key={`${post.id}:${post.revision}`} locale={locale} post={post} /><details className="mt-12 border-t pt-6"><summary className="mb-8 cursor-pointer">{t("blog.editor.preview")}</summary><Markdown>{post.body}</Markdown></details></section>; }

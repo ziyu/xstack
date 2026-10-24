@@ -1,5 +1,5 @@
 import { defineModule } from "../define";
-import { NEXT_SHELL } from "./stack";
+import { NATIVE_SHELL } from "./stack";
 
 export default defineModule({
   id: "i18n",
@@ -10,7 +10,7 @@ export default defineModule({
   },
   category: "foundation",
   hidden: true,
-  supports: NEXT_SHELL,
+  supports: NATIVE_SHELL,
   options: {
     locales: {
       type: "enum",

@@ -283,13 +283,13 @@ xstack --frontend none
 
 ## Features
 
-Business capabilities such as authentication and payments are feature modules, not stack choices. Pick them with `--features` (or a `--preset`); each module renders natively on the Next.js product shell and falls back to its stack templates elsewhere where it has them.
+Business capabilities are feature modules, not stack choices. Native product modules support `next`, `tanstack-start` and `nuxt` with `--backend self --api none --orm drizzle` and SQLite/PostgreSQL. Pick modules with `--features` or a preset; unsupported combinations are rejected. Cloudflare native modules remain Next/OpenNext-only. Legacy auth stack templates remain available on other supported technology combinations.
 
 ### `--features <modules...>`
 
 - `auth`: Sign-in, sessions, roles and account settings
 - `email`: Transactional email (native stack only)
-- `sms`: Verification SMS through Alibaba Cloud, Tencent Cloud or Twilio; select with `auth` to enable phone-number signup/login (native Next.js/Drizzle stack only)
+- `sms`: Verification SMS through Alibaba Cloud, Tencent Cloud or Twilio; select with `auth` to enable phone-number signup/login on a native product stack
 - `admin`: Role-based admin console (native stack only)
 - `payment`: Pricing, one-time payments and subscriptions (native stack only)
 - `credits`: Usage credits with an auditable ledger (native stack only)
@@ -315,7 +315,7 @@ Selects a curated feature set: `starter` (auth), `saas-global` (auth, email, adm
 Chooses the providers a module uses, for example `--providers payment:stripe,mock auth:github`.
 
 - `payment`: `stripe` (default), `polar`, `wechat` (Native QR), `alipay` (desktop website), or development-only `mock`. Pricing shows configured providers compatible with the plan. Selecting either domestic provider generates CNY one-time credit packs, not automatic subscriptions; configure merchant credentials and HTTPS callbacks in the generated environment.
-- `auth`: `google`, `github`, `wechat`, or `auth:none` to keep email/password authentication without OAuth providers. WeChat requires the native Next.js/Better Auth implementation. Do not combine `none` with named providers for the same module.
+- `auth`: `google`, `github`, `wechat`, or `auth:none` to keep email/password login without OAuth. WeChat requires the native Better Auth implementation. Do not combine `none` with named providers for the same module.
 - `email`: choose exactly one of `resend` or `smtp`.
 - `sms`: choose exactly one of `aliyun` (default), `tencent`, or `twilio`. Provider credentials and approved sign/template settings belong in the generated environment.
 - `storage`: choose one of `s3` (Node default), `r2` (S3 API), `r2-binding` (Cloudflare default), `oss`, or `cos`. API adapters use 60-second signed attachment downloads; binding downloads stream through authenticated owner-only routes. Browser uploads are limited to 4 MiB.

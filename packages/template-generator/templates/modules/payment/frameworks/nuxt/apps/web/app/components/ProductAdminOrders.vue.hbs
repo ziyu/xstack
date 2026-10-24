@@ -1,0 +1,12 @@
+<script setup lang="ts">
+const { label, locale } = useProductLocale();
+const page = ref(1);
+type Order = { id: string; planId: string; provider: string; amount: number; currency: string; status: string; createdAt: string };
+const { data, error } = await useFetch<{ rows: { order: Order; email: string }[]; total: number }>("/api/product/orders", { query: { page } });
+const money = (row: Order) => new Intl.NumberFormat(locale.value, { style: "currency", currency: row.currency }).format(row.amount / 100);
+</script>
+<template>
+  <p v-if="error" role="alert" class="error">\{{ error.message }}</p>
+  <div class="table-wrap"><table><thead><tr><th>\{{ label('Order', '订单') }}</th><th>\{{ label('Customer', '客户') }}</th><th>\{{ label('Plan', '方案') }}</th><th>\{{ label('Provider', '支付方式') }}</th><th>\{{ label('Amount', '金额') }}</th><th>\{{ label('Status', '状态') }}</th><th>\{{ label('Date', '日期') }}</th></tr></thead><tbody><tr v-for="row in data?.rows ?? []" :key="row.order.id"><td>\{{ row.order.id }}</td><td>\{{ row.email }}</td><td>\{{ row.order.planId }}</td><td>\{{ row.order.provider }}</td><td>\{{ money(row.order) }}</td><td>\{{ row.order.status }}</td><td>\{{ row.order.createdAt.slice(0, 10) }}</td></tr></tbody></table></div>
+  <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\{{ label('Previous', '上一页') }}</button><span>\{{ page }} · \{{ data?.total ?? 0 }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\{{ label('Next', '下一页') }}</button></nav>
+</template>

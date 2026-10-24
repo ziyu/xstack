@@ -7,6 +7,10 @@ description: Understanding compatibility rules and restrictions between differen
 
 The CLI validates option combinations to ensure generated projects work correctly. Here are the key compatibility rules and restrictions.
 
+### Native product modules
+
+All feature modules and `full` can be generated with Next.js, TanStack Start or Nuxt when using `backend=self`, `api=none`, Drizzle, and SQLite/PostgreSQL. Domain packages are shared; routing, rendering and cookies use each framework's adapter. React-only UI dependencies are not added to Nuxt. Cloudflare native product deployments currently require Next/OpenNext and D1; Start/Nuxt native Cloudflare combinations are rejected rather than partially generated. Other stack-only deployments retain their existing compatibility rules.
+
 ## Database & ORM Compatibility
 
 ### Required Combinations

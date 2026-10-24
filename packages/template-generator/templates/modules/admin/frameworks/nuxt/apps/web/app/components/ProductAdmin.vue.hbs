@@ -1,0 +1,24 @@
+<script setup lang="ts">
+import { navigation } from "@/config/navigation";
+const props = defineProps<{ section: string; id?: string }>();
+const { label, path, t } = useProductLocale();
+const sections = ["", "users"{{#if (includes product.features "payment")}}, "orders"{{/if}}{{#if (includes product.features "credits")}}, "credits"{{/if}}{{#if (includes product.features "blog")}}, "blog"{{/if}}{{#if (includes product.features "affiliate")}}, "affiliate"{{/if}}];
+if (!sections.includes(props.section)) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+const titles: Record<string, string> = { "": label("Overview", "概览"), users: label("Users", "用户"), orders: label("Orders", "订单"), credits: label("Credits", "积分"), blog: label("Blog", "博客"), affiliate: label("Referrals", "推荐") };
+const summary = ref<{ users: number; admins: number; recent: { id: string; name: string; email: string; createdAt: string }[] }>();
+if (!props.section) {
+  const { data, error } = await useFetch<{ users: number; admins: number; recent: { id: string; name: string; email: string; createdAt: string }[] }>("/api/product/admin");
+  if (error.value) throw createError({ statusCode: error.value.statusCode ?? 500, statusMessage: error.value.message });
+  summary.value = data.value ?? undefined;
+}
+</script>
+<template>
+  <div class="workspace"><nav class="workspace-nav" :aria-label="label('Administration', '管理')"><NuxtLink v-for="item in navigation.admin" :key="item.href" :to="path(item.href)">\{{ t(item.labelKey) }}</NuxtLink></nav><section class="stack"><h1>\{{ titles[section] }}</h1>
+    <template v-if="!section"><div class="grid"><div class="panel"><h2>\{{ summary?.users ?? 0 }}</h2><p>\{{ label('Users', '用户') }}</p></div><div class="panel"><h2>\{{ summary?.admins ?? 0 }}</h2><p>\{{ label('Administrators', '管理员') }}</p></div></div><h2>\{{ label('Recent accounts', '最近账户') }}</h2><div class="table-wrap"><table><thead><tr><th>\{{ label('Name', '姓名') }}</th><th>\{{ label('Email', '邮箱') }}</th><th>\{{ label('Created', '创建时间') }}</th></tr></thead><tbody><tr v-for="user in summary?.recent ?? []" :key="user.id"><td>\{{ user.name }}</td><td>\{{ user.email }}</td><td>\{{ user.createdAt.slice(0, 10) }}</td></tr></tbody></table></div></template>
+    <ProductAdminUsers v-else-if="section === 'users'" />
+    {{#if (includes product.features "payment")}}<ProductAdminOrders v-else-if="section === 'orders'" />{{/if}}
+    {{#if (includes product.features "credits")}}<ProductAdminCredits v-else-if="section === 'credits'" />{{/if}}
+    {{#if (includes product.features "blog")}}<ProductBlogEditor v-else-if="section === 'blog'" :id="id" />{{/if}}
+    {{#if (includes product.features "affiliate")}}<ProductAdminAffiliate v-else-if="section === 'affiliate'" />{{/if}}
+  </section></div>
+</template>

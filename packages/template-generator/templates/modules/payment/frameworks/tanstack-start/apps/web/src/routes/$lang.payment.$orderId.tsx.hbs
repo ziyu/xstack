@@ -1,0 +1,7 @@
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { orderSchema, formatMoney } from "@/lib/payment-data";
+export const Route = createFileRoute("/$lang/payment/$orderId")({ loader: ({ params }) => loadProduct(`/api/product/order/${encodeURIComponent(params.orderId)}`, params.lang, z.object({ order: orderSchema, qrImage: z.string().nullable() })), component: Checkout });
+function Checkout() { const { order, qrImage } = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const router = useRouter(); return <section className="mx-auto max-w-lg space-y-8 px-6 py-20"><h1 className="font-serif text-4xl">{t("payment.checkout.title")}</h1><div className="space-y-6 border p-8 text-center"><p className="text-4xl font-semibold">{formatMoney(order.amount, order.currency, locale)}</p><p role="status">{order.status}</p>{qrImage && <img src={qrImage} alt={t("payment.checkout.qrAlt")} width={256} height={256} className="mx-auto" />}<button className="border px-4 py-2" onClick={() => void router.invalidate()}>{t("payment.checkout.refresh")}</button><a className="block underline" href={`/${locale}/dashboard/billing`}>{t("payment.checkout.billing")}</a></div></section>; }

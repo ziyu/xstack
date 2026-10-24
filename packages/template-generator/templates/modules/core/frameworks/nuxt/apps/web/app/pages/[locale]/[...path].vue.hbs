@@ -1,0 +1,52 @@
+<script setup lang="ts">
+import { {{#if (includes product.features "seo")}}defaultLocale, {{/if}}isLocale } from "@{{projectName}}/i18n";
+definePageMeta({ key: (route) => route.fullPath });
+const route = useRoute();
+const { label, path } = useProductLocale();
+if (!isLocale(String(route.params.locale))) throw createError({ statusCode: 404, statusMessage: "Unknown locale" });
+const segments = Array.isArray(route.params.path) ? route.params.path : String(route.params.path ?? "").split("/").filter(Boolean);
+const section = segments[0] ?? "";
+const allowed = [""{{#if (includes product.features "auth")}}, "login", "signup", "dashboard"{{/if}}{{#if (and (includes product.features "auth") (includes product.features "email"))}}, "forgot-password", "reset-password", "verify-email"{{/if}}{{#if (includes product.features "admin")}}, "admin"{{/if}}{{#if (includes product.features "payment")}}, "pricing", "payment"{{/if}}{{#if (includes product.features "blog")}}, "blog"{{/if}}{{#if (includes product.features "affiliate")}}, "ref"{{/if}}];
+if (!allowed.includes(section)) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+const depth = section === "admin" && segments[1] === "blog" ? 3 : ["dashboard", "admin", "blog", "payment", "ref"].includes(section) ? 2 : {{#if (includes product.features "sms")}}section === "login" && segments[1] === "phone" ? 2 : {{/if}}1;
+if (segments.length > depth || (["payment", "ref"].includes(section) && !segments[1])) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+{{#if (includes product.features "auth")}}
+const { data: session } = await useFetch<{ user: { id: string; name: string; email: string; role?: string | null; emailVerified: boolean } } | null>("/api/product/session", { key: "product-session" });
+if (["dashboard", "admin", "payment"].includes(section) && !session.value) await navigateTo(`${path("login")}?next=${encodeURIComponent(route.fullPath)}`, { replace: true });
+if (section === "admin" && session.value && session.value.user.role !== "admin") throw createError({ statusCode: 403, statusMessage: "Forbidden" });
+{{/if}}
+const privatePage = ["dashboard", "admin", "payment", "login", "signup", "forgot-password", "reset-password", "verify-email", "ref"].includes(section);
+useSeoMeta({ title: `${section ? section.charAt(0).toUpperCase() + section.slice(1) : "{{projectName}}"} · {{projectName}}`, robots: privatePage ? "noindex, nofollow" : "index, follow" });
+{{#if (includes product.features "seo")}}
+const { data: config } = await useFetch<{ siteUrl: string }>("/api/product/config");
+const { locale, locales } = useProductLocale();
+const description = section === "pricing" ? label("Choose a plan for your workspace.", "选择适合你的工作空间的方案。") : label("Bring your ideas, work and account together.", "连接你的创意、工作和账户。");
+useSeoMeta({ description, ogTitle: "{{projectName}}", ogDescription: description, ogType: "website", ogLocale: locale.value.replaceAll("-", "_"), ogUrl: () => privatePage || !config.value ? undefined : `${config.value.siteUrl}${route.path}`, twitterCard: "summary", twitterTitle: "{{projectName}}", twitterDescription: description });
+useHead(() => ({ link: privatePage || !config.value?.siteUrl || section === "blog" && segments[1] ? [] : [
+  { rel: "canonical" as const, href: `${config.value.siteUrl}${route.path}` },
+  ...locales.map((code) => ({ rel: "alternate" as const, hreflang: code, href: `${config.value!.siteUrl}/${code}${route.path.replace(/^\/[^/]+/, "")}` })),
+  { rel: "alternate" as const, hreflang: "x-default", href: `${config.value.siteUrl}/${defaultLocale}${route.path.replace(/^\/[^/]+/, "")}` },
+] }));
+{{/if}}
+</script>
+
+<template>
+  <section v-if="!section" class="hero">
+    <p class="eyebrow">{{projectName}}</p>
+    <h1>\{{ label('A space for what comes next.', '为下一步，留出空间。') }}</h1>
+    <p>\{{ label('Bring your ideas, your work, and your account together in one carefully built workspace.', '在精心构建的工作空间中，连接你的创意、工作和账户。') }}</p>
+    <div class="actions">
+      {{#if (includes product.features "auth")}}<NuxtLink class="button" :to="path(session ? 'dashboard' : 'signup')">\{{ label('Open your workspace', '开启你的工作空间') }}</NuxtLink>{{/if}}
+      {{#if (includes product.features "payment")}}<NuxtLink :to="path('pricing')">\{{ label('Explore plans', '查看方案') }}</NuxtLink>{{/if}}
+      {{#if (includes product.features "blog")}}<NuxtLink :to="path('blog')">\{{ label('Read the journal', '阅读博客') }}</NuxtLink>{{/if}}
+    </div>
+  </section>
+  {{#if (includes product.features "auth")}}
+  <ProductAuth v-else-if="['login', 'signup', 'forgot-password', 'reset-password', 'verify-email'].includes(section)" :mode="section" />
+  <ProductWorkspace v-else-if="section === 'dashboard' && session" :section="segments[1] ?? ''" :user="session.user" />
+  {{/if}}
+  {{#if (includes product.features "admin")}}<ProductAdmin v-else-if="section === 'admin'" :section="segments[1] ?? ''" :id="segments[2]" />{{/if}}
+  {{#if (includes product.features "payment")}}<ProductPayment v-else-if="section === 'pricing' || section === 'payment'" :order-id="section === 'payment' ? segments[1] : undefined" />{{/if}}
+  {{#if (includes product.features "blog")}}<ProductBlog v-else-if="section === 'blog'" :slug="segments[1]" />{{/if}}
+  {{#if (includes product.features "affiliate")}}<ProductReferral v-else-if="section === 'ref'" :code="segments[1] ?? ''" />{{/if}}
+</template>

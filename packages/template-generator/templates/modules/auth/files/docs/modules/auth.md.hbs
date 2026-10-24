@@ -2,6 +2,8 @@
 
 Built on [Better Auth](https://better-auth.com). The `packages/auth` package exports `createAuth(env, db, events)`; `apps/web/src/services.ts` creates the instance.
 
+The HTTP boundary is `/api/auth/**` on every framework. {{#if (includes frontend "next")}}Next.js uses the Better Auth `nextCookies` adapter.{{else if (includes frontend "tanstack-start")}}TanStack Start uses `tanstackStartCookies` as the last auth plugin so server API calls can propagate session cookies.{{else}}Nuxt forwards the H3 request to the Better Auth WHATWG handler and returns its response, including every session cookie.{{/if}} Never cache authenticated responses or expose the server service graph to client bundles.
+
 ## What you get
 
 - Email and password sign-up and sign-in (`/login`, `/signup`)
@@ -83,6 +85,7 @@ Expired and consumed challenge rows retain their hashed phone identifier until t
 {{/if}}
 ## Protecting pages
 
+{{#if (includes frontend "next")}}
 ```ts
 import { requireUser } from "@/lib/session";
 
@@ -90,6 +93,9 @@ const user = await requireUser(locale, "/dashboard/billing");
 ```
 
 `requireUser` redirects anonymous visitors to `/login?next=…`.
+{{else}}
+Use the generated framework's protected page loader and preserve incoming request headers when reading `auth.api.getSession({ headers })`. Every data mutation must independently authenticate its request; a page redirect or hidden button is not an authorization boundary. Validate redirect destinations as same-origin, locale-prefixed paths.
+{{/if}}
 
 ## Schema changes
 

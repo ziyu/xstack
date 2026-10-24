@@ -1,5 +1,5 @@
 import { defineModule } from "../define";
-import { NEXT_SHELL } from "./stack";
+import { NATIVE_SHELL } from "./stack";
 
 export default defineModule({
   id: "email",
@@ -11,7 +11,7 @@ export default defineModule({
   category: "communication",
   requires: ["core"],
   enhances: ["auth"],
-  supports: NEXT_SHELL,
+  supports: NATIVE_SHELL,
   providers: {
     min: 1,
     max: 1,

@@ -1,0 +1,22 @@
+import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
+import { getMessages, isLocale } from "@{{projectName}}/i18n";
+import { I18nProvider } from "@/components/i18n-provider";
+import { ProductShell } from "@/components/product-shell";
+{{#if (includes product.features "auth")}}
+import { loadProduct } from "@/lib/product-data";
+import { sessionSchema } from "@/lib/auth-data";
+{{/if}}
+export const Route = createFileRoute("/$lang")({
+  beforeLoad: ({ params }) => { if (!isLocale(params.lang)) throw notFound(); return { locale: params.lang }; },
+{{#if (includes product.features "auth")}}
+  loader: ({ params }) => loadProduct("/api/product/session", params.lang, sessionSchema),
+{{/if}}
+  component: LocaleLayout,
+});
+function LocaleLayout() {
+  const { locale } = Route.useRouteContext();
+{{#if (includes product.features "auth")}}
+  const session = Route.useLoaderData();
+{{/if}}
+  return <I18nProvider locale={locale} messages={getMessages(locale)}><ProductShell{{#if (includes product.features "auth")}} initialUser={session?.user ?? null}{{/if}}><Outlet /></ProductShell></I18nProvider>;
+}

@@ -1,0 +1,8 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import PhoneSignInForm from "@/components/auth/phone-sign-in-form";
+import { AuthCard } from "@/components/auth/auth-card";
+import { useT } from "@/components/i18n-provider";
+import { safeNext } from "@/lib/auth-data";
+export const Route = createFileRoute("/$lang/login_/phone")({ validateSearch: z.object({ next: z.string().optional() }), component: PhonePage });
+function PhonePage() { const t = useT(); const { lang } = Route.useParams(); return <AuthCard title={t("auth.phone.title")}><PhoneSignInForm next={safeNext(Route.useSearch().next, `/${lang}/dashboard`)} /></AuthCard>; }

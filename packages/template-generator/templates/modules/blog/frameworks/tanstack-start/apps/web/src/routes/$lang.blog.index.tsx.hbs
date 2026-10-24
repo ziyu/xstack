@@ -1,0 +1,14 @@
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createTranslator, getMessages, isLocale } from "@{{projectName}}/i18n";
+import { z } from "zod";
+import { productHead } from "@/lib/product-head";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { blogSearch, postListSchema } from "@/lib/blog-data";
+export const Route = createFileRoute("/$lang/blog/")({
+  validateSearch: blogSearch,
+  loaderDeps: ({ search }) => search,
+  loader: async ({ params, deps }) => { if (deps.page === null) throw notFound(); const data = await loadProduct(`/api/product/blog?${new URLSearchParams({ locale: params.lang, page: String(deps.page) })}`, params.lang, postListSchema.extend({ siteUrl: z.string().url() })); if (data.page > 1 && !data.posts.length) throw notFound(); return data; },
+  head: ({ params, loaderData }) => { if (!loaderData || !isLocale(params.lang)) return {}; const t = createTranslator(getMessages(params.lang)); return productHead({ siteUrl: loaderData.siteUrl, locale: params.lang, path: "/blog", title: t("blog.title"), description: t("blog.description"), page: loaderData.page }); }, component: Journal,
+});
+function Journal() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="mx-auto max-w-5xl px-6 py-20"><header className="mb-12 border-b pb-10"><p className="mb-4 text-xs uppercase tracking-widest">{t("blog.journal")}</p><h1 className="font-serif text-5xl">{t("blog.title")}</h1><p className="mt-5 text-muted-foreground">{t("blog.description")}</p></header>{!data.posts.length && <p>{t("blog.empty")}</p>}<div className="divide-y">{data.posts.map((post) => <article key={post.id} className="grid gap-5 py-8 md:grid-cols-[10rem_1fr]"><div className="text-sm text-muted-foreground"><time>{post.publishedAt && new Date(post.publishedAt).toLocaleDateString(locale)}</time><p>{post.authorName}</p></div><div><h2 className="font-serif text-3xl"><a href={`/${locale}/blog/${post.slug}`}>{post.title}</a></h2><p className="mt-4 text-muted-foreground">{post.excerpt}</p></div></article>)}</div><nav className="mt-8 flex justify-between border-t pt-6" aria-label={t("blog.pagination")}>{data.page > 1 ? <a href={`?page=${data.page - 1}`}>{t("blog.previous")}</a> : <span />}{data.page * data.limit < data.total && <a href={`?page=${data.page + 1}`}>{t("blog.next")}</a>}</nav></section>; }

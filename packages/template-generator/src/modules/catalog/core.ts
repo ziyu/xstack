@@ -1,5 +1,5 @@
 import { defineModule } from "../define";
-import { NEXT_SHELL_DB } from "./stack";
+import { NATIVE_SHELL_DB } from "./stack";
 
 export default defineModule({
   id: "core",
@@ -11,7 +11,7 @@ export default defineModule({
   category: "foundation",
   hidden: true,
   requires: ["i18n"],
-  supports: NEXT_SHELL_DB,
+  supports: NATIVE_SHELL_DB,
   packages: [{ dir: "events" }],
   services: [
     {
@@ -21,9 +21,22 @@ export default defineModule({
     },
   ],
   nav: [{ area: "main", href: "/", labelKey: "nav.home", order: 0 }],
-  replaces: [
-    "apps/web/src/app/layout.tsx",
-    "apps/web/src/app/page.tsx",
-    "apps/web/src/components/header.tsx",
-  ],
+  frameworkReplaces: {
+    next: [
+      "apps/web/src/app/layout.tsx",
+      "apps/web/src/app/page.tsx",
+      "apps/web/src/components/header.tsx",
+    ],
+    "tanstack-start": [
+      "apps/web/src/routes/__root.tsx",
+      "apps/web/src/routes/index.tsx",
+      "apps/web/src/components/header.tsx",
+    ],
+    nuxt: [
+      "apps/web/app/app.vue",
+      "apps/web/app/pages/index.vue",
+      "apps/web/app/layouts/default.vue",
+      "apps/web/app/components/Header.vue",
+    ],
+  },
 });

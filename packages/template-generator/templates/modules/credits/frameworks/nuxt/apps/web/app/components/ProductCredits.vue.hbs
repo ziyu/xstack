@@ -1,0 +1,10 @@
+<script setup lang="ts">
+const { label, path } = useProductLocale();
+type Transaction = { id: string; amount: number; balanceAfter: number; type: string; reason: string | null; createdAt: string };
+const { data, error, refresh } = await useFetch<{ balance: number; transactions: Transaction[] }>("/api/product/credits");
+</script>
+<template>
+  <p v-if="error" role="alert" class="error">\{{ error.message }}</p>
+  <div class="panel"><p class="eyebrow">\{{ label('Available balance', '可用余额') }}</p><h2>\{{ data?.balance ?? 0 }} \{{ label('credits', '积分') }}</h2><div class="actions"><button class="text-button" @click="refresh()">\{{ label('Refresh', '刷新') }}</button>{{#if (includes product.features "payment")}}<NuxtLink :to="path('pricing')">\{{ label('Get more credits', '获取更多积分') }}</NuxtLink>{{/if}}</div></div>
+  <div class="table-wrap"><table><thead><tr><th>\{{ label('Date', '日期') }}</th><th>\{{ label('Type', '类型') }}</th><th>\{{ label('Amount', '金额') }}</th><th>\{{ label('Balance', '余额') }}</th><th>\{{ label('Reason', '原因') }}</th></tr></thead><tbody><tr v-for="entry in data?.transactions ?? []" :key="entry.id"><td>\{{ entry.createdAt.slice(0, 10) }}</td><td>\{{ entry.type }}</td><td>\{{ entry.amount > 0 ? '+' : '' }}\{{ entry.amount }}</td><td>\{{ entry.balanceAfter }}</td><td>\{{ entry.reason }}</td></tr></tbody></table><p v-if="!data?.transactions.length">\{{ label('No transactions yet.', '暂无交易。') }}</p></div>
+</template>

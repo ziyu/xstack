@@ -1,0 +1,37 @@
+import { blog } from "@{{projectName}}/app-services";
+import { revisionInput } from "@{{projectName}}/blog";
+import { isLocale, defaultLocale } from "@{{projectName}}/i18n";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+import { blogActor, blogFailure, blogResponse, readBlogJson } from "../blog-http";
+import { json, pageOf } from "../product-api";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path !== "/api/blog" && !path.startsWith("/api/blog/") && path !== "/api/product/blog" && !path.startsWith("/api/product/blog/")) return;
+  try {
+    if (path.startsWith("/api/product/blog") && request.method === "GET") {
+      const lang = new URL(request.url).searchParams.get("locale") ?? defaultLocale;
+      if (!isLocale(lang)) return json({ error: "not_found" }, 404);
+      if (path === "/api/product/blog") return json({ ...await blog.listPublished(lang, { page: pageOf(request) }), siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}ENV.BETTER_AUTH_URL{{/if}} });
+      const post = await blog.getPublished(lang, decodeURIComponent(path.slice("/api/product/blog/".length)));
+      return post ? json({ post, translations: await blog.translations(post.translationKey), siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}ENV.BETTER_AUTH_URL{{/if}} }) : json({ error: "not_found" }, 404);
+    }
+    if (path === "/api/blog") {
+      if (request.method === "GET") return blogResponse(await blog.listAdmin(await blogActor(request), { page: pageOf(request) }));
+      if (request.method === "POST") return blogResponse(await blog.create(await blogActor(request, true), await readBlogJson(request)), 201);
+    }
+    const id = decodeURIComponent(path.slice("/api/blog/".length));
+    if (request.method === "GET") return blogResponse(await blog.getAdmin(await blogActor(request), id));
+    if (request.method === "PUT") {
+      const actor = await blogActor(request, true);
+      const data = z.object({ revision: revisionInput, post: z.unknown() }).strict().parse(await readBlogJson(request));
+      return blogResponse(await blog.update(actor, id, data.revision, data.post));
+    }
+    if (request.method === "DELETE") {
+      const actor = await blogActor(request, true);
+      const data = z.object({ revision: revisionInput }).strict().parse(await readBlogJson(request));
+      await blog.delete(actor, id, data.revision);
+      return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+    }
+    return json({ error: "method_not_allowed" }, 405);
+  } catch (error) { return blogFailure(error); }
+}

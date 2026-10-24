@@ -735,7 +735,7 @@ export const DEFAULT_STACK: StackState = {
   yolo: "false",
 };
 
-export const PRESET_TEMPLATES: {
+const PRODUCT_TEMPLATE_PRESETS: {
   id: string;
   name: string;
   description: string;
@@ -744,8 +744,7 @@ export const PRESET_TEMPLATES: {
   {
     id: "shell",
     name: "Shell",
-    description:
-      "Next.js shell with SQLite, Drizzle and internationalization; no optional features",
+    description: "Product shell with Drizzle and internationalization; no optional features",
     stack: DEFAULT_STACK,
   },
   ...Object.entries(PRODUCT_PRESETS).map(([id, preset]) => {
@@ -768,6 +767,30 @@ export const PRESET_TEMPLATES: {
     };
   }),
 ];
+
+export const PRESET_TEMPLATES = (
+  [
+    { id: "next", name: "Next.js" },
+    { id: "tanstack-start", name: "TanStack Start" },
+    { id: "nuxt", name: "Nuxt" },
+  ] as const
+).flatMap((framework) =>
+  PRODUCT_TEMPLATE_PRESETS.map((preset) => {
+    const database = preset.id === "saas-global" || preset.id === "full" ? "postgres" : "sqlite";
+    return {
+      ...preset,
+      id: framework.id === "next" ? preset.id : `${framework.id}-${preset.id}`,
+      name: `${framework.name} · ${preset.name} · ${database === "postgres" ? "PostgreSQL" : "SQLite"}`,
+      framework: framework.name,
+      stack: {
+        ...preset.stack,
+        webFrontend: [framework.id],
+        backend: `self-${framework.id}`,
+        database,
+      } satisfies StackState,
+    };
+  }),
+);
 
 export const isStackDefault = <K extends keyof StackState>(
   stack: StackState,

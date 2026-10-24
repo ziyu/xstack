@@ -1,0 +1,5 @@
+import { createFileRoute } from "@tanstack/react-router";
+import BlogEditor from "@/components/blog/editor";
+import { useLocale, useT } from "@/components/i18n-provider";
+export const Route = createFileRoute("/$lang/admin/blog/new")({ component: NewPost });
+function NewPost() { const locale = useLocale(); const t = useT(); return <section><h1 className="mb-8 font-serif text-4xl">{t("blog.editor.create")}</h1><BlogEditor locale={locale} /></section>; }

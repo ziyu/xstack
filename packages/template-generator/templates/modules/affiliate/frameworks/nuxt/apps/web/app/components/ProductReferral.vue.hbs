@@ -1,0 +1,9 @@
+<script setup lang="ts">
+const props = defineProps<{ code: string }>();
+const { label, locale, path } = useProductLocale();
+const { data, error } = await useFetch<{ commissionPercent: number }>(`/api/product/referral/${encodeURIComponent(props.code)}`);
+if (error.value || !data.value) throw createError({ statusCode: 404, statusMessage: "Invitation not found" });
+</script>
+<template>
+  <section class="hero"><p class="eyebrow">{{projectName}}</p><h1>\{{ label('You’re invited.', '你已受邀。') }}</h1><p>\{{ label('Create your account using this invitation. Your inviter may earn credits when you make an eligible purchase.', '使用此邀请创建账户。当你进行符合条件的购买时，邀请人可能获得积分。') }}</p><form method="post" :action="`/api/affiliate/capture?code=${encodeURIComponent(code)}&lang=${locale}`"><button>\{{ label('Accept invitation', '接受邀请') }}</button></form><p><NuxtLink :to="path('login')">\{{ label('Already have an account? Sign in', '已有账户？登录') }}</NuxtLink></p></section>
+</template>

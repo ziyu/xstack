@@ -565,15 +565,15 @@ SDK/真实 SQLite 验证使用限定测试桶域名的 HTTP 夹具，不接触�
 
 P3 功能代码已实现，`full` 预设通过共享清单接入 CLI、Builder、oRPC 预览和配置复现；原 `starter`/`saas-global` 功能集合不变。`full` 包含 auth/email/sms/admin/payment/credits/storage/ai/seo/blog/affiliate/captcha，基础 i18n/core 自动加入。
 
-| 项目 | 实现边界 |
-| --- | --- |
-| S3/R2 | 官方 S3 SDK、私有桶、60 秒签名附件 URL；R2 Workers binding 使用真实绑定，下载经过登录和所有权检查后流式返回，不是公开链接 |
-| AI | OpenAI 对话/图片、Google 对话/图片/异步视频、OpenAI-compatible/DeepSeek 对话；能力决定 UI；模型/API 依据当前官方文档，不调用已停用 Sora/Veo |
-| AI × credits/storage | 持久化任务、费用快照、请求幂等、确定失败/取消只退款一次；租约与写入 fencing；结果先持久化再存储；不确定供应商结果不自动重提/退款；AI 媒体限制 8 MiB，读取 JSON 流先限制 12 MiB |
-| SEO/blog | canonical/hreflang、OG/Twitter、robots、动态公开 sitemap；数据库多语言文章、草稿/发布、管理员编辑/删除、版本冲突、安全 Markdown/JSON-LD，私有页面 noindex |
-| affiliate | 签名 first-touch 邀请、注册绑定、已验证支付订单产生唯一积分佣金、重放/并发安全、个人与管理员报表；奖励是应用积分，不是现金，退款/争议需人工审计调整 |
-| captcha | Turnstile 服务端 before-hook 强制保护邮箱注册/登录/重置/发验证邮件/短信发码；校验成功、域名、action、时间和重放；缺配置 fail closed，无生产绕过 |
-| Cloudflare | OpenNext、D1、R2、Alchemy、手动触发部署 workflow 和上线清单；按目标选择缺省 provider，显式不兼容选择报错；Twilio HTTP、Stripe fetch/WebCrypto；D1/SQLite 积分用原子 batch，PostgreSQL 用行锁事务 |
+| 项目                 | 实现边界                                                                                                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S3/R2                | 官方 S3 SDK、私有桶、60 秒签名附件 URL；R2 Workers binding 使用真实绑定，下载经过登录和所有权检查后流式返回，不是公开链接                                                                        |
+| AI                   | OpenAI 对话/图片、Google 对话/图片/异步视频、OpenAI-compatible/DeepSeek 对话；能力决定 UI；模型/API 依据当前官方文档，不调用已停用 Sora/Veo                                                      |
+| AI × credits/storage | 持久化任务、费用快照、请求幂等、确定失败/取消只退款一次；租约与写入 fencing；结果先持久化再存储；不确定供应商结果不自动重提/退款；AI 媒体限制 8 MiB，读取 JSON 流先限制 12 MiB                   |
+| SEO/blog             | canonical/hreflang、OG/Twitter、robots、动态公开 sitemap；数据库多语言文章、草稿/发布、管理员编辑/删除、版本冲突、安全 Markdown/JSON-LD，私有页面 noindex                                        |
+| affiliate            | 签名 first-touch 邀请、注册绑定、已验证支付订单产生唯一积分佣金、重放/并发安全、个人与管理员报表；奖励是应用积分，不是现金，退款/争议需人工审计调整                                              |
+| captcha              | Turnstile 服务端 before-hook 强制保护邮箱注册/登录/重置/发验证邮件/短信发码；校验成功、域名、action、时间和重放；缺配置 fail closed，无生产绕过                                                  |
+| Cloudflare           | OpenNext、D1、R2、Alchemy、手动触发部署 workflow 和上线清单；按目标选择缺省 provider，显式不兼容选择报错；Twilio HTTP、Stripe fetch/WebCrypto；D1/SQLite 积分用原子 batch，PostgreSQL 用行锁事务 |
 
 验证记录（本地，不代表真实服务商验收）：
 
@@ -598,3 +598,19 @@ CLI 新项目在确定性格式化后保存 `.xstack/baseline/manifest.json`，�
 Builder 预览按当前配置键和请求轮次绑定，取消过时请求，重生成保留仍存在的文件选择；新增 guidance/module docs 入口、复制/下载状态及失败反馈，树展示点文件和真实模块产物。根 AGENTS 与项目 skill 根据实际模块、providers、命令、环境和部署生成，保留框架子目录说明，并用稳定的末尾用户备注区避免新增文档与用户追加规则冲突。
 
 验收：实际新建 auth 项目，自定义首页/AGENTS/本地密钥后，经 API 连续追加 credits/payment，再经真实 CLI 追加 seo；dry-run 零写入、重复 no-op、定制和秘密保留，通过安装、全部工作区类型检查、生产构建、公开页面/定价/robots/sitemap HTTP 200 和积分页未登录跳转。真实冲突未改文件/配置，恢复后重试通过；符号链接拒绝、缺基线拒绝、干净采用基线、替换中断恢复通过。MCP 测试 19 项、Builder 测试 12 项通过。最小/full/Cloudflare guidance 命令和文档链接验证通过；浏览器选择 AGENTS、更改配置保持选择、快速改名只显示最新产物、下载文件内容与当前配置一致。
+
+## 24. P5 多框架原生模块
+
+P4 已提交并推送 `e2777bf`。P5 将原生产品栈扩展为 Next.js、TanStack Start 和 Nuxt，共用 self/backend、api none、Drizzle、SQLite/PostgreSQL 领域服务。模块清单支持 frameworkReplaces/frameworkAppDependencies；渲染顺序为共享领域与集成、native HTTP 层、React 共享层、具体框架覆盖。Next 输出路径保持兼容，非 Next 产物不导入 Next；Nuxt 不引入 React Markdown/UI 包。
+
+TanStack Start 使用显式 locale 路由、服务端 loader、真实请求 cookie 和框架导航适配；Nuxt 使用 Vue 页面/组件、H3 WHATWG Request/Response 适配与 SSR cookie 传递。认证、邮件/短信/验证码、积分/支付、文件、AI、博客/SEO、邀请奖励和后台管理均接入同一领域服务。抽取共享 React 认证表单、i18n provider、验证码、文件管理、AI studio、博客编辑/Markdown，Next 和 Start 使用同一模板来源，不是复制独立实现。
+
+同配置验收：full × 三框架 × SQLite/PostgreSQL 六种组合安装、全部工作区类型检查和构建通过；Start/Nuxt 各自 shell/auth/storage/blog/credits/payment/ai/seo/captcha 九种独立组合也通过，共 24 种。部分首轮安装被 registry TLS 证书错误阻塞，保留证书校验并在恢复后重试通过，未禁用 TLS。PostgreSQL 本轮为生成/类型/构建检查，不代表真实 PG 并发验收。
+
+Start 与 Nuxt 的真实本地生产产物通过同套 HTTP 验收：验证码与邮件确认后的注册/登录、SSR 会话、全部控制台页面、后台越权拒绝、博客草稿/发布/编辑/删除/翻译/版本冲突、canonical/hreflang/OG/Twitter/sitemap、AI 对话/图片/异步视频与 S3 存储、Stripe 签名付款及重复通知只发一次积分、私有文件上传/签名/删除和 CSRF。外部验证码、邮件、模型和 S3 使用隔离传输夹具，实际应用路由、服务和 SQLite 执行；不代表真实付费 API 或云 IAM 验收。
+
+浏览器通过两框架验证码表单令牌交接、登录和 AI 生成；Start 中文切换及服务端已登录导航确认通过。P4 在两框架 auth→storage 追加后保留用户 README 修改；共享积分并发扣费/退款验证通过。模块测试 18 项、MCP 19 项、Builder 13 项通过，Builder 保留切换框架后的完整 feature/provider 组合。
+
+验收修复：共享 site 配置遗漏、废弃框架 Header、Start 当前 validator API、Next 导入泄漏、Nuxt Unhead link 字面量类型、空 .env 覆盖 schema 默认值、Start 非法分页静默转为第一页、SSR 已登录导航闪烁。Nuxt 元数据中脚本文本位于转义的引号属性内并不可执行，改进测试使用 HTML 解析器识别真实脚本节点，未添加无意义 HTML 重写。Cloudflare 原生产品仍限定 Next/OpenNext+D1/R2；Start/Nuxt 的该部署组合明确拒绝，不宣称已实现。
+
+Builder 验收补充：预设改为紧凑下拉框，按 Next.js/TanStack Start/Nuxt 分组，每组包含 Shell、Starter、Global SaaS、Full。每项是完整配置，Shell/Starter 固定 SQLite、SaaS/Full 固定 PostgreSQL，均使用 Drizzle；选择后替换技术栈、模块、服务商和选项，仅保留项目名。下方修改后按实际配置识别为 Custom configuration，分享 URL 恢复匹配预设。桌面预设区为单行，手机无横向溢出；完整替换、自定义状态和真实文件预览通过，Web 测试 22 项通过。

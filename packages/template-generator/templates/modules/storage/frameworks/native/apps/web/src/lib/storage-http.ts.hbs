@@ -1,0 +1,93 @@
+import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
+import { z } from "zod";
+
+import { ENV } from "@/env.server";
+
+const MAX_BODY_BYTES = MAX_FILE_BYTES + 64 * 1024;
+const contentLengthSchema = z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().nonnegative().safe());
+const fileSchema = z.instanceof(File);
+
+export class StorageRequestError extends Error {
+  constructor(public readonly status: number, public readonly code: string) {
+    super(code);
+  }
+}
+
+export function requireStorageOrigin(request: Request): void {
+  // The auth module configures this same URL as its sole trusted origin.
+  // Do not trust forwarded/Host headers to authorize cookie-authenticated mutations.
+  const trustedOrigin = new URL(ENV.BETTER_AUTH_URL).origin;
+  if (request.headers.get("origin") !== trustedOrigin) {
+    throw new StorageRequestError(403, "forbidden");
+  }
+}
+
+export function storageErrorResponse(error: unknown): Response {
+  if (error instanceof StorageRequestError) {
+    return Response.json({ error: error.code }, { status: error.status, headers: { "Cache-Control": "no-store" } });
+  }
+  if (error instanceof StorageError) {
+    const status = error.code === "not_found" ? 404 : error.code === "invalid_file" ? 400 : 503;
+    return Response.json({ error: error.code }, { status, headers: { "Cache-Control": "no-store" } });
+  }
+  return Response.json({ error: "provider_error" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+}
+
+export async function readStorageFile(request: Request): Promise<File> {
+  if (!/^multipart\/form-data(?:;|$)/i.test(request.headers.get("content-type") ?? "")) {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const header = request.headers.get("content-length");
+  if (header !== null) {
+    const length = contentLengthSchema.safeParse(header);
+    if (!length.success) throw new StorageRequestError(400, "invalid_file");
+    if (length.data > MAX_BODY_BYTES) throw new StorageRequestError(413, "too_large");
+  }
+  if (!request.body) throw new StorageRequestError(400, "invalid_file");
+
+  // Count actual bytes before formData() buffers/parses multipart data. This also
+  // bounds chunked requests and requests with an understated Content-Length.
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      length += chunk.value.byteLength;
+      if (length > MAX_BODY_BYTES) {
+        await reader.cancel();
+        throw new StorageRequestError(413, "too_large");
+      }
+      chunks.push(chunk.value);
+    }
+  } catch (error) {
+    if (error instanceof StorageRequestError) throw error;
+    throw new StorageRequestError(400, "invalid_file");
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  let form: FormData;
+  try {
+    form = await new Response(bytes, {
+      headers: { "Content-Type": request.headers.get("content-type")! },
+    }).formData();
+  } catch {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const entries = [...form.entries()];
+  if (entries.length !== 1 || entries[0]?.[0] !== "file") {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const parsed = fileSchema.safeParse(entries[0][1]);
+  if (!parsed.success || parsed.data.size === 0) throw new StorageRequestError(400, "invalid_file");
+  if (parsed.data.size > MAX_FILE_BYTES) throw new StorageRequestError(413, "too_large");
+  return parsed.data;
+}

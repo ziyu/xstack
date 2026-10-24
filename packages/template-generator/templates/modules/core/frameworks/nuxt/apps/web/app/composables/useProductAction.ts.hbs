@@ -1,0 +1,33 @@
+import { z } from "zod";
+
+export function useProductAction() {
+  const pending = ref(false);
+  const error = ref("");
+  const notice = ref("");
+  async function run(action: () => Promise<void>) {
+    if (pending.value) return;
+    pending.value = true; error.value = ""; notice.value = "";
+    try { await action(); }
+    catch (cause) { error.value = cause instanceof Error ? cause.message : "Request failed"; }
+    finally { pending.value = false; }
+  }
+  return { pending, error, notice, run };
+}
+
+const apiError = z.object({ error: z.string().optional(), message: z.string().optional(), code: z.string().optional() });
+export function productRequest<T>(url: string, options: RequestInit, schema: z.ZodType<T>): Promise<T>;
+export function productRequest(url: string, options?: RequestInit): Promise<void>;
+export async function productRequest<T = void>(url: string, options: RequestInit = {}, schema?: z.ZodType<T>): Promise<T | undefined> {
+  const response = await fetch(url, { credentials: "same-origin", ...options });
+  if (response.status === 204) return schema ? schema.parse(undefined) : undefined;
+  const value = await response.json();
+  if (!response.ok) {
+    const error = apiError.safeParse(value);
+    throw new Error(error.success ? error.data.message ?? error.data.error ?? error.data.code ?? `Request failed (${response.status})` : `Request failed (${response.status})`);
+  }
+  return schema?.parse(value);
+}
+
+export function productJson<T>(body: T): RequestInit {
+  return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+}

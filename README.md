@@ -89,7 +89,7 @@ Choose `aliyun`, `tencent`, or `twilio` in JSON (or `--providers sms:aliyun` wit
 
 ### WeChat website login
 
-Select `--features auth --providers auth:wechat` with the native Next.js + Drizzle stack. Set `WECHAT_CLIENT_ID` and `WECHAT_CLIENT_SECRET` in the generated `apps/web/.env`, using an approved WeChat Open Platform **website application**. Register the authorization callback domain for `BETTER_AUTH_URL`; the callback endpoint is `/api/auth/callback/wechat`. Once configured, login/signup pages offer WeChat QR/quick login. Mini-program and official-account credentials do not work for this flow. Setup details are in the generated `docs/modules/auth.md`.
+Select `--features auth --providers auth:wechat` with a native Next.js, TanStack Start or Nuxt + Drizzle stack. Set `WECHAT_CLIENT_ID` and `WECHAT_CLIENT_SECRET` in the generated `apps/web/.env`, using an approved WeChat Open Platform **website application**. Register the authorization callback domain for `BETTER_AUTH_URL`; the callback endpoint is `/api/auth/callback/wechat`. Mini-program and official-account credentials do not work for this flow. See the generated auth guide.
 
 ## Claude Code plugin
 
@@ -110,7 +110,7 @@ Then ask: _"create a fullstack app with Next, Hono, Postgres and Better Auth"_, 
 - Runtime: Bun, Node.js, or Cloudflare Workers
 - Databases: SQLite, PostgreSQL, MySQL, MongoDB (or none)
 - ORMs: Drizzle, Prisma, Mongoose (or none)
-- Product modules: authentication, email/SMS, admin, payments, credits, S3/R2/OSS/COS storage, AI chat/image/video, SEO, blog, referral credit rewards and Turnstile. Native modules use Next.js full-stack with Drizzle and SQLite/PostgreSQL; Cloudflare requires D1 and compatible providers such as `storage:r2-binding`.
+- Product modules: authentication, email/SMS, admin, payments, credits, S3/R2/OSS/COS storage, AI chat/image/video, SEO, blog, referral credit rewards and Turnstile. Native modules support Next.js, TanStack Start and Nuxt with `backend: self`, `api: none`, Drizzle and SQLite/PostgreSQL. Cloudflare native modules remain Next/OpenNext-only with D1 and compatible providers.
 - Addons: Turborepo, Nx, PWA, Tauri, Electrobun, Biome, Lefthook, Husky, Starlight, Fumadocs, Ultracite, Oxlint, MCP, OpenTUI, WXT, Skills
 - DB Setup: Turso, Neon, Supabase, Prisma PostgreSQL, MongoDB Atlas, Cloudflare D1, Docker
 - Deployment choices: local Node hosting, Docker, Vercel, Cloudflare, or Prisma, subject to stack compatibility

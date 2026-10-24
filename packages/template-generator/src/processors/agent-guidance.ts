@@ -101,6 +101,16 @@ export function processAgentGuidance(vfs: VirtualFileSystem, config: ProjectConf
           "Product pages live under `apps/web/src/app/[lang]/`; preserve locale routing and add translations in the selected i18n workspace rather than hard-coding user-facing copy.",
         ]
       : []),
+    ...(config.frontend.includes("tanstack-start") && vfs.directoryExists("apps/web/src/routes")
+      ? [
+          "TanStack Start routes live in `apps/web/src/routes/`. Preserve locale-prefixed product URLs, server loader authorization and request headers; do not import server services into client components. The generated route tree is framework-owned.",
+        ]
+      : []),
+    ...(config.frontend.includes("nuxt") && vfs.directoryExists("apps/web/app/pages")
+      ? [
+          "Nuxt pages and components live in `apps/web/app/`; server API adapters live in `apps/web/server/`. Product URLs are locale-prefixed. Keep `apps/web/src/services.ts` and `env.server.ts` server-only; `@/` resolves the shared `src/` directory while `~/` resolves the Nuxt app.",
+        ]
+      : []),
   ];
   const database = [
     `Database: \`${config.database}\`; ORM: \`${config.orm}\`; provisioning: \`${config.dbSetup}\`.`,

@@ -2,9 +2,11 @@ export default {
   nav: { files: "Files" },
   page: {
     title: "Private files",
-    description: "Your files, visible only to you. Uploads stay in a private bucket; download links expire after 60 seconds.",
+    description:
+      "Your files, visible only to you. Uploads stay in a private bucket; download links expire after 60 seconds.",
     limits: "Maximum 4 MiB per file. Files download as attachments, never as embedded content.",
-    unavailable: "File storage is not configured. Ask the site operator to configure the private storage provider.",
+    unavailable:
+      "File storage is not configured. Ask the site operator to configure the private storage provider.",
     uploadTitle: "Upload a file",
     fileLabel: "Choose a file (up to 4 MiB)",
     upload: "Upload file",
@@ -22,7 +24,8 @@ export default {
     unauthorized: "Your session has expired. Sign in again to continue.",
     forbidden: "This request was blocked. Reload this page from the site's configured address.",
     tooLarge: "Choose a file no larger than 4 MiB.",
-    invalidFile: "Choose one non-empty file with a name up to 255 UTF-8 bytes, without path separators or control characters.",
+    invalidFile:
+      "Choose one non-empty file with a name up to 255 UTF-8 bytes, without path separators or control characters.",
     notFound: "This file is no longer available. Refresh the page.",
     unavailable: "Storage is unavailable. Please try again later.",
     generic: "The request failed. Please try again.",

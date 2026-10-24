@@ -1,0 +1,30 @@
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { notFound, redirect } from "@tanstack/react-router";
+import { z } from "zod";
+import { isLocale } from "@{{projectName}}/i18n";
+import { handleProductRequest } from "./product-api";
+
+/** GET-only bridge keeps service imports on the server and forwards the real caller's cookies. */
+export const productResponse = createServerFn({ method: "GET" })
+  .validator(z.object({ path: z.string().regex(/^\/api\/(?:product|blog|ai)(?:\/|\?|$)/), locale: z.string().refine(isLocale) }))
+  .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "no-store");
+    const incoming = getRequest();
+    const response = await handleProductRequest(new Request(new URL(data.path, incoming.url), { headers: incoming.headers }));
+    if (response.status === 401) throw redirect({ href: `/${data.locale}/login` });
+    if (response.status === 403 || response.status === 404) throw notFound();
+    if (!response.ok) throw new Error(`Request failed (${response.status})`);
+    return response.text();
+  });
+
+export async function loadProduct<T>(path: string, locale: string, schema: z.ZodType<T>): Promise<T> {
+  const text = await productResponse({ data: { path, locale } });
+  return schema.parse(JSON.parse(text));
+}
+
+export async function mutateProduct(path: string, input: object) {
+  const response = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+  if (!response.ok) throw new Error((await response.text()) || `Request failed (${response.status})`);
+  return response;
+}

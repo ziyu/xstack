@@ -9639,6 +9639,9 @@ const prismaWasm = defineNuxtModule({
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  {{#if (hasNativeModules this)}}
+  alias: { '@': new URL('./src', import.meta.url).pathname },
+  {{/if}}
   {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
   typescript: {
     tsConfig: { references: [apiReference] },
@@ -12840,7 +12843,7 @@ export default defineConfig({
 {{/if}}
 });
 `],
-  ["modules/admin/files/docs/modules/admin.md", `# Admin console
+  ["modules/admin/files/docs/modules/admin.md.hbs", `# Admin console
 
 The admin area lives at \`/admin\` and is visible only to users with the \`admin\` role. Everyone else gets a 404.
 
@@ -12867,11 +12870,22 @@ ability.can("access", "Admin");
 
 Admins \`manage\` everything. Add roles or finer rules in \`defineAbilityFor\`, and register new subjects through declaration merging on \`SubjectMap\`.
 
+{{#if (includes frontend "next")}}
 Pages call \`requireAdmin(locale)\` from \`apps/web/src/lib/admin.ts\`.
+{{else}}
+Protected page loaders and API handlers check the authenticated session's admin role on the server. Hiding a navigation item is not authorization.
+{{/if}}
 
 ## Adding pages
 
-Create \`apps/web/src/app/[lang]/admin/<page>/page.tsx\` and add an entry to \`navigation.admin\` in \`apps/web/src/config/navigation.ts\`. Modules such as payment and credits add their pages this way.
+{{#if (includes frontend "next")}}
+Create \`apps/web/src/app/[lang]/admin/<page>/page.tsx\`.
+{{else if (includes frontend "tanstack-start")}}
+Add a locale-prefixed admin route under \`apps/web/src/routes/\` with a server-authorized loader.
+{{else}}
+Add the page in \`apps/web/app/pages/\` and its protected data handler in \`apps/web/server/\`.
+{{/if}}
+Add an entry to \`navigation.admin\` in \`apps/web/src/config/navigation.ts\`. Modules such as payment and credits add their pages this way.
 `],
   ["modules/admin/files/packages/i18n/src/messages/en/admin.ts", `export default {
   nav: {
@@ -12989,6 +13003,32 @@ export function defineAbilityFor(actor: Actor | null | undefined): AppAbility {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
   if (actor?.role === "admin") can("manage", "all");
   return build();
+}
+`],
+  ["modules/admin/frameworks/native/apps/web/src/lib/native/admin.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+import { z } from "zod";
+import { HttpError, json, pageOf, readJson, requireAdministrator, requireOrigin } from "../product-api";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path !== "/api/product/admin" && path !== "/api/product/users") return;
+  const { user } = await requireAdministrator(request);
+  if (path === "/api/product/admin" && request.method === "GET") {
+    const [recent, admins] = await Promise.all([auth.api.listUsers({ headers: request.headers, query: { limit: 5, sortBy: "createdAt", sortDirection: "desc" } }), auth.api.listUsers({ headers: request.headers, query: { limit: 1, filterField: "role", filterValue: "admin", filterOperator: "eq" } })]);
+    return json({ users: recent.total, admins: admins.total, recent: recent.users });
+  }
+  if (path === "/api/product/users" && request.method === "GET") {
+    const q = new URL(request.url).searchParams.get("q") ?? "";
+    return json(await auth.api.listUsers({ headers: request.headers, query: { limit: 20, offset: (pageOf(request) - 1) * 20, sortBy: "createdAt", sortDirection: "desc", ...(q ? { searchValue: q, searchField: "email", searchOperator: "contains" as const } : {}) } }));
+  }
+  if (path === "/api/product/users" && request.method === "POST") {
+    requireOrigin(request);
+    const data = z.discriminatedUnion("action", [z.object({ action: z.literal("role"), userId: z.string().min(1), role: z.enum(["admin", "user"]) }).strict(), z.object({ action: z.literal("ban"), userId: z.string().min(1), reason: z.string().max(1000).optional() }).strict(), z.object({ action: z.literal("unban"), userId: z.string().min(1) }).strict()]).parse(await readJson(request));
+    if (data.userId === user.id) throw new HttpError(403, "self_modification");
+    if (data.action === "role") await auth.api.setRole({ headers: request.headers, body: { userId: data.userId, role: data.role } });
+    else if (data.action === "ban") await auth.api.banUser({ headers: request.headers, body: { userId: data.userId, banReason: data.reason } });
+    else await auth.api.unbanUser({ headers: request.headers, body: { userId: data.userId } });
+    return json({ success: true });
+  }
+  return json({ error: "method_not_allowed" }, 405);
 }
 `],
   ["modules/admin/frameworks/next/apps/web/src/app/[lang]/admin/layout.tsx", `import SideNav from "@/components/side-nav";
@@ -13287,57 +13327,170 @@ export async function requireAdmin(locale: Locale) {
   return { user, ability };
 }
 `],
+  ["modules/admin/frameworks/nuxt/apps/web/app/components/ProductAdmin.vue.hbs", `<script setup lang="ts">
+import { navigation } from "@/config/navigation";
+const props = defineProps<{ section: string; id?: string }>();
+const { label, path, t } = useProductLocale();
+const sections = ["", "users"{{#if (includes product.features "payment")}}, "orders"{{/if}}{{#if (includes product.features "credits")}}, "credits"{{/if}}{{#if (includes product.features "blog")}}, "blog"{{/if}}{{#if (includes product.features "affiliate")}}, "affiliate"{{/if}}];
+if (!sections.includes(props.section)) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+const titles: Record<string, string> = { "": label("Overview", "概览"), users: label("Users", "用户"), orders: label("Orders", "订单"), credits: label("Credits", "积分"), blog: label("Blog", "博客"), affiliate: label("Referrals", "推荐") };
+const summary = ref<{ users: number; admins: number; recent: { id: string; name: string; email: string; createdAt: string }[] }>();
+if (!props.section) {
+  const { data, error } = await useFetch<{ users: number; admins: number; recent: { id: string; name: string; email: string; createdAt: string }[] }>("/api/product/admin");
+  if (error.value) throw createError({ statusCode: error.value.statusCode ?? 500, statusMessage: error.value.message });
+  summary.value = data.value ?? undefined;
+}
+</script>
+<template>
+  <div class="workspace"><nav class="workspace-nav" :aria-label="label('Administration', '管理')"><NuxtLink v-for="item in navigation.admin" :key="item.href" :to="path(item.href)">\\{{ t(item.labelKey) }}</NuxtLink></nav><section class="stack"><h1>\\{{ titles[section] }}</h1>
+    <template v-if="!section"><div class="grid"><div class="panel"><h2>\\{{ summary?.users ?? 0 }}</h2><p>\\{{ label('Users', '用户') }}</p></div><div class="panel"><h2>\\{{ summary?.admins ?? 0 }}</h2><p>\\{{ label('Administrators', '管理员') }}</p></div></div><h2>\\{{ label('Recent accounts', '最近账户') }}</h2><div class="table-wrap"><table><thead><tr><th>\\{{ label('Name', '姓名') }}</th><th>\\{{ label('Email', '邮箱') }}</th><th>\\{{ label('Created', '创建时间') }}</th></tr></thead><tbody><tr v-for="user in summary?.recent ?? []" :key="user.id"><td>\\{{ user.name }}</td><td>\\{{ user.email }}</td><td>\\{{ user.createdAt.slice(0, 10) }}</td></tr></tbody></table></div></template>
+    <ProductAdminUsers v-else-if="section === 'users'" />
+    {{#if (includes product.features "payment")}}<ProductAdminOrders v-else-if="section === 'orders'" />{{/if}}
+    {{#if (includes product.features "credits")}}<ProductAdminCredits v-else-if="section === 'credits'" />{{/if}}
+    {{#if (includes product.features "blog")}}<ProductBlogEditor v-else-if="section === 'blog'" :id="id" />{{/if}}
+    {{#if (includes product.features "affiliate")}}<ProductAdminAffiliate v-else-if="section === 'affiliate'" />{{/if}}
+  </section></div>
+</template>
+`],
+  ["modules/admin/frameworks/nuxt/apps/web/app/components/ProductAdminUsers.vue.hbs", `<script setup lang="ts">
+const { label } = useProductLocale();
+const { pending, error, notice, run } = useProductAction();
+const page = ref(1); const search = ref(""); const query = ref("");
+type User = { id: string; name: string; email: string; role: string | null; banned: boolean | null; banReason: string | null; createdAt: string };
+const { data, error: loadError, refresh } = await useFetch<{ users: User[]; total: number }>("/api/product/users", { query: { page, q: query } });
+async function change(user: User, action: "role" | "ban" | "unban") {
+  const reason = action === "ban" ? window.prompt(label("Reason for suspension", "封禁原因")) : undefined;
+  if (action === "ban" && !reason?.trim()) return;
+  if (!window.confirm(label("Apply this account change?", "确认修改此账户？"))) return;
+  await run(async () => { await productRequest("/api/product/users", productJson({ userId: user.id, action, ...(action === "role" ? { role: user.role === "admin" ? "user" : "admin" } : {}), ...(reason ? { reason } : {}) })); await refresh(); notice.value = label("Account updated.", "账户已更新。"); });
+}
+</script>
+<template>
+  <p v-if="error || loadError" role="alert" class="error">\\{{ error || loadError?.message }}</p><p v-if="notice" role="status">\\{{ notice }}</p>
+  <form class="actions" @submit.prevent="query = search.trim(); page = 1"><label>\\{{ label('Search users', '搜索用户') }}<input v-model="search" type="search" /></label><button>\\{{ label('Search', '搜索') }}</button></form>
+  <div class="table-wrap"><table><thead><tr><th>\\{{ label('User', '用户') }}</th><th>\\{{ label('Role', '角色') }}</th><th>\\{{ label('Status', '状态') }}</th><th>\\{{ label('Actions', '操作') }}</th></tr></thead><tbody><tr v-for="user in data?.users ?? []" :key="user.id"><td>\\{{ user.name }}<br /><small>\\{{ user.email }}</small></td><td>\\{{ user.role ?? 'user' }}</td><td>\\{{ user.banned ? label('Suspended', '已封禁') : label('Active', '正常') }}<small v-if="user.banReason"> · \\{{ user.banReason }}</small></td><td><div class="actions"><button class="text-button" :disabled="pending" @click="change(user, 'role')">\\{{ user.role === 'admin' ? label('Make user', '设为用户') : label('Make admin', '设为管理员') }}</button><button class="text-button" :disabled="pending" @click="change(user, user.banned ? 'unban' : 'ban')">\\{{ user.banned ? label('Restore', '恢复') : label('Suspend', '封禁') }}</button></div></td></tr></tbody></table></div>
+  <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\\{{ label('Previous', '上一页') }}</button><span>\\{{ page }} · \\{{ data?.total ?? 0 }} \\{{ label('users', '用户') }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\\{{ label('Next', '下一页') }}</button></nav>
+</template>
+`],
+  ["modules/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { userSchema } from "@/lib/auth-data";
+export const Route = createFileRoute("/$lang/admin/")({ loader: ({ params }) => loadProduct("/api/product/admin", params.lang, z.object({ users: z.number(), admins: z.number(), recent: z.array(userSchema) })), component: Overview });
+function Overview() { const data = Route.useLoaderData(); const t = useT(); return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("admin.overview.title")}</h1><div className="grid gap-4 sm:grid-cols-2"><div className="border p-6"><p>{t("admin.overview.users")}</p><strong className="mt-3 block text-4xl">{data.users}</strong></div><div className="border p-6"><p>{t("admin.overview.admins")}</p><strong className="mt-3 block text-4xl">{data.admins}</strong></div></div><h2>{t("admin.overview.recent")}</h2><ul className="divide-y border">{data.recent.map((user) => <li key={user.id} className="flex justify-between p-4"><span>{user.name}</span><span>{user.email}</span></li>)}</ul></section>; }
+`],
+  ["modules/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.tsx.hbs", `import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
+import { loadUser } from "@/lib/auth-data";
+export const Route = createFileRoute("/$lang/admin")({ beforeLoad: async ({ params }) => { const user = await loadUser(params.lang); if (!user.role?.split(",").includes("admin")) throw notFound(); return { user }; }, component: Outlet, head: () => ({ meta: [{ name: "robots", content: "noindex,nofollow" }] }) });
+`],
+  ["modules/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.users.tsx.hbs", `import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct, mutateProduct } from "@/lib/product-data";
+import { userSchema } from "@/lib/auth-data";
+const searchSchema = z.object({ q: z.string().default(""), page: z.coerce.number().int().min(1).catch(1) });
+export const Route = createFileRoute("/$lang/admin/users")({ validateSearch: searchSchema, loaderDeps: ({ search }) => search, loader: ({ params, deps }) => loadProduct(\`/api/product/users?\${new URLSearchParams({ q: deps.q, page: String(deps.page) })}\`, params.lang, z.object({ users: z.array(userSchema.extend({ banned: z.boolean().nullish(), createdAt: z.string() })), total: z.number() })), component: Users });
+function Users() { const data = Route.useLoaderData(); const search = Route.useSearch(); const { user: me } = Route.useRouteContext(); const locale = useLocale(); const t = useT(); const router = useRouter(); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  async function update(input: { action: "role" | "ban" | "unban"; userId: string; role?: "admin" | "user" }) { setBusy(true); setError(""); try { await mutateProduct("/api/product/users", input); await router.invalidate(); } catch { setError("The account could not be updated."); } finally { setBusy(false); } }
+  return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("admin.users.title")}</h1><form className="flex gap-2"><label className="sr-only" htmlFor="user-search">{t("admin.users.search")}</label><input id="user-search" name="q" className="border bg-background p-2" defaultValue={search.q} placeholder={t("admin.users.searchPlaceholder")} /><button className="border px-4">{t("admin.users.search")}</button></form>{error && <p role="alert">{error}</p>}<div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["name", "email", "role", "status", "joined"].map((label) => <th className="border-b p-3" key={label}>{label}</th>)}<th className="border-b p-3">Actions</th></tr></thead><tbody>{data.users.map((user) => <tr key={user.id}><td className="border-b p-3">{user.name}</td><td className="border-b p-3">{user.email}</td><td className="border-b p-3">{user.role}</td><td className="border-b p-3">{t(user.banned ? "admin.users.status.banned" : "admin.users.status.active")}</td><td className="border-b p-3">{new Date(user.createdAt).toLocaleDateString(locale)}</td><td className="space-x-3 border-b p-3">{user.id !== me.id && <><button disabled={busy} className="underline" onClick={() => void update({ action: "role", userId: user.id, role: user.role === "admin" ? "user" : "admin" })}>{user.role === "admin" ? "Make user" : "Make admin"}</button><button disabled={busy} className="underline" onClick={() => void update({ action: user.banned ? "unban" : "ban", userId: user.id })}>{user.banned ? "Unban" : "Ban"}</button></>}</td></tr>)}</tbody></table></div>{!data.users.length && <p>{t("admin.users.empty")}</p>}<nav className="flex justify-between" aria-label="Pagination">{search.page > 1 ? <a href={\`?\${new URLSearchParams({ q: search.q, page: String(search.page - 1) })}\`}>Previous</a> : <span />}{search.page * 20 < data.total && <a href={\`?\${new URLSearchParams({ q: search.q, page: String(search.page + 1) })}\`}>Next</a>}</nav></section>; }
+`],
   ["modules/affiliate/dialects/postgres/packages/db/src/schema/affiliate.ts", `import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
 
 export const affiliateProfile = pgTable("affiliate_profile", {
-  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
   code: text("code").notNull().unique(),
 });
 
-export const affiliateReferral = pgTable("affiliate_referral", {
-  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
-  referrerId: text("referrer_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (table) => [index("affiliate_referral_referrer_idx").on(table.referrerId)]);
+export const affiliateReferral = pgTable(
+  "affiliate_referral",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    referrerId: text("referrer_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("affiliate_referral_referrer_idx").on(table.referrerId)],
+);
 
 // Cross-feature order IDs deliberately have no foreign key.
-export const affiliateCommission = pgTable("affiliate_commission", {
-  orderId: text("order_id").primaryKey(),
-  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  referrerId: text("referrer_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  credits: integer("credits").notNull(),
-  status: text("status", { enum: ["pending", "granted"] }).notNull().default("pending"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  grantedAt: timestamp("granted_at"),
-}, (table) => [index("affiliate_commission_referrer_idx").on(table.referrerId, table.createdAt)]);
+export const affiliateCommission = pgTable(
+  "affiliate_commission",
+  {
+    orderId: text("order_id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    referrerId: text("referrer_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    credits: integer("credits").notNull(),
+    status: text("status", { enum: ["pending", "granted"] })
+      .notNull()
+      .default("pending"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    grantedAt: timestamp("granted_at"),
+  },
+  (table) => [index("affiliate_commission_referrer_idx").on(table.referrerId, table.createdAt)],
+);
 `],
   ["modules/affiliate/dialects/sqlite/packages/db/src/schema/affiliate.ts", `import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 import { user } from "./auth";
 
 export const affiliateProfile = sqliteTable("affiliate_profile", {
-  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
   code: text("code").notNull().unique(),
 });
 
-export const affiliateReferral = sqliteTable("affiliate_referral", {
-  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
-  referrerId: text("referrer_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-}, (table) => [index("affiliate_referral_referrer_idx").on(table.referrerId)]);
+export const affiliateReferral = sqliteTable(
+  "affiliate_referral",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    referrerId: text("referrer_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [index("affiliate_referral_referrer_idx").on(table.referrerId)],
+);
 
 // Cross-feature order IDs deliberately have no foreign key.
-export const affiliateCommission = sqliteTable("affiliate_commission", {
-  orderId: text("order_id").primaryKey(),
-  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  referrerId: text("referrer_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  credits: integer("credits").notNull(),
-  status: text("status", { enum: ["pending", "granted"] }).notNull().default("pending"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-  grantedAt: integer("granted_at", { mode: "timestamp_ms" }),
-}, (table) => [index("affiliate_commission_referrer_idx").on(table.referrerId, table.createdAt)]);
+export const affiliateCommission = sqliteTable(
+  "affiliate_commission",
+  {
+    orderId: text("order_id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    referrerId: text("referrer_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    credits: integer("credits").notNull(),
+    status: text("status", { enum: ["pending", "granted"] })
+      .notNull()
+      .default("pending"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    grantedAt: integer("granted_at", { mode: "timestamp_ms" }),
+  },
+  (table) => [index("affiliate_commission_referrer_idx").on(table.referrerId, table.createdAt)],
+);
 `],
   ["modules/affiliate/files/apps/web/src/integrations/affiliate-payment.ts.hbs", `import type { Services } from "../services";
 
@@ -13570,24 +13723,39 @@ export type Affiliate = ReturnType<typeof createAffiliate>;
   ["modules/affiliate/files/packages/i18n/src/messages/en/affiliate.ts", `export default {
   nav: { affiliate: "Referrals" },
   title: "Share the product. Earn credits.",
-  policy: "Earn {percent}% of the purchased plan's credits, rounded down, on each referred account's paid checkout. Renewals and free orders are excluded. Rewards are app credits only, never cash.",
+  policy:
+    "Earn {percent}% of the purchased plan's credits, rounded down, on each referred account's paid checkout. Renewals and free orders are excluded. Rewards are app credits only, never cash.",
   link: "Your personal referral link",
-  linkHint: "Share this link. The visitor must accept the invitation before creating a new account. The first valid invitation wins.",
-  stats: { signups: "Referred signups", conversions: "Paid conversions", earned: "Credits earned", pending: "Credits pending" },
+  linkHint:
+    "Share this link. The visitor must accept the invitation before creating a new account. The first valid invitation wins.",
+  stats: {
+    signups: "Referred signups",
+    conversions: "Paid conversions",
+    earned: "Credits earned",
+    pending: "Credits pending",
+  },
   history: "Latest 50 conversions",
   empty: "No paid referrals yet. Your completed referrals will appear here.",
   creditUnit: "credits",
   status: { pending: "Awaiting fulfillment", granted: "Credited" },
-  refundPolicy: "Refunds and chargebacks do not automatically reverse referral credits. Administrators review them and make an audited credit adjustment. Multi-account abuse is prohibited.",
+  refundPolicy:
+    "Refunds and chargebacks do not automatically reverse referral credits. Administrators review them and make an audited credit adjustment. Multi-account abuse is prohibited.",
   invite: {
     eyebrow: "You're invited",
     title: "A personal introduction.",
-    description: "Accept this invitation to associate your new account with the person who shared this link. Your inviter may receive app credits if you make a purchase.",
+    description:
+      "Accept this invitation to associate your new account with the person who shared this link. Your inviter may receive app credits if you make a purchase.",
     accept: "Accept invitation and sign up",
   },
   admin: {
-    title: "Referral commissions", total: "Recorded conversions: {total}",
-    order: "Order", referrer: "Inviter account", customer: "Referred account", credits: "Credits", status: "Status", date: "Created",
+    title: "Referral commissions",
+    total: "Recorded conversions: {total}",
+    order: "Order",
+    referrer: "Inviter account",
+    customer: "Referred account",
+    credits: "Credits",
+    status: "Status",
+    date: "Created",
     empty: "No referral commissions recorded.",
   },
 } as const;
@@ -13595,7 +13763,8 @@ export type Affiliate = ReturnType<typeof createAffiliate>;
   ["modules/affiliate/files/packages/i18n/src/messages/zh-CN/affiliate.ts", `export default {
   nav: { affiliate: "邀请奖励" },
   title: "分享产品，赚取积分。",
-  policy: "受邀账户每次完成付费购买，可获得套餐积分的 {percent}%（向下取整）。续订与免费订单不计奖励。奖励仅为应用积分，不可兑换现金。",
+  policy:
+    "受邀账户每次完成付费购买，可获得套餐积分的 {percent}%（向下取整）。续订与免费订单不计奖励。奖励仅为应用积分，不可兑换现金。",
   link: "您的专属邀请链接",
   linkHint: "分享此链接，访客须先接受邀请，再注册新账户。首次有效邀请优先。",
   stats: { signups: "受邀注册", conversions: "付费转化", earned: "已获积分", pending: "待发积分" },
@@ -13603,19 +13772,62 @@ export type Affiliate = ReturnType<typeof createAffiliate>;
   empty: "暂无付费邀请，完成后的奖励将显示在此处。",
   creditUnit: "积分",
   status: { pending: "待发放", granted: "已入账" },
-  refundPolicy: "退款与拒付不会自动撤回邀请积分，管理员须审核并通过可审计的积分调整处理。禁止多账户套利。",
+  refundPolicy:
+    "退款与拒付不会自动撤回邀请积分，管理员须审核并通过可审计的积分调整处理。禁止多账户套利。",
   invite: {
     eyebrow: "您收到一份邀请",
     title: "来自朋友的推荐。",
-    description: "接受邀请后，新注册账户将关联此链接的分享者。如果您付费购买，邀请人可能获得应用积分。",
+    description:
+      "接受邀请后，新注册账户将关联此链接的分享者。如果您付费购买，邀请人可能获得应用积分。",
     accept: "接受邀请并注册",
   },
   admin: {
-    title: "邀请奖励报表", total: "转化记录：{total}",
-    order: "订单", referrer: "邀请人账户", customer: "受邀账户", credits: "积分", status: "状态", date: "创建时间",
+    title: "邀请奖励报表",
+    total: "转化记录：{total}",
+    order: "订单",
+    referrer: "邀请人账户",
+    customer: "受邀账户",
+    credits: "积分",
+    status: "状态",
+    date: "创建时间",
     empty: "暂无邀请奖励记录。",
   },
 } as const;
+`],
+  ["modules/affiliate/frameworks/native/apps/web/src/lib/native/affiliate.ts.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+import { referralCodeSchema, referralCookieFromHeader, referralCookieName, referralCookieSeconds } from "@{{projectName}}/affiliate";
+import { auth } from "@{{projectName}}/app-services";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+import { json, requireOrigin, requireSession } from "../product-api";
+{{#if (includes product.features "admin")}}
+import { pageOf, requireAdministrator } from "../product-api";
+{{/if}}
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+{{#if (includes product.features "admin")}}
+  if (path === "/api/product/referrals" && request.method === "GET") {
+    await requireAdministrator(request);
+    return json(await affiliate.listAll({ limit: 20, offset: (pageOf(request) - 1) * 20 }));
+  }
+{{/if}}
+  if ((path === "/api/affiliate" || path === "/api/product/affiliate") && request.method === "GET") {
+    const { user } = await requireSession(request);
+    const [code, report] = await Promise.all([affiliate.getCode(user.id), affiliate.report(user.id)]);
+    return json({ code, origin: new URL(ENV.BETTER_AUTH_URL).origin, commissionPercent: affiliate.commissionPercent, ...report });
+  }
+  if (path.startsWith("/api/product/referral/") && request.method === "GET") {
+    return await affiliate.findInviter(path.slice("/api/product/referral/".length)) ? json({ commissionPercent: affiliate.commissionPercent }) : json({ error: "not_found" }, 404);
+  }
+  if (path !== "/api/affiliate/capture" || request.method !== "POST") return;
+  requireOrigin(request);
+  const input = z.object({ code: referralCodeSchema, lang: z.enum(["en", "zh-CN"]) }).strict().safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if (!input.success) return json({ error: "invalid_referral" }, 400);
+  if (await auth.api.getSession({ headers: request.headers })) return json({ error: "existing_account" }, 409);
+  const value = await affiliate.capture(input.data.code, referralCookieFromHeader(request.headers.get("cookie") ?? undefined));
+  if (!value) return json({ error: "unknown_referrer" }, 404);
+  const trusted = new URL(ENV.BETTER_AUTH_URL);
+  return new Response(null, { status: 303, headers: { Location: new URL(\`/\${input.data.lang}/signup\`, trusted.origin).href, "Cache-Control": "no-store", "Set-Cookie": \`\${referralCookieName}=\${value}; HttpOnly; SameSite=Lax; Path=/; Max-Age=\${referralCookieSeconds}\${trusted.protocol === "https:" ? "; Secure" : ""}\` } });
+}
 `],
   ["modules/affiliate/frameworks/next/apps/web/src/app/[lang]/dashboard/affiliate/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
@@ -13746,7 +13958,56 @@ export async function GET() {
   return Response.json({ code, commissionPercent: affiliate.commissionPercent, ...report }, { headers: { "Cache-Control": "no-store" } });
 }
 `],
-  ["modules/affiliate/integrations/admin/apps/web/src/app/[lang]/admin/affiliate/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+  ["modules/affiliate/frameworks/nuxt/apps/web/app/components/ProductAdminAffiliate.vue.hbs", `<script setup lang="ts">
+const { label } = useProductLocale(); const page = ref(1);
+const { data, error } = await useFetch<{ rows: { orderId: string; userId: string; referrerId: string; credits: number; status: string; createdAt: string; grantedAt: string | null }[]; total: number }>("/api/product/referrals", { query: { page } });
+</script>
+<template>
+  <p v-if="error" class="error" role="alert">\\{{ error.message }}</p>
+  <div class="table-wrap"><table><thead><tr><th>\\{{ label('Order', '订单') }}</th><th>\\{{ label('Customer', '客户') }}</th><th>\\{{ label('Inviter', '邀请人') }}</th><th>\\{{ label('Credits', '积分') }}</th><th>\\{{ label('Status', '状态') }}</th><th>\\{{ label('Granted', '发放时间') }}</th></tr></thead><tbody><tr v-for="row in data?.rows ?? []" :key="row.orderId"><td>\\{{ row.orderId }}</td><td>\\{{ row.userId }}</td><td>\\{{ row.referrerId }}</td><td>\\{{ row.credits }}</td><td>\\{{ row.status }}</td><td>\\{{ row.grantedAt?.slice(0, 10) ?? '—' }}</td></tr></tbody></table></div>
+  <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\\{{ label('Previous', '上一页') }}</button><span>\\{{ page }} · \\{{ data?.total ?? 0 }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\\{{ label('Next', '下一页') }}</button></nav>
+</template>
+`],
+  ["modules/affiliate/frameworks/nuxt/apps/web/app/components/ProductAffiliate.vue.hbs", `<script setup lang="ts">
+const { label, locale } = useProductLocale();
+const { data, error } = await useFetch<{ code: string; origin: string; commissionPercent: number; referredSignups: number; convertedOrders: number; earnedCredits: number; pendingCredits: number; conversions: { orderId: string; credits: number; status: string; createdAt: string }[] }>("/api/product/affiliate");
+const link = computed(() => data.value ? \`\${data.value.origin}/\${locale.value}/ref/\${data.value.code}\` : "");
+const { notice, run, error: copyError } = useProductAction();
+async function copy() { await run(async () => { await navigator.clipboard.writeText(link.value); notice.value = label("Link copied.", "链接已复制。"); }); }
+</script>
+<template>
+  <p v-if="error || copyError" role="alert" class="error">\\{{ error?.message || copyError }}</p><p v-if="notice" role="status">\\{{ notice }}</p>
+  <div class="panel stack"><p>\\{{ label('Share your invitation link. Eligible paid orders earn', '分享邀请链接。符合条件的付费订单可获得') }} \\{{ data?.commissionPercent }}% \\{{ label('of the plan credits.', '方案积分。') }}</p><label>\\{{ label('Your invitation link', '你的邀请链接') }}<input :value="link" readonly /></label><button @click="copy">\\{{ label('Copy link', '复制链接') }}</button></div>
+  <div class="grid"><div class="panel"><h2>\\{{ data?.referredSignups ?? 0 }}</h2><p>\\{{ label('Referred signups', '推荐注册') }}</p></div><div class="panel"><h2>\\{{ data?.convertedOrders ?? 0 }}</h2><p>\\{{ label('Converted orders', '转化订单') }}</p></div><div class="panel"><h2>\\{{ data?.earnedCredits ?? 0 }}</h2><p>\\{{ label('Earned credits', '已获得积分') }}</p></div><div class="panel"><h2>\\{{ data?.pendingCredits ?? 0 }}</h2><p>\\{{ label('Pending credits', '待发放积分') }}</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>\\{{ label('Order', '订单') }}</th><th>\\{{ label('Credits', '积分') }}</th><th>\\{{ label('Status', '状态') }}</th><th>\\{{ label('Date', '日期') }}</th></tr></thead><tbody><tr v-for="entry in data?.conversions ?? []" :key="entry.orderId"><td>\\{{ entry.orderId }}</td><td>\\{{ entry.credits }}</td><td>\\{{ entry.status }}</td><td>\\{{ entry.createdAt.slice(0, 10) }}</td></tr></tbody></table></div>
+</template>
+`],
+  ["modules/affiliate/frameworks/nuxt/apps/web/app/components/ProductReferral.vue.hbs", `<script setup lang="ts">
+const props = defineProps<{ code: string }>();
+const { label, locale, path } = useProductLocale();
+const { data, error } = await useFetch<{ commissionPercent: number }>(\`/api/product/referral/\${encodeURIComponent(props.code)}\`);
+if (error.value || !data.value) throw createError({ statusCode: 404, statusMessage: "Invitation not found" });
+</script>
+<template>
+  <section class="hero"><p class="eyebrow">{{projectName}}</p><h1>\\{{ label('You’re invited.', '你已受邀。') }}</h1><p>\\{{ label('Create your account using this invitation. Your inviter may earn credits when you make an eligible purchase.', '使用此邀请创建账户。当你进行符合条件的购买时，邀请人可能获得积分。') }}</p><form method="post" :action="\`/api/affiliate/capture?code=\${encodeURIComponent(code)}&lang=\${locale}\`"><button>\\{{ label('Accept invitation', '接受邀请') }}</button></form><p><NuxtLink :to="path('login')">\\{{ label('Already have an account? Sign in', '已有账户？登录') }}</NuxtLink></p></section>
+</template>
+`],
+  ["modules/affiliate/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.affiliate.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+const schema = z.object({ code: z.string(), origin: z.string(), commissionPercent: z.number(), referredSignups: z.number(), convertedOrders: z.number(), earnedCredits: z.number(), pendingCredits: z.number(), conversions: z.array(z.object({ orderId: z.string(), credits: z.number(), status: z.enum(["pending", "granted"]), createdAt: z.string() })) });
+export const Route = createFileRoute("/$lang/dashboard/affiliate")({ loader: ({ params }) => loadProduct("/api/product/affiliate", params.lang, schema), component: Affiliate });
+function Affiliate() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("affiliate.title")}</h1><p>{t("affiliate.policy", { percent: data.commissionPercent })}</p><label className="block space-y-2"><span>{t("affiliate.link")}</span><input readOnly className="w-full border bg-background p-3" value={\`\${data.origin}/\${locale}/ref/\${data.code}\`} /></label><dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">{([["signups", data.referredSignups], ["conversions", data.convertedOrders], ["earned", data.earnedCredits], ["pending", data.pendingCredits]] as const).map(([label, value]) => <div key={label} className="border p-5"><dt className="text-sm">{t(\`affiliate.stats.\${label}\`)}</dt><dd className="mt-3 text-3xl">{value}</dd></div>)}</dl><h2>{t("affiliate.history")}</h2>{data.conversions.length ? <ul className="divide-y border">{data.conversions.map((row) => <li key={row.orderId} className="flex justify-between gap-4 p-4"><span>{new Date(row.createdAt).toLocaleString(locale)}</span><span>{t(\`affiliate.status.\${row.status}\`)}</span><strong>{row.credits}</strong></li>)}</ul> : <p>{t("affiliate.empty")}</p>}<p className="text-xs text-muted-foreground">{t("affiliate.refundPolicy")}</p></section>; }
+`],
+  ["modules/affiliate/frameworks/tanstack-start/apps/web/src/routes/$lang.ref.$code.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+export const Route = createFileRoute("/$lang/ref/$code")({ loader: ({ params }) => loadProduct(\`/api/product/referral/\${encodeURIComponent(params.code)}\`, params.lang, z.object({ commissionPercent: z.number() })), head: () => ({ meta: [{ name: "robots", content: "noindex,nofollow" }] }), component: Referral });
+function Referral() { const { code } = Route.useParams(); const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="mx-auto max-w-xl space-y-8 px-6 py-24"><p className="text-xs uppercase tracking-widest">{t("affiliate.invite.eyebrow")}</p><h1 className="font-serif text-5xl">{t("affiliate.invite.title")}</h1><p>{t("affiliate.invite.description")}</p><form method="post" action={\`/api/affiliate/capture?\${new URLSearchParams({ code, lang: locale })}\`}><button className="bg-foreground px-5 py-3 text-background">{t("affiliate.invite.accept")}</button></form><p className="border-t pt-4 text-sm">{t("affiliate.policy", { percent: data.commissionPercent })}</p></section>; }
+`],
+  ["modules/affiliate/integrations/admin/frameworks/next/apps/web/src/app/[lang]/admin/affiliate/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
 import { z } from "zod";
 
@@ -13796,70 +14057,139 @@ export default async function AdminAffiliatePage({ params, searchParams }: Props
   );
 }
 `],
+  ["modules/affiliate/integrations/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.affiliate.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+export const Route = createFileRoute("/$lang/admin/affiliate")({ validateSearch: z.object({ page: z.coerce.number().int().min(1).catch(1) }), loaderDeps: ({ search }) => search, loader: ({ params, deps }) => loadProduct(\`/api/product/referrals?page=\${deps.page}\`, params.lang, z.object({ rows: z.array(z.object({ orderId: z.string(), userId: z.string(), referrerId: z.string(), credits: z.number(), status: z.string(), createdAt: z.string() })), total: z.number() })), component: Referrals });
+function Referrals() { const data = Route.useLoaderData(); const { page } = Route.useSearch(); const locale = useLocale(); const t = useT(); return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("affiliate.title")}</h1><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["Date", "Order", "Customer", "Referrer", "Credits", "Status"].map((label) => <th className="border-b p-3" key={label}>{label}</th>)}</tr></thead><tbody>{data.rows.map((row) => <tr key={row.orderId}><td className="border-b p-3">{new Date(row.createdAt).toLocaleString(locale)}</td><td className="border-b p-3 font-mono text-xs">{row.orderId}</td><td className="border-b p-3 font-mono text-xs">{row.userId}</td><td className="border-b p-3 font-mono text-xs">{row.referrerId}</td><td className="border-b p-3">{row.credits}</td><td className="border-b p-3">{row.status}</td></tr>)}</tbody></table></div>{!data.rows.length && <p>{t("affiliate.empty")}</p>}<nav className="flex justify-between" aria-label="Pagination">{page > 1 ? <a href={\`?page=\${page - 1}\`}>Previous</a> : <span />}{page * 20 < data.total && <a href={\`?page=\${page + 1}\`}>Next</a>}</nav></section>; }
+`],
   ["modules/ai/dialects/postgres/packages/db/src/schema/ai.ts", `import { bigint, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+
 import { user } from "./auth";
 
-export const aiJob = pgTable("ai_job", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  requestId: text("request_id").notNull(),
-  provider: text("provider").notNull(),
-  kind: text("kind", { enum: ["chat", "image", "video"] }).notNull(),
-  model: text("model").notNull(),
-  prompt: text("prompt").notNull(),
-  parentId: text("parent_id"),
-  cost: integer("cost").notNull(),
-  status: text("status", { enum: ["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"] }).notNull().default("queued"),
-  remoteId: text("remote_id"),
-  resultText: text("result_text"),
-  contentType: text("content_type"),
-  fileId: text("file_id"),
-  errorCode: text("error_code"),
-  leaseToken: text("lease_token"),
-  leaseUntil: bigint("lease_until", { mode: "number" }).notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("ai_job_request_idx").on(table.userId, table.requestId), index("ai_job_user_idx").on(table.userId, table.createdAt)]);
+export const aiJob = pgTable(
+  "ai_job",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    requestId: text("request_id").notNull(),
+    provider: text("provider").notNull(),
+    kind: text("kind", { enum: ["chat", "image", "video"] }).notNull(),
+    model: text("model").notNull(),
+    prompt: text("prompt").notNull(),
+    parentId: text("parent_id"),
+    cost: integer("cost").notNull(),
+    status: text("status", {
+      enum: [
+        "queued",
+        "starting",
+        "running",
+        "saving",
+        "unknown",
+        "completed",
+        "failed",
+        "cancelled",
+      ],
+    })
+      .notNull()
+      .default("queued"),
+    remoteId: text("remote_id"),
+    resultText: text("result_text"),
+    contentType: text("content_type"),
+    fileId: text("file_id"),
+    errorCode: text("error_code"),
+    leaseToken: text("lease_token"),
+    leaseUntil: bigint("lease_until", { mode: "number" }).notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("ai_job_request_idx").on(table.userId, table.requestId),
+    index("ai_job_user_idx").on(table.userId, table.createdAt),
+  ],
+);
 
-export const aiMediaChunk = pgTable("ai_media_chunk", {
-  id: text("id").primaryKey(),
-  jobId: text("job_id").notNull().references(() => aiJob.id, { onDelete: "cascade" }),
-  position: integer("position").notNull(),
-  data: text("data").notNull(),
-}, (table) => [uniqueIndex("ai_media_chunk_position_idx").on(table.jobId, table.position)]);
+export const aiMediaChunk = pgTable(
+  "ai_media_chunk",
+  {
+    id: text("id").primaryKey(),
+    jobId: text("job_id")
+      .notNull()
+      .references(() => aiJob.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    data: text("data").notNull(),
+  },
+  (table) => [uniqueIndex("ai_media_chunk_position_idx").on(table.jobId, table.position)],
+);
 `],
   ["modules/ai/dialects/sqlite/packages/db/src/schema/ai.ts", `import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+
 import { user } from "./auth";
 
-export const aiJob = sqliteTable("ai_job", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  requestId: text("request_id").notNull(),
-  provider: text("provider").notNull(),
-  kind: text("kind", { enum: ["chat", "image", "video"] }).notNull(),
-  model: text("model").notNull(),
-  prompt: text("prompt").notNull(),
-  parentId: text("parent_id"),
-  cost: integer("cost").notNull(),
-  status: text("status", { enum: ["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"] }).notNull().default("queued"),
-  remoteId: text("remote_id"),
-  resultText: text("result_text"),
-  contentType: text("content_type"),
-  fileId: text("file_id"),
-  errorCode: text("error_code"),
-  leaseToken: text("lease_token"),
-  leaseUntil: integer("lease_until").notNull().default(0),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-}, (table) => [uniqueIndex("ai_job_request_idx").on(table.userId, table.requestId), index("ai_job_user_idx").on(table.userId, table.createdAt)]);
+export const aiJob = sqliteTable(
+  "ai_job",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    requestId: text("request_id").notNull(),
+    provider: text("provider").notNull(),
+    kind: text("kind", { enum: ["chat", "image", "video"] }).notNull(),
+    model: text("model").notNull(),
+    prompt: text("prompt").notNull(),
+    parentId: text("parent_id"),
+    cost: integer("cost").notNull(),
+    status: text("status", {
+      enum: [
+        "queued",
+        "starting",
+        "running",
+        "saving",
+        "unknown",
+        "completed",
+        "failed",
+        "cancelled",
+      ],
+    })
+      .notNull()
+      .default("queued"),
+    remoteId: text("remote_id"),
+    resultText: text("result_text"),
+    contentType: text("content_type"),
+    fileId: text("file_id"),
+    errorCode: text("error_code"),
+    leaseToken: text("lease_token"),
+    leaseUntil: integer("lease_until").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("ai_job_request_idx").on(table.userId, table.requestId),
+    index("ai_job_user_idx").on(table.userId, table.createdAt),
+  ],
+);
 
 // Keep each row below D1's per-row limit; media remains ownership-gated by ai_job.
-export const aiMediaChunk = sqliteTable("ai_media_chunk", {
-  id: text("id").primaryKey(),
-  jobId: text("job_id").notNull().references(() => aiJob.id, { onDelete: "cascade" }),
-  position: integer("position").notNull(),
-  data: text("data").notNull(),
-}, (table) => [uniqueIndex("ai_media_chunk_position_idx").on(table.jobId, table.position)]);
+export const aiMediaChunk = sqliteTable(
+  "ai_media_chunk",
+  {
+    id: text("id").primaryKey(),
+    jobId: text("job_id")
+      .notNull()
+      .references(() => aiJob.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    data: text("data").notNull(),
+  },
+  (table) => [uniqueIndex("ai_media_chunk_position_idx").on(table.jobId, table.position)],
+);
 `],
   ["modules/ai/files/docs/modules/ai.md.hbs", `# AI studio
 
@@ -14170,44 +14500,87 @@ export const costs = z.object({ chat: creditPrice, image: creditPrice, video: cr
 
 export const kindSchema = z.enum(["chat", "image", "video"]);
 export type Kind = z.infer<typeof kindSchema>;
-export const requestSchema = z.object({
-  requestId: z.string().uuid(), provider: z.string().min(1).max(40), kind: kindSchema,
-  prompt: z.string().trim().min(1).max(8000), parentId: z.string().uuid().optional(),
-}).strict();
+export const requestSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    provider: z.string().min(1).max(40),
+    kind: kindSchema,
+    prompt: z.string().trim().min(1).max(8000),
+    parentId: z.string().uuid().optional(),
+  })
+  .strict();
 export type GenerationRequest = z.infer<typeof requestSchema>;
 export type Message = { role: "user" | "assistant"; content: string };
 export type Result =
   | { status: "running"; remoteId: string }
   | { status: "completed"; text: string; remoteId?: string }
-  | { status: "completed"; media: { data: string; contentType: "image/png" | "image/jpeg" | "image/webp" | "video/mp4" } }
+  | {
+      status: "completed";
+      media: { data: string; contentType: "image/png" | "image/jpeg" | "image/webp" | "video/mp4" };
+    }
   | { status: "failed" }
   | { status: "cancelled" };
 export interface AIProvider {
   id: string;
   models: Partial<Record<Kind, string>>;
-  generate(input: { kind: Kind; model: string; prompt: string; messages: Message[]; requestId: string; parentRemoteId?: string }): Promise<Result>;
+  generate(input: {
+    kind: Kind;
+    model: string;
+    prompt: string;
+    messages: Message[];
+    requestId: string;
+    parentRemoteId?: string;
+  }): Promise<Result>;
   poll?(remoteId: string, kind: Kind): Promise<Result>;
   cancel?(remoteId: string): Promise<void>;
 }
 export class ProviderRejected extends Error {}
 export class AIError extends Error {
-  constructor(readonly code: "invalid_request" | "not_configured" | "unsupported" | "not_found" | "conflict" | "insufficient_credits" | "provider_error" | "busy") { super(code); }
+  constructor(
+    readonly code:
+      | "invalid_request"
+      | "not_configured"
+      | "unsupported"
+      | "not_found"
+      | "conflict"
+      | "insufficient_credits"
+      | "provider_error"
+      | "busy",
+  ) {
+    super(code);
+  }
 }
 // Leaves headroom for JSON text, parsed base64 and decoded bytes on Workers.
 export const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
 export function decodeMedia(data: string): Uint8Array<ArrayBuffer> {
-  if (!data || data.length > Math.ceil(MAX_MEDIA_BYTES / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) throw new AIError("provider_error");
+  if (
+    !data ||
+    data.length > Math.ceil(MAX_MEDIA_BYTES / 3) * 4 ||
+    !/^[A-Za-z0-9+/]*={0,2}$/.test(data)
+  )
+    throw new AIError("provider_error");
   const decoded = atob(data);
   if (decoded.length > MAX_MEDIA_BYTES) throw new AIError("provider_error");
   return Uint8Array.from(decoded, (value) => value.charCodeAt(0));
 }
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json | undefined };
-export async function jsonRequest(url: string, headers: Record<string, string>, body?: Json, method = body === undefined ? "GET" : "POST"): Promise<unknown> {
-  const init: RequestInit = { method, headers: { ...headers, "Content-Type": "application/json" }, redirect: "manual", signal: AbortSignal.timeout(120_000) };
+export async function jsonRequest(
+  url: string,
+  headers: Record<string, string>,
+  body?: Json,
+  method = body === undefined ? "GET" : "POST",
+): Promise<unknown> {
+  const init: RequestInit = {
+    method,
+    headers: { ...headers, "Content-Type": "application/json" },
+    redirect: "manual",
+    signal: AbortSignal.timeout(120_000),
+  };
   if (body !== undefined) init.body = JSON.stringify(body);
   const response = await fetch(url, init);
   if (!response.ok) {
-    if (response.status >= 400 && response.status < 500 && response.status !== 408) throw new ProviderRejected("Provider rejected generation");
+    if (response.status >= 400 && response.status < 500 && response.status !== 408)
+      throw new ProviderRejected("Provider rejected generation");
     throw new AIError("provider_error");
   }
   if (!response.body) throw new AIError("provider_error");
@@ -14220,31 +14593,173 @@ export async function jsonRequest(url: string, headers: Record<string, string>, 
       const chunk = await reader.read();
       if (chunk.done) break;
       size += chunk.value.byteLength;
-      if (size > 12 * 1024 * 1024) { await reader.cancel(); throw new AIError("provider_error"); }
+      if (size > 12 * 1024 * 1024) {
+        await reader.cancel();
+        throw new AIError("provider_error");
+      }
       text += decoder.decode(chunk.value, { stream: true });
     }
     text += decoder.decode();
-  } finally { reader.releaseLock(); }
+  } finally {
+    reader.releaseLock();
+  }
   return JSON.parse(text);
 }
 `],
   ["modules/ai/files/packages/i18n/src/messages/en/ai.ts", `export default {
   nav: { ai: "AI studio" },
-  title: "AI studio", subtitle: "A private space to think, imagine, and make.",
-  provider: "Provider", kind: "Create", prompt: "Your prompt", generate: "Generate", working: "Working…", history: "Your generations", empty: "Your first idea starts here.", notConfigured: "Add a provider API key on the server to start generating.", cost: "Credits", model: "Model", cancel: "Cancel generation", refresh: "Refresh", download: "Download", continue: "Continue this conversation", newChat: "New conversation", reply: "Replying to the selected conversation", retry: "Retry the same request", error: "We could not complete the request. Refresh to check its persisted status before trying again.",
+  title: "AI studio",
+  subtitle: "A private space to think, imagine, and make.",
+  provider: "Provider",
+  kind: "Create",
+  prompt: "Your prompt",
+  generate: "Generate",
+  working: "Working…",
+  history: "Your generations",
+  empty: "Your first idea starts here.",
+  notConfigured: "Add a provider API key on the server to start generating.",
+  cost: "Credits",
+  model: "Model",
+  cancel: "Cancel generation",
+  refresh: "Refresh",
+  download: "Download",
+  continue: "Continue this conversation",
+  newChat: "New conversation",
+  reply: "Replying to the selected conversation",
+  retry: "Retry the same request",
+  error:
+    "We could not complete the request. Refresh to check its persisted status before trying again.",
   kinds: { chat: "Chat", image: "Image", video: "Video" },
-  statuses: { queued: "Queued", starting: "Submitting", running: "Generating", saving: "Saving media — refresh to retry", unknown: "Provider outcome unknown — contact support; do not resubmit", completed: "Complete", failed: "Failed — credits returned if charged", cancelled: "Cancelled — credits returned" },
-  errors: { insufficient_credits: "Not enough credits. No generation was submitted.", provider_error: "Provider or storage temporarily unavailable.", unknown: "The provider may have accepted the request. Support must reconcile it before any retry or refund.", invalid_request: "Check your prompt and request.", unsupported: "This provider does not support that operation.", not_configured: "This provider is not configured.", conflict: "This request ID belongs to a different prompt.", not_found: "Generation not found.", busy: "This generation is already being processed.", cancelled: "Generation cancelled." },
+  statuses: {
+    queued: "Queued",
+    starting: "Submitting",
+    running: "Generating",
+    saving: "Saving media — refresh to retry",
+    unknown: "Provider outcome unknown — contact support; do not resubmit",
+    completed: "Complete",
+    failed: "Failed — credits returned if charged",
+    cancelled: "Cancelled — credits returned",
+  },
+  errors: {
+    insufficient_credits: "Not enough credits. No generation was submitted.",
+    provider_error: "Provider or storage temporarily unavailable.",
+    unknown:
+      "The provider may have accepted the request. Support must reconcile it before any retry or refund.",
+    invalid_request: "Check your prompt and request.",
+    unsupported: "This provider does not support that operation.",
+    not_configured: "This provider is not configured.",
+    conflict: "This request ID belongs to a different prompt.",
+    not_found: "Generation not found.",
+    busy: "This generation is already being processed.",
+    cancelled: "Generation cancelled.",
+  },
 } as const;
 `],
   ["modules/ai/files/packages/i18n/src/messages/zh-CN/ai.ts", `export default {
   nav: { ai: "AI 工作室" },
-  title: "AI 工作室", subtitle: "思考、想象与创作的私有空间。",
-  provider: "服务商", kind: "创作类型", prompt: "提示词", generate: "开始生成", working: "处理中…", history: "生成记录", empty: "从你的第一个想法开始。", notConfigured: "请在服务端配置服务商 API 密钥后开始生成。", cost: "积分", model: "模型", cancel: "取消生成", refresh: "刷新", download: "下载", continue: "继续此对话", newChat: "新建对话", reply: "正在回复所选对话", retry: "重试相同请求", error: "请求暂未完成，请先刷新确认已保存的状态后再重试。",
+  title: "AI 工作室",
+  subtitle: "思考、想象与创作的私有空间。",
+  provider: "服务商",
+  kind: "创作类型",
+  prompt: "提示词",
+  generate: "开始生成",
+  working: "处理中…",
+  history: "生成记录",
+  empty: "从你的第一个想法开始。",
+  notConfigured: "请在服务端配置服务商 API 密钥后开始生成。",
+  cost: "积分",
+  model: "模型",
+  cancel: "取消生成",
+  refresh: "刷新",
+  download: "下载",
+  continue: "继续此对话",
+  newChat: "新建对话",
+  reply: "正在回复所选对话",
+  retry: "重试相同请求",
+  error: "请求暂未完成，请先刷新确认已保存的状态后再重试。",
   kinds: { chat: "对话", image: "图片", video: "视频" },
-  statuses: { queued: "排队中", starting: "提交中", running: "生成中", saving: "保存媒体中，可刷新重试", unknown: "服务商结果未知，请联系客服，勿重复提交", completed: "已完成", failed: "失败，已扣积分已退回", cancelled: "已取消，积分已退回" },
-  errors: { insufficient_credits: "积分不足，未向服务商提交生成请求。", provider_error: "服务商或存储暂时不可用。", unknown: "服务商可能已接受请求，需客服核对后才能重试或退款。", invalid_request: "请检查提示词与请求。", unsupported: "此服务商不支持该操作。", not_configured: "此服务商未配置。", conflict: "此请求编号已用于其他提示词。", not_found: "未找到生成记录。", busy: "该任务正在处理中。", cancelled: "已取消生成。" },
+  statuses: {
+    queued: "排队中",
+    starting: "提交中",
+    running: "生成中",
+    saving: "保存媒体中，可刷新重试",
+    unknown: "服务商结果未知，请联系客服，勿重复提交",
+    completed: "已完成",
+    failed: "失败，已扣积分已退回",
+    cancelled: "已取消，积分已退回",
+  },
+  errors: {
+    insufficient_credits: "积分不足，未向服务商提交生成请求。",
+    provider_error: "服务商或存储暂时不可用。",
+    unknown: "服务商可能已接受请求，需客服核对后才能重试或退款。",
+    invalid_request: "请检查提示词与请求。",
+    unsupported: "此服务商不支持该操作。",
+    not_configured: "此服务商未配置。",
+    conflict: "此请求编号已用于其他提示词。",
+    not_found: "未找到生成记录。",
+    busy: "该任务正在处理中。",
+    cancelled: "已取消生成。",
+  },
 } as const;
+`],
+  ["modules/ai/frameworks/native/apps/web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+
+export const privateHeaders = { "Cache-Control": "no-store" };
+export function requireAIOrigin(request: Request) {
+  if (request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new AIError("invalid_request");
+}
+export async function readAIRequest(request: Request): Promise<unknown> {
+  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new AIError("invalid_request");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const item = await reader.read();
+      if (item.done) break;
+      size += item.value.length;
+      if (size > 40_000) { await reader.cancel(); throw new AIError("invalid_request"); }
+      chunks.push(item.value);
+    }
+  } finally { reader.releaseLock(); }
+  const data = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder().decode(data)); } catch { throw new AIError("invalid_request"); }
+}
+export function aiErrorResponse(error: unknown) {
+  const code = error instanceof AIError ? error.code : error instanceof z.ZodError ? "invalid_request" : "provider_error";
+  const status = code === "not_found" ? 404 : code === "insufficient_credits" ? 402 : code === "invalid_request" || code === "unsupported" ? 400 : code === "conflict" || code === "busy" ? 409 : 503;
+  return Response.json({ error: code }, { status, headers: privateHeaders });
+}
+`],
+  ["modules/ai/frameworks/native/apps/web/src/lib/native/ai.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
+import { requestSchema } from "@{{projectName}}/ai";
+import { json, requireSession } from "../product-api";
+import { aiErrorResponse, privateHeaders, readAIRequest, requireAIOrigin } from "../ai-http";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path !== "/api/product/ai" && path !== "/api/ai" && !path.startsWith("/api/ai/")) return;
+  const { user } = await requireSession(request);
+  try {
+    if ((path === "/api/ai" || path === "/api/product/ai") && request.method === "GET") return json({ capabilities: ai.capabilities(), jobs: await ai.history(user.id) });
+    if (path === "/api/ai" && request.method === "POST") {
+      requireAIOrigin(request);
+      const job = await ai.generate(user.id, requestSchema.parse(await readAIRequest(request)));
+      return json({ job }, job.status === "failed" ? job.error === "insufficient_credits" ? 402 : 422 : job.status === "unknown" ? 503 : 200);
+    }
+    const match = /^\\/api\\/ai\\/([^/]+)(\\/media)?$/.exec(path);
+    if (!match) return json({ error: "not_found" }, 404);
+    const id = decodeURIComponent(match[1]!);
+    if (match[2] && request.method === "GET") {
+      const media = await ai.media(user.id, id);
+      return new Response(media.body, { headers: { ...privateHeaders, "Content-Type": media.contentType, "Content-Disposition": "inline", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" } });
+    }
+    if (!match[2] && (request.method === "POST" || request.method === "DELETE")) { requireAIOrigin(request); return json({ job: await (request.method === "POST" ? ai.poll(user.id, id) : ai.cancel(user.id, id)) }); }
+    return json({ error: "method_not_allowed" }, 405);
+  } catch (error) { return aiErrorResponse(error); }
+}
 `],
   ["modules/ai/frameworks/next/apps/web/src/app/[lang]/dashboard/ai/page.tsx.hbs", `import { ai } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
@@ -14321,7 +14836,100 @@ export async function POST(request: Request) {
   } catch (error) { return aiErrorResponse(error); }
 }
 `],
-  ["modules/ai/frameworks/next/apps/web/src/components/ai/studio.tsx.hbs", `"use client";
+  ["modules/ai/frameworks/next/apps/web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+
+export const privateHeaders = { "Cache-Control": "no-store" };
+export function requireAIOrigin(request: Request) {
+  if (request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new AIError("invalid_request");
+}
+export async function readAIRequest(request: Request): Promise<unknown> {
+  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new AIError("invalid_request");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const item = await reader.read();
+      if (item.done) break;
+      size += item.value.length;
+      if (size > 40_000) { await reader.cancel(); throw new AIError("invalid_request"); }
+      chunks.push(item.value);
+    }
+  } finally { reader.releaseLock(); }
+  const data = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder().decode(data)); } catch { throw new AIError("invalid_request"); }
+}
+export function aiErrorResponse(error: unknown) {
+  const code = error instanceof AIError ? error.code : error instanceof z.ZodError ? "invalid_request" : "provider_error";
+  const status = code === "not_found" ? 404 : code === "insufficient_credits" ? 402 : code === "invalid_request" || code === "unsupported" ? 400 : code === "conflict" || code === "busy" ? 409 : 503;
+  return Response.json({ error: code }, { status, headers: privateHeaders });
+}
+`],
+  ["modules/ai/frameworks/nuxt/apps/web/app/components/ProductAI.vue.hbs", `<script setup lang="ts">
+import { z } from "zod";
+const { label } = useProductLocale();
+const { pending, error, run } = useProductAction();
+type Kind = "chat" | "image" | "video";
+const jobSchema = z.object({ id: z.string(), provider: z.string(), kind: z.enum(["chat", "image", "video"]), model: z.string(), prompt: z.string(), parentId: z.string().nullable(), status: z.string(), text: z.string().nullable(), error: z.string().nullable(), cost: z.number(), createdAt: z.string(), mediaUrl: z.string().nullable(), cancellable: z.boolean() });
+type Job = z.infer<typeof jobSchema>;
+type Capability = { id: string; models: Partial<Record<Kind, string>>; costs: Record<Kind, number> };
+const { data, error: loadError, refresh } = await useFetch<{ jobs: Job[]; capabilities: Capability[] }>("/api/product/ai");
+const provider = ref(data.value?.capabilities[0]?.id ?? "");
+const capability = computed(() => data.value?.capabilities.find((entry) => entry.id === provider.value));
+const kinds = computed(() => (["chat", "image", "video"] as const).filter((kind) => capability.value?.models[kind]));
+const kind = ref<Kind>(kinds.value[0] ?? "chat");
+const prompt = ref(""); const parentId = ref<string>();
+watch(provider, () => { kind.value = kinds.value[0] ?? "chat"; parentId.value = undefined; });
+watch(kind, () => { if (kind.value !== "chat") parentId.value = undefined; });
+function replaceJob(job: Job) { if (!data.value) return; const index = data.value.jobs.findIndex((entry) => entry.id === job.id); if (index < 0) data.value.jobs.unshift(job); else data.value.jobs[index] = job; }
+async function jobRequest(url: string, options: RequestInit): Promise<Job> {
+  const response = await fetch(url, { credentials: "same-origin", ...options });
+  const value = z.object({ job: jobSchema.optional(), error: z.string().optional() }).parse(await response.json());
+  if (value.job) { replaceJob(value.job); return value.job; }
+  throw new Error(value.error ?? \`Request failed (\${response.status})\`);
+}
+let generationRequest: { key: string; id: string } | undefined;
+async function generate() {
+  await run(async () => {
+    const input = { provider: provider.value, kind: kind.value, prompt: prompt.value.trim(), parentId: parentId.value };
+    const key = JSON.stringify(input);
+    if (generationRequest?.key !== key) generationRequest = { key, id: crypto.randomUUID() };
+    const job = await jobRequest("/api/ai", productJson({ ...input, requestId: generationRequest.id }));
+    if (job.status !== "unknown") generationRequest = undefined;
+    if (job.status === "failed" || job.status === "unknown") error.value = job.error ?? job.status;
+    else { prompt.value = ""; parentId.value = job.kind === "chat" && job.status === "completed" ? job.id : undefined; }
+  });
+}
+async function cancel(job: Job) { await run(async () => { await jobRequest(\`/api/ai/\${encodeURIComponent(job.id)}\`, { method: "DELETE" }); }); }
+function reply(job: Job) { provider.value = job.provider; kind.value = "chat"; nextTick(() => { parentId.value = job.id; }); }
+let timer: ReturnType<typeof setTimeout> | undefined;
+let disposed = false;
+async function poll() {
+  try {
+    for (const job of data.value?.jobs.filter((entry) => ["queued", "starting", "running", "saving"].includes(entry.status)) ?? []) {
+      if (disposed) return;
+      await jobRequest(\`/api/ai/\${encodeURIComponent(job.id)}\`, { method: "POST" });
+    }
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : "Could not refresh generation"; }
+  finally { if (!disposed) timer = setTimeout(poll, 3000); }
+}
+onMounted(() => { timer = setTimeout(poll, 3000); });
+onBeforeUnmount(() => { disposed = true; if (timer) clearTimeout(timer); });
+</script>
+<template>
+  <p v-if="error || loadError" role="alert" class="error">\\{{ error || loadError?.message }}</p>
+  <p v-if="!data?.capabilities.length" class="error" role="alert">\\{{ label('No AI provider is configured. Ask the administrator to configure provider credentials.', '尚未配置 AI 提供商，请联系管理员配置凭据。') }}</p>
+  <form class="panel" @submit.prevent="generate"><div class="grid"><label>\\{{ label('Provider', '提供商') }}<select v-model="provider" required><option v-for="entry in data?.capabilities ?? []" :key="entry.id" :value="entry.id">\\{{ entry.id }}</option></select></label><label>\\{{ label('Type', '类型') }}<select v-model="kind" required><option v-for="entry in kinds" :key="entry" :value="entry">\\{{ entry }}</option></select></label></div><small>\\{{ capability?.models[kind] }} · \\{{ capability?.costs[kind] ?? 0 }} \\{{ label('credits per generation', '积分 / 次') }}</small><p v-if="parentId">\\{{ label('Continuing conversation', '继续对话') }} <button type="button" class="text-button" @click="parentId = undefined">\\{{ label('Start new', '新对话') }}</button></p><label>\\{{ label('Prompt', '提示词') }}<textarea v-model="prompt" required maxlength="20000" /></label><button :disabled="pending || !capability?.models[kind] || !prompt.trim()">\\{{ pending ? label('Generating…', '生成中…') : label('Generate', '生成') }}</button><small>{{#if (includes product.features "credits")}}\\{{ label('Failed or cancelled generations refund their debit. An unknown provider outcome is not retried or refunded automatically.', '失败或取消的生成会退还扣除的积分。未知的提供商结果不会自动重试或退款。') }}{{else}}\\{{ label('Generation costs are shown for reference; credit billing is not enabled.', '生成成本仅供参考，尚未启用积分计费。') }}{{/if}}</small></form>
+  <div class="actions"><h2>\\{{ label('Generation history', '生成历史') }}</h2><button class="text-button" @click="refresh()">\\{{ label('Refresh', '刷新') }}</button></div>
+  <article v-for="job in data?.jobs ?? []" :key="job.id" class="panel stack"><div><small>\\{{ job.provider }} · \\{{ job.model }} · \\{{ job.cost }} \\{{ label('credits', '积分') }}</small><p>\\{{ job.prompt }}</p><p role="status">\\{{ job.status }}<span v-if="job.error"> · \\{{ job.error }}</span></p></div><pre v-if="job.text">\\{{ job.text }}</pre><img v-if="job.mediaUrl && job.kind === 'image'" class="media" :src="job.mediaUrl" :alt="job.prompt" /><video v-if="job.mediaUrl && job.kind === 'video'" class="media" :src="job.mediaUrl" controls preload="metadata" /><div class="actions"><button v-if="job.cancellable" class="text-button" :disabled="pending" @click="cancel(job)">\\{{ label('Cancel generation', '取消生成') }}</button><button v-if="job.kind === 'chat' && job.status === 'completed'" class="text-button" @click="reply(job)">\\{{ label('Continue conversation', '继续对话') }}</button><a v-if="job.mediaUrl" :href="job.mediaUrl" download>\\{{ label('Download', '下载') }}</a></div></article>
+  <p v-if="!data?.jobs.length">\\{{ label('Your generations will appear here.', '生成结果将在这里显示。') }}</p>
+</template>
+`],
+  ["modules/ai/frameworks/react/apps/web/src/components/ai/studio.tsx.hbs", `"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -14411,38 +15019,14 @@ export function AIStudio({ initialJobs, capabilities }: { initialJobs: Job[]; ca
   </div>;
 }
 `],
-  ["modules/ai/frameworks/next/apps/web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
+  ["modules/ai/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.ai.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { ENV } from "@/env.server";
-
-export const privateHeaders = { "Cache-Control": "no-store" };
-export function requireAIOrigin(request: Request) {
-  if (request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new AIError("invalid_request");
-}
-export async function readAIRequest(request: Request): Promise<unknown> {
-  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new AIError("invalid_request");
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const item = await reader.read();
-      if (item.done) break;
-      size += item.value.length;
-      if (size > 40_000) { await reader.cancel(); throw new AIError("invalid_request"); }
-      chunks.push(item.value);
-    }
-  } finally { reader.releaseLock(); }
-  const data = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
-  try { return JSON.parse(new TextDecoder().decode(data)); } catch { throw new AIError("invalid_request"); }
-}
-export function aiErrorResponse(error: unknown) {
-  const code = error instanceof AIError ? error.code : error instanceof z.ZodError ? "invalid_request" : "provider_error";
-  const status = code === "not_found" ? 404 : code === "insufficient_credits" ? 402 : code === "invalid_request" || code === "unsupported" ? 400 : code === "conflict" || code === "busy" ? 409 : 503;
-  return Response.json({ error: code }, { status, headers: privateHeaders });
-}
+import { AIStudio } from "@/components/ai/studio";
+import { useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+const schema = z.object({ jobs: z.array(z.object({ id: z.string(), requestId: z.string(), provider: z.string(), kind: z.enum(["chat", "image", "video"]), model: z.string(), prompt: z.string(), cost: z.number(), status: z.enum(["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"]), text: z.string().nullable(), error: z.string().nullable(), mediaUrl: z.string().nullable(), cancellable: z.boolean() })), capabilities: z.array(z.object({ id: z.string(), models: z.object({ chat: z.string().optional(), image: z.string().optional(), video: z.string().optional() }), costs: z.object({ chat: z.number(), image: z.number(), video: z.number() }) })) });
+export const Route = createFileRoute("/$lang/dashboard/ai")({ loader: ({ params }) => loadProduct("/api/product/ai", params.lang, schema), component: Studio });
+function Studio() { const data = Route.useLoaderData(); const t = useT(); return <section className="space-y-8"><header className="space-y-3"><h1 className="font-serif text-4xl">{t("ai.title")}</h1><p className="text-muted-foreground">{t("ai.subtitle")}</p></header><AIStudio initialJobs={data.jobs} capabilities={data.capabilities} /></section>; }
 `],
   ["modules/ai/integrations/credits/apps/web/src/integrations/ai-credits.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
 import { InsufficientCreditsError } from "@{{projectName}}/credits";
@@ -14469,15 +15053,26 @@ export default function registerAIStorage({ ai, storage }: Services) {
 }
 `],
   ["modules/ai/providers/google/packages/ai/src/providers/google.ts", `import { z } from "zod";
+
 import { AIError, jsonRequest, type AIProvider, type Kind, type Result } from "../types";
 
-const part = z.object({ type: z.string(), text: z.string().optional(), data: z.string().optional(), mime_type: z.enum(["image/png", "image/jpeg", "image/webp", "video/mp4"]).optional() });
+const part = z.object({
+  type: z.string(),
+  text: z.string().optional(),
+  data: z.string().optional(),
+  mime_type: z.enum(["image/png", "image/jpeg", "image/webp", "video/mp4"]).optional(),
+});
 const interaction = z.object({
   id: z.string().min(1),
   status: z.enum(["in_progress", "completed", "failed", "cancelled", "requires_action"]),
   steps: z.array(z.object({ type: z.string(), content: z.array(part).optional() })).optional(),
 });
-export function google(env: { GEMINI_API_KEY?: string; GEMINI_CHAT_MODEL?: string; GEMINI_IMAGE_MODEL?: string; GEMINI_VIDEO_MODEL?: string }): AIProvider | undefined {
+export function google(env: {
+  GEMINI_API_KEY?: string;
+  GEMINI_CHAT_MODEL?: string;
+  GEMINI_IMAGE_MODEL?: string;
+  GEMINI_VIDEO_MODEL?: string;
+}): AIProvider | undefined {
   if (!env.GEMINI_API_KEY) return undefined;
   const base = "https://generativelanguage.googleapis.com/v1beta/interactions";
   const headers = { "x-goog-api-key": env.GEMINI_API_KEY, "Api-Revision": "2026-05-20" };
@@ -14486,80 +15081,164 @@ export function google(env: { GEMINI_API_KEY?: string; GEMINI_CHAT_MODEL?: strin
     if (parsed.status === "cancelled") return { status: "cancelled" };
     if (parsed.status === "failed") return { status: "failed" };
     if (parsed.status !== "completed") throw new AIError("provider_error");
-    const parts = parsed.steps?.filter((step) => step.type === "model_output").flatMap((step) => step.content ?? []) ?? [];
+    const parts =
+      parsed.steps
+        ?.filter((step) => step.type === "model_output")
+        .flatMap((step) => step.content ?? []) ?? [];
     if (kind === "chat") {
-      const text = parts.filter((item) => item.type === "text").map((item) => item.text ?? "").join("");
+      const text = parts
+        .filter((item) => item.type === "text")
+        .map((item) => item.text ?? "")
+        .join("");
       if (!text) throw new AIError("provider_error");
       return { status: "completed", text, remoteId: parsed.id };
     }
     const media = parts.find((item) => item.type === kind && item.data && item.mime_type);
-    if (!media?.data || !media.mime_type || (kind === "video") !== (media.mime_type === "video/mp4")) throw new AIError("provider_error");
+    if (
+      !media?.data ||
+      !media.mime_type ||
+      (kind === "video") !== (media.mime_type === "video/mp4")
+    )
+      throw new AIError("provider_error");
     return { status: "completed", media: { data: media.data, contentType: media.mime_type } };
   }
   return {
     id: "google",
-    models: { chat: env.GEMINI_CHAT_MODEL || "gemini-4-argon", image: env.GEMINI_IMAGE_MODEL || "gemini-nano-banana-2.1", video: env.GEMINI_VIDEO_MODEL || "gemini-omni-1.1-flash" },
+    models: {
+      chat: env.GEMINI_CHAT_MODEL || "gemini-4-argon",
+      image: env.GEMINI_IMAGE_MODEL || "gemini-nano-banana-2.1",
+      video: env.GEMINI_VIDEO_MODEL || "gemini-omni-1.1-flash",
+    },
     async generate(input) {
-      return result(interaction.parse(await jsonRequest(base, headers, {
-        model: input.model,
-        background: input.kind === "video", store: true,
-        input: input.prompt,
-        previous_interaction_id: input.parentRemoteId || undefined,
-        response_format: input.kind === "video" ? { type: "video" } : undefined,
-      })), input.kind);
+      return result(
+        interaction.parse(
+          await jsonRequest(base, headers, {
+            model: input.model,
+            background: input.kind === "video",
+            store: true,
+            input: input.prompt,
+            previous_interaction_id: input.parentRemoteId || undefined,
+            response_format: input.kind === "video" ? { type: "video" } : undefined,
+          }),
+        ),
+        input.kind,
+      );
     },
     async poll(remoteId, kind) {
-      return result(interaction.parse(await jsonRequest(\`\${base}/\${encodeURIComponent(remoteId)}\`, headers)), kind);
+      return result(
+        interaction.parse(await jsonRequest(\`\${base}/\${encodeURIComponent(remoteId)}\`, headers)),
+        kind,
+      );
     },
     async cancel(remoteId) {
-      const response = await fetch(\`\${base}/\${encodeURIComponent(remoteId)}/cancel\`, { method: "POST", headers, redirect: "manual", signal: AbortSignal.timeout(30_000) });
+      const response = await fetch(\`\${base}/\${encodeURIComponent(remoteId)}/cancel\`, {
+        method: "POST",
+        headers,
+        redirect: "manual",
+        signal: AbortSignal.timeout(30_000),
+      });
       if (!response.ok) throw new AIError("provider_error");
     },
   };
 }
 `],
   ["modules/ai/providers/openai-compatible/packages/ai/src/providers/openai-compatible.ts", `import { z } from "zod";
+
 import { AIError, jsonRequest, type AIProvider } from "../types";
 
-export function compatible(env: { AI_COMPATIBLE_API_KEY?: string; AI_COMPATIBLE_BASE_URL?: string; AI_COMPATIBLE_CHAT_MODEL?: string }): AIProvider | undefined {
+export function compatible(env: {
+  AI_COMPATIBLE_API_KEY?: string;
+  AI_COMPATIBLE_BASE_URL?: string;
+  AI_COMPATIBLE_CHAT_MODEL?: string;
+}): AIProvider | undefined {
   if (!env.AI_COMPATIBLE_API_KEY) return undefined;
   // This server-only endpoint is operator configuration, never request input.
-  const endpoint = new URL(z.string().url().parse(env.AI_COMPATIBLE_BASE_URL || "https://api.deepseek.com"));
-  if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new AIError("not_configured");
+  const endpoint = new URL(
+    z
+      .string()
+      .url()
+      .parse(env.AI_COMPATIBLE_BASE_URL || "https://api.deepseek.com"),
+  );
+  if (
+    endpoint.protocol !== "https:" ||
+    endpoint.username ||
+    endpoint.password ||
+    endpoint.search ||
+    endpoint.hash
+  )
+    throw new AIError("not_configured");
   return {
-    id: "openai-compatible", models: { chat: env.AI_COMPATIBLE_CHAT_MODEL || "deepseek-flash" },
+    id: "openai-compatible",
+    models: { chat: env.AI_COMPATIBLE_CHAT_MODEL || "deepseek-flash" },
     async generate(input) {
       if (input.kind !== "chat") throw new AIError("unsupported");
-      const response = z.object({ choices: z.array(z.object({ message: z.object({ content: z.string().min(1) }) })).min(1) }).parse(await jsonRequest(
-        \`\${endpoint.href.replace(/\\/$/, "")}/chat/completions\`, { Authorization: \`Bearer \${env.AI_COMPATIBLE_API_KEY}\` },
-        { model: input.model, messages: input.messages, max_tokens: 2048, stream: false },
-      ));
+      const response = z
+        .object({
+          choices: z.array(z.object({ message: z.object({ content: z.string().min(1) }) })).min(1),
+        })
+        .parse(
+          await jsonRequest(
+            \`\${endpoint.href.replace(/\\/$/, "")}/chat/completions\`,
+            { Authorization: \`Bearer \${env.AI_COMPATIBLE_API_KEY}\` },
+            { model: input.model, messages: input.messages, max_tokens: 2048, stream: false },
+          ),
+        );
       return { status: "completed", text: response.choices[0]!.message.content };
     },
   };
 }
 `],
   ["modules/ai/providers/openai/packages/ai/src/providers/openai.ts", `import { z } from "zod";
+
 import { AIError, jsonRequest, type AIProvider } from "../types";
 
-export function openai(env: { OPENAI_API_KEY?: string; OPENAI_CHAT_MODEL?: string; OPENAI_IMAGE_MODEL?: string }): AIProvider | undefined {
+export function openai(env: {
+  OPENAI_API_KEY?: string;
+  OPENAI_CHAT_MODEL?: string;
+  OPENAI_IMAGE_MODEL?: string;
+}): AIProvider | undefined {
   if (!env.OPENAI_API_KEY) return undefined;
   const headers = { Authorization: \`Bearer \${env.OPENAI_API_KEY}\` };
   return {
     id: "openai",
-    models: { chat: env.OPENAI_CHAT_MODEL || "gpt-4.1-mini", image: env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare" },
+    models: {
+      chat: env.OPENAI_CHAT_MODEL || "gpt-4.1-mini",
+      image: env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare",
+    },
     async generate(input) {
       if (input.kind === "chat") {
-        const response = z.object({ choices: z.array(z.object({ message: z.object({ content: z.string().min(1) }) })).min(1) }).parse(
-          await jsonRequest("https://api.openai.com/v1/chat/completions", headers, { model: input.model, messages: input.messages, max_completion_tokens: 2048, stream: false }),
-        );
+        const response = z
+          .object({
+            choices: z
+              .array(z.object({ message: z.object({ content: z.string().min(1) }) }))
+              .min(1),
+          })
+          .parse(
+            await jsonRequest("https://api.openai.com/v1/chat/completions", headers, {
+              model: input.model,
+              messages: input.messages,
+              max_completion_tokens: 2048,
+              stream: false,
+            }),
+          );
         return { status: "completed", text: response.choices[0]!.message.content };
       }
       if (input.kind !== "image") throw new AIError("unsupported");
-      const response = z.object({ data: z.array(z.object({ b64_json: z.string().min(1) })).min(1) }).parse(
-        await jsonRequest("https://api.openai.com/v1/images/generations", headers, { model: input.model, prompt: input.prompt, n: 1, size: "1024x1024", output_format: "png" }),
-      );
-      return { status: "completed", media: { data: response.data[0]!.b64_json, contentType: "image/png" } };
+      const response = z
+        .object({ data: z.array(z.object({ b64_json: z.string().min(1) })).min(1) })
+        .parse(
+          await jsonRequest("https://api.openai.com/v1/images/generations", headers, {
+            model: input.model,
+            prompt: input.prompt,
+            n: 1,
+            size: "1024x1024",
+            output_format: "png",
+          }),
+        );
+      return {
+        status: "completed",
+        media: { data: response.data[0]!.b64_json, contentType: "image/png" },
+      };
     },
   };
 }
@@ -14840,6 +15519,8 @@ export const authRelations = defineRelationsPart({ user, session, account, verif
 
 Built on [Better Auth](https://better-auth.com). The \`packages/auth\` package exports \`createAuth(env, db, events)\`; \`apps/web/src/services.ts\` creates the instance.
 
+The HTTP boundary is \`/api/auth/**\` on every framework. {{#if (includes frontend "next")}}Next.js uses the Better Auth \`nextCookies\` adapter.{{else if (includes frontend "tanstack-start")}}TanStack Start uses \`tanstackStartCookies\` as the last auth plugin so server API calls can propagate session cookies.{{else}}Nuxt forwards the H3 request to the Better Auth WHATWG handler and returns its response, including every session cookie.{{/if}} Never cache authenticated responses or expose the server service graph to client bundles.
+
 ## What you get
 
 - Email and password sign-up and sign-in (\`/login\`, \`/signup\`)
@@ -14921,6 +15602,7 @@ Expired and consumed challenge rows retain their hashed phone identifier until t
 {{/if}}
 ## Protecting pages
 
+{{#if (includes frontend "next")}}
 \`\`\`ts
 import { requireUser } from "@/lib/session";
 
@@ -14928,6 +15610,9 @@ const user = await requireUser(locale, "/dashboard/billing");
 \`\`\`
 
 \`requireUser\` redirects anonymous visitors to \`/login?next=…\`.
+{{else}}
+Use the generated framework's protected page loader and preserve incoming request headers when reading \`auth.api.getSession({ headers })\`. Every data mutation must independently authenticate its request; a page redirect or hidden button is not an authorization boundary. Validate redirect destinations as same-origin, locale-prefixed paths.
+{{/if}}
 
 ## Schema changes
 
@@ -14966,7 +15651,11 @@ import { createCaptchaBeforeHook, type CaptchaConfig } from "@{{projectName}}/ca
 import { localeFromHeaders } from "@{{projectName}}/i18n";
 {{/if}}
 import { betterAuth } from "better-auth";
+{{#if (includes frontend "next")}}
 import { nextCookies } from "better-auth/next-js";
+{{else if (includes frontend "tanstack-start")}}
+import { tanstackStartCookies } from "better-auth/tanstack-start";
+{{/if}}
 import { admin } from "better-auth/plugins";
 
 import "./events";
@@ -15140,7 +15829,7 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
         },
       },
     },
-    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }), {{#if (includes module.integrations "sms")}}createPhoneAuth(env.BETTER_AUTH_SECRET, database, events), {{/if}}nextCookies()],
+    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }){{#if (includes module.integrations "sms")}}, createPhoneAuth(env.BETTER_AUTH_SECRET, database, events){{/if}}{{#if (includes frontend "next")}}, nextCookies(){{else if (includes frontend "tanstack-start")}}, tanstackStartCookies(){{/if}}],
   });
 }
 
@@ -15372,6 +16061,29 @@ export type Session = Auth["$Infer"]["Session"];
   },
 } as const;
 `],
+  ["modules/auth/frameworks/native/apps/web/src/lib/social-providers.server.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+
+import { isSocialProvider, type SocialProvider } from "./social-providers";
+
+/** OAuth providers whose credentials are configured. */
+export function enabledSocialProviders(): SocialProvider[] {
+  return Object.keys(auth.options.socialProviders).filter(isSocialProvider);
+}
+`],
+  ["modules/auth/frameworks/native/apps/web/src/lib/social-providers.ts.hbs", `export const socialProviderLabels = {
+  google: "Google",
+  github: "GitHub",
+{{#if (includes module.providers "wechat")}}
+  wechat: "WeChat",
+{{/if}}
+} as const;
+
+export type SocialProvider = keyof typeof socialProviderLabels;
+
+export function isSocialProvider(value: string): value is SocialProvider {
+  return value in socialProviderLabels;
+}
+`],
   ["modules/auth/frameworks/next/apps/web/src/app/[lang]/dashboard/layout.tsx", `import SideNav from "@/components/side-nav";
 import { resolveLocale } from "@/lib/i18n/server";
 import { requireUser } from "@/lib/session";
@@ -15456,7 +16168,9 @@ export default async function SettingsPage({ params }: Props) {
 }
 `],
   ["modules/auth/frameworks/next/apps/web/src/app/[lang]/login/layout.tsx", `export const metadata = { robots: { index: false, follow: false } };
-export default function PrivateLayout({ children }: { children: React.ReactNode }) { return children; }
+export default function PrivateLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}
 `],
   ["modules/auth/frameworks/next/apps/web/src/app/[lang]/login/page.tsx.hbs", `import type { Metadata } from "next";
 import Link from "next/link";
@@ -15518,7 +16232,9 @@ export default async function LoginPage({ params, searchParams }: Props) {
 }
 `],
   ["modules/auth/frameworks/next/apps/web/src/app/[lang]/signup/layout.tsx", `export const metadata = { robots: { index: false, follow: false } };
-export default function PrivateLayout({ children }: { children: React.ReactNode }) { return children; }
+export default function PrivateLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}
 `],
   ["modules/auth/frameworks/next/apps/web/src/app/[lang]/signup/page.tsx.hbs", `import type { Metadata } from "next";
 import Link from "next/link";
@@ -15582,382 +16298,6 @@ export default async function SignUpPage({ params, searchParams }: Props) {
 import { toNextJsHandler } from "better-auth/next-js";
 
 export const { GET, POST } = toNextJsHandler(auth);
-`],
-  ["modules/auth/frameworks/next/apps/web/src/components/auth/account-forms.tsx.hbs", `"use client";
-
-import { Button } from "@{{projectName}}/ui/components/button";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { toast } from "sonner";
-
-import { authClient } from "@/lib/auth-client";
-
-import { useT } from "../i18n-provider";
-import { Field, formValue } from "./field";
-
-function useSubmit(
-  action: (form: FormData) => Promise<{ error: { message?: string } | null }>,
-  { reset = false } = {},
-) {
-  const t = useT();
-  const [pending, setPending] = useState(false);
-
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const target = event.currentTarget;
-    setPending(true);
-    const { error } = await action(new FormData(target));
-    setPending(false);
-    if (error) {
-      toast.error(error.message ?? t("auth.errors.generic"));
-      return;
-    }
-    toast.success(t("auth.settings.saved"));
-    if (reset) target.reset();
-  }
-
-  return { pending, onSubmit };
-}
-
-export function ProfileForm({ name, email }: { name: string; email: string }) {
-  const t = useT();
-  const router = useRouter();
-  const { pending, onSubmit } = useSubmit(async (form) => {
-    const result = await authClient.updateUser({ name: formValue(form, "name") });
-    router.refresh();
-    return result;
-  });
-
-  return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <Field label={t("auth.fields.email")} name="email" value={email} disabled readOnly />
-      <Field label={t("auth.fields.name")} name="name" defaultValue={name} autoComplete="name" />
-      <Button type="submit" disabled={pending} className="self-start">
-        {t("auth.settings.save")}
-      </Button>
-    </form>
-  );
-}
-
-export function PasswordForm() {
-  const t = useT();
-  const { pending, onSubmit } = useSubmit(
-    (form) =>
-      authClient.changePassword({
-        currentPassword: formValue(form, "currentPassword"),
-        newPassword: formValue(form, "newPassword"),
-        revokeOtherSessions: true,
-      }),
-    { reset: true },
-  );
-
-  return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <Field
-        label={t("auth.fields.currentPassword")}
-        name="currentPassword"
-        type="password"
-        autoComplete="current-password"
-      />
-      <Field
-        label={t("auth.fields.newPassword")}
-        name="newPassword"
-        type="password"
-        autoComplete="new-password"
-        minLength={8}
-      />
-      <Button type="submit" disabled={pending} className="self-start">
-        {t("auth.settings.save")}
-      </Button>
-    </form>
-  );
-}
-`],
-  ["modules/auth/frameworks/next/apps/web/src/components/auth/auth-card.tsx.hbs", `import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@{{projectName}}/ui/components/card";
-
-export function AuthCard({
-  title,
-  description,
-  footer,
-  children,
-}: {
-  title: string;
-  description?: string;
-  footer?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-1 items-center justify-center px-4 py-12">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">{title}</CardTitle>
-          {description && <CardDescription>{description}</CardDescription>}
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">{children}</CardContent>
-        {footer && (
-          <CardFooter className="justify-center text-muted-foreground text-xs">{footer}</CardFooter>
-        )}
-      </Card>
-    </div>
-  );
-}
-`],
-  ["modules/auth/frameworks/next/apps/web/src/components/auth/field.tsx.hbs", `import { Input } from "@{{projectName}}/ui/components/input";
-import { Label } from "@{{projectName}}/ui/components/label";
-
-export function Field({
-  label,
-  name,
-  ...props
-}: { label: string; name: string } & React.ComponentProps<"input">) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} required {...props} />
-    </div>
-  );
-}
-
-export function formValue(form: FormData, name: string): string {
-  const value = form.get(name);
-  return value instanceof File ? "" : (value ?? "");
-}
-`],
-  ["modules/auth/frameworks/next/apps/web/src/components/auth/sign-in-form.tsx.hbs", `"use client";
-
-import { Button } from "@{{projectName}}/ui/components/button";
-import Link from "next/link";
-import { useState } from "react";
-import { toast } from "sonner";
-
-import { authClient } from "@/lib/auth-client";
-import { localePath } from "@/lib/i18n/paths";
-import type { SocialProvider } from "@/lib/social-providers";
-
-import { useLocale, useT } from "../i18n-provider";
-import { Field, formValue } from "./field";
-import { SocialButtons } from "./social-buttons";
-{{#if (includes product.features "captcha")}}
-import { Captcha, useCaptcha } from "./captcha";
-{{/if}}
-
-export default function SignInForm({
-  next,
-  providers,
-  canResetPassword,
-}: {
-  next: string;
-  providers: SocialProvider[];
-  canResetPassword: boolean;
-}) {
-  const locale = useLocale();
-  const t = useT();
-  const [pending, setPending] = useState(false);
-{{#if (includes product.features "captcha")}}
-  const captcha = useCaptcha();
-{{/if}}
-
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-{{#if (includes product.features "captcha")}}
-    if (!captcha.token || pending) return;
-{{/if}}
-    const form = new FormData(event.currentTarget);
-    setPending(true);
-    const { error } = await authClient.signIn.email({
-      email: formValue(form, "email"),
-      password: formValue(form, "password"),
-      callbackURL: next,
-    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
-    setPending(false);
-    if (error) {
-      toast.error(error.message ?? t("auth.errors.generic"));
-      return;
-    }
-    window.location.assign(next);
-  }
-
-  return (
-    <>
-      <SocialButtons providers={providers} callbackURL={next} />
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
-        <Field
-          label={t("auth.fields.password")}
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          minLength={8}
-        />
-        {canResetPassword && (
-          <Link
-            href={localePath(locale, "/forgot-password")}
-            className="self-end text-muted-foreground text-xs hover:text-foreground"
-          >
-            {t("auth.signIn.forgot")}
-          </Link>
-        )}
-{{#if (includes product.features "captcha")}}
-        <Captcha action="login" challenge={captcha} />
-{{/if}}
-        <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
-          {t("auth.signIn.submit")}
-        </Button>
-      </form>
-    </>
-  );
-}
-`],
-  ["modules/auth/frameworks/next/apps/web/src/components/auth/sign-up-form.tsx.hbs", `"use client";
-
-import { Button } from "@{{projectName}}/ui/components/button";
-import { useState } from "react";
-import { toast } from "sonner";
-
-import { authClient } from "@/lib/auth-client";
-import type { SocialProvider } from "@/lib/social-providers";
-
-import { useT } from "../i18n-provider";
-import { Field, formValue } from "./field";
-import { SocialButtons } from "./social-buttons";
-{{#if (includes product.features "captcha")}}
-import { Captcha, useCaptcha } from "./captcha";
-{{/if}}
-
-export default function SignUpForm({
-  next,
-  providers,
-  verifyEmail,
-}: {
-  next: string;
-  providers: SocialProvider[];
-  /** Accounts must confirm their email before they can sign in. */
-  verifyEmail: boolean;
-}) {
-  const t = useT();
-  const [pending, setPending] = useState(false);
-  const [sentTo, setSentTo] = useState<string>();
-{{#if (includes product.features "captcha")}}
-  const captcha = useCaptcha();
-{{/if}}
-
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-{{#if (includes product.features "captcha")}}
-    if (!captcha.token || pending) return;
-{{/if}}
-    const form = new FormData(event.currentTarget);
-    const email = formValue(form, "email");
-    setPending(true);
-    const { error } = await authClient.signUp.email({
-      name: formValue(form, "name"),
-      email,
-      password: formValue(form, "password"),
-      callbackURL: next,
-    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
-    setPending(false);
-    if (error) {
-      toast.error(error.message ?? t("auth.errors.generic"));
-      return;
-    }
-    if (verifyEmail) setSentTo(email);
-    else window.location.assign(next);
-  }
-
-  if (sentTo) {
-    return <p className="text-sm">{t("auth.signUp.checkEmail", { email: sentTo })}</p>;
-  }
-
-  return (
-    <>
-      <SocialButtons providers={providers} callbackURL={next} />
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <Field label={t("auth.fields.name")} name="name" autoComplete="name" />
-        <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
-        <Field
-          label={t("auth.fields.password")}
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          minLength={8}
-        />
-{{#if (includes product.features "captcha")}}
-        <Captcha action="signup" challenge={captcha} />
-{{/if}}
-        <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
-          {t("auth.signUp.submit")}
-        </Button>
-      </form>
-    </>
-  );
-}
-`],
-  ["modules/auth/frameworks/next/apps/web/src/components/auth/social-buttons.tsx.hbs", `"use client";
-
-import { Button } from "@{{projectName}}/ui/components/button";
-import { useState } from "react";
-
-import { authClient } from "@/lib/auth-client";
-import { type SocialProvider, socialProviderLabels } from "@/lib/social-providers";
-
-import { useT } from "../i18n-provider";
-
-export function SocialButtons({
-  providers,
-  callbackURL,
-}: {
-  providers: SocialProvider[];
-  callbackURL: string;
-}) {
-  const t = useT();
-  const [pending, setPending] = useState<SocialProvider>();
-  const [error, setError] = useState(false);
-  if (providers.length === 0) return null;
-
-  return (
-    <>
-      <div className="flex flex-col gap-2">
-        {providers.map((provider) => (
-          <Button
-            key={provider}
-            variant="outline"
-            type="button"
-            disabled={Boolean(pending)}
-            onClick={async () => {
-              setPending(provider);
-              setError(false);
-              try {
-                const result = await authClient.signIn.social({ provider, callbackURL });
-                if (result.error) {
-                  setError(true);
-                  setPending(undefined);
-                }
-              } catch {
-                setError(true);
-                setPending(undefined);
-              }
-            }}
-          >
-            { {{#if (includes module.providers "wechat")}}provider === "wechat" ? t("auth.social.wechat") : {{/if}}t("auth.social.continueWith", { provider: socialProviderLabels[provider] })}
-          </Button>
-        ))}
-      </div>
-      {error && <p role="alert" className="text-sm text-destructive">{t("auth.errors.generic")}</p>}
-      <div className="flex items-center gap-3 text-muted-foreground text-xs">
-        <span className="h-px flex-1 bg-border" />
-        {t("auth.social.divider")}
-        <span className="h-px flex-1 bg-border" />
-      </div>
-    </>
-  );
-}
 `],
   ["modules/auth/frameworks/next/apps/web/src/components/user-menu.tsx.hbs", `"use client";
 
@@ -16081,7 +16421,572 @@ export function isSocialProvider(value: string): value is SocialProvider {
   return value in socialProviderLabels;
 }
 `],
-  ["modules/auth/integrations/email/apps/web/src/app/[lang]/forgot-password/page.tsx", `import type { Metadata } from "next";
+  ["modules/auth/frameworks/nuxt/apps/web/app/components/ProductAuth.vue.hbs", `<script setup lang="ts">
+import { z } from "zod";
+const props = defineProps<{ mode: string }>();
+const { path, label } = useProductLocale();
+const route = useRoute();
+const { pending, error, notice, run } = useProductAction();
+const name = ref(""); const email = ref(""); const password = ref("");
+const captchaToken = ref(""); const captchaGeneration = ref(0);
+const token = computed(() => typeof route.query.token === "string" ? route.query.token : "");
+const next = computed(() => {
+  const value = route.query.next;
+  return typeof value === "string" && value.startsWith(path("dashboard")) && !value.includes("\\\\") && !/[\\u0000-\\u001f]/.test(value) ? value : path("dashboard");
+});
+const title = computed(() => ({ login: label("Welcome back", "欢迎回来"), signup: label("Create your account", "创建账户"), "forgot-password": label("Reset your password", "重设密码"), "reset-password": label("Choose a new password", "设置新密码"), "verify-email": label("Verify your email", "验证邮箱") })[props.mode]);
+const action = computed(() => ({ login: "login", signup: "signup", "forgot-password": "password_reset_request", "reset-password": "password_reset", "verify-email": "email_verification" })[props.mode] ?? "login");
+const { data: config } = await useFetch<{ socialProviders: string[] }>("/api/product/config");
+async function submit() {
+  await run(async () => {
+    const endpoint = props.mode === "signup" ? "sign-up/email" : props.mode === "login" ? "sign-in/email" : props.mode === "forgot-password" ? "request-password-reset" : props.mode === "reset-password" ? "reset-password" : "send-verification-email";
+    const body = props.mode === "signup" ? { name: name.value.trim(), email: email.value, password: password.value, callbackURL: next.value } : props.mode === "login" ? { email: email.value, password: password.value, callbackURL: next.value } : props.mode === "forgot-password" ? { email: email.value, redirectTo: path("reset-password") } : props.mode === "reset-password" ? { token: token.value, newPassword: password.value } : { email: email.value, callbackURL: next.value };
+    try {
+      const result = await productRequest(\`/api/auth/\${endpoint}\`, { ...productJson(body), headers: { "Content-Type": "application/json", "x-captcha-token": captchaToken.value } }, z.object({ token: z.string().nullable().optional() }));
+      if (props.mode === "login" || props.mode === "signup" && result.token) { window.location.assign(next.value); return; }
+      notice.value = props.mode === "reset-password" ? label("Password updated. You can now sign in.", "密码已更新，请登录。") : label("Check your email for the next step. If the account exists, a message has been sent.", "请检查邮箱。若账户存在，你将收到下一步操作邮件。");
+    } finally { captchaToken.value = ""; captchaGeneration.value++; }
+  });
+}
+async function social(provider: string) {
+  await run(async () => {
+    const result = await productRequest("/api/auth/sign-in/social", productJson({ provider, callbackURL: next.value }), z.object({ url: z.string().url().optional() }));
+    if (!result.url) throw new Error(label("This provider is not configured.", "该提供商尚未配置。"));
+    window.location.assign(result.url);
+  });
+}
+{{#if (includes product.features "sms")}}
+const phone = ref(""); const code = ref(""); const sentTo = ref(""); const phoneMode = ref(route.path.endsWith("/login/phone")); const cooldown = ref(0);
+let cooldownTimer: ReturnType<typeof setInterval> | undefined;
+onBeforeUnmount(() => { if (cooldownTimer) clearInterval(cooldownTimer); });
+async function sendCode() {
+  await run(async () => {
+    if (!/^\\+[1-9]\\d{7,14}$/.test(phone.value.trim())) throw new Error(label("Use international format, for example +14155552671.", "请使用国际格式，例如 +8613800138000。"));
+    try {
+      await productRequest("/api/auth/phone-number/send-otp", { ...productJson({ phoneNumber: phone.value.trim() }), headers: { "Content-Type": "application/json", "x-captcha-token": captchaToken.value } });
+      sentTo.value = phone.value.trim(); code.value = "";
+    } finally {
+      captchaToken.value = ""; captchaGeneration.value++; cooldown.value = 60;
+      if (cooldownTimer) clearInterval(cooldownTimer);
+      cooldownTimer = setInterval(() => { cooldown.value--; if (cooldown.value <= 0 && cooldownTimer) clearInterval(cooldownTimer); }, 1000);
+    }
+  });
+}
+async function verifyPhone() {
+  await run(async () => {
+    await productRequest("/api/auth/phone-number/verify", productJson({ phoneNumber: sentTo.value, code: code.value }));
+    window.location.assign(next.value);
+  });
+}
+{{/if}}
+</script>
+
+<template>
+  <section class="panel auth-panel stack">
+    <div><p class="eyebrow">{{projectName}}</p><h1>\\{{ title }}</h1></div>
+    <p v-if="error" role="alert" class="error">\\{{ error }}</p>
+    <p v-if="notice" role="status" class="notice">\\{{ notice }}</p>
+    {{#if (includes product.features "sms")}}
+    <div v-if="mode === 'login'" class="actions"><button class="text-button" @click="phoneMode = false">\\{{ label('Email', '邮箱') }}</button><button class="text-button" @click="phoneMode = true">\\{{ label('Phone', '手机') }}</button></div>
+    <form v-if="phoneMode && mode === 'login'" :aria-busy="pending" @submit.prevent="sentTo ? verifyPhone() : sendCode()">
+      <label>\\{{ label('Phone number', '手机号') }}<input v-model="phone" type="tel" autocomplete="tel" pattern="\\+[1-9][0-9]{7,14}" maxlength="16" required :readonly="!!sentTo" /></label>
+      <label v-if="sentTo">\\{{ label('Verification code', '验证码') }}<input v-model="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required /></label>
+      {{#if (includes product.features "captcha")}}<ProductCaptcha :key="captchaGeneration" v-model="captchaToken" action="phone_otp" />{{/if}}
+      <button :disabled="pending || (!sentTo && (cooldown > 0{{#if (includes product.features "captcha")}} || !captchaToken{{/if}}))">\\{{ sentTo ? label('Verify and sign in', '验证并登录') : label('Send code', '发送验证码') }}</button>
+      <button v-if="sentTo" type="button" class="text-button" :disabled="pending || cooldown > 0{{#if (includes product.features "captcha")}} || !captchaToken{{/if}}" @click="sendCode">\\{{ label('Resend', '重新发送') }}</button>
+      <button v-if="sentTo" type="button" class="text-button" @click="sentTo = ''; code = ''">\\{{ label('Change phone number', '更换手机号') }}</button>
+      <small v-if="cooldown > 0">\\{{ cooldown }} \\{{ label('seconds until resend', '秒后重试') }}</small>
+    </form>
+    <form v-else :aria-busy="pending" @submit.prevent="submit">
+    {{else}}
+    <form :aria-busy="pending" @submit.prevent="submit">
+    {{/if}}
+      <label v-if="mode === 'signup'">\\{{ label('Name', '姓名') }}<input v-model="name" autocomplete="name" maxlength="100" required /></label>
+      <label v-if="mode !== 'reset-password'">\\{{ label('Email', '邮箱') }}<input v-model="email" type="email" autocomplete="email" maxlength="254" required /></label>
+      <label v-if="['login', 'signup', 'reset-password'].includes(mode)">\\{{ label('Password', '密码') }}<input v-model="password" type="password" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" minlength="8" maxlength="128" required /></label>
+      <p v-if="mode === 'reset-password' && !token" role="alert" class="error">\\{{ label('The reset link is missing its token. Request a new link.', '重置链接缺少令牌，请重新申请。') }}</p>
+      {{#if (includes product.features "captcha")}}<ProductCaptcha :key="captchaGeneration" v-model="captchaToken" :action="action" />{{/if}}
+      <button :disabled="pending || (mode === 'reset-password' && !token){{#if (includes product.features "captcha")}} || !captchaToken{{/if}}">\\{{ pending ? label('Please wait…', '请稍候…') : title }}</button>
+    </form>
+    <div v-if="['login', 'signup'].includes(mode)" class="stack"><button v-for="provider in config?.socialProviders ?? []" :key="provider" class="text-button" :disabled="pending" @click="social(provider)">\\{{ label('Continue with', '使用以下方式继续') }} \\{{ provider }}</button></div>
+    <div class="actions"><NuxtLink :to="path(mode === 'login' ? 'signup' : 'login')">\\{{ mode === 'login' ? label('Create an account', '创建账户') : label('Sign in', '登录') }}</NuxtLink>
+      {{#if (includes product.features "email")}}<NuxtLink :to="path('forgot-password')">\\{{ label('Forgot password?', '忘记密码？') }}</NuxtLink><NuxtLink :to="path('verify-email')">\\{{ label('Resend verification', '重新发送验证邮件') }}</NuxtLink>{{/if}}
+    </div>
+  </section>
+</template>
+<style scoped>.auth-panel{max-width:480px;margin:2rem auto}.auth-panel h1{font-size:2.3rem}</style>
+`],
+  ["modules/auth/frameworks/nuxt/apps/web/app/components/ProductSettings.vue.hbs", `<script setup lang="ts">
+const props = defineProps<{ user: { name: string; email: string; emailVerified: boolean } }>();
+const { label, path } = useProductLocale();
+const { pending, error, notice, run } = useProductAction();
+const name = ref(props.user.name); const currentPassword = ref(""); const newPassword = ref("");
+async function saveProfile() { await run(async () => { await productRequest("/api/auth/update-user", productJson({ name: name.value.trim() })); await refreshNuxtData("product-session"); notice.value = label("Profile updated.", "资料已更新。"); }); }
+async function changePassword() { await run(async () => { await productRequest("/api/auth/change-password", productJson({ currentPassword: currentPassword.value, newPassword: newPassword.value, revokeOtherSessions: true })); currentPassword.value = ""; newPassword.value = ""; notice.value = label("Password updated and other sessions revoked.", "密码已更新，其他会话已退出。"); }); }
+</script>
+<template>
+  <p v-if="error" class="error" role="alert">\\{{ error }}</p><p v-if="notice" class="notice" role="status">\\{{ notice }}</p>
+  <form class="panel" @submit.prevent="saveProfile"><h2>\\{{ label('Profile', '个人资料') }}</h2><label>\\{{ label('Email', '邮箱') }}<input :value="user.email" readonly type="email" /></label><label>\\{{ label('Name', '姓名') }}<input v-model="name" autocomplete="name" required maxlength="100" /></label><button :disabled="pending">\\{{ label('Save profile', '保存资料') }}</button>
+    {{#if (includes product.features "email")}}<NuxtLink v-if="!user.emailVerified" :to="path('verify-email')">\\{{ label('Verify your email address', '验证你的邮箱') }}</NuxtLink>{{/if}}
+  </form>
+  <form class="panel" @submit.prevent="changePassword"><h2>\\{{ label('Change password', '修改密码') }}</h2><label>\\{{ label('Current password', '当前密码') }}<input v-model="currentPassword" type="password" autocomplete="current-password" required /></label><label>\\{{ label('New password', '新密码') }}<input v-model="newPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required /></label><button :disabled="pending">\\{{ label('Update password', '更新密码') }}</button></form>
+</template>
+`],
+  ["modules/auth/frameworks/nuxt/apps/web/app/components/ProductWorkspace.vue.hbs", `<script setup lang="ts">
+import { navigation } from "@/config/navigation";
+const props = defineProps<{ section: string; user: { id: string; name: string; email: string; emailVerified: boolean } }>();
+const { path, label, t } = useProductLocale();
+const sections = ["", "settings"{{#if (includes product.features "credits")}}, "credits"{{/if}}{{#if (includes product.features "payment")}}, "billing"{{/if}}{{#if (includes product.features "storage")}}, "files"{{/if}}{{#if (includes product.features "ai")}}, "ai"{{/if}}{{#if (includes product.features "affiliate")}}, "affiliate"{{/if}}];
+if (!sections.includes(props.section)) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+const titles: Record<string, string> = { "": label("Overview", "概览"), settings: label("Settings", "设置"), credits: label("Credits", "积分"), billing: label("Billing", "账单"), files: label("Files", "文件"), ai: label("AI studio", "AI 工作室"), affiliate: label("Referrals", "推荐") };
+</script>
+<template>
+  <div class="workspace">
+    <nav class="workspace-nav" :aria-label="label('Workspace', '工作空间')"><NuxtLink v-for="item in navigation.dashboard" :key="item.href" :to="path(item.href)">\\{{ t(item.labelKey) }}</NuxtLink></nav>
+    <section class="stack"><h1>\\{{ titles[section] }}</h1>
+      <div v-if="!section" class="panel"><h2>\\{{ label('Welcome,', '欢迎，') }} \\{{ user.name }}</h2><p>\\{{ label('Your account is ready. Manage your profile and explore your workspace using the navigation.', '你的账户已就绪。通过导航管理资料并探索工作空间。') }}</p><NuxtLink :to="path('dashboard/settings')">\\{{ label('Account settings', '账户设置') }}</NuxtLink></div>
+      <ProductSettings v-else-if="section === 'settings'" :user="user" />
+      {{#if (includes product.features "credits")}}<ProductCredits v-else-if="section === 'credits'" />{{/if}}
+      {{#if (includes product.features "payment")}}<ProductBilling v-else-if="section === 'billing'" />{{/if}}
+      {{#if (includes product.features "storage")}}<ProductFiles v-else-if="section === 'files'" />{{/if}}
+      {{#if (includes product.features "ai")}}<ProductAI v-else-if="section === 'ai'" />{{/if}}
+      {{#if (includes product.features "affiliate")}}<ProductAffiliate v-else-if="section === 'affiliate'" />{{/if}}
+    </section>
+  </div>
+</template>
+`],
+  ["modules/auth/frameworks/react/apps/web/src/components/auth/account-forms.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useProductNavigation } from "@/lib/product-navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+
+import { useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+
+function useSubmit(
+  action: (form: FormData) => Promise<{ error: { message?: string } | null }>,
+  { reset = false } = {},
+) {
+  const t = useT();
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const target = event.currentTarget;
+    setPending(true);
+    const { error } = await action(new FormData(target));
+    setPending(false);
+    if (error) {
+      toast.error(error.message ?? t("auth.errors.generic"));
+      return;
+    }
+    toast.success(t("auth.settings.saved"));
+    if (reset) target.reset();
+  }
+
+  return { pending, onSubmit };
+}
+
+export function ProfileForm({ name, email }: { name: string; email: string }) {
+  const t = useT();
+  const navigation = useProductNavigation();
+  const { pending, onSubmit } = useSubmit(async (form) => {
+    const result = await authClient.updateUser({ name: formValue(form, "name") });
+    navigation.refresh();
+    return result;
+  });
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field label={t("auth.fields.email")} name="email" value={email} disabled readOnly />
+      <Field label={t("auth.fields.name")} name="name" defaultValue={name} autoComplete="name" />
+      <Button type="submit" disabled={pending} className="self-start">
+        {t("auth.settings.save")}
+      </Button>
+    </form>
+  );
+}
+
+export function PasswordForm() {
+  const t = useT();
+  const { pending, onSubmit } = useSubmit(
+    (form) =>
+      authClient.changePassword({
+        currentPassword: formValue(form, "currentPassword"),
+        newPassword: formValue(form, "newPassword"),
+        revokeOtherSessions: true,
+      }),
+    { reset: true },
+  );
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field
+        label={t("auth.fields.currentPassword")}
+        name="currentPassword"
+        type="password"
+        autoComplete="current-password"
+      />
+      <Field
+        label={t("auth.fields.newPassword")}
+        name="newPassword"
+        type="password"
+        autoComplete="new-password"
+        minLength={8}
+      />
+      <Button type="submit" disabled={pending} className="self-start">
+        {t("auth.settings.save")}
+      </Button>
+    </form>
+  );
+}
+`],
+  ["modules/auth/frameworks/react/apps/web/src/components/auth/auth-card.tsx.hbs", `import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@{{projectName}}/ui/components/card";
+
+export function AuthCard({
+  title,
+  description,
+  footer,
+  children,
+}: {
+  title: string;
+  description?: string;
+  footer?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-1 items-center justify-center px-4 py-12">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">{title}</CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">{children}</CardContent>
+        {footer && (
+          <CardFooter className="justify-center text-muted-foreground text-xs">{footer}</CardFooter>
+        )}
+      </Card>
+    </div>
+  );
+}
+`],
+  ["modules/auth/frameworks/react/apps/web/src/components/auth/field.tsx.hbs", `import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export function Field({
+  label,
+  name,
+  ...props
+}: { label: string; name: string } & React.ComponentProps<"input">) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={name}>{label}</Label>
+      <Input id={name} name={name} required {...props} />
+    </div>
+  );
+}
+
+export function formValue(form: FormData, name: string): string {
+  const value = form.get(name);
+  return value instanceof File ? "" : (value ?? "");
+}
+`],
+  ["modules/auth/frameworks/react/apps/web/src/components/auth/sign-in-form.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+import { localePath } from "@/lib/i18n/paths";
+import type { SocialProvider } from "@/lib/social-providers";
+
+import { useLocale, useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+import { SocialButtons } from "./social-buttons";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
+
+export default function SignInForm({
+  next,
+  providers,
+  canResetPassword,
+}: {
+  next: string;
+  providers: SocialProvider[];
+  canResetPassword: boolean;
+}) {
+  const locale = useLocale();
+  const t = useT();
+  const [pending, setPending] = useState(false);
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
+    const form = new FormData(event.currentTarget);
+    setPending(true);
+    const { error } = await authClient.signIn.email({
+      email: formValue(form, "email"),
+      password: formValue(form, "password"),
+      callbackURL: next,
+    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
+    setPending(false);
+    if (error) {
+      toast.error(error.message ?? t("auth.errors.generic"));
+      return;
+    }
+    window.location.assign(next);
+  }
+
+  return (
+    <>
+      <SocialButtons providers={providers} callbackURL={next} />
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+        <Field
+          label={t("auth.fields.password")}
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          minLength={8}
+        />
+        {canResetPassword && (
+          <a
+            href={localePath(locale, "/forgot-password")}
+            className="self-end text-muted-foreground text-xs hover:text-foreground"
+          >
+            {t("auth.signIn.forgot")}
+          </a>
+        )}
+{{#if (includes product.features "captcha")}}
+        <Captcha action="login" challenge={captcha} />
+{{/if}}
+        <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
+          {t("auth.signIn.submit")}
+        </Button>
+      </form>
+    </>
+  );
+}
+`],
+  ["modules/auth/frameworks/react/apps/web/src/components/auth/sign-up-form.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+import type { SocialProvider } from "@/lib/social-providers";
+
+import { useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+import { SocialButtons } from "./social-buttons";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
+
+export default function SignUpForm({
+  next,
+  providers,
+  verifyEmail,
+}: {
+  next: string;
+  providers: SocialProvider[];
+  /** Accounts must confirm their email before they can sign in. */
+  verifyEmail: boolean;
+}) {
+  const t = useT();
+  const [pending, setPending] = useState(false);
+  const [sentTo, setSentTo] = useState<string>();
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
+    const form = new FormData(event.currentTarget);
+    const email = formValue(form, "email");
+    setPending(true);
+    const { error } = await authClient.signUp.email({
+      name: formValue(form, "name"),
+      email,
+      password: formValue(form, "password"),
+      callbackURL: next,
+    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
+    setPending(false);
+    if (error) {
+      toast.error(error.message ?? t("auth.errors.generic"));
+      return;
+    }
+    if (verifyEmail) setSentTo(email);
+    else window.location.assign(next);
+  }
+
+  if (sentTo) {
+    return <p className="text-sm">{t("auth.signUp.checkEmail", { email: sentTo })}</p>;
+  }
+
+  return (
+    <>
+      <SocialButtons providers={providers} callbackURL={next} />
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field label={t("auth.fields.name")} name="name" autoComplete="name" />
+        <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+        <Field
+          label={t("auth.fields.password")}
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          minLength={8}
+        />
+{{#if (includes product.features "captcha")}}
+        <Captcha action="signup" challenge={captcha} />
+{{/if}}
+        <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
+          {t("auth.signUp.submit")}
+        </Button>
+      </form>
+    </>
+  );
+}
+`],
+  ["modules/auth/frameworks/react/apps/web/src/components/auth/social-buttons.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+
+import { authClient } from "@/lib/auth-client";
+import { type SocialProvider, socialProviderLabels } from "@/lib/social-providers";
+
+import { useT } from "../i18n-provider";
+
+export function SocialButtons({
+  providers,
+  callbackURL,
+}: {
+  providers: SocialProvider[];
+  callbackURL: string;
+}) {
+  const t = useT();
+  const [pending, setPending] = useState<SocialProvider>();
+  const [error, setError] = useState(false);
+  if (providers.length === 0) return null;
+
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        {providers.map((provider) => (
+          <Button
+            key={provider}
+            variant="outline"
+            type="button"
+            disabled={Boolean(pending)}
+            onClick={async () => {
+              setPending(provider);
+              setError(false);
+              try {
+                const result = await authClient.signIn.social({ provider, callbackURL });
+                if (result.error) {
+                  setError(true);
+                  setPending(undefined);
+                }
+              } catch {
+                setError(true);
+                setPending(undefined);
+              }
+            }}
+          >
+            { {{#if (includes module.providers "wechat")}}provider === "wechat" ? t("auth.social.wechat") : {{/if}}t("auth.social.continueWith", { provider: socialProviderLabels[provider] })}
+          </Button>
+        ))}
+      </div>
+      {error && <p role="alert" className="text-sm text-destructive">{t("auth.errors.generic")}</p>}
+      <div className="flex items-center gap-3 text-muted-foreground text-xs">
+        <span className="h-px flex-1 bg-border" />
+        {t("auth.social.divider")}
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    </>
+  );
+}
+`],
+  ["modules/auth/frameworks/react/apps/web/src/lib/auth-client.ts.hbs", `import { adminClient{{#if (includes module.integrations "sms")}}, phoneNumberClient{{/if}} } from "better-auth/client/plugins";
+import { createAuthClient } from "better-auth/react";
+
+export const authClient = createAuthClient({ plugins: [adminClient(){{#if (includes module.integrations "sms")}}, phoneNumberClient(){{/if}}] });
+`],
+  ["modules/auth/frameworks/tanstack-start/apps/web/src/lib/auth-data.ts.hbs", `import { z } from "zod";
+import { redirect } from "@tanstack/react-router";
+import { loadProduct } from "./product-data";
+export const userSchema = z.object({ id: z.string(), name: z.string(), email: z.string(), role: z.string().nullish(), emailVerified: z.boolean() });
+export const sessionSchema = z.object({ user: userSchema }).nullable();
+export const authConfigSchema = z.object({ socialProviders: z.array(z.enum(["google", "github"{{#if (includes module.providers "wechat")}}, "wechat"{{/if}}])), verifyEmail: z.boolean(), canResetPassword: z.boolean() });
+export async function loadUser(locale: string) {
+  const session = await loadProduct("/api/product/session", locale, sessionSchema);
+  if (!session) throw redirect({ href: \`/\${locale}/login\` });
+  return session.user;
+}
+export function safeNext(value: string | undefined, fallback: string): string {
+  if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\\\")) return fallback;
+  return value;
+}
+`],
+  ["modules/auth/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { useT } from "@/components/i18n-provider";
+export const Route = createFileRoute("/$lang/dashboard/")({ component: Dashboard });
+function Dashboard() { const { user } = Route.useRouteContext(); const t = useT(); return <section className="space-y-6"><p className="text-xs uppercase tracking-[0.2em]">{{projectName}}</p><h1 className="font-serif text-4xl">{t("auth.dashboard.title")}</h1><p>{user.name}</p><p className="text-muted-foreground">{user.email}</p></section>; }
+`],
+  ["modules/auth/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.settings.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { ProfileForm, PasswordForm } from "@/components/auth/account-forms";
+import { useT } from "@/components/i18n-provider";
+export const Route = createFileRoute("/$lang/dashboard/settings")({ component: Settings });
+function Settings() { const { user } = Route.useRouteContext(); const t = useT(); return <div className="max-w-xl space-y-10"><h1 className="font-serif text-4xl">{t("auth.settings.title")}</h1><ProfileForm name={user.name} email={user.email} /><PasswordForm /></div>; }
+`],
+  ["modules/auth/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.tsx.hbs", `import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { loadUser } from "@/lib/auth-data";
+export const Route = createFileRoute("/$lang/dashboard")({ beforeLoad: async ({ params }) => ({ user: await loadUser(params.lang) }), component: Outlet });
+`],
+  ["modules/auth/frameworks/tanstack-start/apps/web/src/routes/$lang.login.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import SignInForm from "@/components/auth/sign-in-form";
+import { AuthCard } from "@/components/auth/auth-card";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { authConfigSchema, safeNext } from "@/lib/auth-data";
+export const Route = createFileRoute("/$lang/login")({ validateSearch: z.object({ next: z.string().optional() }), loader: ({ params }) => loadProduct("/api/product/config", params.lang, authConfigSchema), component: AuthPage });
+function AuthPage() { const config = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const next = safeNext(Route.useSearch().next, \`/\${locale}/dashboard\`); return <AuthCard title={t("auth.signIn.title")} footer={<a href={\`/\${locale}/signup\`} className="underline">{t("auth.signUp.title")}</a>}><SignInForm next={next} providers={config.socialProviders} canResetPassword={config.canResetPassword} />{{#if (includes product.features "sms")}}<a className="text-sm underline" href={\`/\${locale}/login/phone\`}>{t("auth.phone.title")}</a>{{/if}}</AuthCard>; }
+`],
+  ["modules/auth/frameworks/tanstack-start/apps/web/src/routes/$lang.signup.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import SignUpForm from "@/components/auth/sign-up-form";
+import { AuthCard } from "@/components/auth/auth-card";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { authConfigSchema, safeNext } from "@/lib/auth-data";
+export const Route = createFileRoute("/$lang/signup")({ validateSearch: z.object({ next: z.string().optional() }), loader: ({ params }) => loadProduct("/api/product/config", params.lang, authConfigSchema), component: AuthPage });
+function AuthPage() { const config = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const next = safeNext(Route.useSearch().next, \`/\${locale}/dashboard\`); return <AuthCard title={t("auth.signUp.title")} footer={<a href={\`/\${locale}/login\`} className="underline">{t("auth.signIn.title")}</a>}><SignUpForm next={next} providers={config.socialProviders} verifyEmail={config.verifyEmail} />{{#if (includes product.features "sms")}}<a className="text-sm underline" href={\`/\${locale}/login/phone\`}>{t("auth.phone.title")}</a>{{/if}}</AuthCard>; }
+`],
+  ["modules/auth/integrations/email/frameworks/next/apps/web/src/app/[lang]/forgot-password/page.tsx", `import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard } from "@/components/auth/auth-card";
@@ -16115,7 +17020,7 @@ export default async function ForgotPasswordPage({ params }: Props) {
   );
 }
 `],
-  ["modules/auth/integrations/email/apps/web/src/app/[lang]/reset-password/page.tsx", `import type { Metadata } from "next";
+  ["modules/auth/integrations/email/frameworks/next/apps/web/src/app/[lang]/reset-password/page.tsx", `import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard } from "@/components/auth/auth-card";
@@ -16154,7 +17059,7 @@ export default async function ResetPasswordPage({ params, searchParams }: Props)
   );
 }
 `],
-  ["modules/auth/integrations/email/apps/web/src/components/auth/password-reset-forms.tsx.hbs", `"use client";
+  ["modules/auth/integrations/email/frameworks/react/apps/web/src/components/auth/password-reset-forms.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import { useState } from "react";
@@ -16258,7 +17163,23 @@ export function ResetPasswordForm({ token }: { token: string }) {
   );
 }
 `],
-  ["modules/auth/integrations/sms/apps/web/src/app/[lang]/login/phone/page.tsx", `import type { Metadata } from "next";
+  ["modules/auth/integrations/email/frameworks/tanstack-start/apps/web/src/routes/$lang.forgot-password.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { ForgotPasswordForm } from "@/components/auth/password-reset-forms";
+import { AuthCard } from "@/components/auth/auth-card";
+import { useT } from "@/components/i18n-provider";
+export const Route = createFileRoute("/$lang/forgot-password")({ validateSearch: z.object({ token: z.string().optional() }), component: PasswordPage });
+function PasswordPage() { const t = useT();  return <AuthCard title={t("auth.forgot.title")}><ForgotPasswordForm /></AuthCard>; }
+`],
+  ["modules/auth/integrations/email/frameworks/tanstack-start/apps/web/src/routes/$lang.reset-password.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { ResetPasswordForm } from "@/components/auth/password-reset-forms";
+import { AuthCard } from "@/components/auth/auth-card";
+import { useT } from "@/components/i18n-provider";
+export const Route = createFileRoute("/$lang/reset-password")({ validateSearch: z.object({ token: z.string().optional() }), component: PasswordPage });
+function PasswordPage() { const t = useT(); const { token } = Route.useSearch(); return <AuthCard title={t("auth.reset.title")}><ResetPasswordForm token={token ?? ""} /></AuthCard>; }
+`],
+  ["modules/auth/integrations/sms/frameworks/next/apps/web/src/app/[lang]/login/phone/page.tsx", `import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard } from "@/components/auth/auth-card";
@@ -16300,7 +17221,7 @@ export default async function PhoneLoginPage({ params, searchParams }: Props) {
   );
 }
 `],
-  ["modules/auth/integrations/sms/apps/web/src/components/auth/phone-sign-in-form.tsx.hbs", `"use client";
+  ["modules/auth/integrations/sms/frameworks/react/apps/web/src/components/auth/phone-sign-in-form.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import { useEffect, useState } from "react";
@@ -16484,6 +17405,15 @@ export default function PhoneSignInForm({ next }: { next: string }) {
     </form>
   );
 }
+`],
+  ["modules/auth/integrations/sms/frameworks/tanstack-start/apps/web/src/routes/$lang.login_.phone.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import PhoneSignInForm from "@/components/auth/phone-sign-in-form";
+import { AuthCard } from "@/components/auth/auth-card";
+import { useT } from "@/components/i18n-provider";
+import { safeNext } from "@/lib/auth-data";
+export const Route = createFileRoute("/$lang/login_/phone")({ validateSearch: z.object({ next: z.string().optional() }), component: PhonePage });
+function PhonePage() { const t = useT(); const { lang } = Route.useParams(); return <AuthCard title={t("auth.phone.title")}><PhoneSignInForm next={safeNext(Route.useSearch().next, \`/\${lang}/dashboard\`)} /></AuthCard>; }
 `],
   ["modules/auth/integrations/sms/packages/auth/src/phone.ts.hbs", `import { createHmac, randomUUID } from "node:crypto";
 
@@ -27361,49 +28291,69 @@ export const startInstance = createStart(() => {
 `],
   ["modules/blog/dialects/postgres/packages/db/src/schema/blog.ts", `import { pgTable, text, integer, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 
-export const blogPost = pgTable("blog_post", {
-  id: text("id").primaryKey(),
-  translationKey: text("translation_key").notNull(),
-  locale: text("locale").notNull(),
-  slug: text("slug").notNull(),
-  title: text("title").notNull(),
-  excerpt: text("excerpt").notNull(),
-  body: text("body").notNull(),
-  status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
-  authorId: text("author_id").notNull(),
-  authorName: text("author_name").notNull(),
-  revision: integer("revision").notNull().default(1),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().$defaultFn(() => new Date()),
-  publishedAt: timestamp("published_at", { withTimezone: true }),
-}, (table) => [
-  uniqueIndex("blog_locale_slug_unique").on(table.locale, table.slug),
-  uniqueIndex("blog_translation_locale_unique").on(table.translationKey, table.locale),
-  index("blog_publication_idx").on(table.locale, table.status, table.publishedAt),
-]);
+export const blogPost = pgTable(
+  "blog_post",
+  {
+    id: text("id").primaryKey(),
+    translationKey: text("translation_key").notNull(),
+    locale: text("locale").notNull(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    excerpt: text("excerpt").notNull(),
+    body: text("body").notNull(),
+    status: text("status", { enum: ["draft", "published"] })
+      .notNull()
+      .default("draft"),
+    authorId: text("author_id").notNull(),
+    authorName: text("author_name").notNull(),
+    revision: integer("revision").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("blog_locale_slug_unique").on(table.locale, table.slug),
+    uniqueIndex("blog_translation_locale_unique").on(table.translationKey, table.locale),
+    index("blog_publication_idx").on(table.locale, table.status, table.publishedAt),
+  ],
+);
 `],
   ["modules/blog/dialects/sqlite/packages/db/src/schema/blog.ts", `import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-export const blogPost = sqliteTable("blog_post", {
-  id: text("id").primaryKey(),
-  translationKey: text("translation_key").notNull(),
-  locale: text("locale").notNull(),
-  slug: text("slug").notNull(),
-  title: text("title").notNull(),
-  excerpt: text("excerpt").notNull(),
-  body: text("body").notNull(),
-  status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
-  authorId: text("author_id").notNull(),
-  authorName: text("author_name").notNull(),
-  revision: integer("revision").notNull().default(1),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-  publishedAt: integer("published_at", { mode: "timestamp_ms" }),
-}, (table) => [
-  uniqueIndex("blog_locale_slug_unique").on(table.locale, table.slug),
-  uniqueIndex("blog_translation_locale_unique").on(table.translationKey, table.locale),
-  index("blog_publication_idx").on(table.locale, table.status, table.publishedAt),
-]);
+export const blogPost = sqliteTable(
+  "blog_post",
+  {
+    id: text("id").primaryKey(),
+    translationKey: text("translation_key").notNull(),
+    locale: text("locale").notNull(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    excerpt: text("excerpt").notNull(),
+    body: text("body").notNull(),
+    status: text("status", { enum: ["draft", "published"] })
+      .notNull()
+      .default("draft"),
+    authorId: text("author_id").notNull(),
+    authorName: text("author_name").notNull(),
+    revision: integer("revision").notNull().default(1),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    publishedAt: integer("published_at", { mode: "timestamp_ms" }),
+  },
+  (table) => [
+    uniqueIndex("blog_locale_slug_unique").on(table.locale, table.slug),
+    uniqueIndex("blog_translation_locale_unique").on(table.translationKey, table.locale),
+    index("blog_publication_idx").on(table.locale, table.status, table.publishedAt),
+  ],
+);
 `],
   ["modules/blog/files/docs/modules/blog.md.hbs", `# Blog publishing
 
@@ -27538,82 +28488,174 @@ export function createBlog(db: Database) {
 export type Blog = ReturnType<typeof createBlog>;
 `],
   ["modules/blog/files/packages/i18n/src/messages/en/blog.ts", `export default {
-  "nav": {
-    "blog": "Blog"
+  nav: {
+    blog: "Blog",
   },
-  "title": "The journal",
-  "journal": "Notes & perspectives",
-  "description": "Articles, ideas and updates from our team.",
-  "empty": "No articles have been published yet.",
-  "adminEmpty": "No posts yet. Create your first draft.",
-  "back": "All articles",
-  "manage": "Manage articles",
-  "draft": "Draft",
-  "published": "Published",
-  "pagination": "Article pages",
-  "previous": "Previous",
-  "next": "Next",
-  "editor": {
-    "locale": "Language",
-    "slug": "URL slug",
-    "title": "Title",
-    "excerpt": "Summary",
-    "body": "Markdown content",
-    "markdownHelp": "Headings, lists, links and code are supported. Raw HTML is disabled; image syntax renders its text description only. Save before opening the preview.",
-    "translation": "Translation group ID",
-    "translationHelp": "Leave blank for a new article. To connect a translation, copy the original article’s group ID. Each group supports one article per language.",
-    "status": "Publication status",
-    "conflict": "The slug or translation already exists, or this post changed elsewhere. Reload before saving.",
-    "failed": "The change could not be saved. Check your permissions and input.",
-    "saved": "Saved.",
-    "saving": "Saving…",
-    "save": "Save changes",
-    "create": "Create draft",
-    "edit": "Edit article",
-    "delete": "Delete article",
-    "confirmDelete": "Delete this article permanently?",
-    "preview": "Preview saved content"
-  }
+  title: "The journal",
+  journal: "Notes & perspectives",
+  description: "Articles, ideas and updates from our team.",
+  empty: "No articles have been published yet.",
+  adminEmpty: "No posts yet. Create your first draft.",
+  back: "All articles",
+  manage: "Manage articles",
+  draft: "Draft",
+  published: "Published",
+  pagination: "Article pages",
+  previous: "Previous",
+  next: "Next",
+  editor: {
+    locale: "Language",
+    slug: "URL slug",
+    title: "Title",
+    excerpt: "Summary",
+    body: "Markdown content",
+    markdownHelp:
+      "Headings, lists, links and code are supported. Raw HTML is disabled; image syntax renders its text description only. Save before opening the preview.",
+    translation: "Translation group ID",
+    translationHelp:
+      "Leave blank for a new article. To connect a translation, copy the original article’s group ID. Each group supports one article per language.",
+    status: "Publication status",
+    conflict:
+      "The slug or translation already exists, or this post changed elsewhere. Reload before saving.",
+    failed: "The change could not be saved. Check your permissions and input.",
+    saved: "Saved.",
+    saving: "Saving…",
+    save: "Save changes",
+    create: "Create draft",
+    edit: "Edit article",
+    delete: "Delete article",
+    confirmDelete: "Delete this article permanently?",
+    preview: "Preview saved content",
+  },
 } as const;
 `],
   ["modules/blog/files/packages/i18n/src/messages/zh-CN/blog.ts", `export default {
-  "nav": {
-    "blog": "博客"
+  nav: {
+    blog: "博客",
   },
-  "title": "团队日志",
-  "journal": "观点与记录",
-  "description": "来自我们团队的文章、想法与最新动态。",
-  "empty": "暂时没有已发布的文章。",
-  "adminEmpty": "暂无文章，创建第一篇草稿吧。",
-  "back": "全部文章",
-  "manage": "管理文章",
-  "draft": "草稿",
-  "published": "已发布",
-  "pagination": "文章分页",
-  "previous": "上一页",
-  "next": "下一页",
-  "editor": {
-    "locale": "语言",
-    "slug": "网址标识",
-    "title": "标题",
-    "excerpt": "摘要",
-    "body": "Markdown 正文",
-    "markdownHelp": "支持标题、列表、链接和代码。不执行原始 HTML；图片语法只显示文字描述。保存后可打开预览。",
-    "translation": "翻译组 ID",
-    "translationHelp": "新文章可留空。关联翻译时，请复制原文的翻译组 ID。每组每种语言只能有一篇文章。",
-    "status": "发布状态",
-    "conflict": "网址或翻译已存在，或文章已被他人修改，请刷新后重试。",
-    "failed": "无法保存，请检查权限和输入内容。",
-    "saved": "已保存。",
-    "saving": "保存中…",
-    "save": "保存修改",
-    "create": "创建草稿",
-    "edit": "编辑文章",
-    "delete": "删除文章",
-    "confirmDelete": "确定永久删除此文章？",
-    "preview": "预览已保存内容"
-  }
+  title: "团队日志",
+  journal: "观点与记录",
+  description: "来自我们团队的文章、想法与最新动态。",
+  empty: "暂时没有已发布的文章。",
+  adminEmpty: "暂无文章，创建第一篇草稿吧。",
+  back: "全部文章",
+  manage: "管理文章",
+  draft: "草稿",
+  published: "已发布",
+  pagination: "文章分页",
+  previous: "上一页",
+  next: "下一页",
+  editor: {
+    locale: "语言",
+    slug: "网址标识",
+    title: "标题",
+    excerpt: "摘要",
+    body: "Markdown 正文",
+    markdownHelp:
+      "支持标题、列表、链接和代码。不执行原始 HTML；图片语法只显示文字描述。保存后可打开预览。",
+    translation: "翻译组 ID",
+    translationHelp:
+      "新文章可留空。关联翻译时，请复制原文的翻译组 ID。每组每种语言只能有一篇文章。",
+    status: "发布状态",
+    conflict: "网址或翻译已存在，或文章已被他人修改，请刷新后重试。",
+    failed: "无法保存，请检查权限和输入内容。",
+    saved: "已保存。",
+    saving: "保存中…",
+    save: "保存修改",
+    create: "创建草稿",
+    edit: "编辑文章",
+    delete: "删除文章",
+    confirmDelete: "确定永久删除此文章？",
+    preview: "预览已保存内容",
+  },
 } as const;
+`],
+  ["modules/blog/frameworks/native/apps/web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+import { BlogError, type BlogActor } from "@{{projectName}}/blog";
+import { defineAbilityFor } from "@{{projectName}}/permissions";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+
+class RequestError extends Error {
+  constructor(readonly status: number, readonly code: string) { super(code); }
+}
+export async function blogActor(request: Request, mutate = false): Promise<BlogActor> {
+  if (mutate && request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new RequestError(403, "forbidden");
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) throw new RequestError(401, "unauthorized");
+  const actor = session.user;
+  if (defineAbilityFor(actor).cannot("access", "Admin")) throw new RequestError(403, "forbidden");
+  return actor;
+}
+export async function readBlogJson(request: Request): Promise<unknown> {
+  if (!/^application\\/json(?:;|$)/i.test(request.headers.get("content-type") ?? "")) throw new RequestError(400, "invalid_input");
+  if (!request.body) throw new RequestError(400, "invalid_input");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      size += part.value.byteLength;
+      if (size > 512_000) { await reader.cancel(); throw new RequestError(413, "too_large"); }
+      chunks.push(part.value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder().decode(bytes)) as unknown; }
+  catch { throw new RequestError(400, "invalid_input"); }
+}
+export function blogResponse<T>(data: T, status = 200) {
+  return Response.json(data, { status, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
+}
+export function blogFailure(error: unknown) {
+  if (error instanceof RequestError) return blogResponse({ error: error.code }, error.status);
+  if (error instanceof z.ZodError) return blogResponse({ error: "invalid_input" }, 400);
+  if (error instanceof BlogError) return blogResponse({ error: error.code }, error.code === "forbidden" ? 403 : error.code === "not_found" ? 404 : 409);
+  console.error("Blog request failed");
+  return blogResponse({ error: "server_error" }, 500);
+}
+`],
+  ["modules/blog/frameworks/native/apps/web/src/lib/native/blog.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
+import { revisionInput } from "@{{projectName}}/blog";
+import { isLocale, defaultLocale } from "@{{projectName}}/i18n";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+import { blogActor, blogFailure, blogResponse, readBlogJson } from "../blog-http";
+import { json, pageOf } from "../product-api";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path !== "/api/blog" && !path.startsWith("/api/blog/") && path !== "/api/product/blog" && !path.startsWith("/api/product/blog/")) return;
+  try {
+    if (path.startsWith("/api/product/blog") && request.method === "GET") {
+      const lang = new URL(request.url).searchParams.get("locale") ?? defaultLocale;
+      if (!isLocale(lang)) return json({ error: "not_found" }, 404);
+      if (path === "/api/product/blog") return json({ ...await blog.listPublished(lang, { page: pageOf(request) }), siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}ENV.BETTER_AUTH_URL{{/if}} });
+      const post = await blog.getPublished(lang, decodeURIComponent(path.slice("/api/product/blog/".length)));
+      return post ? json({ post, translations: await blog.translations(post.translationKey), siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}ENV.BETTER_AUTH_URL{{/if}} }) : json({ error: "not_found" }, 404);
+    }
+    if (path === "/api/blog") {
+      if (request.method === "GET") return blogResponse(await blog.listAdmin(await blogActor(request), { page: pageOf(request) }));
+      if (request.method === "POST") return blogResponse(await blog.create(await blogActor(request, true), await readBlogJson(request)), 201);
+    }
+    const id = decodeURIComponent(path.slice("/api/blog/".length));
+    if (request.method === "GET") return blogResponse(await blog.getAdmin(await blogActor(request), id));
+    if (request.method === "PUT") {
+      const actor = await blogActor(request, true);
+      const data = z.object({ revision: revisionInput, post: z.unknown() }).strict().parse(await readBlogJson(request));
+      return blogResponse(await blog.update(actor, id, data.revision, data.post));
+    }
+    if (request.method === "DELETE") {
+      const actor = await blogActor(request, true);
+      const data = z.object({ revision: revisionInput }).strict().parse(await readBlogJson(request));
+      await blog.delete(actor, id, data.revision);
+      return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+    }
+    return json({ error: "method_not_allowed" }, 405);
+  } catch (error) { return blogFailure(error); }
+}
 `],
   ["modules/blog/frameworks/next/apps/web/src/app/[lang]/admin/blog/[id]/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
 import { BlogError } from "@{{projectName}}/blog";
@@ -27770,66 +28812,6 @@ export async function POST(request: Request) {
   } catch (error) { return blogFailure(error); }
 }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/components/blog/editor.tsx.hbs", `"use client";
-
-import { locales } from "@{{projectName}}/i18n";
-import type { Locale } from "@{{projectName}}/i18n";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { z } from "zod";
-import { useT } from "@/components/i18n-provider";
-import { localePath } from "@/lib/i18n/paths";
-
-type Editable = { id: string; locale: string; slug: string; title: string; excerpt: string; body: string; translationKey: string; status: "draft" | "published"; revision: number };
-export default function BlogEditor({ locale, post }: { locale: Locale; post?: Editable }) {
-  const t = useT();
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  async function save(form: HTMLFormElement) {
-    setBusy(true); setMessage("");
-    const values = new FormData(form);
-    const data = { locale: String(values.get("locale")), slug: String(values.get("slug")), title: String(values.get("title")), excerpt: String(values.get("excerpt")), body: String(values.get("body")), translationKey: String(values.get("translationKey") ?? "") || undefined, status: String(values.get("status") ?? "draft") };
-    try {
-      const response = await fetch(post ? \`/api/blog/\${post.id}\` : "/api/blog", { method: post ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(post ? { revision: post.revision, post: data } : data) });
-      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
-      const result = z.object({ id: z.string().uuid() }).parse(await response.json());
-      router.push(localePath(locale, \`/admin/blog/\${result.id}\`)); router.refresh(); setMessage(t("blog.editor.saved"));
-    } catch { setMessage(t("blog.editor.failed")); }
-    finally { setBusy(false); }
-  }
-  async function remove() {
-    if (!post || !window.confirm(t("blog.editor.confirmDelete"))) return;
-    setBusy(true); setMessage("");
-    try {
-      const response = await fetch(\`/api/blog/\${post.id}\`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: post.revision }) });
-      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
-      router.push(localePath(locale, "/admin/blog")); router.refresh();
-    } catch { setMessage(t("blog.editor.failed")); }
-    finally { setBusy(false); }
-  }
-  const field = "mt-2 w-full rounded border bg-background px-3 py-2";
-  return <form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void save(event.currentTarget); }}>
-    <fieldset disabled={busy} className="space-y-6">
-      <div className="grid gap-6 sm:grid-cols-2"><label>{t("blog.editor.locale")}<select name="locale" defaultValue={post?.locale ?? locale} className={field}>{locales.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label>{t("blog.editor.slug")}<input className={field} name="slug" required maxLength={160} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={post?.slug} /></label></div>
-      <label className="block">{t("blog.editor.title")}<input className={field} name="title" required maxLength={200} defaultValue={post?.title} /></label>
-      <label className="block">{t("blog.editor.excerpt")}<textarea className={field} name="excerpt" required maxLength={500} rows={3} defaultValue={post?.excerpt} /></label>
-      <label className="block">{t("blog.editor.body")}<textarea className={\`\${field} font-mono text-sm\`} name="body" required maxLength={100000} rows={20} defaultValue={post?.body} /></label>
-      <p className="text-sm text-muted-foreground">{t("blog.editor.markdownHelp")}</p>
-      <label className="block">{t("blog.editor.translation")}<input className={\`\${field} font-mono text-sm\`} name="translationKey" defaultValue={post?.translationKey} /><span className="mt-2 block text-sm text-muted-foreground">{t("blog.editor.translationHelp")}</span></label>
-      {post && <label className="block">{t("blog.editor.status")}<select name="status" className={field} defaultValue={post.status}><option value="draft">{t("blog.draft")}</option><option value="published">{t("blog.published")}</option></select></label>}
-      <div className="flex gap-4"><button type="submit" className="rounded bg-primary px-5 py-2 text-primary-foreground">{busy ? t("blog.editor.saving") : post ? t("blog.editor.save") : t("blog.editor.create")}</button>{post && <button type="button" onClick={() => void remove()} className="rounded border border-destructive px-5 py-2 text-destructive">{t("blog.editor.delete")}</button>}</div>
-    </fieldset><p role="status" aria-live="polite">{message}</p>
-  </form>;
-}
-`],
-  ["modules/blog/frameworks/next/apps/web/src/components/blog/markdown.tsx", `import ReactMarkdown from "react-markdown";
-
-/** Raw HTML is never interpreted. react-markdown also rejects unsafe URL schemes. */
-export default function Markdown({ children }: { children: string }) {
-  return <div className="space-y-5 text-base leading-8 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-5 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:font-serif [&_h1]:text-3xl [&_h2]:mt-10 [&_h2]:font-serif [&_h2]:text-2xl [&_h3]:text-xl [&_li]:ml-6 [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:bg-muted [&_pre]:p-5 [&_ul]:list-disc"><ReactMarkdown skipHtml components={{ img: ({ alt }) => <span className="text-muted-foreground">{alt}</span> }}>{children}</ReactMarkdown></div>;
-}
-`],
   ["modules/blog/frameworks/next/apps/web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 import { BlogError, type BlogActor } from "@{{projectName}}/blog";
 import { defineAbilityFor } from "@{{projectName}}/permissions";
@@ -27904,10 +28886,262 @@ export function blogOrigin() { return new URL(ENV.BETTER_AUTH_URL).origin; }
   ["modules/blog/frameworks/next/apps/web/src/lib/blog-page.ts", `import { notFound } from "next/navigation";
 import { z } from "zod";
 export function blogPage(value: string | string[] | undefined) {
-  const result = z.coerce.number().int().min(1).max(100_000).safeParse(value ?? 1);
+  const result = z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100_000)
+    .safeParse(value ?? 1);
   if (!result.success) notFound();
   return result.data;
 }
+`],
+  ["modules/blog/frameworks/nuxt/apps/web/app/components/ProductBlog.vue.hbs", `<script setup lang="ts">
+import MarkdownIt from "markdown-it";
+import { defaultLocale } from "@{{projectName}}/i18n";
+const props = defineProps<{ slug?: string }>();
+const { locale, path, label } = useProductLocale();
+const route = useRoute();
+const rawPage = route.query.page ?? "1";
+if (typeof rawPage !== "string" || !/^[1-9]\\d*$/.test(rawPage) || Number(rawPage) > 100000) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+const page = Number(rawPage);
+type Post = { id: string; title: string; slug: string; locale: string; excerpt: string; body: string; authorName: string; publishedAt: string | null; updatedAt: string };
+const listing = ref<{ posts: Post[]; total: number; page: number; limit: number }>();
+const article = ref<{ post: Post; translations: { locale: string; slug: string }[] }>();
+if (props.slug) {
+  const { data, error } = await useFetch<{ post: Post; translations: { locale: string; slug: string }[] }>(\`/api/product/blog/\${encodeURIComponent(props.slug)}\`, { query: { locale: locale.value } });
+  if (error.value || !data.value) throw createError({ statusCode: error.value?.statusCode ?? 404, statusMessage: "Post not found" });
+  article.value = data.value;
+} else {
+  const { data, error } = await useFetch<{ posts: Post[]; total: number; page: number; limit: number }>("/api/product/blog", { query: { locale: locale.value, page } });
+  if (error.value) throw createError({ statusCode: error.value.statusCode ?? 500, statusMessage: "Could not load posts" });
+  listing.value = data.value ?? undefined;
+  if (page > 1 && !listing.value?.posts.length) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+}
+// HTML is disabled; markdown-it also rejects javascript:, vbscript: and unsafe data URLs.
+const markdown = new MarkdownIt({ html: false, linkify: false, typographer: true });
+markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index]?.content ?? "");
+const html = computed(() => article.value ? markdown.render(article.value.post.body) : "");
+const { data: config } = await useFetch<{ siteUrl: string }>("/api/product/config");
+const title = computed(() => article.value?.post.title ?? label("Journal", "博客"));
+const description = computed(() => article.value?.post.excerpt ?? label("News and ideas from {{projectName}}.", "{{projectName}} 的新闻与想法。"));
+useSeoMeta({ title: () => \`\${title.value} · {{projectName}}\`, description: () => description.value, ogTitle: () => title.value, ogDescription: () => description.value, ogType: () => article.value ? "article" : "website", twitterCard: "summary", twitterTitle: () => title.value, twitterDescription: () => description.value });
+useHead(() => ({ link: !article.value || !config.value?.siteUrl ? [] : [
+  { rel: "canonical" as const, href: \`\${config.value.siteUrl}/\${article.value.post.locale}/blog/\${article.value.post.slug}\` },
+  ...article.value.translations.map((entry) => ({ rel: "alternate" as const, hreflang: entry.locale, href: \`\${config.value!.siteUrl}/\${entry.locale}/blog/\${entry.slug}\` })),
+  ...article.value.translations.filter((entry) => entry.locale === defaultLocale).map((entry) => ({ rel: "alternate" as const, hreflang: "x-default", href: \`\${config.value!.siteUrl}/\${entry.locale}/blog/\${entry.slug}\` })),
+] }));
+useHead(() => ({ script: !article.value || !config.value?.siteUrl ? [] : [{ type: "application/ld+json", innerHTML: JSON.stringify({ "@context": "https://schema.org", "@type": "BlogPosting", headline: article.value.post.title, description: article.value.post.excerpt, author: { "@type": "Person", name: article.value.post.authorName }, datePublished: article.value.post.publishedAt, dateModified: article.value.post.updatedAt, inLanguage: article.value.post.locale, mainEntityOfPage: \`\${config.value.siteUrl}/\${article.value.post.locale}/blog/\${article.value.post.slug}\` }).replace(/</g, "\\\\u003c").replace(/\\u2028/g, "\\\\u2028").replace(/\\u2029/g, "\\\\u2029") }] }));
+</script>
+<template>
+  <article v-if="article" class="prose"><NuxtLink :to="path('blog')">\\{{ label('All posts', '全部文章') }}</NuxtLink><h1>\\{{ article.post.title }}</h1><p class="muted">\\{{ article.post.authorName }} · \\{{ article.post.publishedAt?.slice(0, 10) }}</p><p>\\{{ article.post.excerpt }}</p><div v-html="html" /><nav class="actions" :aria-label="label('Translations', '翻译')"><NuxtLink v-for="entry in article.translations" :key="entry.locale" :to="\`/\${entry.locale}/blog/\${entry.slug}\`">\\{{ entry.locale }}</NuxtLink></nav></article>
+  <section v-else class="stack"><h1>\\{{ label('Journal', '博客') }}</h1><div class="grid"><article v-for="post in listing?.posts ?? []" :key="post.id" class="panel"><small>\\{{ post.publishedAt?.slice(0, 10) }}</small><h2><NuxtLink :to="path(\`blog/\${post.slug}\`)">\\{{ post.title }}</NuxtLink></h2><p>\\{{ post.excerpt }}</p><small>\\{{ post.authorName }}</small></article></div><p v-if="!listing?.posts.length">\\{{ label('No published posts yet.', '暂无已发布文章。') }}</p><nav class="actions" :aria-label="label('Pagination', '分页')"><NuxtLink v-if="page > 1" :to="\`\${path('blog')}?page=\${page - 1}\`">\\{{ label('Previous', '上一页') }}</NuxtLink><NuxtLink v-if="listing && page * listing.limit < listing.total" :to="\`\${path('blog')}?page=\${page + 1}\`">\\{{ label('Next', '下一页') }}</NuxtLink></nav></section>
+</template>
+`],
+  ["modules/blog/frameworks/nuxt/apps/web/app/components/ProductBlogEditor.vue.hbs", `<script setup lang="ts">
+import { z } from "zod";
+import MarkdownIt from "markdown-it";
+const props = defineProps<{ id?: string }>();
+const { label, locale, locales, path } = useProductLocale();
+const { pending, error, notice, run } = useProductAction();
+const page = ref(1);
+const postSchema = z.object({ id: z.string(), locale: z.string(), slug: z.string(), title: z.string(), excerpt: z.string(), body: z.string(), status: z.enum(["draft", "published"]), translationKey: z.string(), revision: z.number(), updatedAt: z.string() });
+type Post = z.infer<typeof postSchema>;
+const list = ref<{ posts: Post[]; total: number; page: number; limit: number }>();
+const form = reactive({ locale: locale.value as string, slug: "", title: "", excerpt: "", body: "", status: "draft" as "draft" | "published", translationKey: "" });
+const revision = ref(0);
+if (props.id && props.id !== "new") {
+  const { data, error: loadError } = await useFetch(\`/api/blog/\${encodeURIComponent(props.id)}\`, { transform: (value) => postSchema.parse(value) });
+  if (loadError.value || !data.value) throw createError({ statusCode: loadError.value?.statusCode ?? 404, statusMessage: "Post not found" });
+  Object.assign(form, data.value); revision.value = data.value.revision;
+}
+const requestFetch = useRequestFetch();
+async function loadList() {
+  const result = await requestFetch("/api/blog", { query: { page: page.value } });
+  list.value = z.object({ posts: z.array(postSchema), total: z.number(), page: z.number(), limit: z.number() }).parse(result);
+}
+if (!props.id) await loadList();
+watch(page, () => run(loadList));
+const markdown = new MarkdownIt({ html: false, linkify: false });
+const preview = computed(() => markdown.render(form.body));
+async function save() {
+  await run(async () => {
+    const post = { locale: form.locale, slug: form.slug.trim(), title: form.title.trim(), excerpt: form.excerpt.trim(), body: form.body, status: form.status, ...(form.translationKey ? { translationKey: form.translationKey } : {}) };
+    const updating = props.id && props.id !== "new";
+    const result = await productRequest(updating ? \`/api/blog/\${encodeURIComponent(props.id!)}\` : "/api/blog", { ...productJson(updating ? { revision: revision.value, post } : post), method: updating ? "PUT" : "POST" }, postSchema);
+    revision.value = result.revision; Object.assign(form, result);
+    notice.value = label("Saved. Conflicting edits are rejected rather than overwritten.", "已保存。冲突修改将被拒绝，而不会被覆盖。");
+    if (!updating) await navigateTo(path(\`admin/blog/\${result.id}\`));
+  });
+}
+async function remove(post: Post) {
+  if (!window.confirm(label("Delete this post permanently?", "永久删除此文章？"))) return;
+  await run(async () => { await productRequest(\`/api/blog/\${encodeURIComponent(post.id)}\`, { ...productJson({ revision: post.revision }), method: "DELETE" }); await loadList(); });
+}
+</script>
+<template>
+  <p v-if="error" role="alert" class="error">\\{{ error }}</p><p v-if="notice" role="status" class="notice">\\{{ notice }}</p>
+  <template v-if="!id"><NuxtLink class="button" :to="path('admin/blog/new')">\\{{ label('New draft', '新建草稿') }}</NuxtLink><div class="table-wrap"><table><thead><tr><th>\\{{ label('Title', '标题') }}</th><th>\\{{ label('Language', '语言') }}</th><th>\\{{ label('Status', '状态') }}</th><th>\\{{ label('Actions', '操作') }}</th></tr></thead><tbody><tr v-for="post in list?.posts ?? []" :key="post.id"><td><NuxtLink :to="path(\`admin/blog/\${post.id}\`)">\\{{ post.title }}</NuxtLink></td><td>\\{{ post.locale }}</td><td>\\{{ post.status }}</td><td><button class="text-button" :disabled="pending" @click="remove(post)">\\{{ label('Delete', '删除') }}</button></td></tr></tbody></table></div><nav class="actions"><button class="text-button" :disabled="page <= 1" @click="page--">\\{{ label('Previous', '上一页') }}</button><span>\\{{ page }}</span><button class="text-button" :disabled="!list || page * list.limit >= list.total" @click="page++">\\{{ label('Next', '下一页') }}</button></nav></template>
+  <template v-else><NuxtLink :to="path('admin/blog')">\\{{ label('All posts', '全部文章') }}</NuxtLink><form class="panel" @submit.prevent="save"><div class="grid"><label>\\{{ label('Language', '语言') }}<select v-model="form.locale"><option v-for="code in locales" :key="code" :value="code">\\{{ code }}</option></select></label><label>\\{{ label('Slug', '路径名') }}<input v-model="form.slug" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="160" required /></label></div><label>\\{{ label('Title', '标题') }}<input v-model="form.title" maxlength="200" required /></label><label>\\{{ label('Excerpt', '摘要') }}<textarea v-model="form.excerpt" maxlength="500" required /></label><label>\\{{ label('Markdown body · raw HTML disabled', 'Markdown 正文 · 已禁用原始 HTML') }}<textarea v-model="form.body" class="body-editor" maxlength="100000" required /></label><label>\\{{ label('Translation key (same UUID for translated posts)', '翻译键（翻译文章使用相同 UUID）') }}<input v-model="form.translationKey" pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" /></label><label>\\{{ label('Status', '状态') }}<select v-model="form.status" :disabled="id === 'new'"><option value="draft">\\{{ label('Draft', '草稿') }}</option><option value="published">\\{{ label('Published', '已发布') }}</option></select></label><small v-if="id === 'new'">\\{{ label('Save a draft before publishing.', '发布前请先保存草稿。') }}</small><button :disabled="pending">\\{{ label('Save post', '保存文章') }}</button></form><section class="panel prose"><h2>\\{{ label('Preview', '预览') }}</h2><div v-html="preview" /></section></template>
+</template>
+<style scoped>.body-editor{min-height:24rem;font-family:ui-monospace,monospace}</style>
+`],
+  ["modules/blog/frameworks/react/apps/web/src/components/blog/editor.tsx.hbs", `"use client";
+
+import { locales } from "@{{projectName}}/i18n";
+import type { Locale } from "@{{projectName}}/i18n";
+import { useProductNavigation } from "@/lib/product-navigation";
+import { useState } from "react";
+import { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import { localePath } from "@/lib/i18n/paths";
+
+type Editable = { id: string; locale: string; slug: string; title: string; excerpt: string; body: string; translationKey: string; status: "draft" | "published"; revision: number };
+export default function BlogEditor({ locale, post }: { locale: Locale; post?: Editable }) {
+  const t = useT();
+  const navigation = useProductNavigation();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  async function save(form: HTMLFormElement) {
+    setBusy(true); setMessage("");
+    const values = new FormData(form);
+    const data = { locale: String(values.get("locale")), slug: String(values.get("slug")), title: String(values.get("title")), excerpt: String(values.get("excerpt")), body: String(values.get("body")), translationKey: String(values.get("translationKey") ?? "") || undefined, status: String(values.get("status") ?? "draft") };
+    try {
+      const response = await fetch(post ? \`/api/blog/\${post.id}\` : "/api/blog", { method: post ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(post ? { revision: post.revision, post: data } : data) });
+      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
+      const result = z.object({ id: z.string().uuid() }).parse(await response.json());
+      navigation.navigate(localePath(locale, \`/admin/blog/\${result.id}\`)); navigation.refresh(); setMessage(t("blog.editor.saved"));
+    } catch { setMessage(t("blog.editor.failed")); }
+    finally { setBusy(false); }
+  }
+  async function remove() {
+    if (!post || !window.confirm(t("blog.editor.confirmDelete"))) return;
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch(\`/api/blog/\${post.id}\`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: post.revision }) });
+      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
+      navigation.navigate(localePath(locale, "/admin/blog")); navigation.refresh();
+    } catch { setMessage(t("blog.editor.failed")); }
+    finally { setBusy(false); }
+  }
+  const field = "mt-2 w-full rounded border bg-background px-3 py-2";
+  return <form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void save(event.currentTarget); }}>
+    <fieldset disabled={busy} className="space-y-6">
+      <div className="grid gap-6 sm:grid-cols-2"><label>{t("blog.editor.locale")}<select name="locale" defaultValue={post?.locale ?? locale} className={field}>{locales.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label>{t("blog.editor.slug")}<input className={field} name="slug" required maxLength={160} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={post?.slug} /></label></div>
+      <label className="block">{t("blog.editor.title")}<input className={field} name="title" required maxLength={200} defaultValue={post?.title} /></label>
+      <label className="block">{t("blog.editor.excerpt")}<textarea className={field} name="excerpt" required maxLength={500} rows={3} defaultValue={post?.excerpt} /></label>
+      <label className="block">{t("blog.editor.body")}<textarea className={\`\${field} font-mono text-sm\`} name="body" required maxLength={100000} rows={20} defaultValue={post?.body} /></label>
+      <p className="text-sm text-muted-foreground">{t("blog.editor.markdownHelp")}</p>
+      <label className="block">{t("blog.editor.translation")}<input className={\`\${field} font-mono text-sm\`} name="translationKey" defaultValue={post?.translationKey} /><span className="mt-2 block text-sm text-muted-foreground">{t("blog.editor.translationHelp")}</span></label>
+      {post && <label className="block">{t("blog.editor.status")}<select name="status" className={field} defaultValue={post.status}><option value="draft">{t("blog.draft")}</option><option value="published">{t("blog.published")}</option></select></label>}
+      <div className="flex gap-4"><button type="submit" className="rounded bg-primary px-5 py-2 text-primary-foreground">{busy ? t("blog.editor.saving") : post ? t("blog.editor.save") : t("blog.editor.create")}</button>{post && <button type="button" onClick={() => void remove()} className="rounded border border-destructive px-5 py-2 text-destructive">{t("blog.editor.delete")}</button>}</div>
+    </fieldset><p role="status" aria-live="polite">{message}</p>
+  </form>;
+}
+`],
+  ["modules/blog/frameworks/react/apps/web/src/components/blog/markdown.tsx", `import ReactMarkdown from "react-markdown";
+
+/** Raw HTML is never interpreted. react-markdown also rejects unsafe URL schemes. */
+export default function Markdown({ children }: { children: string }) {
+  return (
+    <div className="space-y-5 text-base leading-8 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-5 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:font-serif [&_h1]:text-3xl [&_h2]:mt-10 [&_h2]:font-serif [&_h2]:text-2xl [&_h3]:text-xl [&_li]:ml-6 [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:bg-muted [&_pre]:p-5 [&_ul]:list-disc">
+      <ReactMarkdown
+        skipHtml
+        components={{ img: ({ alt }) => <span className="text-muted-foreground">{alt}</span> }}
+      >
+        {children}
+      </ReactMarkdown>
+    </div>
+  );
+}
+`],
+  ["modules/blog/frameworks/tanstack-start/apps/web/src/lib/blog-data.ts", `import { z } from "zod";
+export const postSchema = z.object({
+  id: z.string(),
+  locale: z.string(),
+  slug: z.string(),
+  title: z.string(),
+  excerpt: z.string(),
+  body: z.string(),
+  translationKey: z.string(),
+  status: z.enum(["draft", "published"]),
+  revision: z.number(),
+  authorName: z.string(),
+  publishedAt: z.string().nullable(),
+  updatedAt: z.string(),
+});
+export const postListSchema = z.object({
+  posts: z.array(postSchema),
+  page: z.number(),
+  limit: z.number(),
+  total: z.number(),
+});
+const blogSearchSchema = z.object({ page: z.coerce.number().int().min(1).max(100_000).default(1) });
+export function blogSearch(search: z.input<typeof blogSearchSchema>) {
+  const result = blogSearchSchema.safeParse(search);
+  return { page: result.success ? result.data.page : null };
+}
+`],
+  ["modules/blog/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.blog.$id.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import BlogEditor from "@/components/blog/editor";
+import Markdown from "@/components/blog/markdown";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { postSchema } from "@/lib/blog-data";
+export const Route = createFileRoute("/$lang/admin/blog/$id")({ loader: ({ params }) => loadProduct(\`/api/blog/\${encodeURIComponent(params.id)}\`, params.lang, postSchema), component: EditPost });
+function EditPost() { const post = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section><h1 className="mb-8 font-serif text-4xl">{t("blog.editor.edit")}</h1><BlogEditor key={\`\${post.id}:\${post.revision}\`} locale={locale} post={post} /><details className="mt-12 border-t pt-6"><summary className="mb-8 cursor-pointer">{t("blog.editor.preview")}</summary><Markdown>{post.body}</Markdown></details></section>; }
+`],
+  ["modules/blog/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.blog.index.tsx.hbs", `import { createFileRoute, notFound } from "@tanstack/react-router";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { blogSearch, postListSchema } from "@/lib/blog-data";
+export const Route = createFileRoute("/$lang/admin/blog/")({ validateSearch: blogSearch, loaderDeps: ({ search }) => search, loader: ({ params, deps }) => { if (deps.page === null) throw notFound(); return loadProduct(\`/api/blog?page=\${deps.page}\`, params.lang, postListSchema); }, component: BlogAdmin });
+function BlogAdmin() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="space-y-8"><header className="flex items-center justify-between"><h1 className="font-serif text-4xl">{t("blog.manage")}</h1><a href={\`/\${locale}/admin/blog/new\`} className="border px-4 py-2">{t("blog.editor.create")}</a></header>{!data.posts.length && <p>{t("blog.adminEmpty")}</p>}<ul className="divide-y border">{data.posts.map((post) => <li key={post.id} className="flex justify-between gap-4 p-5"><div><a className="font-medium underline" href={\`/\${locale}/admin/blog/\${post.id}\`}>{post.title}</a><p className="mt-1 text-sm text-muted-foreground">{post.locale} / {post.slug}</p></div><span>{t(post.status === "published" ? "blog.published" : "blog.draft")}</span></li>)}</ul><nav className="flex justify-between" aria-label={t("blog.pagination")}>{data.page > 1 ? <a href={\`?page=\${data.page - 1}\`}>{t("blog.previous")}</a> : <span />}{data.page * data.limit < data.total && <a href={\`?page=\${data.page + 1}\`}>{t("blog.next")}</a>}</nav></section>; }
+`],
+  ["modules/blog/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.blog.new.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import BlogEditor from "@/components/blog/editor";
+import { useLocale, useT } from "@/components/i18n-provider";
+export const Route = createFileRoute("/$lang/admin/blog/new")({ component: NewPost });
+function NewPost() { const locale = useLocale(); const t = useT(); return <section><h1 className="mb-8 font-serif text-4xl">{t("blog.editor.create")}</h1><BlogEditor locale={locale} /></section>; }
+`],
+  ["modules/blog/frameworks/tanstack-start/apps/web/src/routes/$lang.blog.$slug.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { defaultLocale } from "@{{projectName}}/i18n";
+import { z } from "zod";
+import Markdown from "@/components/blog/markdown";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { postSchema } from "@/lib/blog-data";
+export const Route = createFileRoute("/$lang/blog/$slug")({
+  loader: ({ params }) => loadProduct(\`/api/product/blog/\${encodeURIComponent(params.slug)}?locale=\${encodeURIComponent(params.lang)}\`, params.lang, z.object({ post: postSchema, siteUrl: z.string().url(), translations: z.array(z.object({ locale: z.string(), slug: z.string() })) })),
+  head: ({ loaderData }) => {
+    if (!loaderData) return {};
+    const { post, translations, siteUrl } = loaderData;
+    const canonical = new URL(\`/\${post.locale}/blog/\${post.slug}\`, siteUrl).href;
+    const fallback = translations.find((item) => item.locale === defaultLocale);
+    return { meta: [{ title: post.title }, { name: "description", content: post.excerpt }, { property: "og:title", content: post.title }, { property: "og:description", content: post.excerpt }, { property: "og:url", content: canonical }, { property: "og:type", content: "article" }, { name: "twitter:card", content: "summary" }], links: [{ rel: "canonical", href: canonical }, ...translations.map((item) => ({ rel: "alternate", hrefLang: item.locale, href: new URL(\`/\${item.locale}/blog/\${item.slug}\`, siteUrl).href })), ...(fallback ? [{ rel: "alternate", hrefLang: "x-default", href: new URL(\`/\${fallback.locale}/blog/\${fallback.slug}\`, siteUrl).href }] : [])] };
+  }, component: Article,
+});
+function Article() {
+  const { post, siteUrl } = Route.useLoaderData(); const locale = useLocale(); const t = useT();
+  const canonical = new URL(\`/\${post.locale}/blog/\${post.slug}\`, siteUrl).href;
+  const structured = { "@context": "https://schema.org", "@type": "BlogPosting", headline: post.title, description: post.excerpt, inLanguage: post.locale, author: { "@type": "Person", name: post.authorName }, datePublished: post.publishedAt, dateModified: post.updatedAt, mainEntityOfPage: canonical, url: canonical };
+  return <article className="mx-auto max-w-3xl px-6 py-20"><a className="text-sm underline" href={\`/\${locale}/blog\`}>{t("blog.back")}</a><header className="my-10 border-b pb-10"><h1 className="font-serif text-5xl leading-tight">{post.title}</h1><p className="mt-6 text-lg text-muted-foreground">{post.excerpt}</p><p className="mt-6 text-sm">{post.authorName} · {post.publishedAt && new Date(post.publishedAt).toLocaleDateString(locale)}</p></header><Markdown>{post.body}</Markdown><script type="application/ld+json" dangerouslySetInnerHTML={ { __html: JSON.stringify(structured).replace(/</g, "\\\\u003c").replace(/>/g, "\\\\u003e").replace(/&/g, "\\\\u0026") } } /></article>;
+}
+`],
+  ["modules/blog/frameworks/tanstack-start/apps/web/src/routes/$lang.blog.index.tsx.hbs", `import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createTranslator, getMessages, isLocale } from "@{{projectName}}/i18n";
+import { z } from "zod";
+import { productHead } from "@/lib/product-head";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { blogSearch, postListSchema } from "@/lib/blog-data";
+export const Route = createFileRoute("/$lang/blog/")({
+  validateSearch: blogSearch,
+  loaderDeps: ({ search }) => search,
+  loader: async ({ params, deps }) => { if (deps.page === null) throw notFound(); const data = await loadProduct(\`/api/product/blog?\${new URLSearchParams({ locale: params.lang, page: String(deps.page) })}\`, params.lang, postListSchema.extend({ siteUrl: z.string().url() })); if (data.page > 1 && !data.posts.length) throw notFound(); return data; },
+  head: ({ params, loaderData }) => { if (!loaderData || !isLocale(params.lang)) return {}; const t = createTranslator(getMessages(params.lang)); return productHead({ siteUrl: loaderData.siteUrl, locale: params.lang, path: "/blog", title: t("blog.title"), description: t("blog.description"), page: loaderData.page }); }, component: Journal,
+});
+function Journal() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="mx-auto max-w-5xl px-6 py-20"><header className="mb-12 border-b pb-10"><p className="mb-4 text-xs uppercase tracking-widest">{t("blog.journal")}</p><h1 className="font-serif text-5xl">{t("blog.title")}</h1><p className="mt-5 text-muted-foreground">{t("blog.description")}</p></header>{!data.posts.length && <p>{t("blog.empty")}</p>}<div className="divide-y">{data.posts.map((post) => <article key={post.id} className="grid gap-5 py-8 md:grid-cols-[10rem_1fr]"><div className="text-sm text-muted-foreground"><time>{post.publishedAt && new Date(post.publishedAt).toLocaleDateString(locale)}</time><p>{post.authorName}</p></div><div><h2 className="font-serif text-3xl"><a href={\`/\${locale}/blog/\${post.slug}\`}>{post.title}</a></h2><p className="mt-4 text-muted-foreground">{post.excerpt}</p></div></article>)}</div><nav className="mt-8 flex justify-between border-t pt-6" aria-label={t("blog.pagination")}>{data.page > 1 ? <a href={\`?page=\${data.page - 1}\`}>{t("blog.previous")}</a> : <span />}{data.page * data.limit < data.total && <a href={\`?page=\${data.page + 1}\`}>{t("blog.next")}</a>}</nav></section>; }
 `],
   ["modules/blog/integrations/seo/apps/web/src/integrations/blog-seo.ts.hbs", `import type { Services } from "../services";
 
@@ -28092,6 +29326,13 @@ export function createCaptchaBeforeHook(env: CaptchaConfig) {
   retry: "重新验证",
 };
 `],
+  ["modules/captcha/frameworks/native/apps/web/src/lib/native/captcha.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
+import { ENV } from "@/env.server";
+import { json } from "../product-api";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path === "/api/captcha/config" && request.method === "GET") return json(captchaPublicConfig(ENV));
+}
+`],
   ["modules/captcha/frameworks/next/apps/web/src/app/api/captcha/config/route.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
 import { ENV } from "@/env.server";
 
@@ -28101,7 +29342,53 @@ export function GET() {
   return Response.json(captchaPublicConfig(ENV), { headers: { "Cache-Control": "no-store" } });
 }
 `],
-  ["modules/captcha/frameworks/next/apps/web/src/components/auth/captcha.tsx.hbs", `"use client";
+  ["modules/captcha/frameworks/nuxt/apps/web/app/components/ProductCaptcha.vue.hbs", `<script setup lang="ts">
+import { z } from "zod";
+const props = defineProps<{ action: string }>();
+const token = defineModel<string>({ required: true });
+const { locale, label } = useProductLocale();
+const container = ref<HTMLElement>();
+const status = ref<"loading" | "ready" | "error" | "configuration">("loading");
+type Turnstile = { render(container: HTMLElement, options: { sitekey: string; action: string; language: string; callback(token: string): void; "expired-callback"(): void; "error-callback"(): void; "timeout-callback"(): void; "response-field": false }): string; remove(id: string): void };
+declare global { interface Window { turnstile?: Turnstile } }
+let widget: { api: Turnstile; id: string } | undefined;
+let disposed = false;
+const abort = new AbortController();
+async function render() {
+  token.value = ""; status.value = "loading";
+  if (widget) { widget.api.remove(widget.id); widget = undefined; }
+  try {
+    const config = await productRequest("/api/captcha/config", { signal: abort.signal }, z.object({ siteKey: z.string().min(1).nullable() }));
+    if (disposed) return;
+    if (!config.siteKey) { status.value = "configuration"; return; }
+    if (!window.turnstile) await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      const timeout = setTimeout(() => { script.remove(); reject(new Error("Captcha unavailable")); }, 15000);
+      script.onload = () => { clearTimeout(timeout); resolve(); };
+      script.onerror = () => { clearTimeout(timeout); script.remove(); reject(new Error("Captcha unavailable")); };
+      document.head.appendChild(script);
+    });
+    if (disposed || !container.value) return;
+    const api = window.turnstile;
+    if (!api) throw new Error("Captcha unavailable");
+    const invalidate = () => { if (!disposed) { token.value = ""; status.value = "error"; } };
+    widget = { api, id: api.render(container.value, { sitekey: config.siteKey, action: props.action, language: locale.value, "response-field": false, callback: (value) => { if (!disposed) { token.value = value; status.value = "ready"; } }, "expired-callback": invalidate, "error-callback": invalidate, "timeout-callback": invalidate }) };
+  } catch { if (!disposed) status.value = "error"; }
+}
+onMounted(render);
+onBeforeUnmount(() => { disposed = true; abort.abort(); token.value = ""; if (widget) widget.api.remove(widget.id); });
+</script>
+<template>
+  <div><div ref="container" />
+    <p v-if="status === 'loading'" role="status">\\{{ label('Loading verification…', '正在加载验证…') }}</p>
+    <p v-if="status === 'configuration'" role="alert" class="error">\\{{ label('Verification is not configured. Contact the site administrator.', '验证尚未配置，请联系管理员。') }}</p>
+    <div v-if="status === 'error'" role="alert"><p class="error">\\{{ label('Verification expired or could not load.', '验证已过期或无法加载。') }}</p><button type="button" class="text-button" @click="render">\\{{ label('Try again', '重试') }}</button></div>
+  </div>
+</template>
+`],
+  ["modules/captcha/frameworks/react/apps/web/src/components/auth/captcha.tsx.hbs", `"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -28222,16 +29509,39 @@ export function Captcha({ action, challenge }: {
   );
 }
 `],
-  ["modules/core/files/docs/modules/core.md", `# Product shell
+  ["modules/core/files/apps/web/src/config/site.ts.hbs", `export const site = {
+  name: "{{projectName}}",
+};
+`],
+  ["modules/core/files/docs/modules/core.md.hbs", `# Product shell
 
 The shell every feature module plugs into.
 
 ## Layout
 
-- \`apps/web/src/app/[lang]/\` holds all pages. The \`[lang]\` segment comes from the i18n module.
-- \`apps/web/src/config/site.ts\` holds the product name.
+{{#if (includes frontend "next")}}
+- Product pages live in \`apps/web/src/app/[lang]/\`.
+{{else if (includes frontend "tanstack-start")}}
+- Product routes live in \`apps/web/src/routes/\`, with locale-prefixed URLs and server loaders for protected pages.
+{{else}}
+- Product pages live in \`apps/web/app/pages/\`; server adapters live in \`apps/web/server/\`. Nuxt's \`~/\` alias points to the app and \`@/\` points to the shared \`src/\` directory.
+{{/if}}
 - \`apps/web/src/config/navigation.ts\` is generated from the modules you picked. Edit it freely; it is plain data.
 - \`apps/web/src/services.ts\` is the composition root: every package exports a factory, and this file wires them with environment variables and each other.
+
+{{#if (includes frontend "tanstack-start")}}
+## TanStack Start workflow
+
+From the repository root, install dependencies with \`{{packageManager}} install\`, initialize your selected database with \`{{packageManager}} run db:push\`, and run \`{{packageManager}} run dev\`. The web development server listens on port 3001; set \`BETTER_AUTH_URL=http://localhost:3001\` when authentication is selected. Configure provider credentials in the generated environment files before using their integrations.
+
+Use \`{{packageManager}} run build\` for the workspace production build and \`{{packageManager}} run check-types\` for generated package type checks. Start uses Vite and its native server-route handlers, not Next.js request adapters.
+
+- Every module contributes explicit locale-prefixed file routes under \`apps/web/src/routes/\`.
+- \`apps/web/src/lib/product-data.ts\` defines GET-only server functions that forward the caller's request headers to the shared native service dispatcher. Private loaders and API handlers independently enforce authentication and authorization.
+- \`apps/web/src/routes/api.$.ts\` forwards original WHATWG requests to \`apps/web/src/lib/product-api.ts\`. Module handlers live under \`apps/web/src/lib/native/\`; mutations validate the configured Origin, while payment webhooks delegate signature verification to the provider.
+- \`/api/product/*\` supplies typed page data and protected administration operations. Auth, storage, AI, blog, affiliate and payment retain their documented \`/api/<module>/*\` URLs.
+- Auth forms, captcha, file manager, AI studio, Markdown and blog editor use the same React source templates as Next.js. Only navigation effects are supplied by \`apps/web/src/lib/product-navigation.ts\`.
+{{/if}}
 
 ## Domain events
 
@@ -28254,7 +29564,7 @@ Handlers run in order and an error rejects \`emit\`, so a failed side effect sur
 
 ## Removing a module
 
-Delete its package under \`packages/\`, its pages under \`apps/web/src/app/[lang]/\`, its entries in \`config/navigation.ts\` and \`services.ts\`, and its integration files. Nothing else references it.
+Remove its package, framework-owned routes and components, navigation and service entries, integrations and dependent schema together. Review the resolved module graph first: other selected modules may require it.
 `],
   ["modules/core/files/packages/events/src/index.ts", `/**
  * Domain events shared between feature modules.
@@ -28366,6 +29676,77 @@ export function createEventBus(): EventBus {
     rights: "© {year} {name}。保留所有权利。",
   },
 };
+`],
+  ["modules/core/frameworks/native/apps/web/src/lib/product-api.ts.hbs", `import { z } from "zod";
+{{#if (includes product.features "auth")}}
+import { auth } from "@{{projectName}}/app-services";
+import { enabledSocialProviders } from "./social-providers.server";
+{{/if}}
+{{#if (or (includes product.features "auth") (includes product.features "seo"))}}
+import { ENV } from "@/env.server";
+{{/if}}
+{{#each product.features}}
+{{#if (or (eq this "storage") (eq this "ai") (eq this "blog") (eq this "affiliate") (eq this "payment") (eq this "credits") (eq this "admin") (eq this "captcha") (eq this "seo"))}}
+import { handle as handle_{{this}} } from "./native/{{this}}";
+{{/if}}
+{{/each}}
+
+export const privateHeaders = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" };
+export function json<T>(data: T, status = 200) { return Response.json(data, { status, headers: privateHeaders }); }
+export class HttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
+export function pageOf(request: Request) { return z.coerce.number().int().min(1).max(100000).parse(new URL(request.url).searchParams.get("page") ?? 1); }
+{{#if (includes product.features "auth")}}
+export function requireOrigin(request: Request) {
+  if (request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new HttpError(403, "forbidden");
+}
+export async function requireSession(request: Request) {
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) throw new HttpError(401, "unauthorized");
+  return session;
+}
+export async function requireAdministrator(request: Request) {
+  const session = await requireSession(request);
+  if (!session.user.role?.split(",").includes("admin")) throw new HttpError(403, "forbidden");
+  return session;
+}
+{{/if}}
+/** The request body is bounded before parsing; callers still validate their exact input schema. */
+export async function readJson(request: Request): Promise<unknown> {
+  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new HttpError(400, "invalid_input");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = []; let size = 0;
+  try { while (true) { const part = await reader.read(); if (part.done) break; size += part.value.byteLength; if (size > 40000) { await reader.cancel(); throw new HttpError(413, "too_large"); } chunks.push(part.value); } }
+  finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size); let offset = 0;
+  for (const part of chunks) { bytes.set(part, offset); offset += part.byteLength; }
+  try { return JSON.parse(new TextDecoder().decode(bytes)) as unknown; } catch { throw new HttpError(400, "invalid_input"); }
+}
+
+/** Shared native service boundary. Framework adapters must forward original headers and body. */
+export async function handleProductRequest(request: Request): Promise<Response> {
+  const path = new URL(request.url).pathname.replace(/\\/$/, "");
+  try {
+{{#if (includes product.features "auth")}}
+    if (path.startsWith("/api/auth/")) return auth.handler(request);
+    if (path === "/api/product/config" && request.method === "GET") return json({ socialProviders: enabledSocialProviders(), siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}ENV.BETTER_AUTH_URL{{/if}}, verifyEmail: {{#if (includes product.features "email")}}true{{else}}false{{/if}}, canResetPassword: {{#if (includes product.features "email")}}true{{else}}false{{/if}} });
+    if (path === "/api/product/session" && request.method === "GET") return json(await auth.api.getSession({ headers: request.headers }));
+{{/if}}
+{{#unless (includes product.features "auth")}}
+    if (path === "/api/product/config" && request.method === "GET") return json({ socialProviders: [], siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}new URL(request.url).origin{{/if}}, verifyEmail: false, canResetPassword: false });
+{{/unless}}
+{{#each product.features}}
+{{#if (or (eq this "storage") (eq this "ai") (eq this "blog") (eq this "affiliate") (eq this "payment") (eq this "credits") (eq this "admin") (eq this "captcha") (eq this "seo"))}}
+    { const response = await handle_{{this}}(request, path); if (response) return response; }
+{{/if}}
+{{/each}}
+    return json({ error: "not_found" }, 404);
+  } catch (error) {
+    if (error instanceof HttpError) return json({ error: error.message }, error.status);
+    if (error instanceof z.ZodError) return json({ error: "invalid_input" }, 400);
+    console.error("Product request failed");
+    return json({ error: "server_error" }, 500);
+  }
+}
 `],
   ["modules/core/frameworks/next/apps/web/src/app/[lang]/layout.tsx.hbs", `import { getMessages, locales } from "@{{projectName}}/i18n";
 import type { Metadata } from "next";
@@ -28618,16 +29999,346 @@ export default function SiteHeader() {
   );
 }
 `],
-  ["modules/core/frameworks/next/apps/web/src/config/site.ts.hbs", `export const site = {
-  name: "{{projectName}}",
-};
-`],
   ["modules/core/frameworks/next/apps/web/src/lib/page-metadata.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
 import type { Metadata } from "next";
 
 export function pageMetadata(input: { locale: Locale; path: \`/\${string}\`; title: string; description: string }): Metadata {
   return { title: input.title, description: input.description };
 }
+`],
+  ["modules/core/frameworks/next/apps/web/src/lib/product-navigation.ts", `"use client";
+
+import { useRouter } from "next/navigation";
+
+/** Framework adapter consumed by shared product React components. */
+export function useProductNavigation() {
+  const router = useRouter();
+  return {
+    navigate: (href: string) => window.location.assign(href),
+    refresh: () => router.refresh(),
+  };
+}
+`],
+  ["modules/core/frameworks/nuxt/apps/web/app/app.vue.hbs", `<template>
+  <NuxtRouteAnnouncer />
+  <NuxtLoadingIndicator />
+  <NuxtLayout><NuxtPage :key="$route.path" /></NuxtLayout>
+</template>
+`],
+  ["modules/core/frameworks/nuxt/apps/web/app/composables/useProductAction.ts.hbs", `import { z } from "zod";
+
+export function useProductAction() {
+  const pending = ref(false);
+  const error = ref("");
+  const notice = ref("");
+  async function run(action: () => Promise<void>) {
+    if (pending.value) return;
+    pending.value = true; error.value = ""; notice.value = "";
+    try { await action(); }
+    catch (cause) { error.value = cause instanceof Error ? cause.message : "Request failed"; }
+    finally { pending.value = false; }
+  }
+  return { pending, error, notice, run };
+}
+
+const apiError = z.object({ error: z.string().optional(), message: z.string().optional(), code: z.string().optional() });
+export function productRequest<T>(url: string, options: RequestInit, schema: z.ZodType<T>): Promise<T>;
+export function productRequest(url: string, options?: RequestInit): Promise<void>;
+export async function productRequest<T = void>(url: string, options: RequestInit = {}, schema?: z.ZodType<T>): Promise<T | undefined> {
+  const response = await fetch(url, { credentials: "same-origin", ...options });
+  if (response.status === 204) return schema ? schema.parse(undefined) : undefined;
+  const value = await response.json();
+  if (!response.ok) {
+    const error = apiError.safeParse(value);
+    throw new Error(error.success ? error.data.message ?? error.data.error ?? error.data.code ?? \`Request failed (\${response.status})\` : \`Request failed (\${response.status})\`);
+  }
+  return schema?.parse(value);
+}
+
+export function productJson<T>(body: T): RequestInit {
+  return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+}
+`],
+  ["modules/core/frameworks/nuxt/apps/web/app/composables/useProductLocale.ts.hbs", `import { createTranslator, defaultLocale, getMessages, isLocale, localeNames, locales, type Locale } from "@{{projectName}}/i18n";
+
+export function useProductLocale() {
+  const route = useRoute();
+  const locale = computed<Locale>(() => isLocale(String(route.params.locale ?? "")) ? String(route.params.locale) as Locale : defaultLocale);
+  const t = computed(() => createTranslator(getMessages(locale.value)));
+  const path = (suffix = "") => \`/\${locale.value}\${suffix ? \`/\${suffix.replace(/^\\//, "")}\` : ""}\`;
+  const label = (english: string, chinese: string) => locale.value === "zh-CN" ? chinese : english;
+  return { locale, locales, localeNames, t: (key: Parameters<typeof t.value>[0], params?: Parameters<typeof t.value>[1]) => t.value(key, params), path, label };
+}
+`],
+  ["modules/core/frameworks/nuxt/apps/web/app/layouts/default.vue.hbs", `<script setup lang="ts">
+import { LOCALE_COOKIE } from "@{{projectName}}/i18n";
+import { canSee, navigation } from "@/config/navigation";
+const { locale, locales, localeNames, path, label, t } = useProductLocale();
+const route = useRoute();
+const theme = useCookie<"light" | "dark">("theme", { default: () => "light", sameSite: "lax" });
+useHead(() => ({ htmlAttrs: { lang: locale.value, class: theme.value } }));
+const localeCookie = useCookie(LOCALE_COOKIE, { sameSite: "lax" });
+async function changeLocale(event: Event) {
+  const value = (event.target as HTMLSelectElement).value;
+  localeCookie.value = value;
+  await navigateTo(\`/\${value}\${route.path.replace(/^\\/[^/]+/, "")}\`);
+}
+{{#if (includes product.features "auth")}}
+const { data: session } = await useFetch<{ user: { id: string; name: string; role?: string | null } } | null>("/api/product/session", { key: "product-session" });
+async function signOut() {
+  await productRequest("/api/auth/sign-out", productJson({}));
+  session.value = null;
+  await navigateTo(path("login"));
+}
+{{/if}}
+const mainNavigation = computed(() => navigation.main.filter((item) => canSee(item, {{#if (includes product.features "auth")}}session.value?.user{{else}}null{{/if}})));
+</script>
+
+<template>
+  <a class="skip-link" href="#main">\\{{ label('Skip to content', '跳到内容') }}</a>
+  <header class="site-header">
+    <NuxtLink class="wordmark" :to="path()">{{projectName}}</NuxtLink>
+    <nav :aria-label="label('Main navigation', '主导航')">
+      <NuxtLink v-for="item in mainNavigation" :key="item.href" :to="path(item.href)">\\{{ t(item.labelKey) }}</NuxtLink>
+      {{#if (includes product.features "auth")}}
+      <button v-if="session" class="text-button" @click="signOut">\\{{ label('Sign out', '退出') }}</button>
+      <NuxtLink v-else :to="path('login')">\\{{ label('Sign in', '登录') }}</NuxtLink>
+      {{/if}}
+      <select :value="locale" :aria-label="label('Language', '语言')" @change="changeLocale"><option v-for="code in locales" :key="code" :value="code">\\{{ localeNames[code] }}</option></select>
+      <button class="text-button" :aria-label="label('Toggle theme', '切换主题')" @click="theme = theme === 'dark' ? 'light' : 'dark'">\\{{ theme === 'dark' ? label('Light', '浅色') : label('Dark', '深色') }}</button>
+    </nav>
+  </header>
+  <main id="main" tabindex="-1"><slot /></main>
+  <footer class="site-footer">{{projectName}} <span>\\{{ label('Built for your next chapter.', '为你的下一篇章而构建。') }}</span></footer>
+</template>
+
+<style>
+:root{font-family:Georgia,'Noto Serif',serif;color:#202b29;background:#f6f5ef;font-synthesis:none;--paper:#fffefa;--line:#ccd2c9;--ink:#202b29;--muted:#57675f;--accent:#176047}html.dark{color:#e9eee6;background:#14221d;--paper:#1b2d25;--line:#3d5548;--ink:#e9eee6;--muted:#aebfb2;--accent:#8bdaaa}*{box-sizing:border-box}body{margin:0}a{color:inherit;text-underline-offset:4px}button,input,textarea,select{font:inherit}button,.button{cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--paper);padding:.65rem 1rem;border-radius:4px;text-decoration:none;display:inline-block}button:disabled{opacity:.5;cursor:not-allowed}.text-button{background:transparent;color:var(--ink);border-color:var(--line)}input,textarea,select{background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:.65rem;border-radius:3px;max-width:100%}label{display:grid;gap:.4rem}form{display:grid;gap:1rem}textarea{min-height:8rem}h1,h2,h3{font-weight:500;letter-spacing:-.025em}h1{font-size:clamp(2rem,5vw,4rem);line-height:1.05}h2{font-size:1.65rem}p{line-height:1.65}pre{white-space:pre-wrap;overflow-wrap:anywhere}small,.muted{color:var(--muted)}.site-header,.site-footer{display:flex;align-items:center;justify-content:space-between;gap:2rem;max-width:1280px;margin:auto;padding:1.5rem 2rem}.site-header{border-bottom:1px solid var(--line)}.site-header nav{display:flex;align-items:center;flex-wrap:wrap;gap:1.1rem;font-size:.9rem}.wordmark{font-size:1.4rem;font-weight:700;text-decoration:none}main{max-width:1200px;margin:auto;padding:3rem 2rem;min-height:70vh}.site-footer{border-top:1px solid var(--line);font-size:.85rem}.site-footer span{color:var(--muted)}.skip-link{position:fixed;top:-80px;left:1rem;background:var(--paper);padding:1rem;z-index:100}.skip-link:focus{top:1rem}.panel{background:var(--paper);border:1px solid var(--line);padding:1.5rem;border-radius:5px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:1.5rem}.stack{display:grid;gap:1.5rem}.actions{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}.error{color:#b83d37;border-left:3px solid currentColor;padding:.6rem}.notice{color:var(--accent)}.workspace{display:grid;grid-template-columns:185px minmax(0,1fr);gap:2rem}.workspace-nav{display:flex;flex-direction:column;gap:.8rem}.workspace-nav a{padding:.5rem;text-decoration:none}.workspace-nav .router-link-exact-active{border-left:3px solid var(--accent);background:var(--paper)}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{text-align:left;border-bottom:1px solid var(--line);padding:.8rem;vertical-align:top}.prose{max-width:760px;margin:auto;overflow-wrap:anywhere}.prose img,.media{max-width:100%;height:auto}.hero{padding:4rem 0;max-width:850px}.hero p{font-size:1.3rem;max-width:650px}.eyebrow{text-transform:uppercase;letter-spacing:.18em;font: .75rem ui-monospace,monospace;color:var(--muted)}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}@media(max-width:700px){.site-header{align-items:flex-start;flex-direction:column;gap:1rem}.site-header,main,.site-footer{padding:1.3rem}.workspace{grid-template-columns:1fr}.workspace-nav{flex-direction:row;flex-wrap:wrap}.site-footer{align-items:flex-start;flex-direction:column;gap:.5rem}}
+</style>
+`],
+  ["modules/core/frameworks/nuxt/apps/web/app/pages/[locale]/[...path].vue.hbs", `<script setup lang="ts">
+import { {{#if (includes product.features "seo")}}defaultLocale, {{/if}}isLocale } from "@{{projectName}}/i18n";
+definePageMeta({ key: (route) => route.fullPath });
+const route = useRoute();
+const { label, path } = useProductLocale();
+if (!isLocale(String(route.params.locale))) throw createError({ statusCode: 404, statusMessage: "Unknown locale" });
+const segments = Array.isArray(route.params.path) ? route.params.path : String(route.params.path ?? "").split("/").filter(Boolean);
+const section = segments[0] ?? "";
+const allowed = [""{{#if (includes product.features "auth")}}, "login", "signup", "dashboard"{{/if}}{{#if (and (includes product.features "auth") (includes product.features "email"))}}, "forgot-password", "reset-password", "verify-email"{{/if}}{{#if (includes product.features "admin")}}, "admin"{{/if}}{{#if (includes product.features "payment")}}, "pricing", "payment"{{/if}}{{#if (includes product.features "blog")}}, "blog"{{/if}}{{#if (includes product.features "affiliate")}}, "ref"{{/if}}];
+if (!allowed.includes(section)) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+const depth = section === "admin" && segments[1] === "blog" ? 3 : ["dashboard", "admin", "blog", "payment", "ref"].includes(section) ? 2 : {{#if (includes product.features "sms")}}section === "login" && segments[1] === "phone" ? 2 : {{/if}}1;
+if (segments.length > depth || (["payment", "ref"].includes(section) && !segments[1])) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+{{#if (includes product.features "auth")}}
+const { data: session } = await useFetch<{ user: { id: string; name: string; email: string; role?: string | null; emailVerified: boolean } } | null>("/api/product/session", { key: "product-session" });
+if (["dashboard", "admin", "payment"].includes(section) && !session.value) await navigateTo(\`\${path("login")}?next=\${encodeURIComponent(route.fullPath)}\`, { replace: true });
+if (section === "admin" && session.value && session.value.user.role !== "admin") throw createError({ statusCode: 403, statusMessage: "Forbidden" });
+{{/if}}
+const privatePage = ["dashboard", "admin", "payment", "login", "signup", "forgot-password", "reset-password", "verify-email", "ref"].includes(section);
+useSeoMeta({ title: \`\${section ? section.charAt(0).toUpperCase() + section.slice(1) : "{{projectName}}"} · {{projectName}}\`, robots: privatePage ? "noindex, nofollow" : "index, follow" });
+{{#if (includes product.features "seo")}}
+const { data: config } = await useFetch<{ siteUrl: string }>("/api/product/config");
+const { locale, locales } = useProductLocale();
+const description = section === "pricing" ? label("Choose a plan for your workspace.", "选择适合你的工作空间的方案。") : label("Bring your ideas, work and account together.", "连接你的创意、工作和账户。");
+useSeoMeta({ description, ogTitle: "{{projectName}}", ogDescription: description, ogType: "website", ogLocale: locale.value.replaceAll("-", "_"), ogUrl: () => privatePage || !config.value ? undefined : \`\${config.value.siteUrl}\${route.path}\`, twitterCard: "summary", twitterTitle: "{{projectName}}", twitterDescription: description });
+useHead(() => ({ link: privatePage || !config.value?.siteUrl || section === "blog" && segments[1] ? [] : [
+  { rel: "canonical" as const, href: \`\${config.value.siteUrl}\${route.path}\` },
+  ...locales.map((code) => ({ rel: "alternate" as const, hreflang: code, href: \`\${config.value!.siteUrl}/\${code}\${route.path.replace(/^\\/[^/]+/, "")}\` })),
+  { rel: "alternate" as const, hreflang: "x-default", href: \`\${config.value.siteUrl}/\${defaultLocale}\${route.path.replace(/^\\/[^/]+/, "")}\` },
+] }));
+{{/if}}
+</script>
+
+<template>
+  <section v-if="!section" class="hero">
+    <p class="eyebrow">{{projectName}}</p>
+    <h1>\\{{ label('A space for what comes next.', '为下一步，留出空间。') }}</h1>
+    <p>\\{{ label('Bring your ideas, your work, and your account together in one carefully built workspace.', '在精心构建的工作空间中，连接你的创意、工作和账户。') }}</p>
+    <div class="actions">
+      {{#if (includes product.features "auth")}}<NuxtLink class="button" :to="path(session ? 'dashboard' : 'signup')">\\{{ label('Open your workspace', '开启你的工作空间') }}</NuxtLink>{{/if}}
+      {{#if (includes product.features "payment")}}<NuxtLink :to="path('pricing')">\\{{ label('Explore plans', '查看方案') }}</NuxtLink>{{/if}}
+      {{#if (includes product.features "blog")}}<NuxtLink :to="path('blog')">\\{{ label('Read the journal', '阅读博客') }}</NuxtLink>{{/if}}
+    </div>
+  </section>
+  {{#if (includes product.features "auth")}}
+  <ProductAuth v-else-if="['login', 'signup', 'forgot-password', 'reset-password', 'verify-email'].includes(section)" :mode="section" />
+  <ProductWorkspace v-else-if="section === 'dashboard' && session" :section="segments[1] ?? ''" :user="session.user" />
+  {{/if}}
+  {{#if (includes product.features "admin")}}<ProductAdmin v-else-if="section === 'admin'" :section="segments[1] ?? ''" :id="segments[2]" />{{/if}}
+  {{#if (includes product.features "payment")}}<ProductPayment v-else-if="section === 'pricing' || section === 'payment'" :order-id="section === 'payment' ? segments[1] : undefined" />{{/if}}
+  {{#if (includes product.features "blog")}}<ProductBlog v-else-if="section === 'blog'" :slug="segments[1]" />{{/if}}
+  {{#if (includes product.features "affiliate")}}<ProductReferral v-else-if="section === 'ref'" :code="segments[1] ?? ''" />{{/if}}
+</template>
+`],
+  ["modules/core/frameworks/nuxt/apps/web/app/pages/index.vue.hbs", `<script setup lang="ts">
+import { defaultLocale, isLocale, LOCALE_COOKIE, matchLocale } from "@{{projectName}}/i18n";
+const cookie = useCookie(LOCALE_COOKIE);
+const headers = useRequestHeaders(["accept-language"]);
+await navigateTo(\`/\${isLocale(cookie.value ?? undefined) ? cookie.value : matchLocale(headers["accept-language"]) ?? defaultLocale}\`, { redirectCode: 302, replace: true });
+</script>
+<template><span /></template>
+`],
+  ["modules/core/frameworks/nuxt/apps/web/server/api/[...path].ts.hbs", `import { defineEventHandler, toWebRequest } from "h3";
+import { handleProductRequest } from "@/lib/product-api";
+
+export default defineEventHandler((event) => handleProductRequest(toWebRequest(event)));
+`],
+  ["modules/core/frameworks/nuxt/apps/web/server/middleware/product-private.ts.hbs", `import { defineEventHandler, getRequestURL, setHeader } from "h3";
+
+export default defineEventHandler((event) => {
+  if (/^\\/[^/]+\\/(?:dashboard|admin|payment|login|signup|forgot-password|reset-password|verify-email|ref)(?:\\/|$)/.test(getRequestURL(event).pathname)) {
+    setHeader(event, "Cache-Control", "private, no-store");
+    setHeader(event, "X-Robots-Tag", "noindex, nofollow");
+  }
+});
+`],
+  ["modules/core/frameworks/tanstack-start/apps/web/src/components/product-shell.tsx.hbs", `import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
+import { useLocation } from "@tanstack/react-router";
+import { locales } from "@{{projectName}}/i18n";
+import { canSee, navigation{{#if (includes product.features "auth")}}, type NavUser{{/if}} } from "@/config/navigation";
+import { useLocale, useT } from "./i18n-provider";
+{{#if (includes product.features "auth")}}
+import { authClient } from "@/lib/auth-client";
+{{/if}}
+export function ProductShell({ children{{#if (includes product.features "auth")}}, initialUser{{/if}} }: { children: React.ReactNode{{#if (includes product.features "auth")}}; initialUser: NavUser | null{{/if}} }) {
+  const locale = useLocale(); const t = useT(); const location = useLocation();
+  const { resolvedTheme, setTheme } = useTheme(); const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); document.documentElement.lang = locale; }, [locale]);
+{{#if (includes product.features "auth")}}
+  const { data: session, isPending } = authClient.useSession();
+  const user = isPending ? initialUser : session?.user;
+{{else}}
+  const user = null;
+{{/if}}
+  const area = location.pathname.includes("/admin") ? "admin" : location.pathname.includes("/dashboard") ? "dashboard" : null;
+  return <div className="min-h-screen bg-background text-foreground"><a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4">Skip to content</a><header className="border-b"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-6 px-6 py-5"><a href={\`/\${locale}\`} className="mr-auto font-serif text-2xl font-semibold tracking-tight">{{projectName}}</a><nav aria-label="Main" className="flex gap-5 text-sm">{navigation.main.filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={\`/\${locale}\${item.href === "/" ? "" : item.href}\`} aria-current={location.pathname === \`/\${locale}\${item.href}\` ? "page" : undefined}>{t(item.labelKey)}</a>)}</nav><label className="sr-only" htmlFor="locale">Language</label><select id="locale" aria-label="Language" value={locale} className="border bg-background p-2 text-xs" onChange={(event) => window.location.assign(\`/\${event.target.value}\${location.pathname.slice(locale.length + 1)}\${location.searchStr}\`)}>{locales.map((lang) => <option key={lang} value={lang}>{lang === "en" ? "English" : "简体中文"}</option>)}</select><button type="button" className="border px-3 py-2 text-xs" aria-label="Toggle color theme" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>{mounted && resolvedTheme === "dark" ? "Light" : "Dark"}</button>{{#if (includes product.features "auth")}}{user ? <button className="text-sm underline" onClick={() => void authClient.signOut().then(() => window.location.assign(\`/\${locale}\`))}>{t("auth.user.signOut")}</button> : <a href={\`/\${locale}/login\`} className="text-sm underline">{t("auth.user.signIn")}</a>}{{/if}}</div></header><div className={area ? "mx-auto grid max-w-7xl gap-10 px-6 py-12 md:grid-cols-[180px_1fr]" : ""}>{area && <aside><nav aria-label={area} className="flex flex-wrap gap-4 md:flex-col">{navigation[area].filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={\`/\${locale}\${item.href}\`} className={\`border-l-2 py-2 pl-4 text-sm \${location.pathname === \`/\${locale}\${item.href}\` ? "border-foreground font-semibold" : "border-transparent text-muted-foreground"}\`}>{t(item.labelKey)}</a>)}</nav></aside>}<main id="main-content" className="min-w-0">{children}</main></div><footer className="mx-auto mt-16 max-w-7xl border-t px-6 py-8 text-xs text-muted-foreground">{t("core.footer.rights", { year: new Date().getFullYear(), name: "{{projectName}}" })}</footer></div>;
+}
+`],
+  ["modules/core/frameworks/tanstack-start/apps/web/src/lib/product-data.ts.hbs", `import { createServerFn } from "@tanstack/react-start";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { notFound, redirect } from "@tanstack/react-router";
+import { z } from "zod";
+import { isLocale } from "@{{projectName}}/i18n";
+import { handleProductRequest } from "./product-api";
+
+/** GET-only bridge keeps service imports on the server and forwards the real caller's cookies. */
+export const productResponse = createServerFn({ method: "GET" })
+  .validator(z.object({ path: z.string().regex(/^\\/api\\/(?:product|blog|ai)(?:\\/|\\?|$)/), locale: z.string().refine(isLocale) }))
+  .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "no-store");
+    const incoming = getRequest();
+    const response = await handleProductRequest(new Request(new URL(data.path, incoming.url), { headers: incoming.headers }));
+    if (response.status === 401) throw redirect({ href: \`/\${data.locale}/login\` });
+    if (response.status === 403 || response.status === 404) throw notFound();
+    if (!response.ok) throw new Error(\`Request failed (\${response.status})\`);
+    return response.text();
+  });
+
+export async function loadProduct<T>(path: string, locale: string, schema: z.ZodType<T>): Promise<T> {
+  const text = await productResponse({ data: { path, locale } });
+  return schema.parse(JSON.parse(text));
+}
+
+export async function mutateProduct(path: string, input: object) {
+  const response = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+  if (!response.ok) throw new Error((await response.text()) || \`Request failed (\${response.status})\`);
+  return response;
+}
+`],
+  ["modules/core/frameworks/tanstack-start/apps/web/src/lib/product-head.ts.hbs", `import { defaultLocale, locales } from "@{{projectName}}/i18n";
+/** Translate the shared public URL policy into TanStack Router head entries. */
+export function productHead(input: { siteUrl: string; locale: string; path: string; title: string; description: string; page?: number }) {
+  const suffix = input.path === "/" ? "" : input.path;
+  const query = input.page && input.page > 1 ? \`?page=\${input.page}\` : "";
+  const canonical = new URL(\`/\${input.locale}\${suffix}\${query}\`, input.siteUrl).href;
+  return {
+    meta: [{ title: input.title }, { name: "description", content: input.description }, { property: "og:title", content: input.title }, { property: "og:description", content: input.description }, { property: "og:url", content: canonical }, { property: "og:type", content: "website" }, { property: "og:locale", content: input.locale.replaceAll("-", "_") }, { name: "twitter:card", content: "summary" }, { name: "twitter:title", content: input.title }, { name: "twitter:description", content: input.description }],
+    links: [{ rel: "canonical", href: canonical }, ...locales.map((locale) => ({ rel: "alternate", hrefLang: locale, href: new URL(\`/\${locale}\${suffix}\${query}\`, input.siteUrl).href })), { rel: "alternate", hrefLang: "x-default", href: new URL(\`/\${defaultLocale}\${suffix}\${query}\`, input.siteUrl).href }],
+  };
+}
+`],
+  ["modules/core/frameworks/tanstack-start/apps/web/src/lib/product-navigation.ts", `import { useRouter } from "@tanstack/react-router";
+/** Navigation effects shared UI delegates to the hosting framework. */
+export function useProductNavigation() {
+  const router = useRouter();
+  return {
+    navigate: (href: string) => {
+      void router.navigate({ href });
+    },
+    refresh: () => {
+      void router.invalidate();
+    },
+  };
+}
+`],
+  ["modules/core/frameworks/tanstack-start/apps/web/src/routes/__root.tsx.hbs", `import { HeadContent, Outlet, Scripts, createRootRoute, useLocation } from "@tanstack/react-router";
+import { ThemeProvider } from "next-themes";
+import { Toaster } from "@{{projectName}}/ui/components/sonner";
+import { defaultLocale, isLocale } from "@{{projectName}}/i18n";
+import appCss from "../index.css?url";
+export const Route = createRootRoute({ head: () => ({ meta: [{ charSet: "utf-8" }, { name: "viewport", content: "width=device-width, initial-scale=1" }, { title: "{{projectName}}" }], links: [{ rel: "stylesheet", href: appCss }] }), component: RootDocument, notFoundComponent: () => <main className="mx-auto max-w-3xl px-6 py-24"><h1 className="font-serif text-4xl">Not found</h1><a href="/" className="mt-6 inline-block underline">Home</a></main> });
+function RootDocument() { const segment = useLocation().pathname.split("/")[1] ?? ""; const locale = isLocale(segment) ? segment : defaultLocale; return <html lang={locale} suppressHydrationWarning><head><HeadContent /></head><body><ThemeProvider attribute="class" defaultTheme="system" enableSystem><Outlet /><Toaster richColors /></ThemeProvider><Scripts /></body></html>; }
+`],
+  ["modules/core/frameworks/tanstack-start/apps/web/src/routes/$lang.index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { createTranslator, getMessages, isLocale } from "@{{projectName}}/i18n";
+import { z } from "zod";
+import { {{#if (includes product.features "auth")}}useLocale, {{/if}}useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { productHead } from "@/lib/product-head";
+export const Route = createFileRoute("/$lang/")({
+  loader: ({ params }) => loadProduct("/api/product/config", params.lang, z.object({ siteUrl: z.string().url() })),
+  head: ({ params, loaderData }) => {
+    if (!loaderData || !isLocale(params.lang)) return {};
+    const t = createTranslator(getMessages(params.lang));
+    return productHead({ siteUrl: loaderData.siteUrl, locale: params.lang, path: "/", title: t("core.landing.title"), description: t("core.site.description") });
+  }, component: Home,
+});
+function Home() { {{#if (includes product.features "auth")}}const locale = useLocale(); {{/if}}const t = useT(); return <section className="mx-auto max-w-5xl px-6 py-24"><p className="mb-8 text-xs uppercase tracking-[0.3em]">{{projectName}}</p><h1 className="max-w-3xl font-serif text-6xl leading-tight tracking-tight">{t("core.landing.title")}</h1><p className="mt-8 max-w-xl text-lg leading-relaxed text-muted-foreground">{t("core.landing.subtitle")}</p>{{#if (includes product.features "auth")}}<a href={\`/\${locale}/dashboard\`} className="mt-10 inline-block border bg-foreground px-6 py-3 text-background">{t("core.landing.cta")}</a>{{else}}<p className="mt-10 border-t pt-8">{t("core.landing.features.modular.body")}</p>{{/if}}</section>; }
+`],
+  ["modules/core/frameworks/tanstack-start/apps/web/src/routes/$lang.tsx.hbs", `import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
+import { getMessages, isLocale } from "@{{projectName}}/i18n";
+import { I18nProvider } from "@/components/i18n-provider";
+import { ProductShell } from "@/components/product-shell";
+{{#if (includes product.features "auth")}}
+import { loadProduct } from "@/lib/product-data";
+import { sessionSchema } from "@/lib/auth-data";
+{{/if}}
+export const Route = createFileRoute("/$lang")({
+  beforeLoad: ({ params }) => { if (!isLocale(params.lang)) throw notFound(); return { locale: params.lang }; },
+{{#if (includes product.features "auth")}}
+  loader: ({ params }) => loadProduct("/api/product/session", params.lang, sessionSchema),
+{{/if}}
+  component: LocaleLayout,
+});
+function LocaleLayout() {
+  const { locale } = Route.useRouteContext();
+{{#if (includes product.features "auth")}}
+  const session = Route.useLoaderData();
+{{/if}}
+  return <I18nProvider locale={locale} messages={getMessages(locale)}><ProductShell{{#if (includes product.features "auth")}} initialUser={session?.user ?? null}{{/if}}><Outlet /></ProductShell></I18nProvider>;
+}
+`],
+  ["modules/core/frameworks/tanstack-start/apps/web/src/routes/api.$.ts", `import { createFileRoute } from "@tanstack/react-router";
+
+import { handleProductRequest } from "@/lib/product-api";
+
+const handler = ({ request }: { request: Request }) => handleProductRequest(request);
+export const Route = createFileRoute("/api/$")({
+  server: {
+    handlers: {
+      GET: handler,
+      POST: handler,
+      PUT: handler,
+      PATCH: handler,
+      DELETE: handler,
+      OPTIONS: handler,
+    },
+  },
+});
+`],
+  ["modules/core/frameworks/tanstack-start/apps/web/src/routes/index.tsx.hbs", `import { createFileRoute, redirect } from "@tanstack/react-router";
+import { defaultLocale } from "@{{projectName}}/i18n";
+export const Route = createFileRoute("/")({ beforeLoad: () => { throw redirect({ href: \`/\${defaultLocale}\` }); } });
 `],
   ["modules/credits/dialects/postgres/packages/db/src/schema/credits.ts", `import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
@@ -29071,6 +30782,36 @@ export type Credits = ReturnType<typeof createCredits>;
   },
 } as const;
 `],
+  ["modules/credits/frameworks/native/apps/web/src/lib/native/credits.ts.hbs", `import { credits } from "@{{projectName}}/app-services";
+import { json, requireSession } from "../product-api";
+{{#if (includes product.features "admin")}}
+import { auth } from "@{{projectName}}/app-services";
+import { InsufficientCreditsError } from "@{{projectName}}/credits";
+import { z } from "zod";
+import { HttpError, pageOf, readJson, requireAdministrator, requireOrigin } from "../product-api";
+{{/if}}
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path === "/api/product/credits" && request.method === "GET") {
+    const { user } = await requireSession(request);
+    return json({ balance: await credits.getBalance(user.id), transactions: await credits.listTransactions(user.id) });
+  }
+{{#if (includes product.features "admin")}}
+  if (path !== "/api/product/credit-transactions") return;
+  const { user } = await requireAdministrator(request);
+  if (request.method === "GET") return json(await credits.listAllTransactions({ limit: 20, offset: (pageOf(request) - 1) * 20 }));
+  if (request.method === "POST") {
+    requireOrigin(request);
+    const data = z.object({ email: z.string().email().transform((value) => value.trim().toLowerCase()), amount: z.number().int().safe().refine((value) => value !== 0), reason: z.string().max(1000).default("") }).strict().parse(await readJson(request));
+    const { users } = await auth.api.listUsers({ headers: request.headers, query: { filterField: "email", filterValue: data.email, filterOperator: "eq", limit: 1 } });
+    if (!users[0]) throw new HttpError(404, "user_not_found");
+    try { await credits.adjust(users[0].id, data.amount, data.reason ? \`\${data.reason} (\${user.email})\` : user.email); }
+    catch (error) { if (error instanceof InsufficientCreditsError) throw new HttpError(409, "insufficient_credits"); throw error; }
+    return json({ success: true });
+  }
+  return json({ error: "method_not_allowed" }, 405);
+{{/if}}
+}
+`],
   ["modules/credits/frameworks/next/apps/web/src/app/[lang]/dashboard/credits/page.tsx.hbs", `import { credits } from "@{{projectName}}/app-services";
 {{#if (includes product.features "payment")}}
 import { buttonVariants } from "@{{projectName}}/ui/components/button";
@@ -29143,7 +30884,47 @@ export default async function CreditsPage({ params }: Props) {
   );
 }
 `],
-  ["modules/credits/integrations/admin/apps/web/src/app/[lang]/admin/credits/actions.ts.hbs", `"use server";
+  ["modules/credits/frameworks/nuxt/apps/web/app/components/ProductAdminCredits.vue.hbs", `<script setup lang="ts">
+const { label } = useProductLocale();
+const { pending, error, notice, run } = useProductAction();
+const page = ref(1); const email = ref(""); const amount = ref(0); const reason = ref("");
+type Transaction = { id: string; amount: number; balanceAfter: number; reason: string | null; type: string; createdAt: string };
+const { data, error: loadError, refresh } = await useFetch<{ rows: { transaction: Transaction; email: string }[]; total: number }>("/api/product/credit-transactions", { query: { page } });
+async function adjust() {
+  await run(async () => {
+    if (!Number.isSafeInteger(amount.value) || amount.value === 0 || Math.abs(amount.value) > 2147483647) throw new Error(label("Enter a non-zero whole number within the supported range.", "请输入受支持范围内的非零整数。"));
+    await productRequest("/api/product/credit-transactions", productJson({ email: email.value.trim(), amount: amount.value, reason: reason.value.trim() }));
+    amount.value = 0; reason.value = ""; await refresh(); notice.value = label("Credit adjustment recorded.", "积分调整已记录。");
+  });
+}
+</script>
+<template>
+  <p v-if="error || loadError" class="error" role="alert">\\{{ error || loadError?.message }}</p><p v-if="notice" role="status">\\{{ notice }}</p>
+  <form class="panel" @submit.prevent="adjust"><h2>\\{{ label('Adjust account credits', '调整账户积分') }}</h2><label>\\{{ label('Account email', '账户邮箱') }}<input v-model="email" type="email" required /></label><label>\\{{ label('Signed amount (negative deducts)', '调整数量（负数扣除）') }}<input v-model.number="amount" type="number" step="1" min="-2147483647" max="2147483647" required /></label><label>\\{{ label('Reason', '原因') }}<input v-model="reason" required maxlength="500" /></label><button :disabled="pending || !amount || !reason.trim()">\\{{ label('Record adjustment', '记录调整') }}</button></form>
+  <div class="table-wrap"><table><thead><tr><th>\\{{ label('Account', '账户') }}</th><th>\\{{ label('Amount', '数量') }}</th><th>\\{{ label('Balance', '余额') }}</th><th>\\{{ label('Type / reason', '类型 / 原因') }}</th><th>\\{{ label('Date', '日期') }}</th></tr></thead><tbody><tr v-for="row in data?.rows ?? []" :key="row.transaction.id"><td>\\{{ row.email }}</td><td>\\{{ row.transaction.amount }}</td><td>\\{{ row.transaction.balanceAfter }}</td><td>\\{{ row.transaction.type }} · \\{{ row.transaction.reason }}</td><td>\\{{ row.transaction.createdAt.slice(0, 10) }}</td></tr></tbody></table></div>
+  <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\\{{ label('Previous', '上一页') }}</button><span>\\{{ page }} · \\{{ data?.total ?? 0 }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\\{{ label('Next', '下一页') }}</button></nav>
+</template>
+`],
+  ["modules/credits/frameworks/nuxt/apps/web/app/components/ProductCredits.vue.hbs", `<script setup lang="ts">
+const { label, path } = useProductLocale();
+type Transaction = { id: string; amount: number; balanceAfter: number; type: string; reason: string | null; createdAt: string };
+const { data, error, refresh } = await useFetch<{ balance: number; transactions: Transaction[] }>("/api/product/credits");
+</script>
+<template>
+  <p v-if="error" role="alert" class="error">\\{{ error.message }}</p>
+  <div class="panel"><p class="eyebrow">\\{{ label('Available balance', '可用余额') }}</p><h2>\\{{ data?.balance ?? 0 }} \\{{ label('credits', '积分') }}</h2><div class="actions"><button class="text-button" @click="refresh()">\\{{ label('Refresh', '刷新') }}</button>{{#if (includes product.features "payment")}}<NuxtLink :to="path('pricing')">\\{{ label('Get more credits', '获取更多积分') }}</NuxtLink>{{/if}}</div></div>
+  <div class="table-wrap"><table><thead><tr><th>\\{{ label('Date', '日期') }}</th><th>\\{{ label('Type', '类型') }}</th><th>\\{{ label('Amount', '金额') }}</th><th>\\{{ label('Balance', '余额') }}</th><th>\\{{ label('Reason', '原因') }}</th></tr></thead><tbody><tr v-for="entry in data?.transactions ?? []" :key="entry.id"><td>\\{{ entry.createdAt.slice(0, 10) }}</td><td>\\{{ entry.type }}</td><td>\\{{ entry.amount > 0 ? '+' : '' }}\\{{ entry.amount }}</td><td>\\{{ entry.balanceAfter }}</td><td>\\{{ entry.reason }}</td></tr></tbody></table><p v-if="!data?.transactions.length">\\{{ label('No transactions yet.', '暂无交易。') }}</p></div>
+</template>
+`],
+  ["modules/credits/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.credits.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+const schema = z.object({ balance: z.number(), transactions: z.array(z.object({ id: z.string(), amount: z.number(), type: z.string(), createdAt: z.string(), reason: z.string().nullish() })) });
+export const Route = createFileRoute("/$lang/dashboard/credits")({ loader: ({ params }) => loadProduct("/api/product/credits", params.lang, schema), component: Credits });
+function Credits() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("credits.page.title")}</h1><div className="border p-6"><p className="text-sm text-muted-foreground">{t("credits.page.balance")}</p><p className="my-4 text-5xl font-semibold tabular-nums">{data.balance}</p>{{#if (includes product.features "payment")}}<a href={\`/\${locale}/pricing\`} className="underline">{t("credits.page.buyMore")}</a>{{/if}}</div><h2 className="text-lg font-medium">{t("credits.page.history")}</h2>{data.transactions.length ? <ul className="divide-y border">{data.transactions.map((row) => <li key={row.id} className="flex justify-between gap-4 p-4"><div><p>{row.type}</p><p className="text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString(locale)} · {row.reason}</p></div><span className="tabular-nums">{new Intl.NumberFormat(locale, { signDisplay: "exceptZero" }).format(row.amount)}</span></li>)}</ul> : <p>{t("credits.page.empty")}</p>}</section>; }
+`],
+  ["modules/credits/integrations/admin/frameworks/next/apps/web/src/app/[lang]/admin/credits/actions.ts.hbs", `"use server";
 
 import { auth, credits } from "@{{projectName}}/app-services";
 import { InsufficientCreditsError } from "@{{projectName}}/credits";
@@ -29180,7 +30961,7 @@ export async function adjustCredits(formData: FormData) {
   redirect(\`\${back}?done=1\`);
 }
 `],
-  ["modules/credits/integrations/admin/apps/web/src/app/[lang]/admin/credits/page.tsx.hbs", `import { credits } from "@{{projectName}}/app-services";
+  ["modules/credits/integrations/admin/frameworks/next/apps/web/src/app/[lang]/admin/credits/page.tsx.hbs", `import { credits } from "@{{projectName}}/app-services";
 import { Button } from "@{{projectName}}/ui/components/button";
 import { Input } from "@{{projectName}}/ui/components/input";
 import type { Metadata } from "next";
@@ -29288,6 +31069,17 @@ export default async function AdminCreditsPage({ params, searchParams }: Props) 
     </div>
   );
 }
+`],
+  ["modules/credits/integrations/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.credits.tsx.hbs", `import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct, mutateProduct } from "@/lib/product-data";
+const schema = z.object({ rows: z.array(z.object({ email: z.string().nullable(), transaction: z.object({ id: z.string(), amount: z.number(), balanceAfter: z.number(), type: z.string(), reason: z.string().nullable(), createdAt: z.string() }) })), total: z.number() });
+export const Route = createFileRoute("/$lang/admin/credits")({ validateSearch: z.object({ page: z.coerce.number().int().min(1).catch(1) }), loaderDeps: ({ search }) => search, loader: ({ params, deps }) => loadProduct(\`/api/product/credit-transactions?page=\${deps.page}\`, params.lang, schema), component: CreditsAdmin });
+function CreditsAdmin() { const data = Route.useLoaderData(); const { page } = Route.useSearch(); const locale = useLocale(); const t = useT(); const router = useRouter(); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
+  async function adjust(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = event.currentTarget; const input = new FormData(form); setBusy(true); setMessage(""); try { await mutateProduct("/api/product/credit-transactions", { email: String(input.get("email")), amount: Number(input.get("amount")), reason: String(input.get("reason") ?? "") }); form.reset(); await router.invalidate(); setMessage(t("credits.admin.done")); } catch { setMessage(t("credits.admin.errors.invalid")); } finally { setBusy(false); } }
+  return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("credits.admin.title")}</h1><form onSubmit={adjust} className="space-y-4 border p-6"><h2 className="font-medium">{t("credits.admin.adjust")}</h2><fieldset disabled={busy} className="grid gap-4 md:grid-cols-3"><label>{t("credits.admin.email")}<input name="email" type="email" required className="mt-2 w-full border bg-background p-2" /></label><label>{t("credits.admin.amount")}<input name="amount" type="number" step={1} required className="mt-2 w-full border bg-background p-2" /></label><label>{t("credits.admin.reason")}<input name="reason" maxLength={1000} className="mt-2 w-full border bg-background p-2" /></label></fieldset><p className="text-xs text-muted-foreground">{t("credits.admin.amountHint")}</p><button disabled={busy} className="bg-foreground px-4 py-2 text-background">{t("credits.admin.submit")}</button><p role="status">{message}</p></form><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["date", "user", "type", "reason", "amount", "balance"].map((label) => <th className="border-b p-3" key={label}>{label}</th>)}</tr></thead><tbody>{data.rows.map(({ transaction: row, email }) => <tr key={row.id}><td className="border-b p-3">{new Date(row.createdAt).toLocaleString(locale)}</td><td className="border-b p-3">{email}</td><td className="border-b p-3">{row.type}</td><td className="border-b p-3">{row.reason}</td><td className="border-b p-3">{row.amount}</td><td className="border-b p-3">{row.balanceAfter}</td></tr>)}</tbody></table></div>{!data.rows.length && <p>{t("credits.admin.empty")}</p>}<nav className="flex justify-between" aria-label="Pagination">{page > 1 ? <a href={\`?page=\${page - 1}\`}>Previous</a> : <span />}{page * 20 < data.total && <a href={\`?page=\${page + 1}\`}>Next</a>}</nav></section>; }
 `],
   ["modules/credits/integrations/payment/apps/web/src/integrations/payment-credits.ts.hbs", `import type { Services } from "../services";
 
@@ -29515,14 +31307,20 @@ export function createTransport(env: ProviderConfig): Transport | undefined {
   };
 }
 `],
-  ["modules/i18n/files/docs/modules/i18n.md", `# Internationalization
+  ["modules/i18n/files/docs/modules/i18n.md.hbs", `# Internationalization
 
 - Locales and the default locale: \`packages/i18n/src/config.ts\`.
 - Messages: \`packages/i18n/src/messages/<locale>/<namespace>.ts\`, one namespace per module. \`en\` is the source of truth for keys; other locales are type-checked against it.
+{{#if (includes frontend "next")}}
 - Server components: \`getTranslator(resolveLocale(lang))\` from \`@/lib/i18n/server\`.
 - Client components: \`useT()\` and \`useLocale()\` from \`@/components/i18n-provider\`.
 - Links: always build hrefs with \`localePath(locale, "/path")\`.
 - \`src/proxy.ts\` redirects paths without a locale prefix, using the \`NEXT_LOCALE\` cookie first and \`Accept-Language\` second.
+{{else}}
+- Keep product URLs locale-prefixed and use the generated framework locale helpers for links, page loaders and metadata.
+- Shared translation contracts (\`Locale\`, \`Messages\`, \`MessageKey\`, \`createTranslator\`) live in \`packages/i18n\`; framework UI and request adapters consume them without framework imports in the package.
+- Preserve locale cookies and \`Accept-Language\` when forwarding authenticated server requests. The shared cookie name remains \`NEXT_LOCALE\` across frameworks for consistent locale selection.
+{{/if}}
 
 ## Adding a locale
 
@@ -29631,45 +31429,6 @@ export type MessageKey = Leaves<Messages>;
 
 export type MessageParams = Record<string, string | number>;
 `],
-  ["modules/i18n/frameworks/next/apps/web/src/components/i18n-provider.tsx.hbs", `"use client";
-
-import {
-  createTranslator,
-  type Locale,
-  type Messages,
-  type Translator,
-} from "@{{projectName}}/i18n";
-import { createContext, useContext, useMemo } from "react";
-
-const I18nContext = createContext<{ locale: Locale; t: Translator } | null>(null);
-
-export function I18nProvider({
-  locale,
-  messages,
-  children,
-}: {
-  locale: Locale;
-  messages: Messages;
-  children: React.ReactNode;
-}) {
-  const value = useMemo(() => ({ locale, t: createTranslator(messages) }), [locale, messages]);
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
-}
-
-function useI18n() {
-  const context = useContext(I18nContext);
-  if (!context) throw new Error("useI18n must be used inside <I18nProvider>");
-  return context;
-}
-
-export function useLocale(): Locale {
-  return useI18n().locale;
-}
-
-export function useT(): Translator {
-  return useI18n().t;
-}
-`],
   ["modules/i18n/frameworks/next/apps/web/src/components/locale-switcher.tsx.hbs", `"use client";
 
 import { LOCALE_COOKIE, localeNames, locales } from "@{{projectName}}/i18n";
@@ -29757,6 +31516,48 @@ export function resolveLocale(value: string): Locale {
 export function getTranslator(locale: Locale) {
   return createTranslator(getMessages(locale));
 }
+`],
+  ["modules/i18n/frameworks/react/apps/web/src/components/i18n-provider.tsx.hbs", `"use client";
+
+import {
+  createTranslator,
+  type Locale,
+  type Messages,
+  type Translator,
+} from "@{{projectName}}/i18n";
+import { createContext, useContext, useMemo } from "react";
+
+const I18nContext = createContext<{ locale: Locale; t: Translator } | null>(null);
+
+export function I18nProvider({
+  locale,
+  messages,
+  children,
+}: {
+  locale: Locale;
+  messages: Messages;
+  children: React.ReactNode;
+}) {
+  const value = useMemo(() => ({ locale, t: createTranslator(messages) }), [locale, messages]);
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+function useI18n() {
+  const context = useContext(I18nContext);
+  if (!context) throw new Error("useI18n must be used inside <I18nProvider>");
+  return context;
+}
+
+export function useLocale(): Locale {
+  return useI18n().locale;
+}
+
+export function useT(): Translator {
+  return useI18n().t;
+}
+`],
+  ["modules/i18n/frameworks/tanstack-start/apps/web/src/lib/i18n/paths.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+export function localePath(locale: Locale, href: \`/\${string}\`): string { return \`/\${locale}\${href === "/" ? "" : href}\`; }
 `],
   ["modules/payment/dialects/postgres/packages/db/src/schema/payment.ts", `import {
   boolean,
@@ -30657,6 +32458,70 @@ export interface PaymentProvider {
   createPortalUrl?(customerRef: string, returnUrl: string): Promise<string>;
 }
 `],
+  ["modules/payment/frameworks/native/apps/web/src/lib/native/payment.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
+import { PaymentError, plans } from "@{{projectName}}/payment";
+import { isLocale{{#if (includes module.providers "mock")}}, defaultLocale{{/if}} } from "@{{projectName}}/i18n";
+import { z } from "zod";
+{{#if (includes module.providers "mock")}}
+import { ENV } from "@/env.server";
+{{/if}}
+import { HttpError, json, pageOf, readJson, requireAdministrator, requireOrigin, requireSession } from "../product-api";
+{{#if (includes module.providers "wechat")}}
+import QRCode from "qrcode";
+{{/if}}
+const input = z.object({ planId: z.string().min(1), provider: z.string().min(1), locale: z.string() }).strict();
+{{#if (includes module.providers "mock")}}
+const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+{{/if}}
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path === "/api/product/pricing" && request.method === "GET") return json({ plans: plans.map((plan) => ({ ...plan, providers: payment.availableProviders(plan.id) })) });
+  if (path.startsWith("/api/payment/webhook/") && request.method === "POST") {
+    const provider = path.slice("/api/payment/webhook/".length);
+    try { await payment.handleWebhook(provider, request); return provider === "alipay" ? new Response("success") : provider === "wechat" ? new Response(null, { status: 204 }) : json({ received: true }); }
+    catch { console.error("Payment webhook failed"); return provider === "alipay" ? new Response("failure", { status: 400 }) : json({ error: "Webhook handling failed" }, 400); }
+  }
+  if (!["/api/product/billing", "/api/product/orders", "/api/payment/checkout", "/api/payment/portal", "/api/payment/mock"].includes(path) && !path.startsWith("/api/product/order/")) return;
+  const { user } = await requireSession(request);
+  if (request.method !== "GET") requireOrigin(request);
+  try {
+    if (path === "/api/product/billing" && request.method === "GET") return json({ subscription: await payment.getSubscription(user.id), orders: await payment.listOrders(user.id) });
+    if (path === "/api/product/orders" && request.method === "GET") { await requireAdministrator(request); return json(await payment.listAllOrders({ limit: 20, offset: (pageOf(request) - 1) * 20 })); }
+    if (path.startsWith("/api/product/order/") && request.method === "GET") {
+      const order = await payment.getOrder(user.id, decodeURIComponent(path.slice("/api/product/order/".length)));
+      if (!order) throw new HttpError(404, "not_found");
+      return json({ order, qrImage: {{#if (includes module.providers "wechat")}}order.status === "pending" && order.qrCodeUrl ? await QRCode.toDataURL(order.qrCodeUrl, { width: 256, margin: 2 }) : {{/if}}null });
+    }
+    if (path === "/api/payment/checkout" && request.method === "POST") {
+      const data = input.parse(await readJson(request)); if (!isLocale(data.locale)) throw new HttpError(400, "invalid_locale");
+      return json({ url: await payment.checkout({ user, planId: data.planId, provider: data.provider, checkoutPath: \`/\${data.locale}/payment\`, successPath: \`/\${data.locale}/dashboard/billing?status=success\`, cancelPath: \`/\${data.locale}/pricing\` }) });
+    }
+    if (path === "/api/payment/portal" && request.method === "POST") {
+      const data = z.object({ locale: z.string() }).strict().parse(await readJson(request)); if (!isLocale(data.locale)) throw new HttpError(400, "invalid_locale");
+      return json({ url: await payment.portalUrl(user.id, \`/\${data.locale}/dashboard/billing\`) });
+    }
+{{#if (includes module.providers "mock")}}
+    if (path === "/api/payment/mock") {
+      if (ENV.NODE_ENV === "production") throw new HttpError(404, "not_found");
+      const params = request.method === "GET" ? new URL(request.url).searchParams : new URLSearchParams(await request.text());
+      const order = await payment.getOrder(user.id, params.get("orderId") ?? "");
+      if (!order || order.provider !== "mock") throw new HttpError(404, "not_found");
+      const origin = new URL(ENV.BETTER_AUTH_URL).origin;
+      const safeUrl = (value: string | null) => { const url = new URL(value ?? \`/\${defaultLocale}/dashboard/billing\`, origin); return url.origin === origin ? url.href : new URL(\`/\${defaultLocale}/dashboard/billing\`, origin).href; };
+      if (request.method === "GET") {
+        const hidden = [...params].map(([key, value]) => \`<input type="hidden" name="\${escape(key)}" value="\${escape(value)}">\`).join("");
+        return new Response(\`<!doctype html><html lang="en"><head><title>Mock checkout</title></head><body><h1>Mock checkout</h1><p>No real payment is made.</p><form method="post">\${hidden}<button>Pay</button></form><a href="\${escape(safeUrl(params.get("cancel")))}">Cancel</a></body></html>\`, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+      }
+      if (request.method === "POST") {
+        params.set("userId", user.id); params.set("planId", order.planId);
+        await payment.handleWebhook("mock", new Request(request.url, { method: "POST", body: params.toString() }));
+        return new Response(null, { status: 303, headers: { Location: safeUrl(params.get("success")), "Cache-Control": "no-store" } });
+      }
+    }
+{{/if}}
+    return json({ error: "method_not_allowed" }, 405);
+  } catch (error) { if (error instanceof PaymentError) return json({ error: error.code }, 400); throw error; }
+}
+`],
   ["modules/payment/frameworks/next/apps/web/src/app/[lang]/dashboard/billing/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
 import { getPlan } from "@{{projectName}}/payment";
 import { Button, buttonVariants } from "@{{projectName}}/ui/components/button";
@@ -31020,7 +32885,160 @@ export function formatMoney(amount: number, currency: string, locale: string): s
   return format.format(amount / 10 ** digits);
 }
 `],
-  ["modules/payment/integrations/admin/apps/web/src/app/[lang]/admin/orders/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/frameworks/nuxt/apps/web/app/components/ProductAdminOrders.vue.hbs", `<script setup lang="ts">
+const { label, locale } = useProductLocale();
+const page = ref(1);
+type Order = { id: string; planId: string; provider: string; amount: number; currency: string; status: string; createdAt: string };
+const { data, error } = await useFetch<{ rows: { order: Order; email: string }[]; total: number }>("/api/product/orders", { query: { page } });
+const money = (row: Order) => new Intl.NumberFormat(locale.value, { style: "currency", currency: row.currency }).format(row.amount / 100);
+</script>
+<template>
+  <p v-if="error" role="alert" class="error">\\{{ error.message }}</p>
+  <div class="table-wrap"><table><thead><tr><th>\\{{ label('Order', '订单') }}</th><th>\\{{ label('Customer', '客户') }}</th><th>\\{{ label('Plan', '方案') }}</th><th>\\{{ label('Provider', '支付方式') }}</th><th>\\{{ label('Amount', '金额') }}</th><th>\\{{ label('Status', '状态') }}</th><th>\\{{ label('Date', '日期') }}</th></tr></thead><tbody><tr v-for="row in data?.rows ?? []" :key="row.order.id"><td>\\{{ row.order.id }}</td><td>\\{{ row.email }}</td><td>\\{{ row.order.planId }}</td><td>\\{{ row.order.provider }}</td><td>\\{{ money(row.order) }}</td><td>\\{{ row.order.status }}</td><td>\\{{ row.order.createdAt.slice(0, 10) }}</td></tr></tbody></table></div>
+  <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\\{{ label('Previous', '上一页') }}</button><span>\\{{ page }} · \\{{ data?.total ?? 0 }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\\{{ label('Next', '下一页') }}</button></nav>
+</template>
+`],
+  ["modules/payment/frameworks/nuxt/apps/web/app/components/ProductBilling.vue.hbs", `<script setup lang="ts">
+import { z } from "zod";
+const { label, locale, path } = useProductLocale();
+const { pending, error, run } = useProductAction();
+type Order = { id: string; planId: string; provider: string; amount: number; currency: string; status: string; createdAt: string };
+const { data, error: loadError, refresh } = await useFetch<{ subscription: { planId: string; provider: string; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null; orders: Order[] }>("/api/product/billing");
+async function portal() { await run(async () => { const result = await productRequest("/api/payment/portal", productJson({ locale: locale.value }), z.object({ url: z.string().url() })); window.location.assign(result.url); }); }
+const money = (row: Order) => new Intl.NumberFormat(locale.value, { style: "currency", currency: row.currency }).format(row.amount / 100);
+</script>
+<template>
+  <p v-if="error || loadError" class="error" role="alert">\\{{ error || loadError?.message }}</p>
+  <div class="panel"><h2>\\{{ label('Subscription', '订阅') }}</h2><template v-if="data?.subscription"><p>\\{{ data.subscription.planId }} · \\{{ data.subscription.status }}</p><p v-if="data.subscription.currentPeriodEnd">\\{{ label('Current period ends', '当前周期结束于') }} \\{{ data.subscription.currentPeriodEnd.slice(0, 10) }}</p><p v-if="data.subscription.cancelAtPeriodEnd">\\{{ label('Cancels at the end of this period.', '将在当前周期结束时取消。') }}</p><button :disabled="pending" @click="portal">\\{{ label('Manage subscription', '管理订阅') }}</button></template><p v-else>\\{{ label('No active subscription.', '暂无活跃订阅。') }}</p><div class="actions"><NuxtLink :to="path('pricing')">\\{{ label('View plans', '查看方案') }}</NuxtLink><button class="text-button" @click="refresh()">\\{{ label('Refresh', '刷新') }}</button></div></div>
+  <div class="table-wrap"><table><thead><tr><th>\\{{ label('Date', '日期') }}</th><th>\\{{ label('Plan', '方案') }}</th><th>\\{{ label('Provider', '支付方式') }}</th><th>\\{{ label('Amount', '金额') }}</th><th>\\{{ label('Status', '状态') }}</th></tr></thead><tbody><tr v-for="order in data?.orders ?? []" :key="order.id"><td>\\{{ order.createdAt.slice(0, 10) }}</td><td><NuxtLink :to="path(\`payment/\${order.id}\`)">\\{{ order.planId }}</NuxtLink></td><td>\\{{ order.provider }}</td><td>\\{{ money(order) }}</td><td>\\{{ order.status }}</td></tr></tbody></table><p v-if="!data?.orders.length">\\{{ label('No orders yet.', '暂无订单。') }}</p></div>
+</template>
+`],
+  ["modules/payment/frameworks/nuxt/apps/web/app/components/ProductPayment.vue.hbs", `<script setup lang="ts">
+import { z } from "zod";
+const props = defineProps<{ orderId?: string }>();
+const { label, path, locale, t } = useProductLocale();
+const { pending, error, run } = useProductAction();
+type Plan = { id: string; amount: number; currency: string; credits: number; mode: string; interval?: string; providers: string[] };
+type Order = { id: string; planId: string; status: string; amount: number; currency: string; provider: string };
+const { data: pricing, error: pricingError } = await useFetch<{ plans: Plan[] }>("/api/product/pricing");
+const order = ref<{ order: Order; qrImage: string | null }>();
+const providers = reactive<Record<string, string>>({});
+for (const plan of pricing.value?.plans ?? []) providers[plan.id] = plan.providers[0] ?? "";
+const money = (amount: number, currency: string) => new Intl.NumberFormat(locale.value, { style: "currency", currency }).format(amount / 100);
+const planName = (id: string) => id === "starter" ? t("payment.plans.starter.name") : id === "pro" ? t("payment.plans.pro.name") : id;
+const planDescription = (id: string) => id === "starter" ? t("payment.plans.starter.description") : id === "pro" ? t("payment.plans.pro.description") : "";
+if (props.orderId) {
+  const { data, error: orderError } = await useFetch<{ order: Order; qrImage: string | null }>(\`/api/product/order/\${encodeURIComponent(props.orderId)}\`);
+  if (orderError.value) throw createError({ statusCode: orderError.value.statusCode ?? 500, statusMessage: orderError.value.message });
+  order.value = data.value ?? undefined;
+}
+async function checkout(plan: Plan) {
+  await run(async () => {
+    const result = await productRequest("/api/payment/checkout", productJson({ planId: plan.id, provider: providers[plan.id], locale: locale.value }), z.object({ url: z.string().url() }));
+    window.location.assign(result.url);
+  });
+}
+let timer: ReturnType<typeof setTimeout> | undefined;
+let disposed = false;
+async function poll() {
+  if (!props.orderId || disposed || order.value?.order.status !== "pending") return;
+  try { order.value = await productRequest(\`/api/product/order/\${encodeURIComponent(props.orderId)}\`, {}, z.object({ order: z.object({ id: z.string(), planId: z.string(), status: z.string(), amount: z.number(), currency: z.string(), provider: z.string() }), qrImage: z.string().nullable() })); }
+  catch (cause) { error.value = cause instanceof Error ? cause.message : "Payment status unavailable"; }
+  if (!disposed && order.value?.order.status === "pending") timer = setTimeout(poll, 3000);
+}
+onMounted(() => { if (props.orderId) timer = setTimeout(poll, 3000); });
+onBeforeUnmount(() => { disposed = true; if (timer) clearTimeout(timer); });
+</script>
+<template>
+  <p v-if="error || pricingError" class="error" role="alert">\\{{ error || pricingError?.message }}</p>
+  <section v-if="order" class="panel stack"><h1>\\{{ label('Payment', '支付') }}</h1><p>\\{{ order.order.planId }} · \\{{ money(order.order.amount, order.order.currency) }}</p><p role="status">\\{{ label('Status:', '状态：') }} \\{{ order.order.status }}</p><img v-if="order.qrImage" :src="order.qrImage" :alt="label('Scan with WeChat to complete payment', '使用微信扫码支付')" width="256" height="256" /><p v-if="order.order.status === 'pending'">\\{{ label('Keep this page open. Payment confirmation updates automatically.', '请保持页面打开，支付确认将自动更新。') }}</p><NuxtLink :to="path('dashboard/billing')">\\{{ label('View billing', '查看账单') }}</NuxtLink></section>
+  <section v-else class="stack"><div><p class="eyebrow">\\{{ label('Simple plans', '简单的方案') }}</p><h1>\\{{ t('payment.pricing.title') }}</h1></div><div class="grid"><article v-for="plan in pricing?.plans ?? []" :key="plan.id" class="panel stack"><h2>\\{{ planName(plan.id) }}</h2><p>\\{{ planDescription(plan.id) }}</p><p class="price">\\{{ money(plan.amount, plan.currency) }}<small v-if="plan.interval"> / \\{{ plan.interval }}</small></p><p>\\{{ plan.credits }} \\{{ label('credits', '积分') }}</p><label>\\{{ label('Payment provider', '支付方式') }}<select v-model="providers[plan.id]" :disabled="!plan.providers.length"><option v-for="provider in plan.providers" :key="provider" :value="provider">\\{{ provider }}</option></select></label><button :disabled="pending || !providers[plan.id]" @click="checkout(plan)">\\{{ label('Choose plan', '选择方案') }}</button><p v-if="!plan.providers.length" role="status">\\{{ t('payment.pricing.noProviders') }}</p></article></div></section>
+</template>
+<style scoped>.price{font-size:2rem}.price small{font-size:1rem}</style>
+`],
+  ["modules/payment/frameworks/tanstack-start/apps/web/src/lib/payment-data.ts", `import { z } from "zod";
+export const orderSchema = z.object({
+  id: z.string(),
+  planId: z.string(),
+  provider: z.string(),
+  status: z.string(),
+  amount: z.number(),
+  currency: z.string(),
+  createdAt: z.string(),
+  paidAt: z.string().nullable(),
+});
+export const billingSchema = z.object({
+  orders: z.array(orderSchema),
+  subscription: z
+    .object({
+      planId: z.string(),
+      status: z.string(),
+      customerRef: z.string().nullish(),
+      currentPeriodEnd: z.string().nullish(),
+      cancelAtPeriodEnd: z.boolean(),
+    })
+    .nullish(),
+});
+export const pricingSchema = z.object({
+  plans: z.array(
+    z.object({
+      id: z.string(),
+      amount: z.number(),
+      currency: z.string(),
+      credits: z.number().optional(),
+      mode: z.string(),
+      interval: z.string().optional(),
+      providers: z.array(z.string()),
+    }),
+  ),
+});
+export function formatMoney(amount: number, currency: string, locale: string) {
+  const format = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  });
+  return format.format(amount / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2));
+}
+`],
+  ["modules/payment/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.billing.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct, mutateProduct } from "@/lib/product-data";
+import { billingSchema, formatMoney } from "@/lib/payment-data";
+export const Route = createFileRoute("/$lang/dashboard/billing")({ loader: ({ params }) => loadProduct("/api/product/billing", params.lang, billingSchema), component: Billing });
+function Billing() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const [error, setError] = useState(false); const [busy, setBusy] = useState(false);
+  async function portal() { setBusy(true); setError(false); try { const response = await mutateProduct("/api/payment/portal", { locale }); window.location.assign(z.object({ url: z.string() }).parse(await response.json()).url); } catch { setError(true); } finally { setBusy(false); } }
+  return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("payment.billing.title")}</h1><div className="space-y-4 border p-6"><h2 className="font-medium">{t("payment.billing.subscription")}</h2>{data.subscription ? <><p>{data.subscription.planId} · {data.subscription.status}</p>{data.subscription.currentPeriodEnd && <p>{t(data.subscription.cancelAtPeriodEnd ? "payment.billing.endsOn" : "payment.billing.renewsOn", { date: new Date(data.subscription.currentPeriodEnd).toLocaleDateString(locale) })}</p>}{data.subscription.customerRef && <button disabled={busy} className="border px-4 py-2" onClick={() => void portal()}>{t("payment.billing.manage")}</button>}</> : <p>{t("payment.billing.none")}</p>}<a className="inline-block underline" href={\`/\${locale}/pricing\`}>{t("payment.billing.viewPlans")}</a>{error && <p role="alert">{t("payment.errors.checkout")}</p>}</div><h2 className="font-medium">{t("payment.billing.history")}</h2>{data.orders.length ? <ul className="divide-y border">{data.orders.map((order) => <li key={order.id} className="flex justify-between gap-4 p-4"><a className="underline" href={\`/\${locale}/payment/\${order.id}\`}>{order.planId}</a><span>{order.status}</span><span>{new Date(order.createdAt).toLocaleDateString(locale)}</span><strong>{formatMoney(order.amount, order.currency, locale)}</strong></li>)}</ul> : <p>{t("payment.billing.noOrders")}</p>}</section>; }
+`],
+  ["modules/payment/frameworks/tanstack-start/apps/web/src/routes/$lang.payment.$orderId.tsx.hbs", `import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { orderSchema, formatMoney } from "@/lib/payment-data";
+export const Route = createFileRoute("/$lang/payment/$orderId")({ loader: ({ params }) => loadProduct(\`/api/product/order/\${encodeURIComponent(params.orderId)}\`, params.lang, z.object({ order: orderSchema, qrImage: z.string().nullable() })), component: Checkout });
+function Checkout() { const { order, qrImage } = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const router = useRouter(); return <section className="mx-auto max-w-lg space-y-8 px-6 py-20"><h1 className="font-serif text-4xl">{t("payment.checkout.title")}</h1><div className="space-y-6 border p-8 text-center"><p className="text-4xl font-semibold">{formatMoney(order.amount, order.currency, locale)}</p><p role="status">{order.status}</p>{qrImage && <img src={qrImage} alt={t("payment.checkout.qrAlt")} width={256} height={256} className="mx-auto" />}<button className="border px-4 py-2" onClick={() => void router.invalidate()}>{t("payment.checkout.refresh")}</button><a className="block underline" href={\`/\${locale}/dashboard/billing\`}>{t("payment.checkout.billing")}</a></div></section>; }
+`],
+  ["modules/payment/frameworks/tanstack-start/apps/web/src/routes/$lang.pricing.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { createTranslator, getMessages, isLocale } from "@{{projectName}}/i18n";
+import { useState } from "react";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct, mutateProduct } from "@/lib/product-data";
+import { pricingSchema, formatMoney } from "@/lib/payment-data";
+import { productHead } from "@/lib/product-head";
+export const Route = createFileRoute("/$lang/pricing")({
+  loader: async ({ params }) => { const [pricing, config] = await Promise.all([loadProduct("/api/product/pricing", params.lang, pricingSchema), loadProduct("/api/product/config", params.lang, z.object({ siteUrl: z.string().url() }))]); return { ...pricing, siteUrl: config.siteUrl }; },
+  head: ({ params, loaderData }) => { if (!loaderData || !isLocale(params.lang)) return {}; const t = createTranslator(getMessages(params.lang)); return productHead({ siteUrl: loaderData.siteUrl, locale: params.lang, path: "/pricing", title: t("payment.pricing.title"), description: t("payment.pricing.subtitle") }); }, component: Pricing,
+});
+function Pricing() {
+  const { plans } = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const planMessages = new Map(Object.entries(getMessages(locale).payment.plans));
+  async function checkout(planId: string, provider: string) { setBusy(true); setError(""); try { const response = await mutateProduct("/api/payment/checkout", { planId, provider, locale }); const { url } = z.object({ url: z.string() }).parse(await response.json()); window.location.assign(url); } catch { setError(t("payment.errors.checkout")); } finally { setBusy(false); } }
+  return <section className="mx-auto max-w-5xl px-6 py-20"><header className="mb-12"><h1 className="font-serif text-5xl">{t("payment.pricing.title")}</h1><p className="mt-5 text-muted-foreground">{t("payment.pricing.subtitle")}</p></header>{error && <p role="alert" className="mb-6 text-destructive">{error} <a href={\`/\${locale}/login\`} className="underline">{t("auth.user.signIn")}</a></p>}<div className="grid gap-6 md:grid-cols-2">{plans.map((plan) => <article key={plan.id} className="flex flex-col gap-6 border p-8"><h2 className="text-xl font-medium">{planMessages.get(plan.id)?.name ?? plan.id}</h2>{planMessages.get(plan.id)?.description && <p className="text-muted-foreground">{planMessages.get(plan.id)?.description}</p>}<p className="text-4xl font-semibold">{formatMoney(plan.amount, plan.currency, locale)}<span className="text-sm font-normal text-muted-foreground"> {plan.interval ?? t("payment.pricing.oneTime")}</span></p>{plan.credits !== undefined && <p>{t("payment.pricing.credits", { credits: plan.credits })}</p>}{plan.providers.length ? plan.providers.map((provider) => <button key={provider} disabled={busy} className="border bg-foreground p-3 text-background disabled:opacity-50" onClick={() => void checkout(plan.id, provider)}>{t(plan.mode === "payment" ? "payment.pricing.buyWith" : "payment.pricing.subscribeWith", { provider })}</button>) : <p>{t("payment.pricing.noProviders")}</p>}</article>)}</div></section>;
+}
+`],
+  ["modules/payment/integrations/admin/frameworks/next/apps/web/src/app/[lang]/admin/orders/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
 
 import { Pagination } from "@/components/admin/pagination";
@@ -31097,6 +33115,14 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
     </div>
   );
 }
+`],
+  ["modules/payment/integrations/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.orders.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { orderSchema, formatMoney } from "@/lib/payment-data";
+export const Route = createFileRoute("/$lang/admin/orders")({ validateSearch: z.object({ page: z.coerce.number().int().min(1).catch(1) }), loaderDeps: ({ search }) => search, loader: ({ params, deps }) => loadProduct(\`/api/product/orders?page=\${deps.page}\`, params.lang, z.object({ rows: z.array(z.object({ order: orderSchema, email: z.string().nullable() })), total: z.number() })), component: Orders });
+function Orders() { const data = Route.useLoaderData(); const { page } = Route.useSearch(); const locale = useLocale(); const t = useT(); return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("payment.admin.title")}</h1><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["date", "customer", "plan", "provider", "status", "amount"].map((label) => <th className="border-b p-3" key={label}>{label}</th>)}</tr></thead><tbody>{data.rows.map(({ order, email }) => <tr key={order.id}><td className="border-b p-3">{new Date(order.createdAt).toLocaleString(locale)}</td><td className="border-b p-3">{email}</td><td className="border-b p-3">{order.planId}</td><td className="border-b p-3">{order.provider}</td><td className="border-b p-3">{order.status}</td><td className="border-b p-3">{formatMoney(order.amount, order.currency, locale)}</td></tr>)}</tbody></table></div>{!data.rows.length && <p>{t("payment.admin.empty")}</p>}<nav className="flex justify-between" aria-label="Pagination">{page > 1 ? <a href={\`?page=\${page - 1}\`}>Previous</a> : <span />}{page * 20 < data.total && <a href={\`?page=\${page + 1}\`}>Next</a>}</nav></section>; }
 `],
   ["modules/payment/providers/alipay/packages/payment/src/providers/alipay.ts", `import { createPrivateKey, createPublicKey } from "node:crypto";
 
@@ -31275,7 +33301,7 @@ export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>
   };
 }
 `],
-  ["modules/payment/providers/mock/apps/web/src/app/api/payment/mock/route.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/providers/mock/frameworks/next/apps/web/src/app/api/payment/mock/route.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
 
 function notFound() {
   return new Response("Not found", { status: 404 });
@@ -31901,40 +33927,113 @@ Set \`SITE_URL\` to the public HTTPS origin before deployment. Do not use previe
 
 The module does not invent review claims, organization facts, social images or sample articles. BlogPosting data comes from the blog's persisted publication record. No external SEO service or paid data is required.
 `],
-  ["modules/seo/files/packages/seo/src/index.ts", `export type SitemapEntry = { url: string; lastModified?: Date; alternates?: { languages: Record<string, string> } };
-export type MetadataInput = { title: string; description: string; locale: string; path: \`/\${string}\`; translations?: Record<string, string>; image?: string; type?: "website" | "article" };
+  ["modules/seo/files/packages/seo/src/index.ts", `export type SitemapEntry = {
+  url: string;
+  lastModified?: Date;
+  alternates?: { languages: Record<string, string> };
+};
+export type MetadataInput = {
+  title: string;
+  description: string;
+  locale: string;
+  path: \`/\${string}\`;
+  translations?: Record<string, string>;
+  image?: string;
+  type?: "website" | "article";
+};
 
-export function createSeo(config: { origin: string; locales: readonly string[]; defaultLocale: string }) {
+export function createSeo(config: {
+  origin: string;
+  locales: readonly string[];
+  defaultLocale: string;
+}) {
   const origin = new URL(config.origin).origin;
   const contributors = new Map<string, () => Promise<SitemapEntry[]>>();
   function url(path: string) {
     const result = new URL(path, origin);
-    if (!["http:", "https:"].includes(result.protocol) || result.username || result.password) throw new Error("SEO URLs must be public HTTP(S) URLs without credentials");
+    if (!["http:", "https:"].includes(result.protocol) || result.username || result.password)
+      throw new Error("SEO URLs must be public HTTP(S) URLs without credentials");
     return result.href;
   }
   function metadata(input: MetadataInput) {
     const canonical = url(\`/\${input.locale}\${input.path === "/" ? "" : input.path}\`);
-    const translations = input.translations ?? Object.fromEntries(config.locales.map((locale) => [locale, \`/\${locale}\${input.path === "/" ? "" : input.path}\`]));
-    const languages = Object.fromEntries(Object.entries(translations).map(([locale, path]) => [locale, url(path)]));
+    const translations =
+      input.translations ??
+      Object.fromEntries(
+        config.locales.map((locale) => [
+          locale,
+          \`/\${locale}\${input.path === "/" ? "" : input.path}\`,
+        ]),
+      );
+    const languages = Object.fromEntries(
+      Object.entries(translations).map(([locale, path]) => [locale, url(path)]),
+    );
     if (languages[config.defaultLocale]) languages["x-default"] = languages[config.defaultLocale]!;
     const images = input.image ? [url(input.image)] : undefined;
-    return { title: input.title, description: input.description, alternates: { canonical, languages }, openGraph: { title: input.title, description: input.description, url: canonical, locale: input.locale.replaceAll("-", "_"), alternateLocale: Object.keys(translations).filter((locale) => locale !== input.locale).map((locale) => locale.replaceAll("-", "_")), type: input.type ?? "website", images }, twitter: { card: images ? "summary_large_image" as const : "summary" as const, title: input.title, description: input.description, images } };
+    return {
+      title: input.title,
+      description: input.description,
+      alternates: { canonical, languages },
+      openGraph: {
+        title: input.title,
+        description: input.description,
+        url: canonical,
+        locale: input.locale.replaceAll("-", "_"),
+        alternateLocale: Object.keys(translations)
+          .filter((locale) => locale !== input.locale)
+          .map((locale) => locale.replaceAll("-", "_")),
+        type: input.type ?? "website",
+        images,
+      },
+      twitter: {
+        card: images ? ("summary_large_image" as const) : ("summary" as const),
+        title: input.title,
+        description: input.description,
+        images,
+      },
+    };
   }
   return {
-    origin, url, metadata,
+    origin,
+    url,
+    metadata,
     registerSitemap(name: string, contributor: () => Promise<SitemapEntry[]>) {
       if (contributors.has(name)) throw new Error(\`Duplicate sitemap contributor: \${name}\`);
       contributors.set(name, contributor);
     },
     async sitemap(): Promise<SitemapEntry[]> {
-      const languages = Object.fromEntries(config.locales.map((locale) => [locale, url(\`/\${locale}\`)]));
+      const languages = Object.fromEntries(
+        config.locales.map((locale) => [locale, url(\`/\${locale}\`)]),
+      );
       languages["x-default"] = url(\`/\${config.defaultLocale}\`);
-      const home = config.locales.map((locale) => ({ url: url(\`/\${locale}\`), alternates: { languages } }));
-      return [...home, ...(await Promise.all([...contributors.values()].map((load) => load()))).flat()];
+      const home = config.locales.map((locale) => ({
+        url: url(\`/\${locale}\`),
+        alternates: { languages },
+      }));
+      return [
+        ...home,
+        ...(await Promise.all([...contributors.values()].map((load) => load()))).flat(),
+      ];
     },
   };
 }
 export type Seo = ReturnType<typeof createSeo>;
+`],
+  ["modules/seo/frameworks/native/apps/web/src/lib/native/seo.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+import { locales } from "@{{projectName}}/i18n";
+const escape = (value: string) => value.replace(/[<>&"']/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[char]!);
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (request.method !== "GET") return;
+  if (path === "/robots.txt") {
+    const paths = ["/login", "/signup", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/verify-email", "/dashboard", "/admin", "/api"];
+    return new Response(["User-agent: *", "Allow: /", ...[...paths, ...locales.flatMap((locale) => paths.map((path) => \`/\${locale}\${path}\`))].map((path) => \`Disallow: \${path}\`), \`Sitemap: \${seo.url("/sitemap.xml")}\`, ""].join("\\n"), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  }
+  if (path === "/sitemap.xml") {
+    const entries = await seo.sitemap();
+    const body = entries.map((entry) => \`<url><loc>\${escape(entry.url)}</loc>\${entry.lastModified ? \`<lastmod>\${entry.lastModified.toISOString()}</lastmod>\` : ""}\${Object.entries(entry.alternates?.languages ?? {}).map(([lang, href]) => \`<xhtml:link rel="alternate" hreflang="\${escape(lang)}" href="\${escape(href)}"/>\`).join("")}</url>\`).join("");
+    return new Response(\`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\${body}</urlset>\`, { headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "no-store" } });
+  }
+}
 `],
   ["modules/seo/frameworks/next/apps/web/src/app/robots.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 import { locales } from "@{{projectName}}/i18n";
@@ -31953,7 +34052,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return seo.sitemap();
 }
 `],
-  ["modules/seo/integrations/core/apps/web/src/lib/page-metadata.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+  ["modules/seo/frameworks/nuxt/apps/web/server/routes/robots.txt.ts.hbs", `import { defineEventHandler, toWebRequest } from "h3";
+import { handleProductRequest } from "@/lib/product-api";
+export default defineEventHandler((event) => handleProductRequest(toWebRequest(event)));
+`],
+  ["modules/seo/frameworks/nuxt/apps/web/server/routes/sitemap.xml.ts.hbs", `import { defineEventHandler, toWebRequest } from "h3";
+import { handleProductRequest } from "@/lib/product-api";
+export default defineEventHandler((event) => handleProductRequest(toWebRequest(event)));
+`],
+  ["modules/seo/frameworks/tanstack-start/apps/web/src/routes/robots[.]txt.ts.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { handleProductRequest } from "@/lib/product-api";
+export const Route = createFileRoute("/robots.txt")({ server: { handlers: { GET: ({ request }) => handleProductRequest(request) } } });
+`],
+  ["modules/seo/frameworks/tanstack-start/apps/web/src/routes/sitemap[.]xml.ts.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { handleProductRequest } from "@/lib/product-api";
+export const Route = createFileRoute("/sitemap.xml")({ server: { handlers: { GET: ({ request }) => handleProductRequest(request) } } });
+`],
+  ["modules/seo/integrations/core/frameworks/next/apps/web/src/lib/page-metadata.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 import type { Locale } from "@{{projectName}}/i18n";
 import type { Metadata } from "next";
 
@@ -32306,30 +34421,37 @@ const messageResult = z.object({
 
 export function createTransport(env: ProviderConfig): Sms | undefined {
   const parsed = configuration.safeParse({
-    accountSid: env.TWILIO_ACCOUNT_SID, authToken: env.TWILIO_AUTH_TOKEN, from: env.TWILIO_FROM_NUMBER,
+    accountSid: env.TWILIO_ACCOUNT_SID,
+    authToken: env.TWILIO_AUTH_TOKEN,
+    from: env.TWILIO_FROM_NUMBER,
   });
   if (!parsed.success) return undefined;
   const { accountSid, authToken, from } = parsed.data;
   return {
     async sendOtp({ phoneNumber, code }) {
       try {
-        const response = await fetch(\`https://api.twilio.com/2010-04-01/Accounts/\${accountSid}/Messages.json\`, {
-          method: "POST",
-          headers: {
-            authorization: \`Basic \${btoa(\`\${accountSid}:\${authToken}\`)}\`,
-            "content-type": "application/x-www-form-urlencoded",
+        const response = await fetch(
+          \`https://api.twilio.com/2010-04-01/Accounts/\${accountSid}/Messages.json\`,
+          {
+            method: "POST",
+            headers: {
+              authorization: \`Basic \${btoa(\`\${accountSid}:\${authToken}\`)}\`,
+              "content-type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              To: phoneNumber,
+              From: from,
+              Body: \`Your verification code is \${code}. It expires in 5 minutes.\`,
+              ValidityPeriod: "300",
+            }),
+            redirect: "manual",
+            signal: AbortSignal.timeout(15_000),
           },
-          body: new URLSearchParams({
-            To: phoneNumber, From: from,
-            Body: \`Your verification code is \${code}. It expires in 5 minutes.\`,
-            ValidityPeriod: "300",
-          }),
-          redirect: "manual",
-          signal: AbortSignal.timeout(15_000),
-        });
+        );
         if (!response.ok) throw new Error("SMS request rejected");
         const message = messageResult.parse(await response.json());
-        if (message.error_code != null && message.error_code !== 0) throw new Error("SMS request rejected");
+        if (message.error_code != null && message.error_code !== 0)
+          throw new Error("SMS request rejected");
       } catch {
         // Never automatically retry a paid send with an ambiguous network outcome.
         throw new Error("Twilio SMS request failed; check the provider console");
@@ -32463,9 +34585,11 @@ Local checks do not prove cloud IAM behavior. On Workers, \`bun apps/cli/live-te
   nav: { files: "Files" },
   page: {
     title: "Private files",
-    description: "Your files, visible only to you. Uploads stay in a private bucket; download links expire after 60 seconds.",
+    description:
+      "Your files, visible only to you. Uploads stay in a private bucket; download links expire after 60 seconds.",
     limits: "Maximum 4 MiB per file. Files download as attachments, never as embedded content.",
-    unavailable: "File storage is not configured. Ask the site operator to configure the private storage provider.",
+    unavailable:
+      "File storage is not configured. Ask the site operator to configure the private storage provider.",
     uploadTitle: "Upload a file",
     fileLabel: "Choose a file (up to 4 MiB)",
     upload: "Upload file",
@@ -32483,7 +34607,8 @@ Local checks do not prove cloud IAM behavior. On Workers, \`bun apps/cli/live-te
     unauthorized: "Your session has expired. Sign in again to continue.",
     forbidden: "This request was blocked. Reload this page from the site's configured address.",
     tooLarge: "Choose a file no larger than 4 MiB.",
-    invalidFile: "Choose one non-empty file with a name up to 255 UTF-8 bytes, without path separators or control characters.",
+    invalidFile:
+      "Choose one non-empty file with a name up to 255 UTF-8 bytes, without path separators or control characters.",
     notFound: "This file is no longer available. Refresh the page.",
     unavailable: "Storage is unavailable. Please try again later.",
     generic: "The request failed. Please try again.",
@@ -32983,6 +35108,124 @@ export function createProvider({{#if (includes module.providers "r2-binding")}}_
 {{/if}}
 }
 `],
+  ["modules/storage/frameworks/native/apps/web/src/lib/native/storage.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
+import { z } from "zod";
+import { json, requireSession } from "../product-api";
+import { readStorageFile, requireStorageOrigin, storageErrorResponse, StorageRequestError } from "../storage-http";
+
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path !== "/api/product/files" && path !== "/api/storage" && !path.startsWith("/api/storage/")) return;
+  const { user } = await requireSession(request);
+  try {
+    if (path === "/api/product/files" && request.method === "GET") return json({ configured: storage.configured, files: await storage.listFiles(user.id) });
+    if (path === "/api/storage" && request.method === "POST") {
+      requireStorageOrigin(request);
+      if (!storage.configured) return json({ error: "not_configured" }, 503);
+      const file = await storage.upload(user.id, await readStorageFile(request));
+      return json({ id: file.id }, 201);
+    }
+    const id = z.string().min(1).max(255).regex(/^[a-zA-Z0-9_-]+$/).safeParse(path.slice("/api/storage/".length));
+    if (!id.success) throw new StorageRequestError(404, "not_found");
+    if (request.method === "GET") return new Response(null, { status: 307, headers: { Location: await storage.downloadUrl(user.id, id.data), "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
+    if (request.method === "DELETE") { requireStorageOrigin(request); await storage.deleteFile(user.id, id.data); return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } }); }
+    return json({ error: "method_not_allowed" }, 405);
+  } catch (error) { return storageErrorResponse(error); }
+}
+`],
+  ["modules/storage/frameworks/native/apps/web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
+import { z } from "zod";
+
+import { ENV } from "@/env.server";
+
+const MAX_BODY_BYTES = MAX_FILE_BYTES + 64 * 1024;
+const contentLengthSchema = z.string().regex(/^\\d+$/).transform(Number).pipe(z.number().int().nonnegative().safe());
+const fileSchema = z.instanceof(File);
+
+export class StorageRequestError extends Error {
+  constructor(public readonly status: number, public readonly code: string) {
+    super(code);
+  }
+}
+
+export function requireStorageOrigin(request: Request): void {
+  // The auth module configures this same URL as its sole trusted origin.
+  // Do not trust forwarded/Host headers to authorize cookie-authenticated mutations.
+  const trustedOrigin = new URL(ENV.BETTER_AUTH_URL).origin;
+  if (request.headers.get("origin") !== trustedOrigin) {
+    throw new StorageRequestError(403, "forbidden");
+  }
+}
+
+export function storageErrorResponse(error: unknown): Response {
+  if (error instanceof StorageRequestError) {
+    return Response.json({ error: error.code }, { status: error.status, headers: { "Cache-Control": "no-store" } });
+  }
+  if (error instanceof StorageError) {
+    const status = error.code === "not_found" ? 404 : error.code === "invalid_file" ? 400 : 503;
+    return Response.json({ error: error.code }, { status, headers: { "Cache-Control": "no-store" } });
+  }
+  return Response.json({ error: "provider_error" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+}
+
+export async function readStorageFile(request: Request): Promise<File> {
+  if (!/^multipart\\/form-data(?:;|$)/i.test(request.headers.get("content-type") ?? "")) {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const header = request.headers.get("content-length");
+  if (header !== null) {
+    const length = contentLengthSchema.safeParse(header);
+    if (!length.success) throw new StorageRequestError(400, "invalid_file");
+    if (length.data > MAX_BODY_BYTES) throw new StorageRequestError(413, "too_large");
+  }
+  if (!request.body) throw new StorageRequestError(400, "invalid_file");
+
+  // Count actual bytes before formData() buffers/parses multipart data. This also
+  // bounds chunked requests and requests with an understated Content-Length.
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      length += chunk.value.byteLength;
+      if (length > MAX_BODY_BYTES) {
+        await reader.cancel();
+        throw new StorageRequestError(413, "too_large");
+      }
+      chunks.push(chunk.value);
+    }
+  } catch (error) {
+    if (error instanceof StorageRequestError) throw error;
+    throw new StorageRequestError(400, "invalid_file");
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  let form: FormData;
+  try {
+    form = await new Response(bytes, {
+      headers: { "Content-Type": request.headers.get("content-type")! },
+    }).formData();
+  } catch {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const entries = [...form.entries()];
+  if (entries.length !== 1 || entries[0]?.[0] !== "file") {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const parsed = fileSchema.safeParse(entries[0][1]);
+  if (!parsed.success || parsed.data.size === 0) throw new StorageRequestError(400, "invalid_file");
+  if (parsed.data.size > MAX_FILE_BYTES) throw new StorageRequestError(413, "too_large");
+  return parsed.data;
+}
+`],
   ["modules/storage/frameworks/next/apps/web/src/app/[lang]/dashboard/files/page.tsx.hbs", `import { storage } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
 
@@ -33135,196 +35378,6 @@ export async function POST(request: Request) {
   }
 }
 `],
-  ["modules/storage/frameworks/next/apps/web/src/components/storage/file-manager.tsx.hbs", `"use client";
-
-import { Button, buttonVariants } from "@{{projectName}}/ui/components/button";
-import { useRouter } from "next/navigation";
-import { type FormEvent, useState, useTransition } from "react";
-
-export type StorageFileEntry = {
-  id: string;
-  name: string;
-  size: string;
-  createdAt: string;
-};
-
-export type StorageLabels = {
-  uploadTitle: string;
-  fileLabel: string;
-  upload: string;
-  uploading: string;
-  listTitle: string;
-  empty: string;
-  download: string;
-  delete: string;
-  deleting: string;
-  deleteConfirm: string;
-  uploaded: string;
-  deleted: string;
-  errors: {
-    unauthorized: string;
-    forbidden: string;
-    tooLarge: string;
-    invalidFile: string;
-    notFound: string;
-    unavailable: string;
-    generic: string;
-  };
-};
-
-export function FileManager({
-  files,
-  configured,
-  labels,
-}: {
-  files: StorageFileEntry[];
-  configured: boolean;
-  labels: StorageLabels;
-}) {
-  const router = useRouter();
-  const [active, setActive] = useState<string | null>(null);
-  const [refreshing, startTransition] = useTransition();
-  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
-  const pending = active !== null || refreshing;
-
-  function responseError(status: number): string {
-    switch (status) {
-      case 400: return labels.errors.invalidFile;
-      case 401: return labels.errors.unauthorized;
-      case 403: return labels.errors.forbidden;
-      case 404: return labels.errors.notFound;
-      case 413: return labels.errors.tooLarge;
-      case 503: return labels.errors.unavailable;
-      default: return labels.errors.generic;
-    }
-  }
-
-  async function upload(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (pending || !configured) return;
-    const form = event.currentTarget;
-    setActive("upload");
-    setNotice(null);
-    try {
-      const response = await fetch("/api/storage", {
-        method: "POST",
-        credentials: "same-origin",
-        body: new FormData(form),
-      });
-      if (!response.ok) {
-        setNotice({ text: responseError(response.status), error: true });
-        return;
-      }
-      form.reset();
-      setNotice({ text: labels.uploaded, error: false });
-      startTransition(() => router.refresh());
-    } catch {
-      setNotice({ text: labels.errors.generic, error: true });
-    } finally {
-      setActive(null);
-    }
-  }
-
-  async function deleteFile(id: string) {
-    if (pending || !configured || !window.confirm(labels.deleteConfirm)) return;
-    setActive(id);
-    setNotice(null);
-    try {
-      const response = await fetch(\`/api/storage/\${encodeURIComponent(id)}\`, {
-        method: "DELETE",
-        credentials: "same-origin",
-      });
-      if (!response.ok) {
-        setNotice({ text: responseError(response.status), error: true });
-        return;
-      }
-      setNotice({ text: labels.deleted, error: false });
-      startTransition(() => router.refresh());
-    } catch {
-      setNotice({ text: labels.errors.generic, error: true });
-    } finally {
-      setActive(null);
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-8" aria-busy={pending}>
-      <section aria-labelledby="storage-upload-title" className="border p-5 sm:p-6">
-        <h2 id="storage-upload-title" className="mb-4 font-medium">{labels.uploadTitle}</h2>
-        <form onSubmit={upload} className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <label htmlFor="storage-file" className="text-sm">{labels.fileLabel}</label>
-            <input
-              id="storage-file"
-              name="file"
-              type="file"
-              required
-              disabled={pending || !configured}
-              aria-describedby="storage-limits"
-              className="min-w-0 w-full rounded-md border px-3 py-2 text-sm file:mr-4 file:font-medium disabled:opacity-50"
-            />
-          </div>
-          <Button type="submit" disabled={pending || !configured}>
-            {active === "upload" ? labels.uploading : labels.upload}
-          </Button>
-        </form>
-      </section>
-
-      {notice && (
-        <p role={notice.error ? "alert" : "status"} className={notice.error ? "text-destructive text-sm" : "text-sm"}>
-          {notice.text}
-        </p>
-      )}
-
-      <section aria-labelledby="storage-list-title" className="flex flex-col gap-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 id="storage-list-title" className="font-medium">{labels.listTitle}</h2>
-          <span className="text-muted-foreground text-sm tabular-nums">{files.length}</span>
-        </div>
-        {files.length === 0 ? (
-          <p className="border border-dashed px-5 py-10 text-muted-foreground text-sm">{labels.empty}</p>
-        ) : (
-          <ul className="divide-y border">
-            {files.map((file) => (
-              <li key={file.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="break-words font-medium text-sm">{file.name}</p>
-                  <p className="mt-1 text-muted-foreground text-xs tabular-nums">{file.size} · {file.createdAt}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {configured && !pending ? (
-                    <a
-                      href={\`/api/storage/\${encodeURIComponent(file.id)}\`}
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
-                      aria-label={\`\${labels.download}: \${file.name}\`}
-                    >
-                      {labels.download}
-                    </a>
-                  ) : (
-                    <Button type="button" variant="outline" size="sm" disabled>
-                      {labels.download}
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={pending || !configured}
-                    onClick={() => deleteFile(file.id)}
-                    aria-label={\`\${labels.delete}: \${file.name}\`}
-                  >
-                    {active === file.id ? labels.deleting : labels.delete}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
-  );
-}
-`],
   ["modules/storage/frameworks/next/apps/web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
 import { z } from "zod";
 
@@ -33417,6 +35470,233 @@ export async function readStorageFile(request: Request): Promise<File> {
   if (!parsed.success || parsed.data.size === 0) throw new StorageRequestError(400, "invalid_file");
   if (parsed.data.size > MAX_FILE_BYTES) throw new StorageRequestError(413, "too_large");
   return parsed.data;
+}
+`],
+  ["modules/storage/frameworks/nuxt/apps/web/app/components/ProductFiles.vue.hbs", `<script setup lang="ts">
+const { label } = useProductLocale();
+const { pending, error, notice, run } = useProductAction();
+const selected = ref<File>(); const input = ref<HTMLInputElement>();
+const { data, error: loadError, refresh } = await useFetch<{ configured: boolean; files: { id: string; name: string; size: number; createdAt: string }[] }>("/api/product/files");
+function choose(event: Event) { selected.value = (event.target as HTMLInputElement).files?.[0]; }
+async function upload() {
+  await run(async () => {
+    if (!selected.value || selected.value.size <= 0 || selected.value.size > 4 * 1024 * 1024) throw new Error(label("Choose a non-empty file up to 4 MiB.", "请选择不超过 4 MiB 的非空文件。"));
+    const body = new FormData(); body.set("file", selected.value);
+    await productRequest("/api/storage", { method: "POST", body });
+    selected.value = undefined; if (input.value) input.value.value = "";
+    await refresh(); notice.value = label("File uploaded.", "文件已上传。");
+  });
+}
+async function remove(id: string) { if (!window.confirm(label("Delete this file permanently?", "永久删除此文件？"))) return; await run(async () => { await productRequest(\`/api/storage/\${encodeURIComponent(id)}\`, { method: "DELETE" }); await refresh(); }); }
+</script>
+<template>
+  <p v-if="error || loadError" role="alert" class="error">\\{{ error || loadError?.message }}</p><p v-if="notice" role="status" class="notice">\\{{ notice }}</p>
+  <p v-if="data && !data.configured" role="alert" class="error">\\{{ label('Storage is not configured. Contact the administrator.', '存储尚未配置，请联系管理员。') }}</p>
+  <form class="panel" @submit.prevent="upload"><label>\\{{ label('Upload a file · up to 4 MiB', '上传文件 · 最大 4 MiB') }}<input ref="input" type="file" required :disabled="pending || !data?.configured" @change="choose" /></label><button :disabled="pending || !selected || !data?.configured">\\{{ label('Upload', '上传') }}</button></form>
+  <div class="table-wrap"><table><thead><tr><th>\\{{ label('Name', '名称') }}</th><th>\\{{ label('Size', '大小') }}</th><th>\\{{ label('Created', '创建时间') }}</th><th>\\{{ label('Actions', '操作') }}</th></tr></thead><tbody><tr v-for="file in data?.files ?? []" :key="file.id"><td>\\{{ file.name }}</td><td>\\{{ (file.size / 1024).toFixed(1) }} KiB</td><td>\\{{ file.createdAt.slice(0, 10) }}</td><td class="actions"><a :href="\`/api/storage/\${encodeURIComponent(file.id)}\`" rel="noreferrer">\\{{ label('Download', '下载') }}</a><button class="text-button" :disabled="pending" @click="remove(file.id)">\\{{ label('Delete', '删除') }}</button></td></tr></tbody></table><p v-if="!data?.files.length">\\{{ label('No files yet.', '暂无文件。') }}</p></div>
+</template>
+`],
+  ["modules/storage/frameworks/react/apps/web/src/components/storage/file-manager.tsx.hbs", `"use client";
+
+import { Button, buttonVariants } from "@{{projectName}}/ui/components/button";
+import { useProductNavigation } from "@/lib/product-navigation";
+import { type FormEvent, useState, useTransition } from "react";
+
+export type StorageFileEntry = {
+  id: string;
+  name: string;
+  size: string;
+  createdAt: string;
+};
+
+export type StorageLabels = {
+  uploadTitle: string;
+  fileLabel: string;
+  upload: string;
+  uploading: string;
+  listTitle: string;
+  empty: string;
+  download: string;
+  delete: string;
+  deleting: string;
+  deleteConfirm: string;
+  uploaded: string;
+  deleted: string;
+  errors: {
+    unauthorized: string;
+    forbidden: string;
+    tooLarge: string;
+    invalidFile: string;
+    notFound: string;
+    unavailable: string;
+    generic: string;
+  };
+};
+
+export function FileManager({
+  files,
+  configured,
+  labels,
+}: {
+  files: StorageFileEntry[];
+  configured: boolean;
+  labels: StorageLabels;
+}) {
+  const navigation = useProductNavigation();
+  const [active, setActive] = useState<string | null>(null);
+  const [refreshing, startTransition] = useTransition();
+  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
+  const pending = active !== null || refreshing;
+
+  function responseError(status: number): string {
+    switch (status) {
+      case 400: return labels.errors.invalidFile;
+      case 401: return labels.errors.unauthorized;
+      case 403: return labels.errors.forbidden;
+      case 404: return labels.errors.notFound;
+      case 413: return labels.errors.tooLarge;
+      case 503: return labels.errors.unavailable;
+      default: return labels.errors.generic;
+    }
+  }
+
+  async function upload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending || !configured) return;
+    const form = event.currentTarget;
+    setActive("upload");
+    setNotice(null);
+    try {
+      const response = await fetch("/api/storage", {
+        method: "POST",
+        credentials: "same-origin",
+        body: new FormData(form),
+      });
+      if (!response.ok) {
+        setNotice({ text: responseError(response.status), error: true });
+        return;
+      }
+      form.reset();
+      setNotice({ text: labels.uploaded, error: false });
+      startTransition(() => navigation.refresh());
+    } catch {
+      setNotice({ text: labels.errors.generic, error: true });
+    } finally {
+      setActive(null);
+    }
+  }
+
+  async function deleteFile(id: string) {
+    if (pending || !configured || !window.confirm(labels.deleteConfirm)) return;
+    setActive(id);
+    setNotice(null);
+    try {
+      const response = await fetch(\`/api/storage/\${encodeURIComponent(id)}\`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      if (!response.ok) {
+        setNotice({ text: responseError(response.status), error: true });
+        return;
+      }
+      setNotice({ text: labels.deleted, error: false });
+      startTransition(() => navigation.refresh());
+    } catch {
+      setNotice({ text: labels.errors.generic, error: true });
+    } finally {
+      setActive(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-8" aria-busy={pending}>
+      <section aria-labelledby="storage-upload-title" className="border p-5 sm:p-6">
+        <h2 id="storage-upload-title" className="mb-4 font-medium">{labels.uploadTitle}</h2>
+        <form onSubmit={upload} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <label htmlFor="storage-file" className="text-sm">{labels.fileLabel}</label>
+            <input
+              id="storage-file"
+              name="file"
+              type="file"
+              required
+              disabled={pending || !configured}
+              aria-describedby="storage-limits"
+              className="min-w-0 w-full rounded-md border px-3 py-2 text-sm file:mr-4 file:font-medium disabled:opacity-50"
+            />
+          </div>
+          <Button type="submit" disabled={pending || !configured}>
+            {active === "upload" ? labels.uploading : labels.upload}
+          </Button>
+        </form>
+      </section>
+
+      {notice && (
+        <p role={notice.error ? "alert" : "status"} className={notice.error ? "text-destructive text-sm" : "text-sm"}>
+          {notice.text}
+        </p>
+      )}
+
+      <section aria-labelledby="storage-list-title" className="flex flex-col gap-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="storage-list-title" className="font-medium">{labels.listTitle}</h2>
+          <span className="text-muted-foreground text-sm tabular-nums">{files.length}</span>
+        </div>
+        {files.length === 0 ? (
+          <p className="border border-dashed px-5 py-10 text-muted-foreground text-sm">{labels.empty}</p>
+        ) : (
+          <ul className="divide-y border">
+            {files.map((file) => (
+              <li key={file.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="break-words font-medium text-sm">{file.name}</p>
+                  <p className="mt-1 text-muted-foreground text-xs tabular-nums">{file.size} · {file.createdAt}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {configured && !pending ? (
+                    <a
+                      href={\`/api/storage/\${encodeURIComponent(file.id)}\`}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                      aria-label={\`\${labels.download}: \${file.name}\`}
+                    >
+                      {labels.download}
+                    </a>
+                  ) : (
+                    <Button type="button" variant="outline" size="sm" disabled>
+                      {labels.download}
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={pending || !configured}
+                    onClick={() => deleteFile(file.id)}
+                    aria-label={\`\${labels.delete}: \${file.name}\`}
+                  >
+                    {active === file.id ? labels.deleting : labels.delete}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+`],
+  ["modules/storage/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.files.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { FileManager, type StorageLabels } from "@/components/storage/file-manager";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+const schema = z.object({ configured: z.boolean(), files: z.array(z.object({ id: z.string(), name: z.string(), size: z.number(), createdAt: z.string() })) });
+export const Route = createFileRoute("/$lang/dashboard/files")({ loader: ({ params }) => loadProduct("/api/product/files", params.lang, schema), component: Files });
+function Files() {
+  const { files, configured } = Route.useLoaderData(); const locale = useLocale(); const t = useT();
+  const labels: StorageLabels = { uploadTitle: t("storage.page.uploadTitle"), fileLabel: t("storage.page.fileLabel"), upload: t("storage.page.upload"), uploading: t("storage.page.uploading"), listTitle: t("storage.page.listTitle"), empty: t("storage.page.empty"), download: t("storage.page.download"), delete: t("storage.page.delete"), deleting: t("storage.page.deleting"), deleteConfirm: t("storage.page.deleteConfirm"), uploaded: t("storage.page.uploaded"), deleted: t("storage.page.deleted"), errors: { unauthorized: t("storage.errors.unauthorized"), forbidden: t("storage.errors.forbidden"), tooLarge: t("storage.errors.tooLarge"), invalidFile: t("storage.errors.invalidFile"), notFound: t("storage.errors.notFound"), unavailable: t("storage.errors.unavailable"), generic: t("storage.errors.generic") } };
+  return <section className="space-y-8"><header><h1 className="font-serif text-4xl">{t("storage.page.title")}</h1><p className="mt-4 text-muted-foreground">{t("storage.page.description")}</p><p id="storage-limits" className="mt-2 text-xs">{t("storage.page.limits")}</p></header>{!configured && <p role="status">{t("storage.page.unavailable")}</p>}<FileManager configured={configured} labels={labels} files={files.map((file) => ({ id: file.id, name: file.name, size: \`\${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(file.size / 1024)} KiB\`, createdAt: new Date(file.createdAt).toLocaleString(locale) }))} /></section>;
 }
 `],
   ["packages/config/package.json.hbs", `{
@@ -35255,4 +37535,4 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 `]
 ]);
 
-export const TEMPLATE_COUNT = 673;
+export const TEMPLATE_COUNT = 760;

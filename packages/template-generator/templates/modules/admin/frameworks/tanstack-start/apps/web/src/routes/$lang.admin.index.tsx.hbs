@@ -1,0 +1,7 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { userSchema } from "@/lib/auth-data";
+export const Route = createFileRoute("/$lang/admin/")({ loader: ({ params }) => loadProduct("/api/product/admin", params.lang, z.object({ users: z.number(), admins: z.number(), recent: z.array(userSchema) })), component: Overview });
+function Overview() { const data = Route.useLoaderData(); const t = useT(); return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("admin.overview.title")}</h1><div className="grid gap-4 sm:grid-cols-2"><div className="border p-6"><p>{t("admin.overview.users")}</p><strong className="mt-3 block text-4xl">{data.users}</strong></div><div className="border p-6"><p>{t("admin.overview.admins")}</p><strong className="mt-3 block text-4xl">{data.admins}</strong></div></div><h2>{t("admin.overview.recent")}</h2><ul className="divide-y border">{data.recent.map((user) => <li key={user.id} className="flex justify-between p-4"><span>{user.name}</span><span>{user.email}</span></li>)}</ul></section>; }

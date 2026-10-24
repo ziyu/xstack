@@ -1,0 +1,6 @@
+import { captchaPublicConfig } from "@{{projectName}}/captcha";
+import { ENV } from "@/env.server";
+import { json } from "../product-api";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path === "/api/captcha/config" && request.method === "GET") return json(captchaPublicConfig(ENV));
+}

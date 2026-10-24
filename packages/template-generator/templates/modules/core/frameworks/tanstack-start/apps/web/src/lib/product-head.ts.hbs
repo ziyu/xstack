@@ -1,0 +1,11 @@
+import { defaultLocale, locales } from "@{{projectName}}/i18n";
+/** Translate the shared public URL policy into TanStack Router head entries. */
+export function productHead(input: { siteUrl: string; locale: string; path: string; title: string; description: string; page?: number }) {
+  const suffix = input.path === "/" ? "" : input.path;
+  const query = input.page && input.page > 1 ? `?page=${input.page}` : "";
+  const canonical = new URL(`/${input.locale}${suffix}${query}`, input.siteUrl).href;
+  return {
+    meta: [{ title: input.title }, { name: "description", content: input.description }, { property: "og:title", content: input.title }, { property: "og:description", content: input.description }, { property: "og:url", content: canonical }, { property: "og:type", content: "website" }, { property: "og:locale", content: input.locale.replaceAll("-", "_") }, { name: "twitter:card", content: "summary" }, { name: "twitter:title", content: input.title }, { name: "twitter:description", content: input.description }],
+    links: [{ rel: "canonical", href: canonical }, ...locales.map((locale) => ({ rel: "alternate", hrefLang: locale, href: new URL(`/${locale}${suffix}${query}`, input.siteUrl).href })), { rel: "alternate", hrefLang: "x-default", href: new URL(`/${defaultLocale}${suffix}${query}`, input.siteUrl).href }],
+  };
+}

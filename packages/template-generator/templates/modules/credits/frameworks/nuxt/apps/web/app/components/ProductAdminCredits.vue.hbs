@@ -1,0 +1,20 @@
+<script setup lang="ts">
+const { label } = useProductLocale();
+const { pending, error, notice, run } = useProductAction();
+const page = ref(1); const email = ref(""); const amount = ref(0); const reason = ref("");
+type Transaction = { id: string; amount: number; balanceAfter: number; reason: string | null; type: string; createdAt: string };
+const { data, error: loadError, refresh } = await useFetch<{ rows: { transaction: Transaction; email: string }[]; total: number }>("/api/product/credit-transactions", { query: { page } });
+async function adjust() {
+  await run(async () => {
+    if (!Number.isSafeInteger(amount.value) || amount.value === 0 || Math.abs(amount.value) > 2147483647) throw new Error(label("Enter a non-zero whole number within the supported range.", "请输入受支持范围内的非零整数。"));
+    await productRequest("/api/product/credit-transactions", productJson({ email: email.value.trim(), amount: amount.value, reason: reason.value.trim() }));
+    amount.value = 0; reason.value = ""; await refresh(); notice.value = label("Credit adjustment recorded.", "积分调整已记录。");
+  });
+}
+</script>
+<template>
+  <p v-if="error || loadError" class="error" role="alert">\{{ error || loadError?.message }}</p><p v-if="notice" role="status">\{{ notice }}</p>
+  <form class="panel" @submit.prevent="adjust"><h2>\{{ label('Adjust account credits', '调整账户积分') }}</h2><label>\{{ label('Account email', '账户邮箱') }}<input v-model="email" type="email" required /></label><label>\{{ label('Signed amount (negative deducts)', '调整数量（负数扣除）') }}<input v-model.number="amount" type="number" step="1" min="-2147483647" max="2147483647" required /></label><label>\{{ label('Reason', '原因') }}<input v-model="reason" required maxlength="500" /></label><button :disabled="pending || !amount || !reason.trim()">\{{ label('Record adjustment', '记录调整') }}</button></form>
+  <div class="table-wrap"><table><thead><tr><th>\{{ label('Account', '账户') }}</th><th>\{{ label('Amount', '数量') }}</th><th>\{{ label('Balance', '余额') }}</th><th>\{{ label('Type / reason', '类型 / 原因') }}</th><th>\{{ label('Date', '日期') }}</th></tr></thead><tbody><tr v-for="row in data?.rows ?? []" :key="row.transaction.id"><td>\{{ row.email }}</td><td>\{{ row.transaction.amount }}</td><td>\{{ row.transaction.balanceAfter }}</td><td>\{{ row.transaction.type }} · \{{ row.transaction.reason }}</td><td>\{{ row.transaction.createdAt.slice(0, 10) }}</td></tr></tbody></table></div>
+  <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\{{ label('Previous', '上一页') }}</button><span>\{{ page }} · \{{ data?.total ?? 0 }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\{{ label('Next', '下一页') }}</button></nav>
+</template>

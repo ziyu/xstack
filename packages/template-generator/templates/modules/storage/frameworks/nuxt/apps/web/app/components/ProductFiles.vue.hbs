@@ -1,0 +1,23 @@
+<script setup lang="ts">
+const { label } = useProductLocale();
+const { pending, error, notice, run } = useProductAction();
+const selected = ref<File>(); const input = ref<HTMLInputElement>();
+const { data, error: loadError, refresh } = await useFetch<{ configured: boolean; files: { id: string; name: string; size: number; createdAt: string }[] }>("/api/product/files");
+function choose(event: Event) { selected.value = (event.target as HTMLInputElement).files?.[0]; }
+async function upload() {
+  await run(async () => {
+    if (!selected.value || selected.value.size <= 0 || selected.value.size > 4 * 1024 * 1024) throw new Error(label("Choose a non-empty file up to 4 MiB.", "请选择不超过 4 MiB 的非空文件。"));
+    const body = new FormData(); body.set("file", selected.value);
+    await productRequest("/api/storage", { method: "POST", body });
+    selected.value = undefined; if (input.value) input.value.value = "";
+    await refresh(); notice.value = label("File uploaded.", "文件已上传。");
+  });
+}
+async function remove(id: string) { if (!window.confirm(label("Delete this file permanently?", "永久删除此文件？"))) return; await run(async () => { await productRequest(`/api/storage/${encodeURIComponent(id)}`, { method: "DELETE" }); await refresh(); }); }
+</script>
+<template>
+  <p v-if="error || loadError" role="alert" class="error">\{{ error || loadError?.message }}</p><p v-if="notice" role="status" class="notice">\{{ notice }}</p>
+  <p v-if="data && !data.configured" role="alert" class="error">\{{ label('Storage is not configured. Contact the administrator.', '存储尚未配置，请联系管理员。') }}</p>
+  <form class="panel" @submit.prevent="upload"><label>\{{ label('Upload a file · up to 4 MiB', '上传文件 · 最大 4 MiB') }}<input ref="input" type="file" required :disabled="pending || !data?.configured" @change="choose" /></label><button :disabled="pending || !selected || !data?.configured">\{{ label('Upload', '上传') }}</button></form>
+  <div class="table-wrap"><table><thead><tr><th>\{{ label('Name', '名称') }}</th><th>\{{ label('Size', '大小') }}</th><th>\{{ label('Created', '创建时间') }}</th><th>\{{ label('Actions', '操作') }}</th></tr></thead><tbody><tr v-for="file in data?.files ?? []" :key="file.id"><td>\{{ file.name }}</td><td>\{{ (file.size / 1024).toFixed(1) }} KiB</td><td>\{{ file.createdAt.slice(0, 10) }}</td><td class="actions"><a :href="`/api/storage/${encodeURIComponent(file.id)}`" rel="noreferrer">\{{ label('Download', '下载') }}</a><button class="text-button" :disabled="pending" @click="remove(file.id)">\{{ label('Delete', '删除') }}</button></td></tr></tbody></table><p v-if="!data?.files.length">\{{ label('No files yet.', '暂无文件。') }}</p></div>
+</template>

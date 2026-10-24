@@ -1,5 +1,5 @@
 import { defineModule } from "../define";
-import { NEXT_SHELL } from "./stack";
+import { NATIVE_SHELL } from "./stack";
 
 export default defineModule({
   id: "admin",
@@ -10,7 +10,7 @@ export default defineModule({
   },
   category: "operations",
   requires: ["auth"],
-  supports: NEXT_SHELL,
+  supports: NATIVE_SHELL,
   packages: [{ dir: "permissions", dependencies: { "@casl/ability": "^7.0.1" } }],
   nav: [
     { area: "main", href: "/admin", labelKey: "nav.admin", order: 95, role: "admin" },

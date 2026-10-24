@@ -1,0 +1,6 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+export const Route = createFileRoute("/$lang/ref/$code")({ loader: ({ params }) => loadProduct(`/api/product/referral/${encodeURIComponent(params.code)}`, params.lang, z.object({ commissionPercent: z.number() })), head: () => ({ meta: [{ name: "robots", content: "noindex,nofollow" }] }), component: Referral });
+function Referral() { const { code } = Route.useParams(); const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="mx-auto max-w-xl space-y-8 px-6 py-24"><p className="text-xs uppercase tracking-widest">{t("affiliate.invite.eyebrow")}</p><h1 className="font-serif text-5xl">{t("affiliate.invite.title")}</h1><p>{t("affiliate.invite.description")}</p><form method="post" action={`/api/affiliate/capture?${new URLSearchParams({ code, lang: locale })}`}><button className="bg-foreground px-5 py-3 text-background">{t("affiliate.invite.accept")}</button></form><p className="border-t pt-4 text-sm">{t("affiliate.policy", { percent: data.commissionPercent })}</p></section>; }

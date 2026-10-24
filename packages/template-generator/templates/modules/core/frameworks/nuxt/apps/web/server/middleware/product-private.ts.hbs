@@ -1,0 +1,8 @@
+import { defineEventHandler, getRequestURL, setHeader } from "h3";
+
+export default defineEventHandler((event) => {
+  if (/^\/[^/]+\/(?:dashboard|admin|payment|login|signup|forgot-password|reset-password|verify-email|ref)(?:\/|$)/.test(getRequestURL(event).pathname)) {
+    setHeader(event, "Cache-Control", "private, no-store");
+    setHeader(event, "X-Robots-Tag", "noindex, nofollow");
+  }
+});

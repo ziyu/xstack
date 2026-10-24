@@ -1,0 +1,59 @@
+<script setup lang="ts">
+import { z } from "zod";
+const { label } = useProductLocale();
+const { pending, error, run } = useProductAction();
+type Kind = "chat" | "image" | "video";
+const jobSchema = z.object({ id: z.string(), provider: z.string(), kind: z.enum(["chat", "image", "video"]), model: z.string(), prompt: z.string(), parentId: z.string().nullable(), status: z.string(), text: z.string().nullable(), error: z.string().nullable(), cost: z.number(), createdAt: z.string(), mediaUrl: z.string().nullable(), cancellable: z.boolean() });
+type Job = z.infer<typeof jobSchema>;
+type Capability = { id: string; models: Partial<Record<Kind, string>>; costs: Record<Kind, number> };
+const { data, error: loadError, refresh } = await useFetch<{ jobs: Job[]; capabilities: Capability[] }>("/api/product/ai");
+const provider = ref(data.value?.capabilities[0]?.id ?? "");
+const capability = computed(() => data.value?.capabilities.find((entry) => entry.id === provider.value));
+const kinds = computed(() => (["chat", "image", "video"] as const).filter((kind) => capability.value?.models[kind]));
+const kind = ref<Kind>(kinds.value[0] ?? "chat");
+const prompt = ref(""); const parentId = ref<string>();
+watch(provider, () => { kind.value = kinds.value[0] ?? "chat"; parentId.value = undefined; });
+watch(kind, () => { if (kind.value !== "chat") parentId.value = undefined; });
+function replaceJob(job: Job) { if (!data.value) return; const index = data.value.jobs.findIndex((entry) => entry.id === job.id); if (index < 0) data.value.jobs.unshift(job); else data.value.jobs[index] = job; }
+async function jobRequest(url: string, options: RequestInit): Promise<Job> {
+  const response = await fetch(url, { credentials: "same-origin", ...options });
+  const value = z.object({ job: jobSchema.optional(), error: z.string().optional() }).parse(await response.json());
+  if (value.job) { replaceJob(value.job); return value.job; }
+  throw new Error(value.error ?? `Request failed (${response.status})`);
+}
+let generationRequest: { key: string; id: string } | undefined;
+async function generate() {
+  await run(async () => {
+    const input = { provider: provider.value, kind: kind.value, prompt: prompt.value.trim(), parentId: parentId.value };
+    const key = JSON.stringify(input);
+    if (generationRequest?.key !== key) generationRequest = { key, id: crypto.randomUUID() };
+    const job = await jobRequest("/api/ai", productJson({ ...input, requestId: generationRequest.id }));
+    if (job.status !== "unknown") generationRequest = undefined;
+    if (job.status === "failed" || job.status === "unknown") error.value = job.error ?? job.status;
+    else { prompt.value = ""; parentId.value = job.kind === "chat" && job.status === "completed" ? job.id : undefined; }
+  });
+}
+async function cancel(job: Job) { await run(async () => { await jobRequest(`/api/ai/${encodeURIComponent(job.id)}`, { method: "DELETE" }); }); }
+function reply(job: Job) { provider.value = job.provider; kind.value = "chat"; nextTick(() => { parentId.value = job.id; }); }
+let timer: ReturnType<typeof setTimeout> | undefined;
+let disposed = false;
+async function poll() {
+  try {
+    for (const job of data.value?.jobs.filter((entry) => ["queued", "starting", "running", "saving"].includes(entry.status)) ?? []) {
+      if (disposed) return;
+      await jobRequest(`/api/ai/${encodeURIComponent(job.id)}`, { method: "POST" });
+    }
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : "Could not refresh generation"; }
+  finally { if (!disposed) timer = setTimeout(poll, 3000); }
+}
+onMounted(() => { timer = setTimeout(poll, 3000); });
+onBeforeUnmount(() => { disposed = true; if (timer) clearTimeout(timer); });
+</script>
+<template>
+  <p v-if="error || loadError" role="alert" class="error">\{{ error || loadError?.message }}</p>
+  <p v-if="!data?.capabilities.length" class="error" role="alert">\{{ label('No AI provider is configured. Ask the administrator to configure provider credentials.', '尚未配置 AI 提供商，请联系管理员配置凭据。') }}</p>
+  <form class="panel" @submit.prevent="generate"><div class="grid"><label>\{{ label('Provider', '提供商') }}<select v-model="provider" required><option v-for="entry in data?.capabilities ?? []" :key="entry.id" :value="entry.id">\{{ entry.id }}</option></select></label><label>\{{ label('Type', '类型') }}<select v-model="kind" required><option v-for="entry in kinds" :key="entry" :value="entry">\{{ entry }}</option></select></label></div><small>\{{ capability?.models[kind] }} · \{{ capability?.costs[kind] ?? 0 }} \{{ label('credits per generation', '积分 / 次') }}</small><p v-if="parentId">\{{ label('Continuing conversation', '继续对话') }} <button type="button" class="text-button" @click="parentId = undefined">\{{ label('Start new', '新对话') }}</button></p><label>\{{ label('Prompt', '提示词') }}<textarea v-model="prompt" required maxlength="20000" /></label><button :disabled="pending || !capability?.models[kind] || !prompt.trim()">\{{ pending ? label('Generating…', '生成中…') : label('Generate', '生成') }}</button><small>{{#if (includes product.features "credits")}}\{{ label('Failed or cancelled generations refund their debit. An unknown provider outcome is not retried or refunded automatically.', '失败或取消的生成会退还扣除的积分。未知的提供商结果不会自动重试或退款。') }}{{else}}\{{ label('Generation costs are shown for reference; credit billing is not enabled.', '生成成本仅供参考，尚未启用积分计费。') }}{{/if}}</small></form>
+  <div class="actions"><h2>\{{ label('Generation history', '生成历史') }}</h2><button class="text-button" @click="refresh()">\{{ label('Refresh', '刷新') }}</button></div>
+  <article v-for="job in data?.jobs ?? []" :key="job.id" class="panel stack"><div><small>\{{ job.provider }} · \{{ job.model }} · \{{ job.cost }} \{{ label('credits', '积分') }}</small><p>\{{ job.prompt }}</p><p role="status">\{{ job.status }}<span v-if="job.error"> · \{{ job.error }}</span></p></div><pre v-if="job.text">\{{ job.text }}</pre><img v-if="job.mediaUrl && job.kind === 'image'" class="media" :src="job.mediaUrl" :alt="job.prompt" /><video v-if="job.mediaUrl && job.kind === 'video'" class="media" :src="job.mediaUrl" controls preload="metadata" /><div class="actions"><button v-if="job.cancellable" class="text-button" :disabled="pending" @click="cancel(job)">\{{ label('Cancel generation', '取消生成') }}</button><button v-if="job.kind === 'chat' && job.status === 'completed'" class="text-button" @click="reply(job)">\{{ label('Continue conversation', '继续对话') }}</button><a v-if="job.mediaUrl" :href="job.mediaUrl" download>\{{ label('Download', '下载') }}</a></div></article>
+  <p v-if="!data?.jobs.length">\{{ label('Your generations will appear here.', '生成结果将在这里显示。') }}</p>
+</template>

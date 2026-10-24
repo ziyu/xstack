@@ -1,0 +1,41 @@
+<script setup lang="ts">
+import MarkdownIt from "markdown-it";
+import { defaultLocale } from "@{{projectName}}/i18n";
+const props = defineProps<{ slug?: string }>();
+const { locale, path, label } = useProductLocale();
+const route = useRoute();
+const rawPage = route.query.page ?? "1";
+if (typeof rawPage !== "string" || !/^[1-9]\d*$/.test(rawPage) || Number(rawPage) > 100000) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+const page = Number(rawPage);
+type Post = { id: string; title: string; slug: string; locale: string; excerpt: string; body: string; authorName: string; publishedAt: string | null; updatedAt: string };
+const listing = ref<{ posts: Post[]; total: number; page: number; limit: number }>();
+const article = ref<{ post: Post; translations: { locale: string; slug: string }[] }>();
+if (props.slug) {
+  const { data, error } = await useFetch<{ post: Post; translations: { locale: string; slug: string }[] }>(`/api/product/blog/${encodeURIComponent(props.slug)}`, { query: { locale: locale.value } });
+  if (error.value || !data.value) throw createError({ statusCode: error.value?.statusCode ?? 404, statusMessage: "Post not found" });
+  article.value = data.value;
+} else {
+  const { data, error } = await useFetch<{ posts: Post[]; total: number; page: number; limit: number }>("/api/product/blog", { query: { locale: locale.value, page } });
+  if (error.value) throw createError({ statusCode: error.value.statusCode ?? 500, statusMessage: "Could not load posts" });
+  listing.value = data.value ?? undefined;
+  if (page > 1 && !listing.value?.posts.length) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+}
+// HTML is disabled; markdown-it also rejects javascript:, vbscript: and unsafe data URLs.
+const markdown = new MarkdownIt({ html: false, linkify: false, typographer: true });
+markdown.renderer.rules.image = (tokens, index) => markdown.utils.escapeHtml(tokens[index]?.content ?? "");
+const html = computed(() => article.value ? markdown.render(article.value.post.body) : "");
+const { data: config } = await useFetch<{ siteUrl: string }>("/api/product/config");
+const title = computed(() => article.value?.post.title ?? label("Journal", "博客"));
+const description = computed(() => article.value?.post.excerpt ?? label("News and ideas from {{projectName}}.", "{{projectName}} 的新闻与想法。"));
+useSeoMeta({ title: () => `${title.value} · {{projectName}}`, description: () => description.value, ogTitle: () => title.value, ogDescription: () => description.value, ogType: () => article.value ? "article" : "website", twitterCard: "summary", twitterTitle: () => title.value, twitterDescription: () => description.value });
+useHead(() => ({ link: !article.value || !config.value?.siteUrl ? [] : [
+  { rel: "canonical" as const, href: `${config.value.siteUrl}/${article.value.post.locale}/blog/${article.value.post.slug}` },
+  ...article.value.translations.map((entry) => ({ rel: "alternate" as const, hreflang: entry.locale, href: `${config.value!.siteUrl}/${entry.locale}/blog/${entry.slug}` })),
+  ...article.value.translations.filter((entry) => entry.locale === defaultLocale).map((entry) => ({ rel: "alternate" as const, hreflang: "x-default", href: `${config.value!.siteUrl}/${entry.locale}/blog/${entry.slug}` })),
+] }));
+useHead(() => ({ script: !article.value || !config.value?.siteUrl ? [] : [{ type: "application/ld+json", innerHTML: JSON.stringify({ "@context": "https://schema.org", "@type": "BlogPosting", headline: article.value.post.title, description: article.value.post.excerpt, author: { "@type": "Person", name: article.value.post.authorName }, datePublished: article.value.post.publishedAt, dateModified: article.value.post.updatedAt, inLanguage: article.value.post.locale, mainEntityOfPage: `${config.value.siteUrl}/${article.value.post.locale}/blog/${article.value.post.slug}` }).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029") }] }));
+</script>
+<template>
+  <article v-if="article" class="prose"><NuxtLink :to="path('blog')">\{{ label('All posts', '全部文章') }}</NuxtLink><h1>\{{ article.post.title }}</h1><p class="muted">\{{ article.post.authorName }} · \{{ article.post.publishedAt?.slice(0, 10) }}</p><p>\{{ article.post.excerpt }}</p><div v-html="html" /><nav class="actions" :aria-label="label('Translations', '翻译')"><NuxtLink v-for="entry in article.translations" :key="entry.locale" :to="`/${entry.locale}/blog/${entry.slug}`">\{{ entry.locale }}</NuxtLink></nav></article>
+  <section v-else class="stack"><h1>\{{ label('Journal', '博客') }}</h1><div class="grid"><article v-for="post in listing?.posts ?? []" :key="post.id" class="panel"><small>\{{ post.publishedAt?.slice(0, 10) }}</small><h2><NuxtLink :to="path(`blog/${post.slug}`)">\{{ post.title }}</NuxtLink></h2><p>\{{ post.excerpt }}</p><small>\{{ post.authorName }}</small></article></div><p v-if="!listing?.posts.length">\{{ label('No published posts yet.', '暂无已发布文章。') }}</p><nav class="actions" :aria-label="label('Pagination', '分页')"><NuxtLink v-if="page > 1" :to="`${path('blog')}?page=${page - 1}`">\{{ label('Previous', '上一页') }}</NuxtLink><NuxtLink v-if="listing && page * listing.limit < listing.total" :to="`${path('blog')}?page=${page + 1}`">\{{ label('Next', '下一页') }}</NuxtLink></nav></section>
+</template>

@@ -171,12 +171,16 @@ export type ModuleManifest = {
   packages?: WorkspacePackageSpec[];
   /** Dependencies added to `apps/web`. */
   appDependencies?: Record<string, string>;
+  /** Framework-specific application dependencies, added only for the selected framework. */
+  frameworkAppDependencies?: Partial<Record<Framework, Record<string, string>>>;
   env?: EnvSpec[];
   services?: ServiceSpec[];
   nav?: NavItem[];
   proxy?: ProxyStep[];
   /** Stack-generated files this module supersedes (exact paths or `dir/` prefixes); each must exist. */
   replaces?: string[];
+  /** Framework-owned stack files replaced by native module adapters. */
+  frameworkReplaces?: Partial<Record<Framework, string[]>>;
 };
 
 export type OptionValue = string | number | boolean;

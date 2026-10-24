@@ -7,7 +7,8 @@ import type { VirtualNode } from "@xstack/template-generator";
 
 import { POST } from "../src/app/api/rpc/[[...rest]]/route";
 import { DEFAULT_STACK, PRESET_TEMPLATES } from "../src/lib/constant";
-import { resolveStackCompatibility } from "../src/lib/stack-compatibility";
+import { findMatchingPreset } from "../src/lib/preset-stacks";
+import { applyStackUpdate, resolveStackCompatibility } from "../src/lib/stack-compatibility";
 import { StackStateSchema, stackStateToConfig } from "../src/lib/stack-schema";
 import { loadStackParams } from "../src/lib/stack-url-state";
 import { generateStackCommand, generateStackUrlFromState } from "../src/lib/stack-utils";
@@ -41,8 +42,41 @@ describe("builder preview over oRPC", () => {
         stackStateToConfig(resolved).projectName,
       );
       expect(generateStackCommand(shared)).toBe(generateStackCommand(resolved));
+      const framework = shared.webFrontend[0];
+      expect(
+        JSON.parse(output.get("apps/web/package.json")!).dependencies[
+          framework === "tanstack-start" ? "@tanstack/react-start" : framework
+        ],
+      ).toBeDefined();
+      expect(
+        JSON.parse(output.get("packages/db/package.json")!).dependencies[
+          shared.database === "postgres" ? "pg" : "@libsql/client"
+        ],
+      ).toBeDefined();
+      expect(findMatchingPreset(input)?.id).toBe(preset.id);
     });
   }
+
+  test("replaces a customized stack with a complete preset while retaining the project name", async () => {
+    let current: typeof DEFAULT_STACK = { ...DEFAULT_STACK, projectName: "my-custom-project" };
+    for (const preset of PRESET_TEMPLATES) {
+      current = applyStackUpdate(current, {
+        ...preset.stack,
+        projectName: current.projectName,
+      }).stack;
+      expect(findMatchingPreset(current)?.id).toBe(preset.id);
+      expect(current.projectName).toBe("my-custom-project");
+      const customized = applyStackUpdate(current, { packageManager: "npm", providers: {} }).stack;
+      expect(findMatchingPreset(customized)).toBeUndefined();
+      const shared = StackStateSchema.parse(
+        await loadStackParams(Promise.resolve(new URL(generateStackUrlFromState(customized)))),
+      );
+      expect(findMatchingPreset(shared)).toBeUndefined();
+      const output = files((await client.preview(shared)).root);
+      expect(JSON.parse(output.get("package.json")!).packageManager).toStartWith("npm@");
+      current = customized;
+    }
+  });
 
   test("normalizes project names consistently and uses the folder basename", async () => {
     for (const projectName of ["My App", "apps/My App"]) {
@@ -108,6 +142,21 @@ describe("builder preview over oRPC", () => {
         ...update,
       });
       await expect(client.preview(input)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    }
+  });
+
+  test("preserves full feature selections when switching native frameworks", async () => {
+    const full = PRESET_TEMPLATES.find((preset) => preset.id === "full")!.stack;
+    for (const framework of ["tanstack-start", "nuxt"] as const) {
+      const selected = { ...full, webFrontend: [framework], backend: `self-${framework}` as const };
+      const resolved = resolveStackCompatibility(selected).stack;
+      expect(resolved.features).toEqual(full.features);
+      const shared = StackStateSchema.parse(
+        await loadStackParams(Promise.resolve(new URL(generateStackUrlFromState(resolved)))),
+      );
+      expect(shared.webFrontend).toEqual([framework]);
+      expect(shared.providers).toEqual(full.providers);
+      await client.preview(shared);
     }
   });
 

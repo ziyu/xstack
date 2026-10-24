@@ -1,0 +1,14 @@
+<script setup lang="ts">
+import { z } from "zod";
+const { label, locale, path } = useProductLocale();
+const { pending, error, run } = useProductAction();
+type Order = { id: string; planId: string; provider: string; amount: number; currency: string; status: string; createdAt: string };
+const { data, error: loadError, refresh } = await useFetch<{ subscription: { planId: string; provider: string; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null; orders: Order[] }>("/api/product/billing");
+async function portal() { await run(async () => { const result = await productRequest("/api/payment/portal", productJson({ locale: locale.value }), z.object({ url: z.string().url() })); window.location.assign(result.url); }); }
+const money = (row: Order) => new Intl.NumberFormat(locale.value, { style: "currency", currency: row.currency }).format(row.amount / 100);
+</script>
+<template>
+  <p v-if="error || loadError" class="error" role="alert">\{{ error || loadError?.message }}</p>
+  <div class="panel"><h2>\{{ label('Subscription', '订阅') }}</h2><template v-if="data?.subscription"><p>\{{ data.subscription.planId }} · \{{ data.subscription.status }}</p><p v-if="data.subscription.currentPeriodEnd">\{{ label('Current period ends', '当前周期结束于') }} \{{ data.subscription.currentPeriodEnd.slice(0, 10) }}</p><p v-if="data.subscription.cancelAtPeriodEnd">\{{ label('Cancels at the end of this period.', '将在当前周期结束时取消。') }}</p><button :disabled="pending" @click="portal">\{{ label('Manage subscription', '管理订阅') }}</button></template><p v-else>\{{ label('No active subscription.', '暂无活跃订阅。') }}</p><div class="actions"><NuxtLink :to="path('pricing')">\{{ label('View plans', '查看方案') }}</NuxtLink><button class="text-button" @click="refresh()">\{{ label('Refresh', '刷新') }}</button></div></div>
+  <div class="table-wrap"><table><thead><tr><th>\{{ label('Date', '日期') }}</th><th>\{{ label('Plan', '方案') }}</th><th>\{{ label('Provider', '支付方式') }}</th><th>\{{ label('Amount', '金额') }}</th><th>\{{ label('Status', '状态') }}</th></tr></thead><tbody><tr v-for="order in data?.orders ?? []" :key="order.id"><td>\{{ order.createdAt.slice(0, 10) }}</td><td><NuxtLink :to="path(`payment/${order.id}`)">\{{ order.planId }}</NuxtLink></td><td>\{{ order.provider }}</td><td>\{{ money(order) }}</td><td>\{{ order.status }}</td></tr></tbody></table><p v-if="!data?.orders.length">\{{ label('No orders yet.', '暂无订单。') }}</p></div>
+</template>

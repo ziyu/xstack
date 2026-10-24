@@ -12,7 +12,11 @@ import { createCaptchaBeforeHook, type CaptchaConfig } from "@{{projectName}}/ca
 import { localeFromHeaders } from "@{{projectName}}/i18n";
 {{/if}}
 import { betterAuth } from "better-auth";
+{{#if (includes frontend "next")}}
 import { nextCookies } from "better-auth/next-js";
+{{else if (includes frontend "tanstack-start")}}
+import { tanstackStartCookies } from "better-auth/tanstack-start";
+{{/if}}
 import { admin } from "better-auth/plugins";
 
 import "./events";
@@ -186,7 +190,7 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
         },
       },
     },
-    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }), {{#if (includes module.integrations "sms")}}createPhoneAuth(env.BETTER_AUTH_SECRET, database, events), {{/if}}nextCookies()],
+    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }){{#if (includes module.integrations "sms")}}, createPhoneAuth(env.BETTER_AUTH_SECRET, database, events){{/if}}{{#if (includes frontend "next")}}, nextCookies(){{else if (includes frontend "tanstack-start")}}, tanstackStartCookies(){{/if}}],
   });
 }
 

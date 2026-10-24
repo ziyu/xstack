@@ -1,0 +1,23 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { defaultLocale } from "@{{projectName}}/i18n";
+import { z } from "zod";
+import Markdown from "@/components/blog/markdown";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { postSchema } from "@/lib/blog-data";
+export const Route = createFileRoute("/$lang/blog/$slug")({
+  loader: ({ params }) => loadProduct(`/api/product/blog/${encodeURIComponent(params.slug)}?locale=${encodeURIComponent(params.lang)}`, params.lang, z.object({ post: postSchema, siteUrl: z.string().url(), translations: z.array(z.object({ locale: z.string(), slug: z.string() })) })),
+  head: ({ loaderData }) => {
+    if (!loaderData) return {};
+    const { post, translations, siteUrl } = loaderData;
+    const canonical = new URL(`/${post.locale}/blog/${post.slug}`, siteUrl).href;
+    const fallback = translations.find((item) => item.locale === defaultLocale);
+    return { meta: [{ title: post.title }, { name: "description", content: post.excerpt }, { property: "og:title", content: post.title }, { property: "og:description", content: post.excerpt }, { property: "og:url", content: canonical }, { property: "og:type", content: "article" }, { name: "twitter:card", content: "summary" }], links: [{ rel: "canonical", href: canonical }, ...translations.map((item) => ({ rel: "alternate", hrefLang: item.locale, href: new URL(`/${item.locale}/blog/${item.slug}`, siteUrl).href })), ...(fallback ? [{ rel: "alternate", hrefLang: "x-default", href: new URL(`/${fallback.locale}/blog/${fallback.slug}`, siteUrl).href }] : [])] };
+  }, component: Article,
+});
+function Article() {
+  const { post, siteUrl } = Route.useLoaderData(); const locale = useLocale(); const t = useT();
+  const canonical = new URL(`/${post.locale}/blog/${post.slug}`, siteUrl).href;
+  const structured = { "@context": "https://schema.org", "@type": "BlogPosting", headline: post.title, description: post.excerpt, inLanguage: post.locale, author: { "@type": "Person", name: post.authorName }, datePublished: post.publishedAt, dateModified: post.updatedAt, mainEntityOfPage: canonical, url: canonical };
+  return <article className="mx-auto max-w-3xl px-6 py-20"><a className="text-sm underline" href={`/${locale}/blog`}>{t("blog.back")}</a><header className="my-10 border-b pb-10"><h1 className="font-serif text-5xl leading-tight">{post.title}</h1><p className="mt-6 text-lg text-muted-foreground">{post.excerpt}</p><p className="mt-6 text-sm">{post.authorName} · {post.publishedAt && new Date(post.publishedAt).toLocaleDateString(locale)}</p></header><Markdown>{post.body}</Markdown><script type="application/ld+json" dangerouslySetInnerHTML={ { __html: JSON.stringify(structured).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026") } } /></article>;
+}

@@ -1,0 +1,29 @@
+import { credits } from "@{{projectName}}/app-services";
+import { json, requireSession } from "../product-api";
+{{#if (includes product.features "admin")}}
+import { auth } from "@{{projectName}}/app-services";
+import { InsufficientCreditsError } from "@{{projectName}}/credits";
+import { z } from "zod";
+import { HttpError, pageOf, readJson, requireAdministrator, requireOrigin } from "../product-api";
+{{/if}}
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path === "/api/product/credits" && request.method === "GET") {
+    const { user } = await requireSession(request);
+    return json({ balance: await credits.getBalance(user.id), transactions: await credits.listTransactions(user.id) });
+  }
+{{#if (includes product.features "admin")}}
+  if (path !== "/api/product/credit-transactions") return;
+  const { user } = await requireAdministrator(request);
+  if (request.method === "GET") return json(await credits.listAllTransactions({ limit: 20, offset: (pageOf(request) - 1) * 20 }));
+  if (request.method === "POST") {
+    requireOrigin(request);
+    const data = z.object({ email: z.string().email().transform((value) => value.trim().toLowerCase()), amount: z.number().int().safe().refine((value) => value !== 0), reason: z.string().max(1000).default("") }).strict().parse(await readJson(request));
+    const { users } = await auth.api.listUsers({ headers: request.headers, query: { filterField: "email", filterValue: data.email, filterOperator: "eq", limit: 1 } });
+    if (!users[0]) throw new HttpError(404, "user_not_found");
+    try { await credits.adjust(users[0].id, data.amount, data.reason ? `${data.reason} (${user.email})` : user.email); }
+    catch (error) { if (error instanceof InsufficientCreditsError) throw new HttpError(409, "insufficient_credits"); throw error; }
+    return json({ success: true });
+  }
+  return json({ error: "method_not_allowed" }, 405);
+{{/if}}
+}

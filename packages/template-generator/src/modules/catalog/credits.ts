@@ -1,6 +1,6 @@
 import { dependencyVersionMap } from "../../utils/add-deps";
 import { defineModule } from "../define";
-import { NEXT_SHELL_DB } from "./stack";
+import { NATIVE_SHELL_DB } from "./stack";
 
 export default defineModule({
   id: "credits",
@@ -12,7 +12,7 @@ export default defineModule({
   category: "monetization",
   requires: ["auth"],
   enhances: ["payment", "admin"],
-  supports: NEXT_SHELL_DB,
+  supports: NATIVE_SHELL_DB,
   options: {
     signupBonus: {
       type: "number",

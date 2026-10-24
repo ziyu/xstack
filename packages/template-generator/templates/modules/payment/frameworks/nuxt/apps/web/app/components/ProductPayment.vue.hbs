@@ -1,0 +1,42 @@
+<script setup lang="ts">
+import { z } from "zod";
+const props = defineProps<{ orderId?: string }>();
+const { label, path, locale, t } = useProductLocale();
+const { pending, error, run } = useProductAction();
+type Plan = { id: string; amount: number; currency: string; credits: number; mode: string; interval?: string; providers: string[] };
+type Order = { id: string; planId: string; status: string; amount: number; currency: string; provider: string };
+const { data: pricing, error: pricingError } = await useFetch<{ plans: Plan[] }>("/api/product/pricing");
+const order = ref<{ order: Order; qrImage: string | null }>();
+const providers = reactive<Record<string, string>>({});
+for (const plan of pricing.value?.plans ?? []) providers[plan.id] = plan.providers[0] ?? "";
+const money = (amount: number, currency: string) => new Intl.NumberFormat(locale.value, { style: "currency", currency }).format(amount / 100);
+const planName = (id: string) => id === "starter" ? t("payment.plans.starter.name") : id === "pro" ? t("payment.plans.pro.name") : id;
+const planDescription = (id: string) => id === "starter" ? t("payment.plans.starter.description") : id === "pro" ? t("payment.plans.pro.description") : "";
+if (props.orderId) {
+  const { data, error: orderError } = await useFetch<{ order: Order; qrImage: string | null }>(`/api/product/order/${encodeURIComponent(props.orderId)}`);
+  if (orderError.value) throw createError({ statusCode: orderError.value.statusCode ?? 500, statusMessage: orderError.value.message });
+  order.value = data.value ?? undefined;
+}
+async function checkout(plan: Plan) {
+  await run(async () => {
+    const result = await productRequest("/api/payment/checkout", productJson({ planId: plan.id, provider: providers[plan.id], locale: locale.value }), z.object({ url: z.string().url() }));
+    window.location.assign(result.url);
+  });
+}
+let timer: ReturnType<typeof setTimeout> | undefined;
+let disposed = false;
+async function poll() {
+  if (!props.orderId || disposed || order.value?.order.status !== "pending") return;
+  try { order.value = await productRequest(`/api/product/order/${encodeURIComponent(props.orderId)}`, {}, z.object({ order: z.object({ id: z.string(), planId: z.string(), status: z.string(), amount: z.number(), currency: z.string(), provider: z.string() }), qrImage: z.string().nullable() })); }
+  catch (cause) { error.value = cause instanceof Error ? cause.message : "Payment status unavailable"; }
+  if (!disposed && order.value?.order.status === "pending") timer = setTimeout(poll, 3000);
+}
+onMounted(() => { if (props.orderId) timer = setTimeout(poll, 3000); });
+onBeforeUnmount(() => { disposed = true; if (timer) clearTimeout(timer); });
+</script>
+<template>
+  <p v-if="error || pricingError" class="error" role="alert">\{{ error || pricingError?.message }}</p>
+  <section v-if="order" class="panel stack"><h1>\{{ label('Payment', '支付') }}</h1><p>\{{ order.order.planId }} · \{{ money(order.order.amount, order.order.currency) }}</p><p role="status">\{{ label('Status:', '状态：') }} \{{ order.order.status }}</p><img v-if="order.qrImage" :src="order.qrImage" :alt="label('Scan with WeChat to complete payment', '使用微信扫码支付')" width="256" height="256" /><p v-if="order.order.status === 'pending'">\{{ label('Keep this page open. Payment confirmation updates automatically.', '请保持页面打开，支付确认将自动更新。') }}</p><NuxtLink :to="path('dashboard/billing')">\{{ label('View billing', '查看账单') }}</NuxtLink></section>
+  <section v-else class="stack"><div><p class="eyebrow">\{{ label('Simple plans', '简单的方案') }}</p><h1>\{{ t('payment.pricing.title') }}</h1></div><div class="grid"><article v-for="plan in pricing?.plans ?? []" :key="plan.id" class="panel stack"><h2>\{{ planName(plan.id) }}</h2><p>\{{ planDescription(plan.id) }}</p><p class="price">\{{ money(plan.amount, plan.currency) }}<small v-if="plan.interval"> / \{{ plan.interval }}</small></p><p>\{{ plan.credits }} \{{ label('credits', '积分') }}</p><label>\{{ label('Payment provider', '支付方式') }}<select v-model="providers[plan.id]" :disabled="!plan.providers.length"><option v-for="provider in plan.providers" :key="provider" :value="provider">\{{ provider }}</option></select></label><button :disabled="pending || !providers[plan.id]" @click="checkout(plan)">\{{ label('Choose plan', '选择方案') }}</button><p v-if="!plan.providers.length" role="status">\{{ t('payment.pricing.noProviders') }}</p></article></div></section>
+</template>
+<style scoped>.price{font-size:2rem}.price small{font-size:1rem}</style>

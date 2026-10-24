@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { track } from "@/lib/analytics";
 import { PRESET_TEMPLATES } from "@/lib/constant";
+import { findMatchingPreset } from "@/lib/preset-stacks";
 import { formatStackCommandForDisplay, getDesktopBuildNote } from "@/lib/stack-utils";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +61,7 @@ export function StackBuilder() {
   const displayCommand = formatStackCommandForDisplay(command);
   const [commandExpanded, setCommandExpanded] = useState(false);
   const isCommandMultiline = displayCommand !== command;
+  const selectedPreset = findMatchingPreset(effectiveStack);
 
   const actionButtons = (
     <ActionButtons
@@ -73,29 +75,33 @@ export function StackBuilder() {
   );
 
   const templatePresets = (
-    <section className="mb-6 space-y-3" aria-label="Template presets">
-      <div>
-        <h1 className="font-mono text-lg font-medium">Template builder</h1>
-        <p className="mt-1 text-sm text-fd-muted-foreground">
-          Start with a product template, choose your modules and providers, then generate your
-          project.
-        </p>
-      </div>
-      <div className="grid gap-2 md:grid-cols-3">
-        {PRESET_TEMPLATES.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            onClick={() => applyPreset(preset.id)}
-            className="builder-focus-ring rounded border p-3 text-left transition-colors hover:border-primary"
-          >
-            <span className="font-mono text-sm text-primary">{preset.name}</span>
-            <span className="mt-1 block text-xs leading-relaxed text-fd-muted-foreground">
-              {preset.description}
-            </span>
-          </button>
-        ))}
-      </div>
+    <section
+      className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-b pb-3"
+      aria-label="Template presets"
+    >
+      <label className="flex min-w-0 max-w-full items-center gap-3 font-mono text-xs">
+        <span className="shrink-0 text-fd-muted-foreground">PRESET</span>
+        <select
+          aria-label="Project preset"
+          className="builder-focus-ring min-w-0 max-w-full rounded border border-fd-border bg-fd-background px-2 py-1.5 text-sm text-fd-foreground"
+          value={selectedPreset?.id ?? ""}
+          onChange={(event) => applyPreset(event.target.value)}
+        >
+          <option value="" disabled>
+            Custom configuration
+          </option>
+          {[...new Set(PRESET_TEMPLATES.map((preset) => preset.framework))].map((framework) => (
+            <optgroup key={framework} label={framework}>
+              {PRESET_TEMPLATES.filter((preset) => preset.framework === framework).map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+      <p className="text-xs text-fd-muted-foreground">Applies a complete stack. Customize below.</p>
     </section>
   );
   return (

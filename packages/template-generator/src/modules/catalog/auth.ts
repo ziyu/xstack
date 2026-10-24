@@ -1,5 +1,5 @@
 import { defineModule } from "../define";
-import { NEXT_SHELL_DB } from "./stack";
+import { NATIVE_SHELL_DB } from "./stack";
 
 export default defineModule({
   id: "auth",
@@ -11,7 +11,7 @@ export default defineModule({
   category: "identity",
   requires: ["core"],
   enhances: ["email", "sms"],
-  supports: NEXT_SHELL_DB,
+  supports: NATIVE_SHELL_DB,
   domain: {
     field: "auth",
     value: ({ options }) => String(options.engine),

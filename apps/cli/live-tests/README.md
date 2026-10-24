@@ -20,7 +20,6 @@ Generate a disposable Next/self/Drizzle project with `--web-deploy cloudflare --
 
 For an auth+storage fixture under `apps/cli/.smoke`, run `bun apps/cli/live-tests/storage.ts <fixture> http://localhost:8787 r2-binding`. This checks local attachment bytes, ownership, mutation origins, upload bounds and deletion. Full fixtures additionally require their configured verification-email and Turnstile signup flow; do not disable those controls to claim full-preset acceptance. Full end-to-end module tests remain separate from this focused storage check.
 
-
 ## Accounts
 
 Supply credentials in the local process environment or use the provider CLI's existing login. Do not commit credentials here.
@@ -131,6 +130,16 @@ Cloudflare: generate full with D1 and `storage:r2-binding`, install, `db:generat
 Run `bun apps/cli/live-tests/module-add.ts apps/cli/.smoke/<new-fixture>` against an absent disposable path. It creates an auth project through the real CLI API, customizes its homepage/guidance/environment, dry-runs and applies credits, verifies repeated no-op behavior, then appends payment and checks local changes and secrets survived. No provider accounts are contacted. Install and run all workspace typechecks/build in that fixture afterward; review and apply its schema only to a disposable database.
 
 MCP coverage in `apps/cli/test/mcp.test.ts` exercises the same plan/apply APIs. Conflict, baseline adoption, interrupted-write recovery and symlink rejection must also be exercised when changing the merge engine. Do not use helper-source snapshots as evidence of safe project evolution.
+
+## Multi-framework product checks
+
+`XSTACK_BUILD_SAMPLES=1 XSTACK_BUILD_SAMPLE_FILTER=product-p5 bun test apps/cli/test/generated-builds.test.ts` generates identical full selections on Next.js/TanStack Start/Nuxt with SQLite/PostgreSQL, plus independent native module combinations. Native configuration requires `backend: "self"`, `api: "none"`, and Drizzle. Current Cloudflare native product support remains Next/OpenNext-only.
+
+For each disposable full SQLite project, install, apply its schema, configure a distinct loopback `BETTER_AUTH_URL`/`SITE_URL`, and obtain real admin/user sessions through configured captcha and email verification. Run `PRODUCT_USER_COOKIE=… bun apps/cli/live-tests/product-framework.ts <fixture> <origin>` to check public SEO, SSR sessions, all dashboard routes, protected APIs and invalid webhook rejection. Run `content.ts` with both cookies for the same publication and authorization contracts. Existing captcha and domain financial fixtures retain their explicit local-provider limitations.
+
+Start runs its generated Vite build/preview scripts; Nuxt runs its Nitro `.output/server/index.mjs`. Do not claim browser success from a build alone. Verify locale changes, client navigation, auth token handoff and at least one stateful feature in each actual browser UI. External API transport fixtures must remain outside generated code and use distinct synthetic secret values to avoid triggering leak detection by matching public fixture text.
+
+Content safety is evaluated with an HTML parser, not a substring search: literal `<script>` text inside an escaped quoted metadata attribute is not an executable script element. Markdown and JSON-LD must remain safe and truthful across serializers.
 
 ## Selected validation run
 

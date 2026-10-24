@@ -1,14 +1,14 @@
 import type { Support } from "../types";
 
-/** Stack the product shell renders on: Next.js serving its own routes, no API layer. */
-export const NEXT_SHELL = {
-  frameworks: ["next"],
+/** Full-stack frameworks with native product modules and no separate API layer. */
+export const NATIVE_SHELL = {
+  frameworks: ["next", "tanstack-start", "nuxt"],
   backends: ["self"],
   apis: ["none"],
 } satisfies Support;
 
-export const NEXT_SHELL_DB = {
-  ...NEXT_SHELL,
+export const NATIVE_SHELL_DB = {
+  ...NATIVE_SHELL,
   orms: ["drizzle"],
   dialects: ["sqlite", "postgres"],
 } satisfies Support;

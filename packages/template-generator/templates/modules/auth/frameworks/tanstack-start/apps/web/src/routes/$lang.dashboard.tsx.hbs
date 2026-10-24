@@ -1,0 +1,3 @@
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { loadUser } from "@/lib/auth-data";
+export const Route = createFileRoute("/$lang/dashboard")({ beforeLoad: async ({ params }) => ({ user: await loadUser(params.lang) }), component: Outlet });

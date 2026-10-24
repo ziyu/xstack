@@ -1,0 +1,18 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { createTranslator, getMessages, isLocale } from "@{{projectName}}/i18n";
+import { useState } from "react";
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct, mutateProduct } from "@/lib/product-data";
+import { pricingSchema, formatMoney } from "@/lib/payment-data";
+import { productHead } from "@/lib/product-head";
+export const Route = createFileRoute("/$lang/pricing")({
+  loader: async ({ params }) => { const [pricing, config] = await Promise.all([loadProduct("/api/product/pricing", params.lang, pricingSchema), loadProduct("/api/product/config", params.lang, z.object({ siteUrl: z.string().url() }))]); return { ...pricing, siteUrl: config.siteUrl }; },
+  head: ({ params, loaderData }) => { if (!loaderData || !isLocale(params.lang)) return {}; const t = createTranslator(getMessages(params.lang)); return productHead({ siteUrl: loaderData.siteUrl, locale: params.lang, path: "/pricing", title: t("payment.pricing.title"), description: t("payment.pricing.subtitle") }); }, component: Pricing,
+});
+function Pricing() {
+  const { plans } = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const planMessages = new Map(Object.entries(getMessages(locale).payment.plans));
+  async function checkout(planId: string, provider: string) { setBusy(true); setError(""); try { const response = await mutateProduct("/api/payment/checkout", { planId, provider, locale }); const { url } = z.object({ url: z.string() }).parse(await response.json()); window.location.assign(url); } catch { setError(t("payment.errors.checkout")); } finally { setBusy(false); } }
+  return <section className="mx-auto max-w-5xl px-6 py-20"><header className="mb-12"><h1 className="font-serif text-5xl">{t("payment.pricing.title")}</h1><p className="mt-5 text-muted-foreground">{t("payment.pricing.subtitle")}</p></header>{error && <p role="alert" className="mb-6 text-destructive">{error} <a href={`/${locale}/login`} className="underline">{t("auth.user.signIn")}</a></p>}<div className="grid gap-6 md:grid-cols-2">{plans.map((plan) => <article key={plan.id} className="flex flex-col gap-6 border p-8"><h2 className="text-xl font-medium">{planMessages.get(plan.id)?.name ?? plan.id}</h2>{planMessages.get(plan.id)?.description && <p className="text-muted-foreground">{planMessages.get(plan.id)?.description}</p>}<p className="text-4xl font-semibold">{formatMoney(plan.amount, plan.currency, locale)}<span className="text-sm font-normal text-muted-foreground"> {plan.interval ?? t("payment.pricing.oneTime")}</span></p>{plan.credits !== undefined && <p>{t("payment.pricing.credits", { credits: plan.credits })}</p>}{plan.providers.length ? plan.providers.map((provider) => <button key={provider} disabled={busy} className="border bg-foreground p-3 text-background disabled:opacity-50" onClick={() => void checkout(plan.id, provider)}>{t(plan.mode === "payment" ? "payment.pricing.buyWith" : "payment.pricing.subscribeWith", { provider })}</button>) : <p>{t("payment.pricing.noProviders")}</p>}</article>)}</div></section>;
+}

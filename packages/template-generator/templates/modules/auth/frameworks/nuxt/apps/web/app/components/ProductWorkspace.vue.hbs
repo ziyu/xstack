@@ -1,0 +1,22 @@
+<script setup lang="ts">
+import { navigation } from "@/config/navigation";
+const props = defineProps<{ section: string; user: { id: string; name: string; email: string; emailVerified: boolean } }>();
+const { path, label, t } = useProductLocale();
+const sections = ["", "settings"{{#if (includes product.features "credits")}}, "credits"{{/if}}{{#if (includes product.features "payment")}}, "billing"{{/if}}{{#if (includes product.features "storage")}}, "files"{{/if}}{{#if (includes product.features "ai")}}, "ai"{{/if}}{{#if (includes product.features "affiliate")}}, "affiliate"{{/if}}];
+if (!sections.includes(props.section)) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+const titles: Record<string, string> = { "": label("Overview", "概览"), settings: label("Settings", "设置"), credits: label("Credits", "积分"), billing: label("Billing", "账单"), files: label("Files", "文件"), ai: label("AI studio", "AI 工作室"), affiliate: label("Referrals", "推荐") };
+</script>
+<template>
+  <div class="workspace">
+    <nav class="workspace-nav" :aria-label="label('Workspace', '工作空间')"><NuxtLink v-for="item in navigation.dashboard" :key="item.href" :to="path(item.href)">\{{ t(item.labelKey) }}</NuxtLink></nav>
+    <section class="stack"><h1>\{{ titles[section] }}</h1>
+      <div v-if="!section" class="panel"><h2>\{{ label('Welcome,', '欢迎，') }} \{{ user.name }}</h2><p>\{{ label('Your account is ready. Manage your profile and explore your workspace using the navigation.', '你的账户已就绪。通过导航管理资料并探索工作空间。') }}</p><NuxtLink :to="path('dashboard/settings')">\{{ label('Account settings', '账户设置') }}</NuxtLink></div>
+      <ProductSettings v-else-if="section === 'settings'" :user="user" />
+      {{#if (includes product.features "credits")}}<ProductCredits v-else-if="section === 'credits'" />{{/if}}
+      {{#if (includes product.features "payment")}}<ProductBilling v-else-if="section === 'billing'" />{{/if}}
+      {{#if (includes product.features "storage")}}<ProductFiles v-else-if="section === 'files'" />{{/if}}
+      {{#if (includes product.features "ai")}}<ProductAI v-else-if="section === 'ai'" />{{/if}}
+      {{#if (includes product.features "affiliate")}}<ProductAffiliate v-else-if="section === 'affiliate'" />{{/if}}
+    </section>
+  </div>
+</template>

@@ -1,0 +1,3 @@
+import { defineEventHandler, toWebRequest } from "h3";
+import { handleProductRequest } from "@/lib/product-api";
+export default defineEventHandler((event) => handleProductRequest(toWebRequest(event)));

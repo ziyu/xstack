@@ -1,0 +1,15 @@
+import { z } from "zod";
+import { redirect } from "@tanstack/react-router";
+import { loadProduct } from "./product-data";
+export const userSchema = z.object({ id: z.string(), name: z.string(), email: z.string(), role: z.string().nullish(), emailVerified: z.boolean() });
+export const sessionSchema = z.object({ user: userSchema }).nullable();
+export const authConfigSchema = z.object({ socialProviders: z.array(z.enum(["google", "github"{{#if (includes module.providers "wechat")}}, "wechat"{{/if}}])), verifyEmail: z.boolean(), canResetPassword: z.boolean() });
+export async function loadUser(locale: string) {
+  const session = await loadProduct("/api/product/session", locale, sessionSchema);
+  if (!session) throw redirect({ href: `/${locale}/login` });
+  return session.user;
+}
+export function safeNext(value: string | undefined, fallback: string): string {
+  if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\")) return fallback;
+  return value;
+}

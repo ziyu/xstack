@@ -65,6 +65,40 @@ const baseConfig = {
 } satisfies Partial<CreateInput>;
 
 const buildSamples: BuildSample[] = [
+  ...(["next", "tanstack-start", "nuxt"] as const).flatMap((framework) =>
+    (["sqlite", "postgres"] as const).map((database): BuildSample => ({
+      name: `product-p5-full-${framework}-${database}`,
+      packageManagers: ["bun"],
+      config: {
+        ...baseConfig,
+        frontend: [framework],
+        backend: "self",
+        runtime: "none",
+        api: "none",
+        database,
+        orm: "drizzle",
+        preset: "full",
+      },
+    })),
+  ),
+  ...(["tanstack-start", "nuxt"] as const).flatMap((framework) =>
+    (
+      ["shell", "auth", "storage", "blog", "credits", "payment", "ai", "seo", "captcha"] as const
+    ).map((feature): BuildSample => ({
+      name: `product-p5-${framework}-${feature}`,
+      packageManagers: ["bun"],
+      config: {
+        ...baseConfig,
+        frontend: [framework],
+        backend: "self",
+        runtime: "none",
+        api: "none",
+        database: "sqlite",
+        orm: "drizzle",
+        product: { features: feature === "shell" ? [] : [feature], providers: { auth: [] } },
+      },
+    })),
+  ),
   ...(["sqlite", "postgres"] as const).map((database): BuildSample => ({
     name: `product-p3-full-${database}`,
     packageManagers: ["bun"],

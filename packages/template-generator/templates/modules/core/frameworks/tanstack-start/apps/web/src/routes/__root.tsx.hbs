@@ -1,0 +1,7 @@
+import { HeadContent, Outlet, Scripts, createRootRoute, useLocation } from "@tanstack/react-router";
+import { ThemeProvider } from "next-themes";
+import { Toaster } from "@{{projectName}}/ui/components/sonner";
+import { defaultLocale, isLocale } from "@{{projectName}}/i18n";
+import appCss from "../index.css?url";
+export const Route = createRootRoute({ head: () => ({ meta: [{ charSet: "utf-8" }, { name: "viewport", content: "width=device-width, initial-scale=1" }, { title: "{{projectName}}" }], links: [{ rel: "stylesheet", href: appCss }] }), component: RootDocument, notFoundComponent: () => <main className="mx-auto max-w-3xl px-6 py-24"><h1 className="font-serif text-4xl">Not found</h1><a href="/" className="mt-6 inline-block underline">Home</a></main> });
+function RootDocument() { const segment = useLocation().pathname.split("/")[1] ?? ""; const locale = isLocale(segment) ? segment : defaultLocale; return <html lang={locale} suppressHydrationWarning><head><HeadContent /></head><body><ThemeProvider attribute="class" defaultTheme="system" enableSystem><Outlet /><Toaster richColors /></ThemeProvider><Scripts /></body></html>; }

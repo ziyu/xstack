@@ -1,0 +1,10 @@
+import { createTranslator, defaultLocale, getMessages, isLocale, localeNames, locales, type Locale } from "@{{projectName}}/i18n";
+
+export function useProductLocale() {
+  const route = useRoute();
+  const locale = computed<Locale>(() => isLocale(String(route.params.locale ?? "")) ? String(route.params.locale) as Locale : defaultLocale);
+  const t = computed(() => createTranslator(getMessages(locale.value)));
+  const path = (suffix = "") => `/${locale.value}${suffix ? `/${suffix.replace(/^\//, "")}` : ""}`;
+  const label = (english: string, chinese: string) => locale.value === "zh-CN" ? chinese : english;
+  return { locale, locales, localeNames, t: (key: Parameters<typeof t.value>[0], params?: Parameters<typeof t.value>[1]) => t.value(key, params), path, label };
+}

@@ -68,34 +68,82 @@ export function addAppDependencies(vfs: VirtualFileSystem, dependencies: Record<
   });
 }
 
-/** Preserve existing Next settings while keeping Node SDK dynamic imports outside the bundle. */
-export function addServerExternalPackages(vfs: VirtualFileSystem, packages: string[]) {
+/** Preserve framework settings while keeping Node SDK dynamic imports outside server bundles. */
+export function addServerExternalPackages(
+  vfs: VirtualFileSystem,
+  packages: string[],
+  config: ProjectConfig,
+) {
   if (!packages.length) return;
-  const path = `${WEB}/next.config.ts`;
+  const next = config.frontend.includes("next");
+  const nuxt = config.frontend.includes("nuxt");
+  const path = `${WEB}/${next ? "next.config.ts" : nuxt ? "nuxt.config.ts" : "vite.config.ts"}`;
   const project = new Project({ useInMemoryFileSystem: true });
   const source = project.createSourceFile(path, stackFile(vfs, path, "server external packages"));
-  const config = source
-    .getVariableDeclarationOrThrow("nextConfig")
-    .getInitializerIfKindOrThrow(SyntaxKind.ObjectLiteralExpression);
-  const property = config.getProperty("serverExternalPackages");
-  if (!property) {
-    config.addPropertyAssignment({
-      name: "serverExternalPackages",
-      initializer: JSON.stringify([...new Set(packages)]),
+  const exported = source.getExportAssignment((assignment) => !assignment.isExportEquals());
+  const expression = exported?.getExpression();
+  const root = next
+    ? source
+        .getVariableDeclarationOrThrow("nextConfig")
+        .getInitializerIfKindOrThrow(SyntaxKind.ObjectLiteralExpression)
+    : expression
+        ?.asKind(SyntaxKind.CallExpression)
+        ?.getArguments()[0]
+        ?.asKind(SyntaxKind.ObjectLiteralExpression);
+  if (!root)
+    throw new GeneratorError({
+      message: `Expected a framework config object in ${path}`,
+      phase: "modules",
     });
-  } else {
-    if (!Node.isPropertyAssignment(property))
+  let object = root;
+  for (const name of nuxt ? ["nitro", "externals"] : next ? [] : ["ssr"]) {
+    const property =
+      object.getProperty(name) ?? object.addPropertyAssignment({ name, initializer: "{}" });
+    if (!Node.isPropertyAssignment(property)) {
       throw new GeneratorError({
-        message: "Expected a serverExternalPackages array",
+        message: `Expected a ${name} configuration object in ${path}`,
         phase: "modules",
       });
-    const values = property.getInitializerIfKindOrThrow(SyntaxKind.ArrayLiteralExpression);
-    const existing = new Set(values.getElements().map((element) => element.getText()));
-    for (const name of packages) {
-      const quoted = JSON.stringify(name);
-      if (!existing.has(quoted)) {
-        values.addElement(quoted);
-        existing.add(quoted);
+    }
+    object = property.getInitializerIfKindOrThrow(SyntaxKind.ObjectLiteralExpression);
+  }
+  const name = next ? "serverExternalPackages" : "external";
+  const property =
+    object.getProperty(name) ?? object.addPropertyAssignment({ name, initializer: "[]" });
+  if (!Node.isPropertyAssignment(property)) {
+    throw new GeneratorError({ message: `Expected an ${name} array in ${path}`, phase: "modules" });
+  }
+  const values = property.getInitializerIfKindOrThrow(SyntaxKind.ArrayLiteralExpression);
+  const existing = new Set(values.getElements().map((element) => element.getText()));
+  for (const name of packages) {
+    const quoted = JSON.stringify(name);
+    if (!existing.has(quoted)) {
+      values.addElement(quoted);
+      existing.add(quoted);
+    }
+  }
+  if (!next && !nuxt) {
+    const nitro = source
+      .getDescendantsOfKind(SyntaxKind.CallExpression)
+      .find((call) => call.getExpression().getText() === "nitro");
+    if (nitro) {
+      if (!nitro.getArguments().length) nitro.addArgument("{}");
+      const options = nitro.getArguments()[0]?.asKind(SyntaxKind.ObjectLiteralExpression);
+      if (!options)
+        throw new GeneratorError({ message: "Expected Nitro plugin options", phase: "modules" });
+      const trace =
+        options.getProperty("traceDeps") ??
+        options.addPropertyAssignment({ name: "traceDeps", initializer: "[]" });
+      if (!Node.isPropertyAssignment(trace))
+        throw new GeneratorError({ message: "Expected Nitro traceDeps array", phase: "modules" });
+      const traced = trace.getInitializerIfKindOrThrow(SyntaxKind.ArrayLiteralExpression);
+      const included = new Set(traced.getElements().map((element) => element.getText()));
+      for (const name of packages) {
+        const quoted = JSON.stringify(name);
+        if (!included.has(quoted)) {
+          traced.addElement(quoted);
+          included.add(quoted);
+        }
       }
     }
   }
@@ -115,7 +163,7 @@ export function appendEnv(vfs: VirtualFileSystem, entries: ModuleEnvEntry[]) {
       lastModule = module;
     }
     if (spec.comment) content += `# ${spec.comment}\n`;
-    const value = spec.example ?? "";
+    const value = spec.example ?? spec.default ?? "";
     content += spec.required === false && !value ? `# ${spec.key}=\n` : `${spec.key}=${value}\n`;
   }
   vfs.writeFile(SEAM_FILES.env, content);

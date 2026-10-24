@@ -212,6 +212,17 @@ function processStandardAuthDeps(vfs: VirtualFileSystem, config: RenderConfig): 
         authDependencies.push("mongodb");
       }
       addPackageDependency({ vfs, packagePath: authPath, dependencies: authDependencies });
+      if (backend === "self" && frontend.includes("tanstack-start")) {
+        const startVersion = vfs.readJson<{ dependencies?: Record<string, string> }>(webPath)
+          ?.dependencies?.["@tanstack/react-start"];
+        if (startVersion) {
+          addPackageDependency({
+            vfs,
+            packagePath: authPath,
+            customDependencies: { "@tanstack/react-start": startVersion },
+          });
+        }
+      }
       if (hasNative) {
         addPackageDependency({ vfs, packagePath: authPath, dependencies: ["@better-auth/expo"] });
       }

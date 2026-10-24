@@ -170,6 +170,18 @@ function resolveAttempt(
     drain();
   }
 
+  if (
+    stack.webDeploy === "cloudflare" &&
+    !stack.frontend.includes("next") &&
+    [...entries.values()].some((entry) => entry.variant === "native")
+  ) {
+    issues.push({
+      level: "error",
+      message:
+        "Native product modules on Cloudflare currently require the Next.js OpenNext adapter; TanStack Start and Nuxt support local, Docker and Vercel deployments, not request-scoped Cloudflare bindings.",
+    });
+  }
+
   for (const id of reasons.keys()) {
     for (const other of catalog.get(id)!.conflicts ?? []) {
       if (reasons.has(other) && id < other) {

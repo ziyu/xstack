@@ -1,0 +1,47 @@
+<script setup lang="ts">
+import { z } from "zod";
+import MarkdownIt from "markdown-it";
+const props = defineProps<{ id?: string }>();
+const { label, locale, locales, path } = useProductLocale();
+const { pending, error, notice, run } = useProductAction();
+const page = ref(1);
+const postSchema = z.object({ id: z.string(), locale: z.string(), slug: z.string(), title: z.string(), excerpt: z.string(), body: z.string(), status: z.enum(["draft", "published"]), translationKey: z.string(), revision: z.number(), updatedAt: z.string() });
+type Post = z.infer<typeof postSchema>;
+const list = ref<{ posts: Post[]; total: number; page: number; limit: number }>();
+const form = reactive({ locale: locale.value as string, slug: "", title: "", excerpt: "", body: "", status: "draft" as "draft" | "published", translationKey: "" });
+const revision = ref(0);
+if (props.id && props.id !== "new") {
+  const { data, error: loadError } = await useFetch(`/api/blog/${encodeURIComponent(props.id)}`, { transform: (value) => postSchema.parse(value) });
+  if (loadError.value || !data.value) throw createError({ statusCode: loadError.value?.statusCode ?? 404, statusMessage: "Post not found" });
+  Object.assign(form, data.value); revision.value = data.value.revision;
+}
+const requestFetch = useRequestFetch();
+async function loadList() {
+  const result = await requestFetch("/api/blog", { query: { page: page.value } });
+  list.value = z.object({ posts: z.array(postSchema), total: z.number(), page: z.number(), limit: z.number() }).parse(result);
+}
+if (!props.id) await loadList();
+watch(page, () => run(loadList));
+const markdown = new MarkdownIt({ html: false, linkify: false });
+const preview = computed(() => markdown.render(form.body));
+async function save() {
+  await run(async () => {
+    const post = { locale: form.locale, slug: form.slug.trim(), title: form.title.trim(), excerpt: form.excerpt.trim(), body: form.body, status: form.status, ...(form.translationKey ? { translationKey: form.translationKey } : {}) };
+    const updating = props.id && props.id !== "new";
+    const result = await productRequest(updating ? `/api/blog/${encodeURIComponent(props.id!)}` : "/api/blog", { ...productJson(updating ? { revision: revision.value, post } : post), method: updating ? "PUT" : "POST" }, postSchema);
+    revision.value = result.revision; Object.assign(form, result);
+    notice.value = label("Saved. Conflicting edits are rejected rather than overwritten.", "已保存。冲突修改将被拒绝，而不会被覆盖。");
+    if (!updating) await navigateTo(path(`admin/blog/${result.id}`));
+  });
+}
+async function remove(post: Post) {
+  if (!window.confirm(label("Delete this post permanently?", "永久删除此文章？"))) return;
+  await run(async () => { await productRequest(`/api/blog/${encodeURIComponent(post.id)}`, { ...productJson({ revision: post.revision }), method: "DELETE" }); await loadList(); });
+}
+</script>
+<template>
+  <p v-if="error" role="alert" class="error">\{{ error }}</p><p v-if="notice" role="status" class="notice">\{{ notice }}</p>
+  <template v-if="!id"><NuxtLink class="button" :to="path('admin/blog/new')">\{{ label('New draft', '新建草稿') }}</NuxtLink><div class="table-wrap"><table><thead><tr><th>\{{ label('Title', '标题') }}</th><th>\{{ label('Language', '语言') }}</th><th>\{{ label('Status', '状态') }}</th><th>\{{ label('Actions', '操作') }}</th></tr></thead><tbody><tr v-for="post in list?.posts ?? []" :key="post.id"><td><NuxtLink :to="path(`admin/blog/${post.id}`)">\{{ post.title }}</NuxtLink></td><td>\{{ post.locale }}</td><td>\{{ post.status }}</td><td><button class="text-button" :disabled="pending" @click="remove(post)">\{{ label('Delete', '删除') }}</button></td></tr></tbody></table></div><nav class="actions"><button class="text-button" :disabled="page <= 1" @click="page--">\{{ label('Previous', '上一页') }}</button><span>\{{ page }}</span><button class="text-button" :disabled="!list || page * list.limit >= list.total" @click="page++">\{{ label('Next', '下一页') }}</button></nav></template>
+  <template v-else><NuxtLink :to="path('admin/blog')">\{{ label('All posts', '全部文章') }}</NuxtLink><form class="panel" @submit.prevent="save"><div class="grid"><label>\{{ label('Language', '语言') }}<select v-model="form.locale"><option v-for="code in locales" :key="code" :value="code">\{{ code }}</option></select></label><label>\{{ label('Slug', '路径名') }}<input v-model="form.slug" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="160" required /></label></div><label>\{{ label('Title', '标题') }}<input v-model="form.title" maxlength="200" required /></label><label>\{{ label('Excerpt', '摘要') }}<textarea v-model="form.excerpt" maxlength="500" required /></label><label>\{{ label('Markdown body · raw HTML disabled', 'Markdown 正文 · 已禁用原始 HTML') }}<textarea v-model="form.body" class="body-editor" maxlength="100000" required /></label><label>\{{ label('Translation key (same UUID for translated posts)', '翻译键（翻译文章使用相同 UUID）') }}<input v-model="form.translationKey" pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" /></label><label>\{{ label('Status', '状态') }}<select v-model="form.status" :disabled="id === 'new'"><option value="draft">\{{ label('Draft', '草稿') }}</option><option value="published">\{{ label('Published', '已发布') }}</option></select></label><small v-if="id === 'new'">\{{ label('Save a draft before publishing.', '发布前请先保存草稿。') }}</small><button :disabled="pending">\{{ label('Save post', '保存文章') }}</button></form><section class="panel prose"><h2>\{{ label('Preview', '预览') }}</h2><div v-html="preview" /></section></template>
+</template>
+<style scoped>.body-editor{min-height:24rem;font-family:ui-monospace,monospace}</style>

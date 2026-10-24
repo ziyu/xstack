@@ -1,6 +1,6 @@
 import { dependencyVersionMap } from "../../utils/add-deps";
 import { defineModule } from "../define";
-import { NEXT_SHELL_DB } from "./stack";
+import { NATIVE_SHELL_DB } from "./stack";
 
 export default defineModule({
   id: "storage",
@@ -11,7 +11,7 @@ export default defineModule({
   },
   category: "content",
   requires: ["auth"],
-  supports: NEXT_SHELL_DB,
+  supports: NATIVE_SHELL_DB,
   providers: {
     min: 1,
     max: 1,
@@ -52,7 +52,7 @@ export default defineModule({
       "r2-binding": {
         name: "Cloudflare R2 (Workers binding)",
         market: "global",
-        supports: { targets: ["cloudflare"] },
+        supports: { frameworks: ["next"], targets: ["cloudflare"] },
         dependencies: { "@opennextjs/cloudflare": dependencyVersionMap["@opennextjs/cloudflare"] },
         devDependencies: {
           "@cloudflare/workers-types": dependencyVersionMap["@cloudflare/workers-types"],

@@ -1,0 +1,5 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { ProfileForm, PasswordForm } from "@/components/auth/account-forms";
+import { useT } from "@/components/i18n-provider";
+export const Route = createFileRoute("/$lang/dashboard/settings")({ component: Settings });
+function Settings() { const { user } = Route.useRouteContext(); const t = useT(); return <div className="max-w-xl space-y-10"><h1 className="font-serif text-4xl">{t("auth.settings.title")}</h1><ProfileForm name={user.name} email={user.email} /><PasswordForm /></div>; }

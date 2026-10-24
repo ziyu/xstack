@@ -72,7 +72,7 @@ describe("module resolver", () => {
       );
     }
     for (const stack of [
-      { frontend: ["nuxt"] as ["nuxt"] },
+      { frontend: ["svelte"] as ["svelte"] },
       { database: "none" as const },
       { orm: "prisma" as const },
     ]) {
@@ -105,6 +105,17 @@ describe("module resolver", () => {
         plan({ features: ["affiliate"], options: { affiliate: { commissionPercent: 101 } } }),
       ),
     ).toBe(true);
+  });
+
+  it("resolves the same full feature selection on supported native frameworks", () => {
+    for (const frontend of ["next", "tanstack-start", "nuxt"] as const) {
+      const selected = plan(PRODUCT_PRESETS.full, { frontend: [frontend] });
+      expect(selected.issues.filter((issue) => issue.level === "error")).toEqual([]);
+      expect(selected.modules.filter((module) => module.variant !== "native")).toEqual([]);
+      expect(selected.modules.map((module) => module.manifest.id).sort()).toEqual(
+        [...PRODUCT_PRESETS.full.features, "core", "i18n"].sort(),
+      );
+    }
   });
 
   it("falls back to the stack templates outside the native stack", () => {
@@ -159,7 +170,7 @@ describe("module resolver", () => {
     expect(native.modules.find((module) => module.manifest.id === "auth")?.providers).toEqual([
       "wechat",
     ]);
-    expect(hasErrors(plan(product, { frontend: ["nuxt"] }))).toBe(true);
+    expect(hasErrors(plan(product, { frontend: ["svelte"] }))).toBe(true);
     expect(hasErrors(plan({ ...product, options: { auth: { engine: "clerk" } } }))).toBe(true);
   });
 
@@ -188,7 +199,7 @@ describe("module resolver", () => {
     ]) {
       expect(hasErrors(plan(selection))).toBe(true);
     }
-    expect(hasErrors(plan({ features: ["sms"] }, { frontend: ["nuxt"] }))).toBe(true);
+    expect(hasErrors(plan({ features: ["sms"] }, { frontend: ["svelte"] }))).toBe(true);
     expect(
       hasErrors(
         plan({ features: ["sms"], providers: { sms: ["aliyun"] } }, { webDeploy: "cloudflare" }),

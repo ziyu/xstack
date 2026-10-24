@@ -325,7 +325,7 @@ export function useStackBuilder() {
     }
 
     startTransition(() => {
-      setStack({ ...preset.stack, projectName: stack.projectName });
+      setStack((current) => ({ ...preset.stack, projectName: current.projectName }));
     });
 
     contentRef.current?.scrollTo(0, 0);

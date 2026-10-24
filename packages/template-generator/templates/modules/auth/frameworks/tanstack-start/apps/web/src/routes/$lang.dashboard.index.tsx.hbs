@@ -1,0 +1,4 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useT } from "@/components/i18n-provider";
+export const Route = createFileRoute("/$lang/dashboard/")({ component: Dashboard });
+function Dashboard() { const { user } = Route.useRouteContext(); const t = useT(); return <section className="space-y-6"><p className="text-xs uppercase tracking-[0.2em]">{{projectName}}</p><h1 className="font-serif text-4xl">{t("auth.dashboard.title")}</h1><p>{user.name}</p><p className="text-muted-foreground">{user.email}</p></section>; }

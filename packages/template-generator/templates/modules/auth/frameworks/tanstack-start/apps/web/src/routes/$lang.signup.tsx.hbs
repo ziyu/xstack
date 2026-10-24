@@ -1,0 +1,9 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import SignUpForm from "@/components/auth/sign-up-form";
+import { AuthCard } from "@/components/auth/auth-card";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+import { authConfigSchema, safeNext } from "@/lib/auth-data";
+export const Route = createFileRoute("/$lang/signup")({ validateSearch: z.object({ next: z.string().optional() }), loader: ({ params }) => loadProduct("/api/product/config", params.lang, authConfigSchema), component: AuthPage });
+function AuthPage() { const config = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const next = safeNext(Route.useSearch().next, `/${locale}/dashboard`); return <AuthCard title={t("auth.signUp.title")} footer={<a href={`/${locale}/login`} className="underline">{t("auth.signIn.title")}</a>}><SignUpForm next={next} providers={config.socialProviders} verifyEmail={config.verifyEmail} />{{#if (includes product.features "sms")}}<a className="text-sm underline" href={`/${locale}/login/phone`}>{t("auth.phone.title")}</a>{{/if}}</AuthCard>; }

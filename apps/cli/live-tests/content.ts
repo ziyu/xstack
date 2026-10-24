@@ -107,9 +107,37 @@ try {
   assert.equal(publicResponse.status, 200);
   const html = await publicResponse.text();
   assert.ok(html.includes("A safe paragraph."));
-  assert.ok(!/<script>attack\(\)<\/script>/.test(html));
-  assert.ok(!/href="javascript:/i.test(html));
-  const jsonText = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)?.[1];
+  const scripts: { type: string | null; text: string }[] = [];
+  const links: string[] = [];
+  let currentScript: { type: string | null; text: string } | undefined;
+  const parsedHtml = new HTMLRewriter()
+    .on("script", {
+      element(element) {
+        currentScript = { type: element.getAttribute("type"), text: "" };
+        scripts.push(currentScript);
+      },
+      text(chunk) {
+        if (currentScript) currentScript.text += chunk.text;
+      },
+    })
+    .on("a", {
+      element(element) {
+        links.push(element.getAttribute("href") ?? "");
+      },
+    })
+    .transform(new Response(html));
+  await parsedHtml.text();
+  assert.ok(
+    !scripts.some(
+      (script) => script.type !== "application/ld+json" && script.text.trim() === "attack()",
+    ),
+    "Untrusted content created an executable script element",
+  );
+  assert.ok(
+    !links.some((href) => /^javascript:/i.test(href)),
+    "Untrusted content created a JavaScript link",
+  );
+  const jsonText = scripts.find((script) => script.type === "application/ld+json")?.text;
   assert.ok(jsonText, "Article contains JSON-LD");
   const json = z
     .object({

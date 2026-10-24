@@ -1,0 +1,15 @@
+import { seo } from "@{{projectName}}/app-services";
+import { locales } from "@{{projectName}}/i18n";
+const escape = (value: string) => value.replace(/[<>&"']/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[char]!);
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (request.method !== "GET") return;
+  if (path === "/robots.txt") {
+    const paths = ["/login", "/signup", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/verify-email", "/dashboard", "/admin", "/api"];
+    return new Response(["User-agent: *", "Allow: /", ...[...paths, ...locales.flatMap((locale) => paths.map((path) => `/${locale}${path}`))].map((path) => `Disallow: ${path}`), `Sitemap: ${seo.url("/sitemap.xml")}`, ""].join("\n"), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  }
+  if (path === "/sitemap.xml") {
+    const entries = await seo.sitemap();
+    const body = entries.map((entry) => `<url><loc>${escape(entry.url)}</loc>${entry.lastModified ? `<lastmod>${entry.lastModified.toISOString()}</lastmod>` : ""}${Object.entries(entry.alternates?.languages ?? {}).map(([lang, href]) => `<xhtml:link rel="alternate" hreflang="${escape(lang)}" href="${escape(href)}"/>`).join("")}</url>`).join("");
+    return new Response(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">${body}</urlset>`, { headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "no-store" } });
+  }
+}

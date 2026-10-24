@@ -1,0 +1,7 @@
+<script setup lang="ts">
+import { defaultLocale, isLocale, LOCALE_COOKIE, matchLocale } from "@{{projectName}}/i18n";
+const cookie = useCookie(LOCALE_COOKIE);
+const headers = useRequestHeaders(["accept-language"]);
+await navigateTo(`/${isLocale(cookie.value ?? undefined) ? cookie.value : matchLocale(headers["accept-language"]) ?? defaultLocale}`, { redirectCode: 302, replace: true });
+</script>
+<template><span /></template>

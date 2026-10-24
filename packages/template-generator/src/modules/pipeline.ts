@@ -54,6 +54,10 @@ export function getModulePlan(config: ProjectConfig): ResolvedPlan {
   return plan;
 }
 
+Handlebars.registerHelper("hasNativeModules", (config: ProjectConfig) =>
+  getModulePlan(config).modules.some((module) => module.variant === "native"),
+);
+
 /** The config the stack templates render with, carrying the auth engine the module plan picked. */
 export function toRenderConfig(config: ProjectConfig): RenderConfig {
   const plan = getModulePlan(config);
@@ -134,7 +138,10 @@ function renderPrefix(
   const normalized = `${prefix}/`;
   for (const [templatePath, content] of templates) {
     if (!templatePath.startsWith(normalized)) continue;
-    const destPath = transformFilename(templatePath.slice(normalized.length));
+    const relativePath = templatePath.slice(normalized.length);
+    // Framework overlays are selected explicitly, never emitted as output directories.
+    if (relativePath.startsWith("frameworks/")) continue;
+    const destPath = transformFilename(relativePath);
     if (stackFiles.has(destPath)) {
       throw new GeneratorError({
         message: `Module "${context.module.id}" overwrites ${destPath} from the stack templates; declare it in "replaces"`,
@@ -199,22 +206,41 @@ export function processModuleTemplates(
     const base = `modules/${manifest.id}`;
     const context = templateContext(config, plan, module);
 
-    if (manifest.replaces) {
-      for (const file of replaceStackFiles(vfs, manifest.id, manifest.replaces)) {
+    const replacements = [
+      ...(manifest.replaces ?? []),
+      ...config.frontend.flatMap((framework) => manifest.frameworkReplaces?.[framework] ?? []),
+    ];
+    if (replacements.length) {
+      for (const file of replaceStackFiles(vfs, manifest.id, replacements)) {
         stackFiles.delete(file);
       }
     }
 
-    renderPrefix(vfs, templates, `${base}/files`, context, stackFiles);
-    for (const framework of config.frontend) {
+    const prefixes = [
+      `${base}/files`,
+      `${base}/dialects/${config.database}`,
+      ...module.providers.map((provider) => `${base}/providers/${provider}`),
+      ...module.integrations.map((other) => `${base}/integrations/${other}`),
+    ];
+    for (const prefix of prefixes) renderPrefix(vfs, templates, prefix, context, stackFiles);
+    const frameworks = [
+      ...(config.frontend.some(
+        (framework) => framework === "tanstack-start" || framework === "nuxt",
+      )
+        ? ["native"]
+        : []),
+      ...(config.frontend.some(
+        (framework) => framework === "next" || framework === "tanstack-start",
+      )
+        ? ["react"]
+        : []),
+      ...config.frontend,
+    ];
+    for (const framework of frameworks) {
       renderPrefix(vfs, templates, `${base}/frameworks/${framework}`, context, stackFiles);
-    }
-    renderPrefix(vfs, templates, `${base}/dialects/${config.database}`, context, stackFiles);
-    for (const provider of module.providers) {
-      renderPrefix(vfs, templates, `${base}/providers/${provider}`, context, stackFiles);
-    }
-    for (const other of module.integrations) {
-      renderPrefix(vfs, templates, `${base}/integrations/${other}`, context, stackFiles);
+      for (const prefix of prefixes) {
+        renderPrefix(vfs, templates, `${prefix}/frameworks/${framework}`, context, stackFiles);
+      }
     }
 
     const [primary] = manifest.packages ?? [];
@@ -234,16 +260,21 @@ export function processModuleTemplates(
     }
 
     if (manifest.appDependencies) addAppDependencies(vfs, manifest.appDependencies);
+    for (const framework of config.frontend) {
+      const dependencies = manifest.frameworkAppDependencies?.[framework];
+      if (dependencies) addAppDependencies(vfs, dependencies);
+    }
     for (const spec of providerSpecs) {
       if (spec.appDependencies) addAppDependencies(vfs, spec.appDependencies);
-      if (spec.serverExternalPackages) addServerExternalPackages(vfs, spec.serverExternalPackages);
+      if (spec.serverExternalPackages)
+        addServerExternalPackages(vfs, spec.serverExternalPackages, config);
     }
   }
 
   aggregateMessages(vfs, plan);
   indexDbSchema(vfs);
   writeNavigation(vfs, config, plan);
-  writeProxy(vfs, plan);
+  if (config.frontend.includes("next")) writeProxy(vfs, plan);
   writeModuleDocsIndex(vfs, plan);
 }
 

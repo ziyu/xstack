@@ -1,6 +1,6 @@
 import { dependencyVersionMap } from "../../utils/add-deps";
 import { defineModule } from "../define";
-import { NEXT_SHELL_DB } from "./stack";
+import { NATIVE_SHELL_DB } from "./stack";
 
 export default defineModule({
   id: "sms",
@@ -12,7 +12,7 @@ export default defineModule({
   category: "communication",
   requires: ["core"],
   enhances: ["auth"],
-  supports: NEXT_SHELL_DB,
+  supports: NATIVE_SHELL_DB,
   providers: {
     min: 1,
     max: 1,

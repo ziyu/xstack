@@ -1,0 +1,32 @@
+import { AIError } from "@{{projectName}}/ai";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+
+export const privateHeaders = { "Cache-Control": "no-store" };
+export function requireAIOrigin(request: Request) {
+  if (request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new AIError("invalid_request");
+}
+export async function readAIRequest(request: Request): Promise<unknown> {
+  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new AIError("invalid_request");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const item = await reader.read();
+      if (item.done) break;
+      size += item.value.length;
+      if (size > 40_000) { await reader.cancel(); throw new AIError("invalid_request"); }
+      chunks.push(item.value);
+    }
+  } finally { reader.releaseLock(); }
+  const data = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder().decode(data)); } catch { throw new AIError("invalid_request"); }
+}
+export function aiErrorResponse(error: unknown) {
+  const code = error instanceof AIError ? error.code : error instanceof z.ZodError ? "invalid_request" : "provider_error";
+  const status = code === "not_found" ? 404 : code === "insufficient_credits" ? 402 : code === "invalid_request" || code === "unsupported" ? 400 : code === "conflict" || code === "busy" ? 409 : 503;
+  return Response.json({ error: code }, { status, headers: privateHeaders });
+}
