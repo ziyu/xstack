@@ -49,6 +49,7 @@
   },
   "scripts": {
     "generate-templates": "bun scripts/generate-templates.ts",
+    "audit:contributions": "bun scripts/audit-contributions.ts",
     "prebuild": "bun run generate-templates",
     "build": "tsdown",
     "prepublishOnly": "bun run build",

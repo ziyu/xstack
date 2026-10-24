@@ -3,6 +3,9 @@ import { Result } from "better-result";
 import { generateApplications } from "./apps/generate";
 import type { ResolvedApplication } from "./apps/plan";
 import { renderApplicationLayers } from "./apps/render";
+import { resolveWorkspaceCapabilities } from "./contributions/capabilities";
+import { assertContributionInventory } from "./contributions/inventory";
+import { planStackContributions } from "./contributions/preflight";
 import { VirtualFileSystem } from "./core/virtual-fs";
 import {
   finalizeModules,
@@ -70,6 +73,16 @@ export async function generate(
 ): Promise<Result<VirtualFileTree, GeneratorError>> {
   return Result.tryPromise({
     try: async () => {
+      if (options.templates) assertContributionInventory(options.templates);
+      if (options.config.apps) {
+        const capabilities = resolveWorkspaceCapabilities(options.config, options.templates);
+        if (capabilities.issues.length)
+          throw new GeneratorError({
+            phase: "contributions",
+            message: capabilities.issues.join("; "),
+          });
+      }
+      if (options.templates) planStackContributions(options.config, options.templates);
       if (options.config.apps) return generateApplications(options, generateApplication);
       return generateApplication(options);
     },
@@ -106,6 +119,7 @@ async function generateApplication(
       "apps/web-frontend": "apps/web",
       "apps/backend": "apps/server",
     },
+    context ? { ownsPath: context.ownsPath, inheritedFiles: context.inheritedFiles } : undefined,
   );
   await processBaseTemplate(vfs, templates, config);
   if (app) {
@@ -135,10 +149,12 @@ async function generateApplication(
   finalizeModules(vfs, config);
   if (!app) processCatalogs(vfs, config);
   processVercelConfig(vfs, config);
-  processReadme(vfs, config);
-  if (options.version)
-    writeXStackConfigToVfs(vfs, config, options.version, generateReproducibleCommand(config));
-  processAgentGuidance(vfs, config);
+  if (vfs.ownsPath("package.json")) {
+    processReadme(vfs, config);
+    if (options.version)
+      writeXStackConfigToVfs(vfs, config, options.version, generateReproducibleCommand(config));
+    processAgentGuidance(vfs, config);
+  }
   return {
     root: vfs.toTree(config.projectName),
     fileCount: vfs.getFileCount(),

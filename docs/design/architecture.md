@@ -637,7 +637,7 @@ Builder 默认使用显式 apps，保留紧凑整套预设，新增 split shell 
 
 应用管理与技术栈 UI 分离：Applications 仅保留实例标签、名称、类型和增删；下方 Application technology 跟随同一选中应用显示模板实际支持的框架卡片、runtime 和依赖绑定。全栈默认不展示 API 下拉，backend 的协议放高级设置，绑定客户端显示继承协议。桌面/移动共享当前选择，数据库/工具仍为共享配置。浏览器验证 Nuxt 选择在切换 CLI 后保留、admin 仅展示已有 React Router 实现、backend 展示四种服务框架；改变 backend 为 Node+tRPC 后 frontend 显示继承协议且真实预览成功，390px 无横向溢出。
 
-## 27. 贡献体系补齐计划（检查点 6ca67b4 后，尚未实施）
+## 27. 贡献体系补齐计划（检查点 6ca67b4 后，C0/C1 首批已实施）
 
 检查点包含应用模型、目录迁移和 Builder，但不是完整贡献适配交付。2026-10-24 盘点 embedded 模板：14 个模块的 app-scoped 贡献均只有 fullstack-web；旧 web 分支仍有 auth/stack 96 个文件、API 7 个、deploy 10 个。框架壳有 16 个实现，admin 仅 React Router；框架壳可生成不代表业务模块可用。当前没有发现 modules 下 apps/web 贡献残留，但 auth/stack/web、api/web、deploy/web 仍由独立旧 selector 处理；模块 renderPrefix 对不匹配 app 类型直接 continue，目录误写可能静默丢弃。生成项目 apps/web 是用户可选物理目录，与这些逻辑分类不同。
 
@@ -665,3 +665,15 @@ Builder 默认使用显式 apps，保留紧凑整套预设，新增 split shell 
 | C6 外围与收尾     | native 独立壳/产品客户端显式区分；PWA/desktop/addons/deploy/DB provisioning 选择目标 app；清理旧 selector/映射/文档与基线差异                        | 各部署产物、脚本、env、服务绑定指向正确 owner；无跨 app 秘密泄漏；生成后 add 保留定制与密钥，冲突零写入；全矩阵报告无未分类模板 |
 
 先落地 C0/C1，不先复制所有模块的拆分目录。每批建立全栈与拆分对照项目，覆盖不同实例名、共享包唯一性、文件归属、调用契约和权限边界。真实云服务/支付送达需要独立凭据验收，不能用本地协议夹具替代宣称。此计划不新增微服务队列、租户系统或自动升级生成代码。
+
+### 27.3 C0/C1 首批实现与实际边界
+
+贡献库存放在 src/contributions：inventory 覆盖全部模板族并给出 source/family/owner、app/module/framework/provider/integration/dialect 分类；requirements 用明确声明检查选中的原生 provider、integration、dialect 与 framework 来源，inline providers 不强求虚构目录。生成入口先做全量结构校验和选中来源 preflight；误写 apps/web、未知模块/provider/integration、缺少选中 Stripe 或邮件集成均拒绝。audit:contributions 已可执行，当前 836 个来源、119 行结构矩阵、零未知分类；16 个明确 legacy 文件属于 deploy/Electrobun，仍按 C6 迁移，不把零分类错误说成零旧架构。
+
+WorkspacePlan 在 app 渲染前确定 root/package/file owner、依赖顺序和稳定端口；共享包源码只由 owner 渲染，其他 app 只读共享 manifest。VFS 拒绝越权写/删除，聚合不再 first-wins 跳过 root 或 db/api/auth 冲突；共享定义冲突明确失败，依赖与根脚本再按应用汇总。固定 apps/web/apps/server 仍是部分 processor 的内部逻辑别名，由 scoped 路径映射解析；这批没有宣称所有 processor 都已改成 role API。source 库存、stack plan 与 owner map 已有，尚不是每个后处理写入的完整来源/覆盖追踪。
+
+旧 auth/API 选择函数改为 planAuthContributions/planApiContributions，计划声明 source/target/owner/required/appTypes 与明确 optionalReason；选中必需来源缺失不再静默空输出。旧 web 分支迁为 shared/client/frameworks；fullstack/native 来源有类型化目录；模块 frameworks/native 更名 http-server，避免与移动端混淆。模块完整业务拆分、跨框架能力扩展和部署贡献仍属 C2–C6，未在本批伪装完成。
+
+resolveWorkspaceCapabilities 共用到生成入口、CLI 和 Builder；区分 native/stack/missing/not-applicable，移除 Builder 的 blanket split 禁用。旧 stack auth 明确标注缺少原生业务集成与管理员后台；真实后端服务初始化接收计划中的客户端 Origin，授权边界不使用通配符。
+
+验证：全栈 Next auth+credits+CLI 与拆分 React Router frontend/console+Hono auth+CLI 实际安装、全部 workspace 类型检查和构建、SQLite schema 应用通过。全栈注册/会话/积分页通过；拆分两个声明 Origin 的真实注册/会话通过，第三方 Origin 403。命名 portal 项目追加 credits 保留用户 README 和独立 CLI。浏览器验证 Builder 显示 stack auth 限制且真实预览成功。选择顺序反转的产物比较排除 createdAt 时间元数据，其余一致；未知贡献、缺失 provider、共享冲突与越权写入已有回归覆盖。

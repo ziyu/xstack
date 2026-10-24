@@ -417,6 +417,538 @@ export default defineConfig({
   images: ["public/logo.png"],
 });
 `],
+  ["api/orpc/apps/fullstack-web/frameworks/astro/src/pages/rpc/[...rest].ts.hbs", `import type { APIRoute } from "astro";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { RPCHandler } from "@orpc/server/fetch";
+import { onError } from "@orpc/server";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createContext } from "@{{projectName}}/api/context";
+
+const handler = new RPCHandler(appRouter, {
+  interceptors: [
+    onError((error) => {
+      console.error(error);
+    }),
+  ],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+  plugins: [
+    new OpenAPIReferencePlugin({
+      schemaConverters: [new ZodToJsonSchemaConverter()],
+    }),
+  ],
+  interceptors: [
+    onError((error) => {
+      console.error(error);
+    }),
+  ],
+});
+
+export const prerender = false;
+
+export const ALL: APIRoute = async ({ request }) => {
+  const context = await createContext({ headers: request.headers });
+
+  const rpcResult = await handler.handle(request, {
+    prefix: "/rpc",
+    context,
+  });
+  if (rpcResult.response) return rpcResult.response;
+
+  const apiResult = await apiHandler.handle(request, {
+    prefix: "/rpc/api-reference",
+    context,
+  });
+  if (apiResult.response) return apiResult.response;
+
+  return new Response("Not found", { status: 404 });
+};
+`],
+  ["api/orpc/apps/fullstack-web/frameworks/next/src/app/api/rpc/[[...rest]]/route.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { RPCHandler } from "@orpc/server/fetch";
+import { onError } from "@orpc/server";
+import { NextRequest } from "next/server";
+
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+async function handleRequest(req: NextRequest) {
+	const rpcResult = await rpcHandler.handle(req, {
+		prefix: "/api/rpc",
+		context: await createContext(req),
+	});
+	if (rpcResult.response) return rpcResult.response;
+
+	const apiResult = await apiHandler.handle(req, {
+		prefix: "/api/rpc/api-reference",
+		context: await createContext(req),
+	});
+	if (apiResult.response) return apiResult.response;
+
+	return new Response("Not found", { status: 404 });
+}
+
+export const GET = handleRequest;
+export const POST = handleRequest;
+export const PUT = handleRequest;
+export const PATCH = handleRequest;
+export const DELETE = handleRequest;`],
+  ["api/orpc/apps/fullstack-web/frameworks/nuxt/app/plugins/orpc.client.ts.hbs", `import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+
+export default defineNuxtPlugin(() => {
+  const rpcLink = new RPCLink({
+    url: \`\${window.location.origin}/rpc\`,
+    {{#if (eq auth "better-auth")}}
+    fetch(url, options) {
+        return fetch(url, {
+        ...options,
+        credentials: "include",
+        });
+    },
+    {{/if}}
+  });
+
+  const client: AppRouterClient = createORPCClient(rpcLink);
+  const orpcUtils = createTanstackQueryUtils(client);
+
+  return {
+    provide: {
+      orpc: orpcUtils,
+    },
+  };
+});
+`],
+  ["api/orpc/apps/fullstack-web/frameworks/nuxt/app/plugins/orpc.server.ts.hbs", `import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+
+export default defineNuxtPlugin(() => {
+  const event = useRequestEvent();
+
+  if (!event) {
+    throw new Error("Missing Nuxt request event");
+  }
+
+  const rpcLink = new RPCLink({
+    url: new URL("/rpc", useRequestURL()).href,
+    fetch(request, init) {
+      return event.fetch(request, init);
+    },
+  });
+
+  const client: AppRouterClient = createORPCClient(rpcLink);
+  const orpc = createTanstackQueryUtils(client);
+
+  return {
+    provide: {
+      orpc,
+    },
+  };
+});
+`],
+  ["api/orpc/apps/fullstack-web/frameworks/nuxt/server/routes/rpc/[...].ts.hbs", `import { RPCHandler } from "@orpc/server/fetch";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { onError } from "@orpc/server";
+import { BatchHandlerPlugin } from "@orpc/server/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createContext } from "@{{projectName}}/api/context";
+{{#if (eq webDeploy "cloudflare")}}
+import type { CloudflareEnv } from "../../../src/env.server";
+{{/if}}
+
+const rpcHandler = new RPCHandler(appRouter, {
+  interceptors: [
+    onError((error) => {
+      console.error(error);
+    }),
+  ],
+  plugins: [new BatchHandlerPlugin()],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+  plugins: [
+    new OpenAPIReferencePlugin({
+      schemaConverters: [new ZodToJsonSchemaConverter()],
+    }),
+  ],
+  interceptors: [
+    onError((error) => {
+      console.error(error);
+    }),
+  ],
+});
+
+export default defineEventHandler(async (event) => {
+  const request = toWebRequest(event);
+  const context = await createContext({
+    headers: request.headers,
+    {{#if (eq webDeploy "cloudflare")}}
+    env: (event.context.cloudflare as { env: CloudflareEnv }).env,
+    {{/if}}
+  });
+
+  const rpcResult = await rpcHandler.handle(request, {
+    prefix: "/rpc",
+    context,
+  });
+  if (rpcResult.response) return rpcResult.response;
+
+  const apiResult = await apiHandler.handle(request, {
+    prefix: "/rpc/api-reference",
+    context,
+  });
+  if (apiResult.response) return apiResult.response;
+
+  setResponseStatus(event, 404, "Not Found");
+  return "Not found";
+});
+`],
+  ["api/orpc/apps/fullstack-web/frameworks/nuxt/server/routes/rpc/index.ts.hbs", `export { default } from "./[...]";
+`],
+  ["api/orpc/apps/fullstack-web/frameworks/solid/src/routes/rpc/[...rest].ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { onError } from "@orpc/server";
+import { RPCHandler } from "@orpc/server/fetch";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import type { APIHandler } from "filesystem-routing/api";
+
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const handle: APIHandler = async ({ request }) => {
+	const context = await createContext({ headers: request.headers });
+
+	const rpcResult = await rpcHandler.handle(request, {
+		prefix: "/rpc",
+		context,
+	});
+	if (rpcResult.response) return rpcResult.response;
+
+	const apiResult = await apiHandler.handle(request, {
+		prefix: "/rpc/api-reference",
+		context,
+	});
+	if (apiResult.response) return apiResult.response;
+
+	return new Response("Not found", { status: 404 });
+};
+
+export const HEAD = handle;
+export const GET = handle;
+export const POST = handle;
+export const PUT = handle;
+export const PATCH = handle;
+export const DELETE = handle;
+`],
+  ["api/orpc/apps/fullstack-web/frameworks/solid/src/routes/rpc/index.ts.hbs", `export {
+	DELETE,
+	GET,
+	HEAD,
+	PATCH,
+	POST,
+	PUT,
+} from "./[...rest]";
+`],
+  ["api/orpc/apps/fullstack-web/frameworks/solid/src/utils/orpc.server.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createRouterClient } from "@orpc/server";
+import { getRequestEvent } from "@solidjs/web";
+
+if (!import.meta.env.SSR) {
+  throw new Error("This file must only be imported on the server.");
+}
+
+globalThis.$client = createRouterClient(appRouter, {
+	context: async () => {
+		const headers = getRequestEvent()?.request.headers ?? new Headers();
+		return createContext({ headers });
+	},
+});
+`],
+  ["api/orpc/apps/fullstack-web/frameworks/svelte/src/lib/orpc.server.ts.hbs", `import { getRequestEvent } from "$app/server";
+import { createContext } from "@{{projectName}}/api/context";
+import { appRouter, type AppRouterClient } from "@{{projectName}}/api/routers/index";
+{{#if (eq webDeploy "cloudflare")}}
+import { ENV } from "../env.server";
+{{/if}}
+import { createRouterClient } from "@orpc/server";
+
+if (typeof window !== "undefined") {
+	throw new Error("This file should only be imported on the server.");
+}
+
+const serverClient: AppRouterClient = createRouterClient(appRouter, {
+	context: async () => {
+		const event = getRequestEvent();
+{{#if (eq webDeploy "cloudflare")}}
+		const env = event.platform?.env ?? ENV;
+
+{{/if}}
+		return createContext({
+			headers: event.request.headers,
+{{#if (eq webDeploy "cloudflare")}}
+			env,
+{{/if}}
+		});
+	},
+});
+
+// oRPC's SvelteKit SSR setup loads this from hooks.server.ts so $lib/orpc can
+// reuse the in-process server client during SSR and fall back to HTTP in the browser.
+globalThis.$client = serverClient;
+`],
+  ["api/orpc/apps/fullstack-web/frameworks/svelte/src/routes/rpc/[...rest]/+server.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+{{#if (eq webDeploy "cloudflare")}}
+import { ENV } from "../../../env.server";
+{{/if}}
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { onError } from "@orpc/server";
+import { RPCHandler } from "@orpc/server/fetch";
+import type { RequestHandler } from "@sveltejs/kit";
+
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const handle: RequestHandler = async ({ request{{#if (eq webDeploy "cloudflare")}}, platform{{/if}} }) => {
+{{#if (eq webDeploy "cloudflare")}}
+	const env = platform?.env ?? ENV;
+
+{{/if}}
+	const context = await createContext({
+		headers: request.headers,
+{{#if (eq webDeploy "cloudflare")}}
+		env,
+{{/if}}
+	});
+
+	const rpcResult = await rpcHandler.handle(request, {
+		prefix: "/rpc",
+		context,
+	});
+	if (rpcResult.response) return rpcResult.response;
+
+	const apiResult = await apiHandler.handle(request, {
+		prefix: "/rpc/api-reference",
+		context,
+	});
+	if (apiResult.response) return apiResult.response;
+
+	return new Response("Not found", { status: 404 });
+};
+
+export const HEAD = handle;
+export const GET = handle;
+export const POST = handle;
+export const PUT = handle;
+export const PATCH = handle;
+export const DELETE = handle;
+`],
+  ["api/orpc/apps/fullstack-web/frameworks/tanstack-start/src/routes/api/rpc/$.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { RPCHandler } from "@orpc/server/fetch";
+import { onError } from "@orpc/server";
+import { createFileRoute } from "@tanstack/react-router";
+
+const rpcHandler = new RPCHandler(appRouter, {
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+const apiHandler = new OpenAPIHandler(appRouter, {
+	plugins: [
+		new OpenAPIReferencePlugin({
+			schemaConverters: [new ZodToJsonSchemaConverter()],
+		}),
+	],
+	interceptors: [
+		onError((error) => {
+			console.error(error);
+		}),
+	],
+});
+
+async function handle({ request }: { request: Request }) {
+	const rpcResult = await rpcHandler.handle(request, {
+		prefix: "/api/rpc",
+		context: await createContext({ req: request }),
+	});
+	if (rpcResult.response) return rpcResult.response;
+
+	const apiResult = await apiHandler.handle(request, {
+		prefix: "/api/rpc/api-reference",
+		context: await createContext({ req: request }),
+	});
+	if (apiResult.response) return apiResult.response;
+
+	return new Response("Not found", { status: 404 });
+}
+
+export const Route = createFileRoute('/api/rpc/$')({
+  server: {
+    handlers: {
+      HEAD: handle,
+      GET: handle,
+      POST: handle,
+      PUT: handle,
+      PATCH: handle,
+      DELETE: handle,
+    },
+  },
+})`],
+  ["api/orpc/apps/native/utils/orpc.ts.hbs", `import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { QueryCache, QueryClient } from "@tanstack/react-query";
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { ENV } from "../src/env";
+{{#if (eq auth "better-auth")}}
+import { authClient } from "@/lib/auth-client";
+import { Platform } from "react-native";
+{{else if (eq auth "clerk")}}
+import { getClerkAuthToken } from "@/utils/clerk-auth";
+{{/if}}
+
+export const queryClient = new QueryClient({
+	queryCache: new QueryCache({
+		onError: (error) => {
+			console.log(error)
+		},
+	}),
+});
+
+async function expoFetch(request: Request, init?: RequestInit) {
+	const { fetch } = await import("expo/fetch");
+
+	return fetch(request.url, {
+		body: await request.blob(),
+		headers: request.headers,
+		method: request.method,
+		signal: request.signal,
+		...init,
+	});
+}
+
+export const link = new RPCLink({
+{{#if (eq backend "self")}}
+{{#if (or (includes frontend "next") (includes frontend "tanstack-start"))}}
+	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/api/rpc\`,
+{{else}}
+	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/rpc\`,
+{{/if}}
+{{else}}
+	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}{{apiPrefix webDeploy serverDeploy}}/rpc\`,
+{{/if}}
+{{#if (eq auth "better-auth")}}
+	fetch(request, init) {
+		return expoFetch(request, {
+			...init,
+			// Better Auth Expo forwards the session cookie manually on native.
+			credentials: Platform.OS === "web" ? "include" : "omit",
+		});
+	},
+	async headers() {
+		if (Platform.OS === "web") {
+			return {};
+		}
+		const headers = new Map<string, string>();
+		const cookies = await authClient.getCookie();
+		if (cookies) {
+			headers.set("Cookie", cookies);
+		}
+		return Object.fromEntries(headers);
+	},
+{{else if (eq auth "clerk")}}
+	headers: async () => {
+		const token = await getClerkAuthToken();
+		return token ? { Authorization: \`Bearer \${token}\` } : {};
+	},
+	fetch: expoFetch,
+{{else}}
+	fetch: expoFetch,
+{{/if}}
+});
+
+export const client: AppRouterClient = createORPCClient(link);
+
+export const orpc = createTanstackQueryUtils(client);
+`],
   ["api/orpc/context.ts.hbs", `import type { Context as ApiContext } from "@{{projectName}}/api/context";
 {{#if (ne database "none")}}
 import { {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}getDb{{else}}db{{/if}} } from "@{{projectName}}/app-services";
@@ -867,538 +1399,6 @@ export async function createContext(): Promise<ApiContext> {
 
 export type Context = Awaited<ReturnType<typeof createContext>>;
 `],
-  ["api/orpc/fullstack/astro/src/pages/rpc/[...rest].ts.hbs", `import type { APIRoute } from "astro";
-import { OpenAPIHandler } from "@orpc/openapi/fetch";
-import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
-import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-import { RPCHandler } from "@orpc/server/fetch";
-import { onError } from "@orpc/server";
-import { appRouter } from "@{{projectName}}/api/routers/index";
-import { createContext } from "@{{projectName}}/api/context";
-
-const handler = new RPCHandler(appRouter, {
-  interceptors: [
-    onError((error) => {
-      console.error(error);
-    }),
-  ],
-});
-
-const apiHandler = new OpenAPIHandler(appRouter, {
-  plugins: [
-    new OpenAPIReferencePlugin({
-      schemaConverters: [new ZodToJsonSchemaConverter()],
-    }),
-  ],
-  interceptors: [
-    onError((error) => {
-      console.error(error);
-    }),
-  ],
-});
-
-export const prerender = false;
-
-export const ALL: APIRoute = async ({ request }) => {
-  const context = await createContext({ headers: request.headers });
-
-  const rpcResult = await handler.handle(request, {
-    prefix: "/rpc",
-    context,
-  });
-  if (rpcResult.response) return rpcResult.response;
-
-  const apiResult = await apiHandler.handle(request, {
-    prefix: "/rpc/api-reference",
-    context,
-  });
-  if (apiResult.response) return apiResult.response;
-
-  return new Response("Not found", { status: 404 });
-};
-`],
-  ["api/orpc/fullstack/next/src/app/api/rpc/[[...rest]]/route.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
-import { appRouter } from "@{{projectName}}/api/routers/index";
-import { OpenAPIHandler } from "@orpc/openapi/fetch";
-import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
-import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-import { RPCHandler } from "@orpc/server/fetch";
-import { onError } from "@orpc/server";
-import { NextRequest } from "next/server";
-
-const rpcHandler = new RPCHandler(appRouter, {
-	interceptors: [
-		onError((error) => {
-			console.error(error);
-		}),
-	],
-});
-const apiHandler = new OpenAPIHandler(appRouter, {
-	plugins: [
-		new OpenAPIReferencePlugin({
-			schemaConverters: [new ZodToJsonSchemaConverter()],
-		}),
-	],
-	interceptors: [
-		onError((error) => {
-			console.error(error);
-		}),
-	],
-});
-
-async function handleRequest(req: NextRequest) {
-	const rpcResult = await rpcHandler.handle(req, {
-		prefix: "/api/rpc",
-		context: await createContext(req),
-	});
-	if (rpcResult.response) return rpcResult.response;
-
-	const apiResult = await apiHandler.handle(req, {
-		prefix: "/api/rpc/api-reference",
-		context: await createContext(req),
-	});
-	if (apiResult.response) return apiResult.response;
-
-	return new Response("Not found", { status: 404 });
-}
-
-export const GET = handleRequest;
-export const POST = handleRequest;
-export const PUT = handleRequest;
-export const PATCH = handleRequest;
-export const DELETE = handleRequest;`],
-  ["api/orpc/fullstack/nuxt/app/plugins/orpc.client.ts.hbs", `import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
-import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
-import { createTanstackQueryUtils } from "@orpc/tanstack-query";
-
-export default defineNuxtPlugin(() => {
-  const rpcLink = new RPCLink({
-    url: \`\${window.location.origin}/rpc\`,
-    {{#if (eq auth "better-auth")}}
-    fetch(url, options) {
-        return fetch(url, {
-        ...options,
-        credentials: "include",
-        });
-    },
-    {{/if}}
-  });
-
-  const client: AppRouterClient = createORPCClient(rpcLink);
-  const orpcUtils = createTanstackQueryUtils(client);
-
-  return {
-    provide: {
-      orpc: orpcUtils,
-    },
-  };
-});
-`],
-  ["api/orpc/fullstack/nuxt/app/plugins/orpc.server.ts.hbs", `import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
-import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
-import { createTanstackQueryUtils } from "@orpc/tanstack-query";
-
-export default defineNuxtPlugin(() => {
-  const event = useRequestEvent();
-
-  if (!event) {
-    throw new Error("Missing Nuxt request event");
-  }
-
-  const rpcLink = new RPCLink({
-    url: new URL("/rpc", useRequestURL()).href,
-    fetch(request, init) {
-      return event.fetch(request, init);
-    },
-  });
-
-  const client: AppRouterClient = createORPCClient(rpcLink);
-  const orpc = createTanstackQueryUtils(client);
-
-  return {
-    provide: {
-      orpc,
-    },
-  };
-});
-`],
-  ["api/orpc/fullstack/nuxt/server/routes/rpc/[...].ts.hbs", `import { RPCHandler } from "@orpc/server/fetch";
-import { OpenAPIHandler } from "@orpc/openapi/fetch";
-import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
-import { onError } from "@orpc/server";
-import { BatchHandlerPlugin } from "@orpc/server/plugins";
-import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-import { appRouter } from "@{{projectName}}/api/routers/index";
-import { createContext } from "@{{projectName}}/api/context";
-{{#if (eq webDeploy "cloudflare")}}
-import type { CloudflareEnv } from "../../../src/env.server";
-{{/if}}
-
-const rpcHandler = new RPCHandler(appRouter, {
-  interceptors: [
-    onError((error) => {
-      console.error(error);
-    }),
-  ],
-  plugins: [new BatchHandlerPlugin()],
-});
-
-const apiHandler = new OpenAPIHandler(appRouter, {
-  plugins: [
-    new OpenAPIReferencePlugin({
-      schemaConverters: [new ZodToJsonSchemaConverter()],
-    }),
-  ],
-  interceptors: [
-    onError((error) => {
-      console.error(error);
-    }),
-  ],
-});
-
-export default defineEventHandler(async (event) => {
-  const request = toWebRequest(event);
-  const context = await createContext({
-    headers: request.headers,
-    {{#if (eq webDeploy "cloudflare")}}
-    env: (event.context.cloudflare as { env: CloudflareEnv }).env,
-    {{/if}}
-  });
-
-  const rpcResult = await rpcHandler.handle(request, {
-    prefix: "/rpc",
-    context,
-  });
-  if (rpcResult.response) return rpcResult.response;
-
-  const apiResult = await apiHandler.handle(request, {
-    prefix: "/rpc/api-reference",
-    context,
-  });
-  if (apiResult.response) return apiResult.response;
-
-  setResponseStatus(event, 404, "Not Found");
-  return "Not found";
-});
-`],
-  ["api/orpc/fullstack/nuxt/server/routes/rpc/index.ts.hbs", `export { default } from "./[...]";
-`],
-  ["api/orpc/fullstack/solid/src/routes/rpc/[...rest].ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
-import { appRouter } from "@{{projectName}}/api/routers/index";
-import { OpenAPIHandler } from "@orpc/openapi/fetch";
-import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
-import { onError } from "@orpc/server";
-import { RPCHandler } from "@orpc/server/fetch";
-import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-import type { APIHandler } from "filesystem-routing/api";
-
-const rpcHandler = new RPCHandler(appRouter, {
-	interceptors: [
-		onError((error) => {
-			console.error(error);
-		}),
-	],
-});
-
-const apiHandler = new OpenAPIHandler(appRouter, {
-	plugins: [
-		new OpenAPIReferencePlugin({
-			schemaConverters: [new ZodToJsonSchemaConverter()],
-		}),
-	],
-	interceptors: [
-		onError((error) => {
-			console.error(error);
-		}),
-	],
-});
-
-const handle: APIHandler = async ({ request }) => {
-	const context = await createContext({ headers: request.headers });
-
-	const rpcResult = await rpcHandler.handle(request, {
-		prefix: "/rpc",
-		context,
-	});
-	if (rpcResult.response) return rpcResult.response;
-
-	const apiResult = await apiHandler.handle(request, {
-		prefix: "/rpc/api-reference",
-		context,
-	});
-	if (apiResult.response) return apiResult.response;
-
-	return new Response("Not found", { status: 404 });
-};
-
-export const HEAD = handle;
-export const GET = handle;
-export const POST = handle;
-export const PUT = handle;
-export const PATCH = handle;
-export const DELETE = handle;
-`],
-  ["api/orpc/fullstack/solid/src/routes/rpc/index.ts.hbs", `export {
-	DELETE,
-	GET,
-	HEAD,
-	PATCH,
-	POST,
-	PUT,
-} from "./[...rest]";
-`],
-  ["api/orpc/fullstack/solid/src/utils/orpc.server.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
-import { appRouter } from "@{{projectName}}/api/routers/index";
-import { createRouterClient } from "@orpc/server";
-import { getRequestEvent } from "@solidjs/web";
-
-if (!import.meta.env.SSR) {
-  throw new Error("This file must only be imported on the server.");
-}
-
-globalThis.$client = createRouterClient(appRouter, {
-	context: async () => {
-		const headers = getRequestEvent()?.request.headers ?? new Headers();
-		return createContext({ headers });
-	},
-});
-`],
-  ["api/orpc/fullstack/svelte/src/lib/orpc.server.ts.hbs", `import { getRequestEvent } from "$app/server";
-import { createContext } from "@{{projectName}}/api/context";
-import { appRouter, type AppRouterClient } from "@{{projectName}}/api/routers/index";
-{{#if (eq webDeploy "cloudflare")}}
-import { ENV } from "../env.server";
-{{/if}}
-import { createRouterClient } from "@orpc/server";
-
-if (typeof window !== "undefined") {
-	throw new Error("This file should only be imported on the server.");
-}
-
-const serverClient: AppRouterClient = createRouterClient(appRouter, {
-	context: async () => {
-		const event = getRequestEvent();
-{{#if (eq webDeploy "cloudflare")}}
-		const env = event.platform?.env ?? ENV;
-
-{{/if}}
-		return createContext({
-			headers: event.request.headers,
-{{#if (eq webDeploy "cloudflare")}}
-			env,
-{{/if}}
-		});
-	},
-});
-
-// oRPC's SvelteKit SSR setup loads this from hooks.server.ts so $lib/orpc can
-// reuse the in-process server client during SSR and fall back to HTTP in the browser.
-globalThis.$client = serverClient;
-`],
-  ["api/orpc/fullstack/svelte/src/routes/rpc/[...rest]/+server.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
-import { appRouter } from "@{{projectName}}/api/routers/index";
-{{#if (eq webDeploy "cloudflare")}}
-import { ENV } from "../../../env.server";
-{{/if}}
-import { OpenAPIHandler } from "@orpc/openapi/fetch";
-import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
-import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-import { onError } from "@orpc/server";
-import { RPCHandler } from "@orpc/server/fetch";
-import type { RequestHandler } from "@sveltejs/kit";
-
-const rpcHandler = new RPCHandler(appRouter, {
-	interceptors: [
-		onError((error) => {
-			console.error(error);
-		}),
-	],
-});
-
-const apiHandler = new OpenAPIHandler(appRouter, {
-	plugins: [
-		new OpenAPIReferencePlugin({
-			schemaConverters: [new ZodToJsonSchemaConverter()],
-		}),
-	],
-	interceptors: [
-		onError((error) => {
-			console.error(error);
-		}),
-	],
-});
-
-const handle: RequestHandler = async ({ request{{#if (eq webDeploy "cloudflare")}}, platform{{/if}} }) => {
-{{#if (eq webDeploy "cloudflare")}}
-	const env = platform?.env ?? ENV;
-
-{{/if}}
-	const context = await createContext({
-		headers: request.headers,
-{{#if (eq webDeploy "cloudflare")}}
-		env,
-{{/if}}
-	});
-
-	const rpcResult = await rpcHandler.handle(request, {
-		prefix: "/rpc",
-		context,
-	});
-	if (rpcResult.response) return rpcResult.response;
-
-	const apiResult = await apiHandler.handle(request, {
-		prefix: "/rpc/api-reference",
-		context,
-	});
-	if (apiResult.response) return apiResult.response;
-
-	return new Response("Not found", { status: 404 });
-};
-
-export const HEAD = handle;
-export const GET = handle;
-export const POST = handle;
-export const PUT = handle;
-export const PATCH = handle;
-export const DELETE = handle;
-`],
-  ["api/orpc/fullstack/tanstack-start/src/routes/api/rpc/$.ts.hbs", `import { createContext } from "@{{projectName}}/api/context";
-import { appRouter } from "@{{projectName}}/api/routers/index";
-import { OpenAPIHandler } from "@orpc/openapi/fetch";
-import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
-import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-import { RPCHandler } from "@orpc/server/fetch";
-import { onError } from "@orpc/server";
-import { createFileRoute } from "@tanstack/react-router";
-
-const rpcHandler = new RPCHandler(appRouter, {
-	interceptors: [
-		onError((error) => {
-			console.error(error);
-		}),
-	],
-});
-
-const apiHandler = new OpenAPIHandler(appRouter, {
-	plugins: [
-		new OpenAPIReferencePlugin({
-			schemaConverters: [new ZodToJsonSchemaConverter()],
-		}),
-	],
-	interceptors: [
-		onError((error) => {
-			console.error(error);
-		}),
-	],
-});
-
-async function handle({ request }: { request: Request }) {
-	const rpcResult = await rpcHandler.handle(request, {
-		prefix: "/api/rpc",
-		context: await createContext({ req: request }),
-	});
-	if (rpcResult.response) return rpcResult.response;
-
-	const apiResult = await apiHandler.handle(request, {
-		prefix: "/api/rpc/api-reference",
-		context: await createContext({ req: request }),
-	});
-	if (apiResult.response) return apiResult.response;
-
-	return new Response("Not found", { status: 404 });
-}
-
-export const Route = createFileRoute('/api/rpc/$')({
-  server: {
-    handlers: {
-      HEAD: handle,
-      GET: handle,
-      POST: handle,
-      PUT: handle,
-      PATCH: handle,
-      DELETE: handle,
-    },
-  },
-})`],
-  ["api/orpc/native/utils/orpc.ts.hbs", `import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
-import { createTanstackQueryUtils } from "@orpc/tanstack-query";
-import { QueryCache, QueryClient } from "@tanstack/react-query";
-import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
-import { ENV } from "../src/env";
-{{#if (eq auth "better-auth")}}
-import { authClient } from "@/lib/auth-client";
-import { Platform } from "react-native";
-{{else if (eq auth "clerk")}}
-import { getClerkAuthToken } from "@/utils/clerk-auth";
-{{/if}}
-
-export const queryClient = new QueryClient({
-	queryCache: new QueryCache({
-		onError: (error) => {
-			console.log(error)
-		},
-	}),
-});
-
-async function expoFetch(request: Request, init?: RequestInit) {
-	const { fetch } = await import("expo/fetch");
-
-	return fetch(request.url, {
-		body: await request.blob(),
-		headers: request.headers,
-		method: request.method,
-		signal: request.signal,
-		...init,
-	});
-}
-
-export const link = new RPCLink({
-{{#if (eq backend "self")}}
-{{#if (or (includes frontend "next") (includes frontend "tanstack-start"))}}
-	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/api/rpc\`,
-{{else}}
-	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/rpc\`,
-{{/if}}
-{{else}}
-	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}{{apiPrefix webDeploy serverDeploy}}/rpc\`,
-{{/if}}
-{{#if (eq auth "better-auth")}}
-	fetch(request, init) {
-		return expoFetch(request, {
-			...init,
-			// Better Auth Expo forwards the session cookie manually on native.
-			credentials: Platform.OS === "web" ? "include" : "omit",
-		});
-	},
-	async headers() {
-		if (Platform.OS === "web") {
-			return {};
-		}
-		const headers = new Map<string, string>();
-		const cookies = await authClient.getCookie();
-		if (cookies) {
-			headers.set("Cookie", cookies);
-		}
-		return Object.fromEntries(headers);
-	},
-{{else if (eq auth "clerk")}}
-	headers: async () => {
-		const token = await getClerkAuthToken();
-		return token ? { Authorization: \`Bearer \${token}\` } : {};
-	},
-	fetch: expoFetch,
-{{else}}
-	fetch: expoFetch,
-{{/if}}
-});
-
-export const client: AppRouterClient = createORPCClient(link);
-
-export const orpc = createTanstackQueryUtils(client);
-`],
   ["api/orpc/server/_gitignore", `# dependencies (bun install)
 node_modules
 
@@ -1564,7 +1564,7 @@ export type AppRouter = typeof appRouter;
     {{#if (eq auth "better-auth")}}{ "path": "../auth" }{{/if}}]
 }
 `],
-  ["api/orpc/web/astro/src/lib/orpc.ts.hbs", `import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+  ["api/orpc/shared/client/frameworks/astro/src/lib/orpc.ts.hbs", `import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
 
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -1598,7 +1598,7 @@ export const link = new RPCLink({
 
 export const orpc: AppRouterClient = createORPCClient(link);
 `],
-  ["api/orpc/web/nuxt/app/plugins/orpc.ts.hbs", `import { defineNuxtPlugin } from '#app'
+  ["api/orpc/shared/client/frameworks/nuxt/app/plugins/orpc.ts.hbs", `import { defineNuxtPlugin } from '#app'
 import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
 import { createORPCClient } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
@@ -1638,7 +1638,7 @@ export default defineNuxtPlugin(() => {
   }
 })
 `],
-  ["api/orpc/web/nuxt/app/plugins/vue-query.ts.hbs", `import type {
+  ["api/orpc/shared/client/frameworks/nuxt/app/plugins/vue-query.ts.hbs", `import type {
   DehydratedState,
   VueQueryPluginOptions,
 } from '@tanstack/vue-query'
@@ -1691,7 +1691,7 @@ export default defineNuxtPlugin((nuxt) => {
   }
 })
 `],
-  ["api/orpc/web/react/base/src/utils/orpc.ts.hbs", `import { createORPCClient } from "@orpc/client";
+  ["api/orpc/shared/client/frameworks/react/base/src/utils/orpc.ts.hbs", `import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
@@ -1858,7 +1858,7 @@ export const client: AppRouterClient = createORPCClient(link)
 
 export const orpc = createTanstackQueryUtils(client)
 `],
-  ["api/orpc/web/solid/src/utils/orpc.ts.hbs", `import { createORPCClient } from "@orpc/client";
+  ["api/orpc/shared/client/frameworks/solid/src/utils/orpc.ts.hbs", `import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/solid-query";
@@ -1931,7 +1931,7 @@ export function createQueryClient() {
 	});
 }
 `],
-  ["api/orpc/web/svelte/src/lib/orpc.ts.hbs", `{{#unless (eq backend "self")}}
+  ["api/orpc/shared/client/frameworks/svelte/src/lib/orpc.ts.hbs", `{{#unless (eq backend "self")}}
 import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{else}}.generated{{/if}}";
 {{/unless}}
 import { createORPCClient } from "@orpc/client";
@@ -1985,6 +1985,103 @@ export const client: AppRouterClient = createORPCClient(link);
 {{/if}}
 
 export const orpc = createTanstackQueryUtils(client);
+`],
+  ["api/orpc/shared/server/svelte/hooks.server.ts.hbs", `import "./lib/orpc.server";
+`],
+  ["api/trpc/apps/fullstack-web/frameworks/next/src/app/api/trpc/[trpc]/route.ts.hbs", `import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { appRouter } from "@{{projectName}}/api/routers/index";
+import { createContext } from "@{{projectName}}/api/context";
+import { NextRequest } from "next/server";
+
+function handler(req: NextRequest) {
+	return fetchRequestHandler({
+		endpoint: "/api/trpc",
+		req,
+		router: appRouter,
+		createContext: () => createContext(req),
+	});
+}
+export { handler as GET, handler as POST };
+`],
+  ["api/trpc/apps/fullstack-web/frameworks/tanstack-start/src/routes/api/trpc/$.ts.hbs", `import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
+import { appRouter } from '@{{projectName}}/api/routers/index'
+import { createContext } from '@{{projectName}}/api/context'
+import { createFileRoute } from '@tanstack/react-router'
+
+function handler({ request }: { request: Request }) {
+  return fetchRequestHandler({
+    req: request,
+    router: appRouter,
+    createContext,
+    endpoint: '/api/trpc',
+  })
+}
+
+export const Route = createFileRoute('/api/trpc/$')({
+  server: {
+    handlers: {
+      GET: handler,
+      POST: handler,
+    },
+  },
+})
+`],
+  ["api/trpc/apps/native/utils/trpc.ts.hbs", `{{#if (eq auth "better-auth")}}
+import { authClient } from "@/lib/auth-client";
+import { Platform } from "react-native";
+{{else if (eq auth "clerk")}}
+import { getClerkAuthToken } from "@/utils/clerk-auth";
+{{/if}}
+import { QueryClient } from "@tanstack/react-query";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
+import type { AppRouter } from "@{{projectName}}/api/routers/index";
+import { ENV } from "../src/env";
+
+export const queryClient = new QueryClient();
+
+const trpcClient = createTRPCClient<AppRouter>({
+	links: [
+		httpBatchLink({
+{{#if (eq backend "self")}}
+			url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/api/trpc\`,
+{{else}}
+			url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}{{apiPrefix webDeploy serverDeploy}}/trpc\`,
+{{/if}}
+{{#if (eq auth "better-auth")}}
+			fetch:
+				function (url, options) {
+					return fetch(url, {
+						...options,
+						// Better Auth Expo forwards the session cookie manually on native.
+						credentials: Platform.OS === "web" ? "include" : "omit",
+					});
+				},
+			async headers() {
+				if (Platform.OS === "web") {
+					return {};
+				}
+				const headers = new Map<string, string>();
+				const cookies = await authClient.getCookie();
+				if (cookies) {
+					headers.set("Cookie", cookies);
+				}
+				return Object.fromEntries(headers);
+			},
+{{else if (eq auth "clerk")}}
+			headers: async function () {
+				const token = await getClerkAuthToken();
+				return token ? { Authorization: \`Bearer \${token}\` } : {};
+			},
+{{/if}}
+		}),
+	],
+});
+
+export const trpc = createTRPCOptionsProxy<AppRouter>({
+	client: trpcClient,
+	queryClient,
+});
 `],
   ["api/trpc/context.ts.hbs", `import type { Context as ApiContext } from "@{{projectName}}/api/context";
 {{#if (ne database "none")}}
@@ -2279,101 +2376,6 @@ export async function createContext(): Promise<ApiContext> {
 
 export type Context = Awaited<ReturnType<typeof createContext>>;
 `],
-  ["api/trpc/fullstack/next/src/app/api/trpc/[trpc]/route.ts.hbs", `import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
-import { appRouter } from "@{{projectName}}/api/routers/index";
-import { createContext } from "@{{projectName}}/api/context";
-import { NextRequest } from "next/server";
-
-function handler(req: NextRequest) {
-	return fetchRequestHandler({
-		endpoint: "/api/trpc",
-		req,
-		router: appRouter,
-		createContext: () => createContext(req),
-	});
-}
-export { handler as GET, handler as POST };
-`],
-  ["api/trpc/fullstack/tanstack-start/src/routes/api/trpc/$.ts.hbs", `import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
-import { appRouter } from '@{{projectName}}/api/routers/index'
-import { createContext } from '@{{projectName}}/api/context'
-import { createFileRoute } from '@tanstack/react-router'
-
-function handler({ request }: { request: Request }) {
-  return fetchRequestHandler({
-    req: request,
-    router: appRouter,
-    createContext,
-    endpoint: '/api/trpc',
-  })
-}
-
-export const Route = createFileRoute('/api/trpc/$')({
-  server: {
-    handlers: {
-      GET: handler,
-      POST: handler,
-    },
-  },
-})
-`],
-  ["api/trpc/native/utils/trpc.ts.hbs", `{{#if (eq auth "better-auth")}}
-import { authClient } from "@/lib/auth-client";
-import { Platform } from "react-native";
-{{else if (eq auth "clerk")}}
-import { getClerkAuthToken } from "@/utils/clerk-auth";
-{{/if}}
-import { QueryClient } from "@tanstack/react-query";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
-import type { AppRouter } from "@{{projectName}}/api/routers/index";
-import { ENV } from "../src/env";
-
-export const queryClient = new QueryClient();
-
-const trpcClient = createTRPCClient<AppRouter>({
-	links: [
-		httpBatchLink({
-{{#if (eq backend "self")}}
-			url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/api/trpc\`,
-{{else}}
-			url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}{{apiPrefix webDeploy serverDeploy}}/trpc\`,
-{{/if}}
-{{#if (eq auth "better-auth")}}
-			fetch:
-				function (url, options) {
-					return fetch(url, {
-						...options,
-						// Better Auth Expo forwards the session cookie manually on native.
-						credentials: Platform.OS === "web" ? "include" : "omit",
-					});
-				},
-			async headers() {
-				if (Platform.OS === "web") {
-					return {};
-				}
-				const headers = new Map<string, string>();
-				const cookies = await authClient.getCookie();
-				if (cookies) {
-					headers.set("Cookie", cookies);
-				}
-				return Object.fromEntries(headers);
-			},
-{{else if (eq auth "clerk")}}
-			headers: async function () {
-				const token = await getClerkAuthToken();
-				return token ? { Authorization: \`Bearer \${token}\` } : {};
-			},
-{{/if}}
-		}),
-	],
-});
-
-export const trpc = createTRPCOptionsProxy<AppRouter>({
-	client: trpcClient,
-	queryClient,
-});
-`],
   ["api/trpc/server/_gitignore", `# dependencies (bun install)
 node_modules
 
@@ -2538,7 +2540,7 @@ export type AppRouter = typeof appRouter;
   }
 }
 `],
-  ["api/trpc/web/react/base/src/utils/trpc.ts.hbs", `{{#if (includes frontend 'next')}}
+  ["api/trpc/shared/client/frameworks/react/base/src/utils/trpc.ts.hbs", `{{#if (includes frontend 'next')}}
 import { QueryCache, QueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
@@ -5774,7 +5776,7 @@ export async function createAuth({{#if (usesRequestScopedCloudflareEnv backend w
 export const db = {{#if (eq orm "mongoose")}}await {{/if}}{{#if (eq orm "prisma")}}createPrismaClient{{else}}createDb{{/if}}(ENV);
 {{/if}}
 {{#if (eq auth "better-auth")}}
-export const auth = createAuth(ENV{{#if (ne database "none")}}, db{{/if}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}, desktopOrigins{{/if}});
+export const auth = createAuth(ENV{{#if (ne database "none")}}, db{{/if}}{{#if (and application (ne backend "self"))}}, [{{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}, desktopOrigins{{/if}}{{/if}});
 {{/if}}
 {{/if}}
 `],
@@ -5809,9 +5811,7 @@ declare module "cloudflare:workers" {
   "apps": {
     "fullstack-web": {
       "stack": {
-        "frontend": [
-          "astro"
-        ],
+        "frontend": ["astro"],
         "backend": "self",
         "runtime": "none",
         "api": "orpc"
@@ -5819,9 +5819,7 @@ declare module "cloudflare:workers" {
     },
     "web-frontend": {
       "stack": {
-        "frontend": [
-          "astro"
-        ],
+        "frontend": ["astro"],
         "runtime": "none",
         "api": "none"
       }
@@ -6240,9 +6238,7 @@ const { title = "{{projectName}}" } = Astro.props;
   "apps": {
     "native": {
       "stack": {
-        "frontend": [
-          "native-bare"
-        ],
+        "frontend": ["native-bare"],
         "runtime": "none",
         "api": "none"
       }
@@ -7396,9 +7392,7 @@ module.exports = withVarlockMetroConfig(config);
   "apps": {
     "native": {
       "stack": {
-        "frontend": [
-          "native-unistyles"
-        ],
+        "frontend": ["native-unistyles"],
         "runtime": "none",
         "api": "none"
       }
@@ -8750,9 +8744,7 @@ StyleSheet.configure({
   "apps": {
     "native": {
       "stack": {
-        "frontend": [
-          "native-uniwind"
-        ],
+        "frontend": ["native-uniwind"],
         "runtime": "none",
         "api": "none"
       }
@@ -9741,9 +9733,7 @@ declare module "*.css";
   "apps": {
     "fullstack-web": {
       "stack": {
-        "frontend": [
-          "nuxt"
-        ],
+        "frontend": ["nuxt"],
         "backend": "self",
         "runtime": "none",
         "api": "none"
@@ -9751,9 +9741,7 @@ declare module "*.css";
     },
     "web-frontend": {
       "stack": {
-        "frontend": [
-          "nuxt"
-        ],
+        "frontend": ["nuxt"],
         "runtime": "none",
         "api": "none"
       }
@@ -10505,9 +10493,7 @@ Disallow:
   "apps": {
     "fullstack-web": {
       "stack": {
-        "frontend": [
-          "next"
-        ],
+        "frontend": ["next"],
         "backend": "self",
         "runtime": "none",
         "api": "none"
@@ -10515,9 +10501,7 @@ Disallow:
     },
     "web-frontend": {
       "stack": {
-        "frontend": [
-          "next"
-        ],
+        "frontend": ["next"],
         "runtime": "none",
         "api": "none"
       }
@@ -11266,18 +11250,14 @@ export function ThemeProvider({
   "apps": {
     "web-frontend": {
       "stack": {
-        "frontend": [
-          "react-router"
-        ],
+        "frontend": ["react-router"],
         "runtime": "none",
         "api": "none"
       }
     },
     "admin": {
       "stack": {
-        "frontend": [
-          "react-router"
-        ],
+        "frontend": ["react-router"],
         "runtime": "none",
         "api": "none"
       }
@@ -12556,9 +12536,7 @@ export default function Loader() {
   "apps": {
     "web-frontend": {
       "stack": {
-        "frontend": [
-          "tanstack-router"
-        ],
+        "frontend": ["tanstack-router"],
         "runtime": "none",
         "api": "none"
       }
@@ -13040,9 +13018,7 @@ export default defineConfig({
   "apps": {
     "fullstack-web": {
       "stack": {
-        "frontend": [
-          "tanstack-start"
-        ],
+        "frontend": ["tanstack-start"],
         "backend": "self",
         "runtime": "none",
         "api": "none"
@@ -13050,9 +13026,7 @@ export default defineConfig({
     },
     "web-frontend": {
       "stack": {
-        "frontend": [
-          "tanstack-start"
-        ],
+        "frontend": ["tanstack-start"],
         "runtime": "none",
         "api": "none"
       }
@@ -14359,9 +14333,7 @@ Disallow:
   "apps": {
     "fullstack-web": {
       "stack": {
-        "frontend": [
-          "solid"
-        ],
+        "frontend": ["solid"],
         "backend": "self",
         "runtime": "none",
         "api": "orpc"
@@ -14369,9 +14341,7 @@ Disallow:
     },
     "web-frontend": {
       "stack": {
-        "frontend": [
-          "solid"
-        ],
+        "frontend": ["solid"],
         "runtime": "none",
         "api": "none"
       }
@@ -15021,9 +14991,7 @@ body {
   "apps": {
     "fullstack-web": {
       "stack": {
-        "frontend": [
-          "svelte"
-        ],
+        "frontend": ["svelte"],
         "backend": "self",
         "runtime": "none",
         "api": "orpc"
@@ -15031,9 +14999,7 @@ body {
     },
     "web-frontend": {
       "stack": {
-        "frontend": [
-          "svelte"
-        ],
+        "frontend": ["svelte"],
         "runtime": "none",
         "api": "none"
       }
@@ -15925,7 +15891,7 @@ export function defineAbilityFor(actor: Actor | null | undefined): AppAbility {
   return build();
 }
 `],
-  ["modules/admin/frameworks/native/apps/fullstack-web/src/lib/native/admin.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/admin/frameworks/http-server/apps/fullstack-web/src/lib/native/admin.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 import { z } from "zod";
 import { HttpError, json, pageOf, readJson, requireAdministrator, requireOrigin } from "../product-api";
 export async function handle(request: Request, path: string): Promise<Response | undefined> {
@@ -16714,7 +16680,7 @@ export type Affiliate = ReturnType<typeof createAffiliate>;
   },
 } as const;
 `],
-  ["modules/affiliate/frameworks/native/apps/fullstack-web/src/lib/native/affiliate.ts.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+  ["modules/affiliate/frameworks/http-server/apps/fullstack-web/src/lib/native/affiliate.ts.hbs", `import { affiliate } from "@{{projectName}}/app-services";
 import { referralCodeSchema, referralCookieFromHeader, referralCookieName, referralCookieSeconds } from "@{{projectName}}/affiliate";
 import { auth } from "@{{projectName}}/app-services";
 import { z } from "zod";
@@ -17622,7 +17588,7 @@ export async function jsonRequest(
   },
 } as const;
 `],
-  ["modules/ai/frameworks/native/apps/fullstack-web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
+  ["modules/ai/frameworks/http-server/apps/fullstack-web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
 import { z } from "zod";
 import { ENV } from "@/env.server";
 
@@ -17655,7 +17621,7 @@ export function aiErrorResponse(error: unknown) {
   return Response.json({ error: code }, { status, headers: privateHeaders });
 }
 `],
-  ["modules/ai/frameworks/native/apps/fullstack-web/src/lib/native/ai.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
+  ["modules/ai/frameworks/http-server/apps/fullstack-web/src/lib/native/ai.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
 import { requestSchema } from "@{{projectName}}/ai";
 import { json, requireSession } from "../product-api";
 import { aiErrorResponse, privateHeaders, readAIRequest, requireAIOrigin } from "../ai-http";
@@ -18981,7 +18947,7 @@ export type Session = Auth["$Infer"]["Session"];
   },
 } as const;
 `],
-  ["modules/auth/frameworks/native/apps/fullstack-web/src/lib/social-providers.server.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/auth/frameworks/http-server/apps/fullstack-web/src/lib/social-providers.server.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 
 import { isSocialProvider, type SocialProvider } from "./social-providers";
 
@@ -18990,7 +18956,7 @@ export function enabledSocialProviders(): SocialProvider[] {
   return Object.keys(auth.options.socialProviders).filter(isSocialProvider);
 }
 `],
-  ["modules/auth/frameworks/native/apps/fullstack-web/src/lib/social-providers.ts.hbs", `export const socialProviderLabels = {
+  ["modules/auth/frameworks/http-server/apps/fullstack-web/src/lib/social-providers.ts.hbs", `export const socialProviderLabels = {
   google: "Google",
   github: "GitHub",
 {{#if (includes module.providers "wechat")}}
@@ -20466,3068 +20432,7 @@ export function createPhoneAuth(secret: string, database: Database, events: Even
   };
 }
 `],
-  ["modules/auth/stack/better-auth/client/auth-client.ts.hbs", `import { createClient, type AuthClient } from "@{{projectName}}/auth/client";
-{{#unless (eq backend "self")}}
-import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
-
-{{> getServerUrl}}
-{{/unless}}
-
-export const authClient: AuthClient = createClient({{#unless (eq backend "self")}}{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}new URL("/api/auth", getServerUrl(ENV.VITE_SERVER_URL)).toString(){{else}}ENV.VITE_SERVER_URL{{/if}}{{/unless}});
-`],
-  ["modules/auth/stack/better-auth/client/solid/src/client.ts.hbs", `import { createAuthClient } from "better-auth/client";
-
-type ClientOptions = {
-  baseURL?: string;
-};
-
-export function createClient(baseURL?: string): ReturnType<typeof createAuthClient<ClientOptions>> {
-  return createAuthClient({
-    baseURL,
-  });
-}
-
-export type AuthClient = ReturnType<typeof createClient>;
-`],
-  ["modules/auth/stack/better-auth/convex/backend/convex/auth.config.ts.hbs", `import { getAuthConfigProvider } from "@convex-dev/better-auth/auth-config";
-import type { AuthConfig } from "convex/server";
-
-export default {
-  providers: [getAuthConfigProvider()],
-} satisfies AuthConfig;
-`],
-  ["modules/auth/stack/better-auth/convex/backend/convex/auth.ts.hbs", `import { createClient, type GenericCtx } from "@convex-dev/better-auth";
-{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
-import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
-{{else}}
-import { convex } from "@convex-dev/better-auth/plugins";
-{{/if}}
-{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
-import { expo } from "@better-auth/expo";
-{{/if}}
-import { components } from "./_generated/api";
-import type { DataModel } from "./_generated/dataModel";
-import { query } from "./_generated/server";
-import { betterAuth } from "better-auth/minimal";
-import authConfig from "./auth.config";
-
-{{#if (or (includes frontend "tanstack-start") (includes frontend "next") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid") (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
-const siteUrl = process.env.SITE_URL{{#if (or (includes frontend "tanstack-start") (includes frontend "next") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}!{{else}} || "http://localhost:8081"{{/if}};
-{{/if}}
-{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
-const nativeAppUrl = process.env.NATIVE_APP_URL || "{{projectName}}://";
-{{/if}}
-
-export const authComponent = createClient<DataModel>(components.betterAuth);
-
-function createAuth(ctx: GenericCtx<DataModel>) {
-  return betterAuth({
-    {{#if (or (includes frontend "tanstack-router") (includes frontend "react-router"))}}
-    baseURL: process.env.CONVEX_SITE_URL,
-    {{/if}}
-    {{#if (or (includes frontend "tanstack-start") (includes frontend "next"))}}
-    baseURL: siteUrl,
-    {{/if}}
-    {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
-    trustedOrigins: [siteUrl, nativeAppUrl, "exp://"],
-    {{else if (or (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
-    trustedOrigins: [siteUrl],
-    {{else if (or (includes frontend "tanstack-start") (includes frontend "next"))}}
-    trustedOrigins: [siteUrl],
-    {{/if}}
-    database: authComponent.adapter(ctx),
-    emailAndPassword: {
-      enabled: true,
-      requireEmailVerification: false,
-    },
-    plugins: [
-      {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
-      expo(),
-      {{/if}}
-      {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
-      crossDomain({ siteUrl }),
-      {{/if}}
-      convex({
-        authConfig,
-        jwksRotateOnTokenGenerationError: true,
-      }),
-    ],
-  });
-}
-
-export { createAuth };
-
-export const getCurrentUser = query({
-  args: {},
-  handler: async (ctx) => {
-    return await authComponent.safeGetAuthUser(ctx);
-  },
-});
-`],
-  ["modules/auth/stack/better-auth/convex/backend/convex/http.ts.hbs", `import { httpRouter } from "convex/server";
-import { authComponent, createAuth } from "./auth";
-
-const http = httpRouter();
-
-{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
-authComponent.registerRoutes(http, createAuth, { cors: true });
-{{else}}
-authComponent.registerRoutes(http, createAuth);
-{{/if}}
-
-export default http;
-`],
-  ["modules/auth/stack/better-auth/convex/backend/convex/privateData.ts.hbs", `import { query } from "./_generated/server";
-import { authComponent } from "./auth";
-
-export const get = query({
-  args: {},
-  handler: async (ctx) => {
-    const authUser = await authComponent.safeGetAuthUser(ctx);
-    if (!authUser) {
-      return {
-        message: "Not authenticated",
-      };
-    }
-    return {
-      message: "This is private",
-    };
-  },
-});
-`],
-  ["modules/auth/stack/better-auth/convex/native/bare/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { NAV_THEME } from "@/lib/constants";
-import { useColorScheme } from "@/lib/use-color-scheme";
-import z from "zod";
-
-const signInSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(8, "Use at least 8 characters"),
-});
-
-function getErrorMessage(error: unknown): string | null {
-  if (!error) return null;
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (Array.isArray(error)) {
-    for (const issue of error) {
-      const message = getErrorMessage(issue);
-      if (message) {
-        return message;
-      }
-    }
-    return null;
-  }
-
-  if (typeof error === "object" && error !== null) {
-    const maybeError = error as { message?: unknown };
-    if (typeof maybeError.message === "string") {
-      return maybeError.message;
-    }
-  }
-
-  return null;
-}
-
-function SignIn() {
-  const { colorScheme } = useColorScheme();
-  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
-  const [error, setError] = useState<string | null>(null);
-
-  const form = useForm({
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-    validators: {
-      onSubmit: signInSchema,
-    },
-    onSubmit: async ({ value, formApi }) => {
-      await authClient.signIn.email(
-        {
-          email: value.email.trim(),
-          password: value.password,
-        },
-        {
-          onError(error) {
-            setError(error.error?.message || "Failed to sign in");
-          },
-          onSuccess() {
-            setError(null);
-            formApi.reset();
-          },
-        },
-      );
-    },
-  });
-
-  return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.title, { color: theme.text }]}>Sign In</Text>
-
-      <form.Subscribe
-        selector={(state) => ({
-          isSubmitting: state.isSubmitting,
-          validationError: getErrorMessage(state.errorMap.onSubmit),
-        })}
-      >
-        {({ isSubmitting, validationError }) => {
-          const formError = error ?? validationError;
-
-          return (
-            <>
-              {formError ? (
-                <View style={[styles.errorContainer, { backgroundColor: theme.notification + "20" }]}>
-                  <Text style={[styles.errorText, { color: theme.notification }]}>{formError}</Text>
-                </View>
-              ) : null}
-
-              <form.Field name="email">
-                {(field) => (
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: theme.text,
-                        borderColor: theme.border,
-                        backgroundColor: theme.background,
-                      },
-                    ]}
-                    placeholder="Email"
-                    placeholderTextColor={theme.text}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChangeText={(value) => {
-                      field.handleChange(value);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                )}
-              </form.Field>
-
-              <form.Field name="password">
-                {(field) => (
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: theme.text,
-                        borderColor: theme.border,
-                        backgroundColor: theme.background,
-                      },
-                    ]}
-                    placeholder="Password"
-                    placeholderTextColor={theme.text}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChangeText={(value) => {
-                      field.handleChange(value);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                    secureTextEntry
-                    onSubmitEditing={form.handleSubmit}
-                  />
-                )}
-              </form.Field>
-
-              <TouchableOpacity
-                onPress={form.handleSubmit}
-                disabled={isSubmitting}
-                style={[
-                  styles.button,
-                  {
-                    backgroundColor: theme.primary,
-                    opacity: isSubmitting ? 0.5 : 1,
-                  },
-                ]}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.buttonText}>Sign In</Text>
-                )}
-              </TouchableOpacity>
-            </>
-          );
-        }}
-      </form.Subscribe>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  card: {
-    marginTop: 16,
-    padding: 16,
-    borderWidth: 1,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 12,
-  },
-  errorContainer: {
-    marginBottom: 12,
-    padding: 8,
-  },
-  errorText: {
-    fontSize: 14,
-  },
-  input: {
-    borderWidth: 1,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  button: {
-    padding: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontSize: 16,
-  },
-});
-
-export { SignIn };
-`],
-  ["modules/auth/stack/better-auth/convex/native/bare/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { NAV_THEME } from "@/lib/constants";
-import { useColorScheme } from "@/lib/use-color-scheme";
-import z from "zod";
-
-const signUpSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Name is required")
-    .min(2, "Name must be at least 2 characters"),
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(8, "Use at least 8 characters"),
-});
-
-function getErrorMessage(error: unknown): string | null {
-  if (!error) return null;
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (Array.isArray(error)) {
-    for (const issue of error) {
-      const message = getErrorMessage(issue);
-      if (message) {
-        return message;
-      }
-    }
-    return null;
-  }
-
-  if (typeof error === "object" && error !== null) {
-    const maybeError = error as { message?: unknown };
-    if (typeof maybeError.message === "string") {
-      return maybeError.message;
-    }
-  }
-
-  return null;
-}
-
-function SignUp() {
-  const { colorScheme } = useColorScheme();
-  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
-  const [error, setError] = useState<string | null>(null);
-
-  const form = useForm({
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-    },
-    validators: {
-      onSubmit: signUpSchema,
-    },
-    onSubmit: async ({ value, formApi }) => {
-      await authClient.signUp.email(
-        {
-          name: value.name.trim(),
-          email: value.email.trim(),
-          password: value.password,
-        },
-        {
-          onError(error) {
-            setError(error.error?.message || "Failed to sign up");
-          },
-          onSuccess() {
-            setError(null);
-            formApi.reset();
-          },
-        },
-      );
-    },
-  });
-
-  return (
-    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
-
-      <form.Subscribe
-        selector={(state) => ({
-          isSubmitting: state.isSubmitting,
-          validationError: getErrorMessage(state.errorMap.onSubmit),
-        })}
-      >
-        {({ isSubmitting, validationError }) => {
-          const formError = error ?? validationError;
-
-          return (
-            <>
-              {formError ? (
-                <View style={[styles.errorContainer, { backgroundColor: theme.notification + "20" }]}>
-                  <Text style={[styles.errorText, { color: theme.notification }]}>{formError}</Text>
-                </View>
-              ) : null}
-
-              <form.Field name="name">
-                {(field) => (
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: theme.text,
-                        borderColor: theme.border,
-                        backgroundColor: theme.background,
-                      },
-                    ]}
-                    placeholder="Name"
-                    placeholderTextColor={theme.text}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChangeText={(value) => {
-                      field.handleChange(value);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                  />
-                )}
-              </form.Field>
-
-              <form.Field name="email">
-                {(field) => (
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: theme.text,
-                        borderColor: theme.border,
-                        backgroundColor: theme.background,
-                      },
-                    ]}
-                    placeholder="Email"
-                    placeholderTextColor={theme.text}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChangeText={(value) => {
-                      field.handleChange(value);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                )}
-              </form.Field>
-
-              <form.Field name="password">
-                {(field) => (
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: theme.text,
-                        borderColor: theme.border,
-                        backgroundColor: theme.background,
-                      },
-                    ]}
-                    placeholder="Password"
-                    placeholderTextColor={theme.text}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChangeText={(value) => {
-                      field.handleChange(value);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                    secureTextEntry
-                    onSubmitEditing={form.handleSubmit}
-                  />
-                )}
-              </form.Field>
-
-              <TouchableOpacity
-                onPress={form.handleSubmit}
-                disabled={isSubmitting}
-                style={[
-                  styles.button,
-                  {
-                    backgroundColor: theme.primary,
-                    opacity: isSubmitting ? 0.5 : 1,
-                  },
-                ]}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.buttonText}>Sign Up</Text>
-                )}
-              </TouchableOpacity>
-            </>
-          );
-        }}
-      </form.Subscribe>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  card: {
-    marginTop: 16,
-    padding: 16,
-    borderWidth: 1,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 12,
-  },
-  errorContainer: {
-    marginBottom: 12,
-    padding: 8,
-  },
-  errorText: {
-    fontSize: 14,
-  },
-  input: {
-    borderWidth: 1,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  button: {
-    padding: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontSize: 16,
-  },
-});
-
-export { SignUp };
-`],
-  ["modules/auth/stack/better-auth/convex/native/base/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
-import { convexClient, crossDomainClient } from "@convex-dev/better-auth/client/plugins";
-import { expoClient } from "@better-auth/expo/client";
-import Constants from "expo-constants";
-import * as SecureStore from "expo-secure-store";
-import { Platform } from "react-native";
-import { ENV } from "../src/env";
-
-export const authClient = createAuthClient({
-	baseURL: ENV.EXPO_PUBLIC_CONVEX_SITE_URL,
-	plugins: [
-		convexClient(),
-		Platform.OS === "web"
-			? crossDomainClient()
-			: expoClient({
-				scheme: Constants.expoConfig?.scheme as string,
-				storagePrefix: Constants.expoConfig?.scheme as string,
-				storage: SecureStore,
-			}),
-	],
-});
-`],
-  ["modules/auth/stack/better-auth/convex/native/unistyles/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { StyleSheet } from "react-native-unistyles";
-import z from "zod";
-
-const signInSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(8, "Use at least 8 characters"),
-});
-
-function getErrorMessage(error: unknown): string | null {
-  if (!error) return null;
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (Array.isArray(error)) {
-    for (const issue of error) {
-      const message = getErrorMessage(issue);
-      if (message) {
-        return message;
-      }
-    }
-    return null;
-  }
-
-  if (typeof error === "object" && error !== null) {
-    const maybeError = error as { message?: unknown };
-    if (typeof maybeError.message === "string") {
-      return maybeError.message;
-    }
-  }
-
-  return null;
-}
-
-export function SignIn() {
-  const [error, setError] = useState<string | null>(null);
-
-  const form = useForm({
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-    validators: {
-      onSubmit: signInSchema,
-    },
-    onSubmit: async ({ value, formApi }) => {
-      await authClient.signIn.email(
-        {
-          email: value.email.trim(),
-          password: value.password,
-        },
-        {
-          onError(error) {
-            setError(error.error?.message || "Failed to sign in");
-          },
-          onSuccess() {
-            setError(null);
-            formApi.reset();
-          },
-        },
-      );
-    },
-  });
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Sign In</Text>
-
-      <form.Subscribe
-        selector={(state) => ({
-          isSubmitting: state.isSubmitting,
-          validationError: getErrorMessage(state.errorMap.onSubmit),
-        })}
-      >
-        {({ isSubmitting, validationError }) => {
-          const formError = error ?? validationError;
-
-          return (
-            <>
-              {formError ? (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>{formError}</Text>
-                </View>
-              ) : null}
-
-              <form.Field name="email">
-                {(field) => (
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChangeText={(value) => {
-                      field.handleChange(value);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                )}
-              </form.Field>
-
-              <form.Field name="password">
-                {(field) => (
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Password"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChangeText={(value) => {
-                      field.handleChange(value);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                    secureTextEntry
-                    onSubmitEditing={form.handleSubmit}
-                  />
-                )}
-              </form.Field>
-
-              <TouchableOpacity
-                onPress={form.handleSubmit}
-                disabled={isSubmitting}
-                style={styles.button}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Sign In</Text>
-                )}
-              </TouchableOpacity>
-            </>
-          );
-        }}
-      </form.Subscribe>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create((theme) => ({
-  container: {
-    marginTop: 24,
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: theme.colors.typography,
-    marginBottom: 16,
-  },
-  errorContainer: {
-    marginBottom: 16,
-    padding: 12,
-    borderRadius: 6,
-  },
-  errorText: {
-    color: theme.colors.destructive,
-    fontSize: 14,
-  },
-  input: {
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 6,
-    color: theme.colors.typography,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  button: {
-    backgroundColor: theme.colors.primary,
-    padding: 16,
-    borderRadius: 6,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonText: {
-    fontWeight: "500",
-  },
-}));
-`],
-  ["modules/auth/stack/better-auth/convex/native/unistyles/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { StyleSheet } from "react-native-unistyles";
-import z from "zod";
-
-const signUpSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Name is required")
-    .min(2, "Name must be at least 2 characters"),
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(8, "Use at least 8 characters"),
-});
-
-function getErrorMessage(error: unknown): string | null {
-  if (!error) return null;
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (Array.isArray(error)) {
-    for (const issue of error) {
-      const message = getErrorMessage(issue);
-      if (message) {
-        return message;
-      }
-    }
-    return null;
-  }
-
-  if (typeof error === "object" && error !== null) {
-    const maybeError = error as { message?: unknown };
-    if (typeof maybeError.message === "string") {
-      return maybeError.message;
-    }
-  }
-
-  return null;
-}
-
-export function SignUp() {
-  const [error, setError] = useState<string | null>(null);
-
-  const form = useForm({
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-    },
-    validators: {
-      onSubmit: signUpSchema,
-    },
-    onSubmit: async ({ value, formApi }) => {
-      await authClient.signUp.email(
-        {
-          name: value.name.trim(),
-          email: value.email.trim(),
-          password: value.password,
-        },
-        {
-          onError(error) {
-            setError(error.error?.message || "Failed to sign up");
-          },
-          onSuccess() {
-            setError(null);
-            formApi.reset();
-          },
-        },
-      );
-    },
-  });
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Create Account</Text>
-
-      <form.Subscribe
-        selector={(state) => ({
-          isSubmitting: state.isSubmitting,
-          validationError: getErrorMessage(state.errorMap.onSubmit),
-        })}
-      >
-        {({ isSubmitting, validationError }) => {
-          const formError = error ?? validationError;
-
-          return (
-            <>
-              {formError ? (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>{formError}</Text>
-                </View>
-              ) : null}
-
-              <form.Field name="name">
-                {(field) => (
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Name"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChangeText={(value) => {
-                      field.handleChange(value);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                  />
-                )}
-              </form.Field>
-
-              <form.Field name="email">
-                {(field) => (
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChangeText={(value) => {
-                      field.handleChange(value);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                )}
-              </form.Field>
-
-              <form.Field name="password">
-                {(field) => (
-                  <TextInput
-                    style={styles.inputLast}
-                    placeholder="Password"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChangeText={(value) => {
-                      field.handleChange(value);
-                      if (error) {
-                        setError(null);
-                      }
-                    }}
-                    secureTextEntry
-                    onSubmitEditing={form.handleSubmit}
-                  />
-                )}
-              </form.Field>
-
-              <TouchableOpacity
-                onPress={form.handleSubmit}
-                disabled={isSubmitting}
-                style={styles.button}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Sign Up</Text>
-                )}
-              </TouchableOpacity>
-            </>
-          );
-        }}
-      </form.Subscribe>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create((theme) => ({
-  container: {
-    marginTop: 24,
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: theme.colors.typography,
-    marginBottom: 16,
-  },
-  errorContainer: {
-    marginBottom: 16,
-    padding: 12,
-    borderRadius: 6,
-  },
-  errorText: {
-    color: theme.colors.destructive,
-    fontSize: 14,
-  },
-  input: {
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 6,
-    color: theme.colors.typography,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  inputLast: {
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 6,
-    color: theme.colors.typography,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  button: {
-    backgroundColor: theme.colors.primary,
-    padding: 16,
-    borderRadius: 6,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonText: {
-    fontWeight: "500",
-  },
-}));
-`],
-  ["modules/auth/stack/better-auth/convex/native/uniwind/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useRef } from "react";
-import { Text, View } from "react-native";
-import { Button, FieldError, Input, type InputRef, Label, Spinner, Surface, TextField, useToast } from "heroui-native";
-import z from "zod";
-
-const signInSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(8, "Use at least 8 characters"),
-});
-
-function getErrorMessage(error: unknown): string | null {
-  if (!error) return null;
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (Array.isArray(error)) {
-    for (const issue of error) {
-      const message = getErrorMessage(issue);
-      if (message) {
-        return message;
-      }
-    }
-    return null;
-  }
-
-  if (typeof error === "object" && error !== null) {
-    const maybeError = error as { message?: unknown };
-    if (typeof maybeError.message === "string") {
-      return maybeError.message;
-    }
-  }
-
-  return null;
-}
-
-export function SignIn() {
-  const passwordInputRef = useRef<InputRef>(null);
-  const { toast } = useToast();
-
-  const form = useForm({
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-    validators: {
-      onSubmit: signInSchema,
-    },
-    onSubmit: async ({ value, formApi }) => {
-      await authClient.signIn.email(
-        {
-          email: value.email.trim(),
-          password: value.password,
-        },
-        {
-          onError(error) {
-            toast.show({
-              variant: "danger",
-              label: error.error?.message || "Failed to sign in",
-            });
-          },
-          onSuccess() {
-            formApi.reset();
-            toast.show({
-              variant: "success",
-              label: "Signed in successfully",
-            });
-          },
-        },
-      );
-    },
-  });
-
-  return (
-    <Surface variant="secondary" className="p-4 rounded-lg">
-      <Text className="text-foreground font-medium mb-4">Sign In</Text>
-
-      <form.Subscribe
-        selector={(state) => ({
-          isSubmitting: state.isSubmitting,
-          validationError: getErrorMessage(state.errorMap.onSubmit),
-        })}
-      >
-        {({ isSubmitting, validationError }) => {
-          const formError = validationError;
-
-          return (
-            <>
-              <FieldError isInvalid={!!formError} className="mb-3">
-                {formError}
-              </FieldError>
-
-              <View className="gap-3">
-                <form.Field name="email">
-                  {(field) => (
-                    <TextField>
-                      <Label>Email</Label>
-                      <Input
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChangeText={field.handleChange}
-                        placeholder="email@example.com"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        autoComplete="email"
-                        textContentType="emailAddress"
-                        returnKeyType="next"
-                        blurOnSubmit={false}
-                        onSubmitEditing={() => {
-                          passwordInputRef.current?.focus();
-                        }}
-                      />
-                    </TextField>
-                  )}
-                </form.Field>
-
-                <form.Field name="password">
-                  {(field) => (
-                    <TextField>
-                      <Label>Password</Label>
-                      <Input
-                        ref={passwordInputRef}
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChangeText={field.handleChange}
-                        placeholder="••••••••"
-                        secureTextEntry
-                        autoComplete="password"
-                        textContentType="password"
-                        returnKeyType="go"
-                        onSubmitEditing={form.handleSubmit}
-                      />
-                    </TextField>
-                  )}
-                </form.Field>
-
-                <Button onPress={form.handleSubmit} isDisabled={isSubmitting} className="mt-1">
-                  {isSubmitting ? <Spinner size="sm" color="default" /> : <Button.Label>Sign In</Button.Label>}
-                </Button>
-              </View>
-            </>
-          );
-        }}
-      </form.Subscribe>
-    </Surface>
-  );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/native/uniwind/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useRef } from "react";
-import { Text, View } from "react-native";
-import { Button, FieldError, Input, type InputRef, Label, Spinner, Surface, TextField, useToast } from "heroui-native";
-import z from "zod";
-
-const signUpSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Name is required")
-    .min(2, "Name must be at least 2 characters"),
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(8, "Use at least 8 characters"),
-});
-
-function getErrorMessage(error: unknown): string | null {
-  if (!error) return null;
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  if (Array.isArray(error)) {
-    for (const issue of error) {
-      const message = getErrorMessage(issue);
-      if (message) {
-        return message;
-      }
-    }
-    return null;
-  }
-
-  if (typeof error === "object" && error !== null) {
-    const maybeError = error as { message?: unknown };
-    if (typeof maybeError.message === "string") {
-      return maybeError.message;
-    }
-  }
-
-  return null;
-}
-
-export function SignUp() {
-  const emailInputRef = useRef<InputRef>(null);
-  const passwordInputRef = useRef<InputRef>(null);
-  const { toast } = useToast();
-
-  const form = useForm({
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-    },
-    validators: {
-      onSubmit: signUpSchema,
-    },
-    onSubmit: async ({ value, formApi }) => {
-      await authClient.signUp.email(
-        {
-          name: value.name.trim(),
-          email: value.email.trim(),
-          password: value.password,
-        },
-        {
-          onError(error) {
-            toast.show({
-              variant: "danger",
-              label: error.error?.message || "Failed to sign up",
-            });
-          },
-          onSuccess() {
-            formApi.reset();
-            toast.show({
-              variant: "success",
-              label: "Account created successfully",
-            });
-          },
-        },
-      );
-    },
-  });
-
-  return (
-    <Surface variant="secondary" className="p-4 rounded-lg">
-      <Text className="text-foreground font-medium mb-4">Create Account</Text>
-
-      <form.Subscribe
-        selector={(state) => ({
-          isSubmitting: state.isSubmitting,
-          validationError: getErrorMessage(state.errorMap.onSubmit),
-        })}
-      >
-        {({ isSubmitting, validationError }) => {
-          const formError = validationError;
-
-          return (
-            <>
-              <FieldError isInvalid={!!formError} className="mb-3">
-                {formError}
-              </FieldError>
-
-              <View className="gap-3">
-                <form.Field name="name">
-                  {(field) => (
-                    <TextField>
-                      <Label>Name</Label>
-                      <Input
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChangeText={field.handleChange}
-                        placeholder="John Doe"
-                        autoComplete="name"
-                        textContentType="name"
-                        returnKeyType="next"
-                        blurOnSubmit={false}
-                        onSubmitEditing={() => {
-                          emailInputRef.current?.focus();
-                        }}
-                      />
-                    </TextField>
-                  )}
-                </form.Field>
-
-                <form.Field name="email">
-                  {(field) => (
-                    <TextField>
-                      <Label>Email</Label>
-                      <Input
-                        ref={emailInputRef}
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChangeText={field.handleChange}
-                        placeholder="email@example.com"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        autoComplete="email"
-                        textContentType="emailAddress"
-                        returnKeyType="next"
-                        blurOnSubmit={false}
-                        onSubmitEditing={() => {
-                          passwordInputRef.current?.focus();
-                        }}
-                      />
-                    </TextField>
-                  )}
-                </form.Field>
-
-                <form.Field name="password">
-                  {(field) => (
-                    <TextField>
-                      <Label>Password</Label>
-                      <Input
-                        ref={passwordInputRef}
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChangeText={field.handleChange}
-                        placeholder="••••••••"
-                        secureTextEntry
-                        autoComplete="new-password"
-                        textContentType="newPassword"
-                        returnKeyType="go"
-                        onSubmitEditing={form.handleSubmit}
-                      />
-                    </TextField>
-                  )}
-                </form.Field>
-
-                <Button onPress={form.handleSubmit} isDisabled={isSubmitting} className="mt-1">
-                  {isSubmitting ? (
-                    <Spinner size="sm" color="default" />
-                  ) : (
-                    <Button.Label>Create Account</Button.Label>
-                  )}
-                </Button>
-              </View>
-            </>
-          );
-        }}
-      </form.Subscribe>
-    </Surface>
-  );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/next/src/app/api/auth/[...all]/route.ts.hbs", `import { handler } from "@/lib/auth-server";
-
-export const { GET, POST } = handler;
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/next/src/app/dashboard/page.tsx.hbs", `"use client"
-
-import SignInForm from "@/components/sign-in-form";
-import SignUpForm from "@/components/sign-up-form";
-import UserMenu from "@/components/user-menu";
-import { api } from "@{{projectName}}/backend/convex/_generated/api";
-import {
-    Authenticated,
-    AuthLoading,
-    Unauthenticated,
-    useQuery,
-} from "convex/react";
-import { useState } from "react";
-
-function DashboardContent() {
-    const privateData = useQuery(api.privateData.get);
-
-    return (
-        <div>
-            <h1>Dashboard</h1>
-            <p>privateData: {privateData?.message}</p>
-            <UserMenu />
-        </div>
-    );
-}
-
-export default function DashboardPage() {
-    const [showSignIn, setShowSignIn] = useState(false);
-
-    return (
-        <>
-            <Authenticated>
-                <DashboardContent />
-            </Authenticated>
-            <Unauthenticated>
-                {showSignIn ? (
-                    <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
-                ) : (
-                    <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
-                )}
-            </Unauthenticated>
-            <AuthLoading>
-                <div>Loading...</div>
-            </AuthLoading>
-        </>
-    );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/next/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { toast } from "sonner";
-import z from "zod";
-import { Button } from "@{{projectName}}/ui/components/button";
-import { Input } from "@{{projectName}}/ui/components/input";
-import { Label } from "@{{projectName}}/ui/components/label";
-import { useRouter } from "next/navigation";
-
-export default function SignInForm({
-	onSwitchToSignUp,
-}: {
-	onSwitchToSignUp: () => void;
-}) {
-	const router = useRouter();
-
-	const form = useForm({
-		defaultValues: {
-			email: "",
-			password: "",
-		},
-		onSubmit: async ({ value }) => {
-			await authClient.signIn.email(
-				{
-					email: value.email,
-					password: value.password,
-				},
-				{
-					onSuccess: () => {
-						router.push("/dashboard");
-						toast.success("Sign in successful");
-					},
-					onError: (error) => {
-						toast.error(error.error.message || error.error.statusText);
-					},
-				},
-			);
-		},
-		validators: {
-			onSubmit: z.object({
-				email: z.email("Invalid email address"),
-				password: z.string().min(8, "Password must be at least 8 characters"),
-			}),
-		},
-	});
-
-	return (
-		<div className="mx-auto w-full mt-10 max-w-md p-6">
-			<h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
-
-			<form
-				onSubmit={(e) => {
-					e.preventDefault();
-					e.stopPropagation();
-					form.handleSubmit();
-				}}
-				className="space-y-4"
-			>
-				<div>
-					<form.Field name="email">
-						{(field) => (
-							<div className="space-y-2">
-								<Label htmlFor={field.name}>Email</Label>
-								<Input
-									id={field.name}
-									name={field.name}
-									type="email"
-									value={field.state.value}
-									onBlur={field.handleBlur}
-									onChange={(e) => field.handleChange(e.target.value)}
-								/>
-								{field.state.meta.errors.map((error) => (
-									<p key={error?.message} className="text-red-500">
-										{error?.message}
-									</p>
-								))}
-							</div>
-						)}
-					</form.Field>
-				</div>
-
-				<div>
-					<form.Field name="password">
-						{(field) => (
-							<div className="space-y-2">
-								<Label htmlFor={field.name}>Password</Label>
-								<Input
-									id={field.name}
-									name={field.name}
-									type="password"
-									value={field.state.value}
-									onBlur={field.handleBlur}
-									onChange={(e) => field.handleChange(e.target.value)}
-								/>
-								{field.state.meta.errors.map((error) => (
-									<p key={error?.message} className="text-red-500">
-										{error?.message}
-									</p>
-								))}
-							</div>
-						)}
-					</form.Field>
-				</div>
-
-				<form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
-          {({ canSubmit, isSubmitting }) => (
-						<Button
-							type="submit"
-							className="w-full"
-							disabled={!canSubmit || isSubmitting}
-						>
-							{isSubmitting ? "Submitting..." : "Sign In"}
-						</Button>
-					)}
-				</form.Subscribe>
-			</form>
-
-			<div className="mt-4 text-center">
-				<Button
-					variant="link"
-					onClick={onSwitchToSignUp}
-					className="text-indigo-600 hover:text-indigo-800"
-				>
-					Need an account? Sign Up
-				</Button>
-			</div>
-		</div>
-	);
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/next/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { toast } from "sonner";
-import z from "zod";
-import { Button } from "@{{projectName}}/ui/components/button";
-import { Input } from "@{{projectName}}/ui/components/input";
-import { Label } from "@{{projectName}}/ui/components/label";
-import { useRouter } from "next/navigation";
-
-export default function SignUpForm({
-	onSwitchToSignIn,
-}: {
-	onSwitchToSignIn: () => void;
-}) {
-	const router = useRouter();
-
-	const form = useForm({
-		defaultValues: {
-			email: "",
-			password: "",
-			name: "",
-		},
-		onSubmit: async ({ value }) => {
-			await authClient.signUp.email(
-				{
-					email: value.email,
-					password: value.password,
-					name: value.name,
-				},
-				{
-					onSuccess: () => {
-						router.push("/dashboard");
-						toast.success("Sign up successful");
-					},
-					onError: (error) => {
-						toast.error(error.error.message || error.error.statusText);
-					},
-				},
-			);
-		},
-		validators: {
-			onSubmit: z.object({
-				name: z.string().min(2, "Name must be at least 2 characters"),
-				email: z.email("Invalid email address"),
-				password: z.string().min(8, "Password must be at least 8 characters"),
-			}),
-		},
-	});
-
-	return (
-		<div className="mx-auto w-full mt-10 max-w-md p-6">
-			<h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
-
-			<form
-				onSubmit={(e) => {
-					e.preventDefault();
-					e.stopPropagation();
-					form.handleSubmit();
-				}}
-				className="space-y-4"
-			>
-				<div>
-					<form.Field name="name">
-						{(field) => (
-							<div className="space-y-2">
-								<Label htmlFor={field.name}>Name</Label>
-								<Input
-									id={field.name}
-									name={field.name}
-									value={field.state.value}
-									onBlur={field.handleBlur}
-									onChange={(e) => field.handleChange(e.target.value)}
-								/>
-								{field.state.meta.errors.map((error) => (
-									<p key={error?.message} className="text-red-500">
-										{error?.message}
-									</p>
-								))}
-							</div>
-						)}
-					</form.Field>
-				</div>
-
-				<div>
-					<form.Field name="email">
-						{(field) => (
-							<div className="space-y-2">
-								<Label htmlFor={field.name}>Email</Label>
-								<Input
-									id={field.name}
-									name={field.name}
-									type="email"
-									value={field.state.value}
-									onBlur={field.handleBlur}
-									onChange={(e) => field.handleChange(e.target.value)}
-								/>
-								{field.state.meta.errors.map((error) => (
-									<p key={error?.message} className="text-red-500">
-										{error?.message}
-									</p>
-								))}
-							</div>
-						)}
-					</form.Field>
-				</div>
-
-				<div>
-					<form.Field name="password">
-						{(field) => (
-							<div className="space-y-2">
-								<Label htmlFor={field.name}>Password</Label>
-								<Input
-									id={field.name}
-									name={field.name}
-									type="password"
-									value={field.state.value}
-									onBlur={field.handleBlur}
-									onChange={(e) => field.handleChange(e.target.value)}
-								/>
-								{field.state.meta.errors.map((error) => (
-									<p key={error?.message} className="text-red-500">
-										{error?.message}
-									</p>
-								))}
-							</div>
-						)}
-					</form.Field>
-				</div>
-
-				<form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
-          {({ canSubmit, isSubmitting }) => (
-						<Button
-							type="submit"
-							className="w-full"
-							disabled={!canSubmit || isSubmitting}
-						>
-							{isSubmitting ? "Submitting..." : "Sign Up"}
-						</Button>
-					)}
-				</form.Subscribe>
-			</form>
-
-			<div className="mt-4 text-center">
-				<Button
-					variant="link"
-					onClick={onSwitchToSignIn}
-					className="text-indigo-600 hover:text-indigo-800"
-				>
-					Already have an account? Sign In
-				</Button>
-			</div>
-		</div>
-	);
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/next/src/components/user-menu.tsx.hbs", `import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuGroup,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@{{projectName}}/ui/components/dropdown-menu";
-import { authClient } from "@/lib/auth-client";
-import { Button } from "@{{projectName}}/ui/components/button";
-import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@{{projectName}}/backend/convex/_generated/api";
-
-export default function UserMenu() {
-	const router = useRouter();
-	const user = useQuery(api.auth.getCurrentUser)
-
-	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger render={<Button variant="outline" />}>
-				{user?.name}
-			</DropdownMenuTrigger>
-			<DropdownMenuContent className="bg-card">
-				<DropdownMenuGroup>
-					<DropdownMenuLabel>My Account</DropdownMenuLabel>
-					<DropdownMenuSeparator />
-					<DropdownMenuItem>{user?.email}</DropdownMenuItem>
-					<DropdownMenuItem
-						variant="destructive"
-						onClick={() => {
-							authClient.signOut({
-								fetchOptions: {
-									onSuccess: () => {
-										router.push("/dashboard");
-									},
-								},
-							});
-						}}
-					>
-						Sign Out
-					</DropdownMenuItem>
-				</DropdownMenuGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/next/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
-import { convexClient } from "@convex-dev/better-auth/client/plugins";
-
-export const authClient = createAuthClient({
-  plugins: [convexClient()],
-});
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/next/src/lib/auth-server.ts.hbs", `import { convexBetterAuthNextJs } from "@convex-dev/better-auth/nextjs";
-import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
-
-export const {
-	handler,
-	preloadAuthQuery,
-	isAuthenticated,
-	getToken,
-	fetchAuthQuery,
-	fetchAuthMutation,
-	fetchAuthAction,
-} = convexBetterAuthNextJs({
-	convexUrl: ENV.NEXT_PUBLIC_CONVEX_URL,
-	convexSiteUrl: ENV.NEXT_PUBLIC_CONVEX_SITE_URL,
-});
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/react-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useNavigate } from "react-router";
-import { toast } from "sonner";
-import z from "zod";
-import { Button } from "@{{projectName}}/ui/components/button";
-import { Input } from "@{{projectName}}/ui/components/input";
-import { Label } from "@{{projectName}}/ui/components/label";
-
-export default function SignInForm({
-  onSwitchToSignUp,
-}: {
-  onSwitchToSignUp: () => void;
-}) {
-  const navigate = useNavigate();
-
-  const form = useForm({
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-    onSubmit: async ({ value }) => {
-      await authClient.signIn.email(
-        {
-          email: value.email,
-          password: value.password,
-        },
-        {
-          onSuccess: () => {
-            navigate("/dashboard");
-            toast.success("Sign in successful");
-          },
-          onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
-          },
-        },
-      );
-    },
-    validators: {
-      onSubmit: z.object({
-        email: z.email("Invalid email address"),
-        password: z.string().min(8, "Password must be at least 8 characters"),
-      }),
-    },
-  });
-
-  return (
-    <div className="mx-auto mt-10 w-full max-w-md p-6">
-      <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
-        }}
-        className="space-y-4"
-      >
-        <div>
-          <form.Field name="email">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Email</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error, index) => (
-                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
-
-        <div>
-          <form.Field name="password">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Password</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="password"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error, index) => (
-                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
-
-        <form.Subscribe
-          selector={(state) => ({
-            canSubmit: state.canSubmit,
-            isSubmitting: state.isSubmitting,
-          })}
-        >
-          {({ canSubmit, isSubmitting }) => (
-            <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Sign In"}
-            </Button>
-          )}
-        </form.Subscribe>
-      </form>
-
-      <div className="mt-4 text-center">
-        <Button
-          variant="link"
-          onClick={onSwitchToSignUp}
-          className="text-indigo-600 hover:text-indigo-800"
-        >
-          Need an account? Sign Up
-        </Button>
-      </div>
-    </div>
-  );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/react-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useNavigate } from "react-router";
-import { toast } from "sonner";
-import z from "zod";
-import { Button } from "@{{projectName}}/ui/components/button";
-import { Input } from "@{{projectName}}/ui/components/input";
-import { Label } from "@{{projectName}}/ui/components/label";
-
-export default function SignUpForm({
-  onSwitchToSignIn,
-}: {
-  onSwitchToSignIn: () => void;
-}) {
-  const navigate = useNavigate();
-
-  const form = useForm({
-    defaultValues: {
-      email: "",
-      password: "",
-      name: "",
-    },
-    onSubmit: async ({ value }) => {
-      await authClient.signUp.email(
-        {
-          email: value.email,
-          password: value.password,
-          name: value.name,
-        },
-        {
-          onSuccess: () => {
-            navigate("/dashboard");
-            toast.success("Sign up successful");
-          },
-          onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
-          },
-        },
-      );
-    },
-    validators: {
-      onSubmit: z.object({
-        name: z.string().min(2, "Name must be at least 2 characters"),
-        email: z.email("Invalid email address"),
-        password: z.string().min(8, "Password must be at least 8 characters"),
-      }),
-    },
-  });
-
-  return (
-    <div className="mx-auto mt-10 w-full max-w-md p-6">
-      <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
-        }}
-        className="space-y-4"
-      >
-        <div>
-          <form.Field name="name">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Name</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error, index) => (
-                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
-
-        <div>
-          <form.Field name="email">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Email</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error, index) => (
-                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
-
-        <div>
-          <form.Field name="password">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Password</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="password"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error, index) => (
-                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
-
-        <form.Subscribe
-          selector={(state) => ({
-            canSubmit: state.canSubmit,
-            isSubmitting: state.isSubmitting,
-          })}
-        >
-          {({ canSubmit, isSubmitting }) => (
-            <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Sign Up"}
-            </Button>
-          )}
-        </form.Subscribe>
-      </form>
-
-      <div className="mt-4 text-center">
-        <Button
-          variant="link"
-          onClick={onSwitchToSignIn}
-          className="text-indigo-600 hover:text-indigo-800"
-        >
-          Already have an account? Sign In
-        </Button>
-      </div>
-    </div>
-  );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/react-router/src/components/user-menu.tsx.hbs", `import { useNavigate } from "react-router";
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@{{projectName}}/ui/components/dropdown-menu";
-import { authClient } from "@/lib/auth-client";
-import { useQuery } from "convex/react";
-import { api } from "@{{projectName}}/backend/convex/_generated/api";
-
-import { Button } from "@{{projectName}}/ui/components/button";
-
-export default function UserMenu() {
-  const navigate = useNavigate();
-  const user = useQuery(api.auth.getCurrentUser);
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline" />}>
-        {user?.name}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="bg-card">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem>{user?.email}</DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => {
-              authClient.signOut({
-                fetchOptions: {
-                  onSuccess: () => {
-                    navigate("/dashboard");
-                  },
-                },
-              });
-            }}
-          >
-            Sign Out
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/react-router/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
-import {
-  convexClient,
-  crossDomainClient,
-} from "@convex-dev/better-auth/client/plugins";
-import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
-
-export const authClient = createAuthClient({
-  baseURL: ENV.VITE_CONVEX_SITE_URL,
-  plugins: [convexClient(), crossDomainClient()],
-});
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/react-router/src/routes/dashboard.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
-import SignUpForm from "@/components/sign-up-form";
-import UserMenu from "@/components/user-menu";
-import { api } from "@{{projectName}}/backend/convex/_generated/api";
-import {
-  Authenticated,
-  AuthLoading,
-  Unauthenticated,
-  useQuery,
-} from "convex/react";
-import { useState } from "react";
-
-function PrivateDashboardContent() {
-  const privateData = useQuery(api.privateData.get);
-
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>privateData: {privateData?.message}</p>
-      <UserMenu />
-    </div>
-  );
-}
-
-export default function Dashboard() {
-  const [showSignIn, setShowSignIn] = useState(false);
-
-  return (
-    <>
-      <Authenticated>
-        <PrivateDashboardContent />
-      </Authenticated>
-      <Unauthenticated>
-        {showSignIn ? (
-          <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
-        ) : (
-          <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
-        )}
-      </Unauthenticated>
-      <AuthLoading>
-        <div>Loading...</div>
-      </AuthLoading>
-    </>
-  );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
-import z from "zod";
-import { Button } from "@{{projectName}}/ui/components/button";
-import { Input } from "@{{projectName}}/ui/components/input";
-import { Label } from "@{{projectName}}/ui/components/label";
-
-export default function SignInForm({
-    onSwitchToSignUp,
-}: {
-    onSwitchToSignUp: () => void;
-}) {
-    const navigate = useNavigate({
-        from: "/",
-    });
-
-    const form = useForm({
-        defaultValues: {
-            email: "",
-            password: "",
-        },
-        onSubmit: async ({ value }) => {
-            await authClient.signIn.email(
-                {
-                    email: value.email,
-                    password: value.password,
-                },
-                {
-                    onSuccess: () => {
-                        navigate({
-                            to: "/dashboard",
-                        });
-                        toast.success("Sign in successful");
-                    },
-                    onError: (error) => {
-                        toast.error(error.error.message || error.error.statusText);
-                    },
-                },
-            );
-        },
-        validators: {
-            onSubmit: z.object({
-                email: z.email("Invalid email address"),
-                password: z.string().min(8, "Password must be at least 8 characters"),
-            }),
-        },
-    });
-
-    return (
-        <div className="mx-auto w-full mt-10 max-w-md p-6">
-            <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
-
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    form.handleSubmit();
-                }}
-                className="space-y-4"
-            >
-                <div>
-                    <form.Field name="email">
-                        {(field) => (
-                            <div className="space-y-2">
-                                <Label htmlFor={field.name}>Email</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    type="email"
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                {field.state.meta.errors.map((error, index) => (
-                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
-                                        {error?.message}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </form.Field>
-                </div>
-
-                <div>
-                    <form.Field name="password">
-                        {(field) => (
-                            <div className="space-y-2">
-                                <Label htmlFor={field.name}>Password</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    type="password"
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                {field.state.meta.errors.map((error, index) => (
-                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
-                                        {error?.message}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </form.Field>
-                </div>
-
-                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
-          {({ canSubmit, isSubmitting }) => (
-                        <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={!canSubmit || isSubmitting}
-                        >
-                            {isSubmitting ? "Submitting..." : "Sign In"}
-                        </Button>
-                    )}
-                </form.Subscribe>
-            </form>
-
-            <div className="mt-4 text-center">
-                <Button
-                    variant="link"
-                    onClick={onSwitchToSignUp}
-                    className="text-indigo-600 hover:text-indigo-800"
-                >
-                    Need an account? Sign Up
-                </Button>
-            </div>
-        </div>
-    );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
-import z from "zod";
-import { Button } from "@{{projectName}}/ui/components/button";
-import { Input } from "@{{projectName}}/ui/components/input";
-import { Label } from "@{{projectName}}/ui/components/label";
-
-export default function SignUpForm({
-    onSwitchToSignIn,
-}: {
-    onSwitchToSignIn: () => void;
-}) {
-    const navigate = useNavigate({
-        from: "/",
-    });
-
-    const form = useForm({
-        defaultValues: {
-            email: "",
-            password: "",
-            name: "",
-        },
-        onSubmit: async ({ value }) => {
-            await authClient.signUp.email(
-                {
-                    email: value.email,
-                    password: value.password,
-                    name: value.name,
-                },
-                {
-                    onSuccess: () => {
-                        navigate({
-                            to: "/dashboard",
-                        });
-                        toast.success("Sign up successful");
-                    },
-                    onError: (error) => {
-                        toast.error(error.error.message || error.error.statusText);
-                    },
-                },
-            );
-        },
-        validators: {
-            onSubmit: z.object({
-                name: z.string().min(2, "Name must be at least 2 characters"),
-                email: z.email("Invalid email address"),
-                password: z.string().min(8, "Password must be at least 8 characters"),
-            }),
-        },
-    });
-
-    return (
-        <div className="mx-auto w-full mt-10 max-w-md p-6">
-            <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
-
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    form.handleSubmit();
-                }}
-                className="space-y-4"
-            >
-                <div>
-                    <form.Field name="name">
-                        {(field) => (
-                            <div className="space-y-2">
-                                <Label htmlFor={field.name}>Name</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                {field.state.meta.errors.map((error, index) => (
-                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
-                                        {error?.message}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </form.Field>
-                </div>
-
-                <div>
-                    <form.Field name="email">
-                        {(field) => (
-                            <div className="space-y-2">
-                                <Label htmlFor={field.name}>Email</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    type="email"
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                {field.state.meta.errors.map((error, index) => (
-                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
-                                        {error?.message}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </form.Field>
-                </div>
-
-                <div>
-                    <form.Field name="password">
-                        {(field) => (
-                            <div className="space-y-2">
-                                <Label htmlFor={field.name}>Password</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    type="password"
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                {field.state.meta.errors.map((error, index) => (
-                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
-                                        {error?.message}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </form.Field>
-                </div>
-
-                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
-          {({ canSubmit, isSubmitting }) => (
-                        <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={!canSubmit || isSubmitting}
-                        >
-                            {isSubmitting ? "Submitting..." : "Sign Up"}
-                        </Button>
-                    )}
-                </form.Subscribe>
-            </form>
-
-            <div className="mt-4 text-center">
-                <Button
-                    variant="link"
-                    onClick={onSwitchToSignIn}
-                    className="text-indigo-600 hover:text-indigo-800"
-                >
-                    Already have an account? Sign In
-                </Button>
-            </div>
-        </div>
-    );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/components/user-menu.tsx.hbs", `import { useNavigate } from "@tanstack/react-router";
-
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@{{projectName}}/ui/components/dropdown-menu";
-import { authClient } from "@/lib/auth-client";
-import { useQuery } from "convex/react";
-import { api } from "@{{projectName}}/backend/convex/_generated/api";
-
-import { Button } from "@{{projectName}}/ui/components/button";
-
-export default function UserMenu() {
-    const navigate = useNavigate();
-    const user = useQuery(api.auth.getCurrentUser)
-
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-                {user?.name}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-card">
-                <DropdownMenuGroup>
-                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>{user?.email}</DropdownMenuItem>
-                    <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => {
-                            authClient.signOut({
-                                fetchOptions: {
-                                    onSuccess: () => {
-                                        navigate({
-                                            to: "/dashboard",
-                                        });
-                                    },
-                                },
-                            });
-                        }}
-                    >
-                        Sign Out
-                    </DropdownMenuItem>
-                </DropdownMenuGroup>
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
-import {
-	convexClient,
-	crossDomainClient,
-} from "@convex-dev/better-auth/client/plugins";
-import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
-
-export const authClient = createAuthClient({
-	baseURL: ENV.VITE_CONVEX_SITE_URL,
-	plugins: [convexClient(), crossDomainClient()],
-});
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `import UserMenu from "@/components/user-menu";
-import { api } from "@{{projectName}}/backend/convex/_generated/api";
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
-
-export const Route = createFileRoute("/_auth/dashboard")({
-  component: DashboardContent,
-});
-
-function DashboardContent() {
-  const privateData = useQuery(api.privateData.get);
-
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>privateData: {privateData?.message}</p>
-      <UserMenu />
-    </div>
-  );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
-import SignUpForm from "@/components/sign-up-form";
-import { Outlet, createFileRoute } from "@tanstack/react-router";
-import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
-import { useState } from "react";
-
-export const Route = createFileRoute("/_auth")({
-  component: AuthLayout,
-});
-
-function AuthLayout() {
-  const [showSignIn, setShowSignIn] = useState(false);
-
-  return (
-    <>
-      <Authenticated>
-        <Outlet />
-      </Authenticated>
-      <Unauthenticated>
-        {showSignIn ? (
-          <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
-        ) : (
-          <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
-        )}
-      </Unauthenticated>
-      <AuthLoading>
-        <div>Loading...</div>
-      </AuthLoading>
-    </>
-  );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
-import z from "zod";
-import { Button } from "@{{projectName}}/ui/components/button";
-import { Input } from "@{{projectName}}/ui/components/input";
-import { Label } from "@{{projectName}}/ui/components/label";
-
-export default function SignInForm({
-    onSwitchToSignUp,
-}: {
-    onSwitchToSignUp: () => void;
-}) {
-    const navigate = useNavigate({
-        from: "/",
-    });
-
-    const form = useForm({
-        defaultValues: {
-            email: "",
-            password: "",
-        },
-        onSubmit: async ({ value }) => {
-            await authClient.signIn.email(
-                {
-                    email: value.email,
-                    password: value.password,
-                },
-                {
-                    onSuccess: () => {
-                        navigate({
-                            to: "/dashboard",
-                        });
-                        toast.success("Sign in successful");
-                    },
-                    onError: (error) => {
-                        toast.error(error.error.message || error.error.statusText);
-                    },
-                },
-            );
-        },
-        validators: {
-            onSubmit: z.object({
-                email: z.email("Invalid email address"),
-                password: z.string().min(8, "Password must be at least 8 characters"),
-            }),
-        },
-    });
-
-    return (
-        <div className="mx-auto w-full mt-10 max-w-md p-6">
-            <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
-
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    form.handleSubmit();
-                }}
-                className="space-y-4"
-            >
-                <div>
-                    <form.Field name="email">
-                        {(field) => (
-                            <div className="space-y-2">
-                                <Label htmlFor={field.name}>Email</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    type="email"
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                {field.state.meta.errors.map((error) => (
-                                    <p key={error?.message} className="text-red-500">
-                                        {error?.message}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </form.Field>
-                </div>
-
-                <div>
-                    <form.Field name="password">
-                        {(field) => (
-                            <div className="space-y-2">
-                                <Label htmlFor={field.name}>Password</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    type="password"
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                {field.state.meta.errors.map((error) => (
-                                    <p key={error?.message} className="text-red-500">
-                                        {error?.message}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </form.Field>
-                </div>
-
-                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
-          {({ canSubmit, isSubmitting }) => (
-                        <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={!canSubmit || isSubmitting}
-                        >
-                            {isSubmitting ? "Submitting..." : "Sign In"}
-                        </Button>
-                    )}
-                </form.Subscribe>
-            </form>
-
-            <div className="mt-4 text-center">
-                <Button
-                    variant="link"
-                    onClick={onSwitchToSignUp}
-                    className="text-indigo-600 hover:text-indigo-800"
-                >
-                    Need an account? Sign Up
-                </Button>
-            </div>
-        </div>
-    );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
-import { useForm } from "@tanstack/react-form";
-import { useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
-import z from "zod";
-import { Button } from "@{{projectName}}/ui/components/button";
-import { Input } from "@{{projectName}}/ui/components/input";
-import { Label } from "@{{projectName}}/ui/components/label";
-
-export default function SignUpForm({
-    onSwitchToSignIn,
-}: {
-    onSwitchToSignIn: () => void;
-}) {
-    const navigate = useNavigate({
-        from: "/",
-    });
-
-    const form = useForm({
-        defaultValues: {
-            email: "",
-            password: "",
-            name: "",
-        },
-        onSubmit: async ({ value }) => {
-            await authClient.signUp.email(
-                {
-                    email: value.email,
-                    password: value.password,
-                    name: value.name,
-                },
-                {
-                    onSuccess: () => {
-                        navigate({
-                            to: "/dashboard",
-                        });
-                        toast.success("Sign up successful");
-                    },
-                    onError: (error) => {
-                        toast.error(error.error.message || error.error.statusText);
-                    },
-                },
-            );
-        },
-        validators: {
-            onSubmit: z.object({
-                name: z.string().min(2, "Name must be at least 2 characters"),
-                email: z.email("Invalid email address"),
-                password: z.string().min(8, "Password must be at least 8 characters"),
-            }),
-        },
-    });
-
-    return (
-        <div className="mx-auto w-full mt-10 max-w-md p-6">
-            <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
-
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    form.handleSubmit();
-                }}
-                className="space-y-4"
-            >
-                <div>
-                    <form.Field name="name">
-                        {(field) => (
-                            <div className="space-y-2">
-                                <Label htmlFor={field.name}>Name</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                {field.state.meta.errors.map((error) => (
-                                    <p key={error?.message} className="text-red-500">
-                                        {error?.message}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </form.Field>
-                </div>
-
-                <div>
-                    <form.Field name="email">
-                        {(field) => (
-                            <div className="space-y-2">
-                                <Label htmlFor={field.name}>Email</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    type="email"
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                {field.state.meta.errors.map((error) => (
-                                    <p key={error?.message} className="text-red-500">
-                                        {error?.message}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </form.Field>
-                </div>
-
-                <div>
-                    <form.Field name="password">
-                        {(field) => (
-                            <div className="space-y-2">
-                                <Label htmlFor={field.name}>Password</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    type="password"
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                {field.state.meta.errors.map((error) => (
-                                    <p key={error?.message} className="text-red-500">
-                                        {error?.message}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </form.Field>
-                </div>
-
-                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
-          {({ canSubmit, isSubmitting }) => (
-                        <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={!canSubmit || isSubmitting}
-                        >
-                            {isSubmitting ? "Submitting..." : "Sign Up"}
-                        </Button>
-                    )}
-                </form.Subscribe>
-            </form>
-
-            <div className="mt-4 text-center">
-                <Button
-                    variant="link"
-                    onClick={onSwitchToSignIn}
-                    className="text-indigo-600 hover:text-indigo-800"
-                >
-                    Already have an account? Sign In
-                </Button>
-            </div>
-        </div>
-    );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/components/user-menu.tsx.hbs", `import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@{{projectName}}/ui/components/dropdown-menu";
-import { authClient } from "@/lib/auth-client";
-import { useQuery } from "convex/react";
-import { api } from "@{{projectName}}/backend/convex/_generated/api";
-
-import { Button } from "@{{projectName}}/ui/components/button";
-
-export default function UserMenu() {
-    const user = useQuery(api.auth.getCurrentUser)
-
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-                {user?.name}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-card">
-                <DropdownMenuGroup>
-                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>{user?.email}</DropdownMenuItem>
-                    <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => {
-                            authClient.signOut({
-                                fetchOptions: {
-                                    onSuccess: () => {
-                                        location.reload();
-                                    },
-                                },
-                            });
-                        }}
-                    >
-                        Sign Out
-                    </DropdownMenuItem>
-                </DropdownMenuGroup>
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
-import { convexClient } from "@convex-dev/better-auth/client/plugins";
-
-export const authClient = createAuthClient({
-  plugins: [convexClient()],
-});`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/lib/auth-server.ts.hbs", `import { convexBetterAuthReactStart } from "@convex-dev/better-auth/react-start";
-import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
-
-export const {
-	handler,
-	getToken,
-	fetchAuthQuery,
-	fetchAuthMutation,
-	fetchAuthAction,
-} = convexBetterAuthReactStart({
-	convexUrl: ENV.VITE_CONVEX_URL,
-	convexSiteUrl: ENV.VITE_CONVEX_SITE_URL,
-});
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `import UserMenu from "@/components/user-menu";
-import { api } from "@{{projectName}}/backend/convex/_generated/api";
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
-
-export const Route = createFileRoute("/_auth/dashboard")({
-  component: DashboardContent,
-});
-
-function DashboardContent() {
-  const privateData = useQuery(api.privateData.get);
-
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>privateData: {privateData?.message}</p>
-      <UserMenu />
-    </div>
-  );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
-import SignUpForm from "@/components/sign-up-form";
-import { Outlet, createFileRoute } from "@tanstack/react-router";
-import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
-import { useState } from "react";
-
-export const Route = createFileRoute("/_auth")({
-  component: AuthLayout,
-});
-
-function AuthLayout() {
-  const [showSignIn, setShowSignIn] = useState(false);
-
-  return (
-    <>
-      <Authenticated>
-        <Outlet />
-      </Authenticated>
-      <Unauthenticated>
-        {showSignIn ? (
-          <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
-        ) : (
-          <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
-        )}
-      </Unauthenticated>
-      <AuthLoading>
-        <div>Loading...</div>
-      </AuthLoading>
-    </>
-  );
-}
-`],
-  ["modules/auth/stack/better-auth/convex/web/react/tanstack-start/src/routes/api/auth/$.ts.hbs", `import { createFileRoute } from "@tanstack/react-router";
-import { handler } from "@/lib/auth-server";
-
-export const Route = createFileRoute("/api/auth/$")({
-  server: {
-    handlers: {
-      GET: ({ request }) => handler(request),
-      POST: ({ request }) => handler(request),
-    },
-  },
-});
-`],
-  ["modules/auth/stack/better-auth/fullstack/astro/src/app.d.ts.hbs", `/// <reference path="../.astro/types.d.ts" />
+  ["modules/auth/stack/better-auth/apps/fullstack-web/frameworks/astro/src/app.d.ts.hbs", `/// <reference path="../.astro/types.d.ts" />
 
 declare namespace App {
   interface Locals {
@@ -23536,7 +20441,7 @@ declare namespace App {
   }
 }
 `],
-  ["modules/auth/stack/better-auth/fullstack/astro/src/middleware.ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  ["modules/auth/stack/better-auth/apps/fullstack-web/frameworks/astro/src/middleware.ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
 import { createAuth } from "@{{projectName}}/auth";
 {{else}}
 import { auth } from "@{{projectName}}/auth";
@@ -23562,7 +20467,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   return next();
 });
 `],
-  ["modules/auth/stack/better-auth/fullstack/astro/src/pages/api/auth/[...all].ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  ["modules/auth/stack/better-auth/apps/fullstack-web/frameworks/astro/src/pages/api/auth/[...all].ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
 import { createAuth } from "@{{projectName}}/auth";
 {{else}}
 import { auth } from "@{{projectName}}/auth";
@@ -23576,7 +20481,7 @@ export const ALL: APIRoute = async (ctx) => {
   return auth.handler(ctx.request);
 };
 `],
-  ["modules/auth/stack/better-auth/fullstack/next/src/app/api/auth/[...all]/route.ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  ["modules/auth/stack/better-auth/apps/fullstack-web/frameworks/next/src/app/api/auth/[...all]/route.ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
 import { createAuth } from "@{{projectName}}/auth";
 {{else}}
 import { auth } from "@{{projectName}}/auth";
@@ -23595,7 +20500,7 @@ export async function POST(request: Request) {
 export const { GET, POST } = toNextJsHandler(auth);
 {{/if}}
 `],
-  ["modules/auth/stack/better-auth/fullstack/nuxt/server/api/auth/[...all].ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  ["modules/auth/stack/better-auth/apps/fullstack-web/frameworks/nuxt/server/api/auth/[...all].ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
 import { createAuth } from "@{{projectName}}/auth";
 {{else}}
 import { auth } from "@{{projectName}}/auth";
@@ -23611,7 +20516,7 @@ export default defineEventHandler(async (event) => {
   return auth.handler(toWebRequest(event));
 });
 `],
-  ["modules/auth/stack/better-auth/fullstack/solid/src/routes/api/auth/[...auth].ts.hbs", `{{#if (and (eq backend "self") (eq webDeploy "cloudflare"))}}
+  ["modules/auth/stack/better-auth/apps/fullstack-web/frameworks/solid/src/routes/api/auth/[...auth].ts.hbs", `{{#if (and (eq backend "self") (eq webDeploy "cloudflare"))}}
 import { createAuth } from "@{{projectName}}/auth";
 {{else}}
 import { auth } from "@{{projectName}}/auth";
@@ -23627,7 +20532,7 @@ const handle: APIHandler = ({ request }) => auth.handler(request);
 export const GET = handle;
 export const POST = handle;
 `],
-  ["modules/auth/stack/better-auth/fullstack/svelte/src/hooks.server.ts.hbs", `{{#if (eq api "orpc")}}
+  ["modules/auth/stack/better-auth/apps/fullstack-web/frameworks/svelte/src/hooks.server.ts.hbs", `{{#if (eq api "orpc")}}
 import "./lib/orpc.server";
 {{/if}}
 import { building } from "$app/environment";
@@ -23666,7 +20571,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	});
 };
 `],
-  ["modules/auth/stack/better-auth/fullstack/tanstack-start/src/routes/api/auth/$.ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
+  ["modules/auth/stack/better-auth/apps/fullstack-web/frameworks/tanstack-start/src/routes/api/auth/$.ts.hbs", `{{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
 import { createAuth } from '@{{projectName}}/auth'
 {{else}}
 import { auth } from '@{{projectName}}/auth'
@@ -23692,38 +20597,7 @@ export const Route = createFileRoute('/api/auth/$')({
   },
 })
 `],
-  ["modules/auth/stack/better-auth/loaders/svelte/dashboard.ts.hbs", `import { authClient } from '$lib/auth-client';
-import type { BetterFetchOption } from 'better-auth/client';
-import { redirect } from '@sveltejs/kit';
-{{#if (or (eq backend "self") (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker"))))}}
-import type { PageServerLoad } from './$types';
-
-export const load = (async ({ fetch, request{{#if (eq backend "self")}}, url{{/if}} }) => {
-{{else}}
-import type { PageLoad } from './$types';
-
-// The session cookie belongs to the separate API origin and is available in the browser.
-export const ssr = false;
-
-export const load = (async ({ fetch }) => {
-{{/if}}
-  const fetchOptions = {
-    customFetchImpl: fetch,
-{{#if (eq backend "self")}}
-    baseURL: new URL('/api/auth', url).toString(),
-{{/if}}
-{{#if (or (eq backend "self") (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker"))))}}
-    headers: { cookie: request.headers.get('cookie') ?? '' },
-    signal: request.signal,
-{{/if}}
-    throw: true,
-  } satisfies BetterFetchOption;
-  const session = await authClient.getSession({ fetchOptions });
-  if (!session) redirect(307, '/login');
-  return { user: session.user };
-}) satisfies {{#if (or (eq backend "self") (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker"))))}}PageServerLoad{{else}}PageLoad{{/if}};
-`],
-  ["modules/auth/stack/better-auth/native/bare/app/(drawer)/index.tsx.hbs", `import { Button, Column, Host, Text as ExpoUIText } from "@expo/ui";
+  ["modules/auth/stack/better-auth/apps/native/bare/app/(drawer)/index.tsx.hbs", `import { Button, Column, Host, Text as ExpoUIText } from "@expo/ui";
 import { View, ScrollView, StyleSheet } from "react-native";
 import { Container } from "@/components/container";
 import { useColorScheme } from "@/lib/use-color-scheme";
@@ -23922,7 +20796,7 @@ borderRadius: 16,
 },
 });
 `],
-  ["modules/auth/stack/better-auth/native/bare/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/apps/native/bare/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 {{#if (eq api "trpc")}}
 import { queryClient } from "@/utils/trpc";
 {{/if}}
@@ -24157,7 +21031,7 @@ const styles = StyleSheet.create({
 
 export { SignIn };
 `],
-  ["modules/auth/stack/better-auth/native/bare/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/apps/native/bare/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 {{#if (eq api "trpc")}}
 import { queryClient } from "@/utils/trpc";
 {{/if}}
@@ -24424,7 +21298,7 @@ const styles = StyleSheet.create({
 
 export { SignUp };
 `],
-  ["modules/auth/stack/better-auth/native/base/lib/auth-client.ts.hbs", `import { expoClient } from "@better-auth/expo/client";
+  ["modules/auth/stack/better-auth/apps/native/base/lib/auth-client.ts.hbs", `import { expoClient } from "@better-auth/expo/client";
 import { createAuthClient } from "better-auth/react";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
@@ -24441,7 +21315,7 @@ export const authClient = createAuthClient({
 	],
 });
 `],
-  ["modules/auth/stack/better-auth/native/unistyles/app/(drawer)/index.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/apps/native/unistyles/app/(drawer)/index.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -24629,7 +21503,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 `],
-  ["modules/auth/stack/better-auth/native/unistyles/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/apps/native/unistyles/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 {{#if (eq api "trpc")}}
 import { queryClient } from "@/utils/trpc";
 {{/if}}
@@ -24845,7 +21719,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 `],
-  ["modules/auth/stack/better-auth/native/unistyles/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/apps/native/unistyles/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 {{#if (eq api "trpc")}}
 import { queryClient } from "@/utils/trpc";
 {{/if}}
@@ -25093,7 +21967,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 `],
-  ["modules/auth/stack/better-auth/native/uniwind/app/(drawer)/index.tsx.hbs", `import { Text, View, Pressable } from "react-native";
+  ["modules/auth/stack/better-auth/apps/native/uniwind/app/(drawer)/index.tsx.hbs", `import { Text, View, Pressable } from "react-native";
 import { Container } from "@/components/container";
 import { authClient } from "@/lib/auth-client";
 import { Ionicons } from "@expo/vector-icons";
@@ -25217,7 +22091,7 @@ return (
 );
 }
 `],
-  ["modules/auth/stack/better-auth/native/uniwind/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/apps/native/uniwind/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 {{#if (eq api "trpc")}}
 import { queryClient } from "@/utils/trpc";
 {{/if}}
@@ -25389,7 +22263,7 @@ function SignIn() {
 
 export { SignIn };
 `],
-  ["modules/auth/stack/better-auth/native/uniwind/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/apps/native/uniwind/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 {{#if (eq api "trpc")}}
 import { queryClient } from "@/utils/trpc";
 {{/if}}
@@ -25592,6 +22466,3098 @@ export function SignUp() {
     </Surface>
   );
 }
+`],
+  ["modules/auth/stack/better-auth/client/auth-client.ts.hbs", `import { createClient, type AuthClient } from "@{{projectName}}/auth/client";
+{{#unless (eq backend "self")}}
+import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+{{> getServerUrl}}
+{{/unless}}
+
+export const authClient: AuthClient = createClient({{#unless (eq backend "self")}}{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}new URL("/api/auth", getServerUrl(ENV.VITE_SERVER_URL)).toString(){{else}}ENV.VITE_SERVER_URL{{/if}}{{/unless}});
+`],
+  ["modules/auth/stack/better-auth/client/solid/src/client.ts.hbs", `import { createAuthClient } from "better-auth/client";
+
+type ClientOptions = {
+  baseURL?: string;
+};
+
+export function createClient(baseURL?: string): ReturnType<typeof createAuthClient<ClientOptions>> {
+  return createAuthClient({
+    baseURL,
+  });
+}
+
+export type AuthClient = ReturnType<typeof createClient>;
+`],
+  ["modules/auth/stack/better-auth/convex/apps/native/bare/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { NAV_THEME } from "@/lib/constants";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import z from "zod";
+
+const signInSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+function SignIn() {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signInSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign in");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Text style={[styles.title, { color: theme.text }]}>Sign In</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={[styles.errorContainer, { backgroundColor: theme.notification + "20" }]}>
+                  <Text style={[styles.errorText, { color: theme.notification }]}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Email"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Password"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={[
+                  styles.button,
+                  {
+                    backgroundColor: theme.primary,
+                    opacity: isSubmitting ? 0.5 : 1,
+                  },
+                ]}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign In</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    marginTop: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  errorContainer: {
+    marginBottom: 12,
+    padding: 8,
+  },
+  errorText: {
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  button: {
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontSize: 16,
+  },
+});
+
+export { SignIn };
+`],
+  ["modules/auth/stack/better-auth/convex/apps/native/bare/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { NAV_THEME } from "@/lib/constants";
+import { useColorScheme } from "@/lib/use-color-scheme";
+import z from "zod";
+
+const signUpSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+function SignUp() {
+  const { colorScheme } = useColorScheme();
+  const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signUpSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signUp.email(
+        {
+          name: value.name.trim(),
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign up");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={[styles.errorContainer, { backgroundColor: theme.notification + "20" }]}>
+                  <Text style={[styles.errorText, { color: theme.notification }]}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="name">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Name"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Email"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.border,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
+                    placeholder="Password"
+                    placeholderTextColor={theme.text}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={[
+                  styles.button,
+                  {
+                    backgroundColor: theme.primary,
+                    opacity: isSubmitting ? 0.5 : 1,
+                  },
+                ]}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign Up</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    marginTop: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  errorContainer: {
+    marginBottom: 12,
+    padding: 8,
+  },
+  errorText: {
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  button: {
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontSize: 16,
+  },
+});
+
+export { SignUp };
+`],
+  ["modules/auth/stack/better-auth/convex/apps/native/base/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+import { convexClient, crossDomainClient } from "@convex-dev/better-auth/client/plugins";
+import { expoClient } from "@better-auth/expo/client";
+import Constants from "expo-constants";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+import { ENV } from "../src/env";
+
+export const authClient = createAuthClient({
+	baseURL: ENV.EXPO_PUBLIC_CONVEX_SITE_URL,
+	plugins: [
+		convexClient(),
+		Platform.OS === "web"
+			? crossDomainClient()
+			: expoClient({
+				scheme: Constants.expoConfig?.scheme as string,
+				storagePrefix: Constants.expoConfig?.scheme as string,
+				storage: SecureStore,
+			}),
+	],
+});
+`],
+  ["modules/auth/stack/better-auth/convex/apps/native/unistyles/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import z from "zod";
+
+const signInSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignIn() {
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signInSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign in");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign In</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={styles.button}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign In</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.typography,
+    marginBottom: 16,
+  },
+  errorContainer: {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 6,
+  },
+  errorText: {
+    color: theme.colors.destructive,
+    fontSize: 14,
+  },
+  input: {
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 6,
+    color: theme.colors.typography,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  button: {
+    backgroundColor: theme.colors.primary,
+    padding: 16,
+    borderRadius: 6,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonText: {
+    fontWeight: "500",
+  },
+}));
+`],
+  ["modules/auth/stack/better-auth/convex/apps/native/unistyles/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { StyleSheet } from "react-native-unistyles";
+import z from "zod";
+
+const signUpSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignUp() {
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signUpSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signUp.email(
+        {
+          name: value.name.trim(),
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            setError(error.error?.message || "Failed to sign up");
+          },
+          onSuccess() {
+            setError(null);
+            formApi.reset();
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Create Account</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = error ?? validationError;
+
+          return (
+            <>
+              {formError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{formError}</Text>
+                </View>
+              ) : null}
+
+              <form.Field name="name">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Name"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="email">
+                {(field) => (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                )}
+              </form.Field>
+
+              <form.Field name="password">
+                {(field) => (
+                  <TextInput
+                    style={styles.inputLast}
+                    placeholder="Password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChangeText={(value) => {
+                      field.handleChange(value);
+                      if (error) {
+                        setError(null);
+                      }
+                    }}
+                    secureTextEntry
+                    onSubmitEditing={form.handleSubmit}
+                  />
+                )}
+              </form.Field>
+
+              <TouchableOpacity
+                onPress={form.handleSubmit}
+                disabled={isSubmitting}
+                style={styles.button}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign Up</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create((theme) => ({
+  container: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.typography,
+    marginBottom: 16,
+  },
+  errorContainer: {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 6,
+  },
+  errorText: {
+    color: theme.colors.destructive,
+    fontSize: 14,
+  },
+  input: {
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 6,
+    color: theme.colors.typography,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  inputLast: {
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 6,
+    color: theme.colors.typography,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  button: {
+    backgroundColor: theme.colors.primary,
+    padding: 16,
+    borderRadius: 6,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonText: {
+    fontWeight: "500",
+  },
+}));
+`],
+  ["modules/auth/stack/better-auth/convex/apps/native/uniwind/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useRef } from "react";
+import { Text, View } from "react-native";
+import { Button, FieldError, Input, type InputRef, Label, Spinner, Surface, TextField, useToast } from "heroui-native";
+import z from "zod";
+
+const signInSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignIn() {
+  const passwordInputRef = useRef<InputRef>(null);
+  const { toast } = useToast();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signInSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            toast.show({
+              variant: "danger",
+              label: error.error?.message || "Failed to sign in",
+            });
+          },
+          onSuccess() {
+            formApi.reset();
+            toast.show({
+              variant: "success",
+              label: "Signed in successfully",
+            });
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <Surface variant="secondary" className="p-4 rounded-lg">
+      <Text className="text-foreground font-medium mb-4">Sign In</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = validationError;
+
+          return (
+            <>
+              <FieldError isInvalid={!!formError} className="mb-3">
+                {formError}
+              </FieldError>
+
+              <View className="gap-3">
+                <form.Field name="email">
+                  {(field) => (
+                    <TextField>
+                      <Label>Email</Label>
+                      <Input
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="email@example.com"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        textContentType="emailAddress"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => {
+                          passwordInputRef.current?.focus();
+                        }}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <form.Field name="password">
+                  {(field) => (
+                    <TextField>
+                      <Label>Password</Label>
+                      <Input
+                        ref={passwordInputRef}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="••••••••"
+                        secureTextEntry
+                        autoComplete="password"
+                        textContentType="password"
+                        returnKeyType="go"
+                        onSubmitEditing={form.handleSubmit}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <Button onPress={form.handleSubmit} isDisabled={isSubmitting} className="mt-1">
+                  {isSubmitting ? <Spinner size="sm" color="default" /> : <Button.Label>Sign In</Button.Label>}
+                </Button>
+              </View>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </Surface>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/apps/native/uniwind/components/sign-up.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useRef } from "react";
+import { Text, View } from "react-native";
+import { Button, FieldError, Input, type InputRef, Label, Spinner, Surface, TextField, useToast } from "heroui-native";
+import z from "zod";
+
+const signUpSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .min(8, "Use at least 8 characters"),
+});
+
+function getErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (Array.isArray(error)) {
+    for (const issue of error) {
+      const message = getErrorMessage(issue);
+      if (message) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === "string") {
+      return maybeError.message;
+    }
+  }
+
+  return null;
+}
+
+export function SignUp() {
+  const emailInputRef = useRef<InputRef>(null);
+  const passwordInputRef = useRef<InputRef>(null);
+  const { toast } = useToast();
+
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: signUpSchema,
+    },
+    onSubmit: async ({ value, formApi }) => {
+      await authClient.signUp.email(
+        {
+          name: value.name.trim(),
+          email: value.email.trim(),
+          password: value.password,
+        },
+        {
+          onError(error) {
+            toast.show({
+              variant: "danger",
+              label: error.error?.message || "Failed to sign up",
+            });
+          },
+          onSuccess() {
+            formApi.reset();
+            toast.show({
+              variant: "success",
+              label: "Account created successfully",
+            });
+          },
+        },
+      );
+    },
+  });
+
+  return (
+    <Surface variant="secondary" className="p-4 rounded-lg">
+      <Text className="text-foreground font-medium mb-4">Create Account</Text>
+
+      <form.Subscribe
+        selector={(state) => ({
+          isSubmitting: state.isSubmitting,
+          validationError: getErrorMessage(state.errorMap.onSubmit),
+        })}
+      >
+        {({ isSubmitting, validationError }) => {
+          const formError = validationError;
+
+          return (
+            <>
+              <FieldError isInvalid={!!formError} className="mb-3">
+                {formError}
+              </FieldError>
+
+              <View className="gap-3">
+                <form.Field name="name">
+                  {(field) => (
+                    <TextField>
+                      <Label>Name</Label>
+                      <Input
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="John Doe"
+                        autoComplete="name"
+                        textContentType="name"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => {
+                          emailInputRef.current?.focus();
+                        }}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <form.Field name="email">
+                  {(field) => (
+                    <TextField>
+                      <Label>Email</Label>
+                      <Input
+                        ref={emailInputRef}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="email@example.com"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        textContentType="emailAddress"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => {
+                          passwordInputRef.current?.focus();
+                        }}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <form.Field name="password">
+                  {(field) => (
+                    <TextField>
+                      <Label>Password</Label>
+                      <Input
+                        ref={passwordInputRef}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChangeText={field.handleChange}
+                        placeholder="••••••••"
+                        secureTextEntry
+                        autoComplete="new-password"
+                        textContentType="newPassword"
+                        returnKeyType="go"
+                        onSubmitEditing={form.handleSubmit}
+                      />
+                    </TextField>
+                  )}
+                </form.Field>
+
+                <Button onPress={form.handleSubmit} isDisabled={isSubmitting} className="mt-1">
+                  {isSubmitting ? (
+                    <Spinner size="sm" color="default" />
+                  ) : (
+                    <Button.Label>Create Account</Button.Label>
+                  )}
+                </Button>
+              </View>
+            </>
+          );
+        }}
+      </form.Subscribe>
+    </Surface>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/backend/convex/auth.config.ts.hbs", `import { getAuthConfigProvider } from "@convex-dev/better-auth/auth-config";
+import type { AuthConfig } from "convex/server";
+
+export default {
+  providers: [getAuthConfigProvider()],
+} satisfies AuthConfig;
+`],
+  ["modules/auth/stack/better-auth/convex/backend/convex/auth.ts.hbs", `import { createClient, type GenericCtx } from "@convex-dev/better-auth";
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
+import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
+{{else}}
+import { convex } from "@convex-dev/better-auth/plugins";
+{{/if}}
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+import { expo } from "@better-auth/expo";
+{{/if}}
+import { components } from "./_generated/api";
+import type { DataModel } from "./_generated/dataModel";
+import { query } from "./_generated/server";
+import { betterAuth } from "better-auth/minimal";
+import authConfig from "./auth.config";
+
+{{#if (or (includes frontend "tanstack-start") (includes frontend "next") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid") (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+const siteUrl = process.env.SITE_URL{{#if (or (includes frontend "tanstack-start") (includes frontend "next") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}!{{else}} || "http://localhost:8081"{{/if}};
+{{/if}}
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+const nativeAppUrl = process.env.NATIVE_APP_URL || "{{projectName}}://";
+{{/if}}
+
+export const authComponent = createClient<DataModel>(components.betterAuth);
+
+function createAuth(ctx: GenericCtx<DataModel>) {
+  return betterAuth({
+    {{#if (or (includes frontend "tanstack-router") (includes frontend "react-router"))}}
+    baseURL: process.env.CONVEX_SITE_URL,
+    {{/if}}
+    {{#if (or (includes frontend "tanstack-start") (includes frontend "next"))}}
+    baseURL: siteUrl,
+    {{/if}}
+    {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+    trustedOrigins: [siteUrl, nativeAppUrl, "exp://"],
+    {{else if (or (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
+    trustedOrigins: [siteUrl],
+    {{else if (or (includes frontend "tanstack-start") (includes frontend "next"))}}
+    trustedOrigins: [siteUrl],
+    {{/if}}
+    database: authComponent.adapter(ctx),
+    emailAndPassword: {
+      enabled: true,
+      requireEmailVerification: false,
+    },
+    plugins: [
+      {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+      expo(),
+      {{/if}}
+      {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
+      crossDomain({ siteUrl }),
+      {{/if}}
+      convex({
+        authConfig,
+        jwksRotateOnTokenGenerationError: true,
+      }),
+    ],
+  });
+}
+
+export { createAuth };
+
+export const getCurrentUser = query({
+  args: {},
+  handler: async (ctx) => {
+    return await authComponent.safeGetAuthUser(ctx);
+  },
+});
+`],
+  ["modules/auth/stack/better-auth/convex/backend/convex/http.ts.hbs", `import { httpRouter } from "convex/server";
+import { authComponent, createAuth } from "./auth";
+
+const http = httpRouter();
+
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles") (includes frontend "tanstack-router") (includes frontend "react-router") (includes frontend "nuxt") (includes frontend "svelte") (includes frontend "solid"))}}
+authComponent.registerRoutes(http, createAuth, { cors: true });
+{{else}}
+authComponent.registerRoutes(http, createAuth);
+{{/if}}
+
+export default http;
+`],
+  ["modules/auth/stack/better-auth/convex/backend/convex/privateData.ts.hbs", `import { query } from "./_generated/server";
+import { authComponent } from "./auth";
+
+export const get = query({
+  args: {},
+  handler: async (ctx) => {
+    const authUser = await authComponent.safeGetAuthUser(ctx);
+    if (!authUser) {
+      return {
+        message: "Not authenticated",
+      };
+    }
+    return {
+      message: "This is private",
+    };
+  },
+});
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/next/src/app/api/auth/[...all]/route.ts.hbs", `import { handler } from "@/lib/auth-server";
+
+export const { GET, POST } = handler;
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/next/src/app/dashboard/page.tsx.hbs", `"use client"
+
+import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import UserMenu from "@/components/user-menu";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import {
+    Authenticated,
+    AuthLoading,
+    Unauthenticated,
+    useQuery,
+} from "convex/react";
+import { useState } from "react";
+
+function DashboardContent() {
+    const privateData = useQuery(api.privateData.get);
+
+    return (
+        <div>
+            <h1>Dashboard</h1>
+            <p>privateData: {privateData?.message}</p>
+            <UserMenu />
+        </div>
+    );
+}
+
+export default function DashboardPage() {
+    const [showSignIn, setShowSignIn] = useState(false);
+
+    return (
+        <>
+            <Authenticated>
+                <DashboardContent />
+            </Authenticated>
+            <Unauthenticated>
+                {showSignIn ? (
+                    <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+                ) : (
+                    <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+                )}
+            </Unauthenticated>
+            <AuthLoading>
+                <div>Loading...</div>
+            </AuthLoading>
+        </>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/next/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+import { useRouter } from "next/navigation";
+
+export default function SignInForm({
+	onSwitchToSignUp,
+}: {
+	onSwitchToSignUp: () => void;
+}) {
+	const router = useRouter();
+
+	const form = useForm({
+		defaultValues: {
+			email: "",
+			password: "",
+		},
+		onSubmit: async ({ value }) => {
+			await authClient.signIn.email(
+				{
+					email: value.email,
+					password: value.password,
+				},
+				{
+					onSuccess: () => {
+						router.push("/dashboard");
+						toast.success("Sign in successful");
+					},
+					onError: (error) => {
+						toast.error(error.error.message || error.error.statusText);
+					},
+				},
+			);
+		},
+		validators: {
+			onSubmit: z.object({
+				email: z.email("Invalid email address"),
+				password: z.string().min(8, "Password must be at least 8 characters"),
+			}),
+		},
+	});
+
+	return (
+		<div className="mx-auto w-full mt-10 max-w-md p-6">
+			<h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+			<form
+				onSubmit={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					form.handleSubmit();
+				}}
+				className="space-y-4"
+			>
+				<div>
+					<form.Field name="email">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Email</Label>
+								<Input
+									id={field.name}
+									name={field.name}
+									type="email"
+									value={field.state.value}
+									onBlur={field.handleBlur}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								{field.state.meta.errors.map((error) => (
+									<p key={error?.message} className="text-red-500">
+										{error?.message}
+									</p>
+								))}
+							</div>
+						)}
+					</form.Field>
+				</div>
+
+				<div>
+					<form.Field name="password">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Password</Label>
+								<Input
+									id={field.name}
+									name={field.name}
+									type="password"
+									value={field.state.value}
+									onBlur={field.handleBlur}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								{field.state.meta.errors.map((error) => (
+									<p key={error?.message} className="text-red-500">
+										{error?.message}
+									</p>
+								))}
+							</div>
+						)}
+					</form.Field>
+				</div>
+
+				<form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+						<Button
+							type="submit"
+							className="w-full"
+							disabled={!canSubmit || isSubmitting}
+						>
+							{isSubmitting ? "Submitting..." : "Sign In"}
+						</Button>
+					)}
+				</form.Subscribe>
+			</form>
+
+			<div className="mt-4 text-center">
+				<Button
+					variant="link"
+					onClick={onSwitchToSignUp}
+					className="text-indigo-600 hover:text-indigo-800"
+				>
+					Need an account? Sign Up
+				</Button>
+			</div>
+		</div>
+	);
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/next/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+import { useRouter } from "next/navigation";
+
+export default function SignUpForm({
+	onSwitchToSignIn,
+}: {
+	onSwitchToSignIn: () => void;
+}) {
+	const router = useRouter();
+
+	const form = useForm({
+		defaultValues: {
+			email: "",
+			password: "",
+			name: "",
+		},
+		onSubmit: async ({ value }) => {
+			await authClient.signUp.email(
+				{
+					email: value.email,
+					password: value.password,
+					name: value.name,
+				},
+				{
+					onSuccess: () => {
+						router.push("/dashboard");
+						toast.success("Sign up successful");
+					},
+					onError: (error) => {
+						toast.error(error.error.message || error.error.statusText);
+					},
+				},
+			);
+		},
+		validators: {
+			onSubmit: z.object({
+				name: z.string().min(2, "Name must be at least 2 characters"),
+				email: z.email("Invalid email address"),
+				password: z.string().min(8, "Password must be at least 8 characters"),
+			}),
+		},
+	});
+
+	return (
+		<div className="mx-auto w-full mt-10 max-w-md p-6">
+			<h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+			<form
+				onSubmit={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					form.handleSubmit();
+				}}
+				className="space-y-4"
+			>
+				<div>
+					<form.Field name="name">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Name</Label>
+								<Input
+									id={field.name}
+									name={field.name}
+									value={field.state.value}
+									onBlur={field.handleBlur}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								{field.state.meta.errors.map((error) => (
+									<p key={error?.message} className="text-red-500">
+										{error?.message}
+									</p>
+								))}
+							</div>
+						)}
+					</form.Field>
+				</div>
+
+				<div>
+					<form.Field name="email">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Email</Label>
+								<Input
+									id={field.name}
+									name={field.name}
+									type="email"
+									value={field.state.value}
+									onBlur={field.handleBlur}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								{field.state.meta.errors.map((error) => (
+									<p key={error?.message} className="text-red-500">
+										{error?.message}
+									</p>
+								))}
+							</div>
+						)}
+					</form.Field>
+				</div>
+
+				<div>
+					<form.Field name="password">
+						{(field) => (
+							<div className="space-y-2">
+								<Label htmlFor={field.name}>Password</Label>
+								<Input
+									id={field.name}
+									name={field.name}
+									type="password"
+									value={field.state.value}
+									onBlur={field.handleBlur}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								{field.state.meta.errors.map((error) => (
+									<p key={error?.message} className="text-red-500">
+										{error?.message}
+									</p>
+								))}
+							</div>
+						)}
+					</form.Field>
+				</div>
+
+				<form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+						<Button
+							type="submit"
+							className="w-full"
+							disabled={!canSubmit || isSubmitting}
+						>
+							{isSubmitting ? "Submitting..." : "Sign Up"}
+						</Button>
+					)}
+				</form.Subscribe>
+			</form>
+
+			<div className="mt-4 text-center">
+				<Button
+					variant="link"
+					onClick={onSwitchToSignIn}
+					className="text-indigo-600 hover:text-indigo-800"
+				>
+					Already have an account? Sign In
+				</Button>
+			</div>
+		</div>
+	);
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/next/src/components/user-menu.tsx.hbs", `import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+
+export default function UserMenu() {
+	const router = useRouter();
+	const user = useQuery(api.auth.getCurrentUser)
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger render={<Button variant="outline" />}>
+				{user?.name}
+			</DropdownMenuTrigger>
+			<DropdownMenuContent className="bg-card">
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>My Account</DropdownMenuLabel>
+					<DropdownMenuSeparator />
+					<DropdownMenuItem>{user?.email}</DropdownMenuItem>
+					<DropdownMenuItem
+						variant="destructive"
+						onClick={() => {
+							authClient.signOut({
+								fetchOptions: {
+									onSuccess: () => {
+										router.push("/dashboard");
+									},
+								},
+							});
+						}}
+					>
+						Sign Out
+					</DropdownMenuItem>
+				</DropdownMenuGroup>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/next/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+import { convexClient } from "@convex-dev/better-auth/client/plugins";
+
+export const authClient = createAuthClient({
+  plugins: [convexClient()],
+});
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/next/src/lib/auth-server.ts.hbs", `import { convexBetterAuthNextJs } from "@convex-dev/better-auth/nextjs";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+export const {
+	handler,
+	preloadAuthQuery,
+	isAuthenticated,
+	getToken,
+	fetchAuthQuery,
+	fetchAuthMutation,
+	fetchAuthAction,
+} = convexBetterAuthNextJs({
+	convexUrl: ENV.NEXT_PUBLIC_CONVEX_URL,
+	convexSiteUrl: ENV.NEXT_PUBLIC_CONVEX_SITE_URL,
+});
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/react-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignInForm({
+  onSwitchToSignUp,
+}: {
+  onSwitchToSignUp: () => void;
+}) {
+  const navigate = useNavigate();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signIn.email(
+        {
+          email: value.email,
+          password: value.password,
+        },
+        {
+          onSuccess: () => {
+            navigate("/dashboard");
+            toast.success("Sign in successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        },
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  return (
+    <div className="mx-auto mt-10 w-full max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error, index) => (
+                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error, index) => (
+                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe
+          selector={(state) => ({
+            canSubmit: state.canSubmit,
+            isSubmitting: state.isSubmitting,
+          })}
+        >
+          {({ canSubmit, isSubmitting }) => (
+            <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
+              {isSubmitting ? "Submitting..." : "Sign In"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignUp}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Need an account? Sign Up
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/react-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignUpForm({
+  onSwitchToSignIn,
+}: {
+  onSwitchToSignIn: () => void;
+}) {
+  const navigate = useNavigate();
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+      name: "",
+    },
+    onSubmit: async ({ value }) => {
+      await authClient.signUp.email(
+        {
+          email: value.email,
+          password: value.password,
+          name: value.name,
+        },
+        {
+          onSuccess: () => {
+            navigate("/dashboard");
+            toast.success("Sign up successful");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        },
+      );
+    },
+    validators: {
+      onSubmit: z.object({
+        name: z.string().min(2, "Name must be at least 2 characters"),
+        email: z.email("Invalid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+      }),
+    },
+  });
+
+  return (
+    <div className="mx-auto mt-10 w-full max-w-md p-6">
+      <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+        className="space-y-4"
+      >
+        <div>
+          <form.Field name="name">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Name</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error, index) => (
+                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="email">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Email</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error, index) => (
+                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <div>
+          <form.Field name="password">
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>Password</Label>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="password"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+                {field.state.meta.errors.map((error, index) => (
+                  <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                    {error?.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        <form.Subscribe
+          selector={(state) => ({
+            canSubmit: state.canSubmit,
+            isSubmitting: state.isSubmitting,
+          })}
+        >
+          {({ canSubmit, isSubmitting }) => (
+            <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
+              {isSubmitting ? "Submitting..." : "Sign Up"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
+
+      <div className="mt-4 text-center">
+        <Button
+          variant="link"
+          onClick={onSwitchToSignIn}
+          className="text-indigo-600 hover:text-indigo-800"
+        >
+          Already have an account? Sign In
+        </Button>
+      </div>
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/react-router/src/components/user-menu.tsx.hbs", `import { useNavigate } from "react-router";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+
+export default function UserMenu() {
+  const navigate = useNavigate();
+  const user = useQuery(api.auth.getCurrentUser);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" />}>
+        {user?.name}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-card">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>{user?.email}</DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => {
+              authClient.signOut({
+                fetchOptions: {
+                  onSuccess: () => {
+                    navigate("/dashboard");
+                  },
+                },
+              });
+            }}
+          >
+            Sign Out
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/react-router/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+import {
+  convexClient,
+  crossDomainClient,
+} from "@convex-dev/better-auth/client/plugins";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+export const authClient = createAuthClient({
+  baseURL: ENV.VITE_CONVEX_SITE_URL,
+  plugins: [convexClient(), crossDomainClient()],
+});
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/react-router/src/routes/dashboard.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import UserMenu from "@/components/user-menu";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import {
+  Authenticated,
+  AuthLoading,
+  Unauthenticated,
+  useQuery,
+} from "convex/react";
+import { useState } from "react";
+
+function PrivateDashboardContent() {
+  const privateData = useQuery(api.privateData.get);
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>privateData: {privateData?.message}</p>
+      <UserMenu />
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const [showSignIn, setShowSignIn] = useState(false);
+
+  return (
+    <>
+      <Authenticated>
+        <PrivateDashboardContent />
+      </Authenticated>
+      <Unauthenticated>
+        {showSignIn ? (
+          <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+        ) : (
+          <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+        )}
+      </Unauthenticated>
+      <AuthLoading>
+        <div>Loading...</div>
+      </AuthLoading>
+    </>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignInForm({
+    onSwitchToSignUp,
+}: {
+    onSwitchToSignUp: () => void;
+}) {
+    const navigate = useNavigate({
+        from: "/",
+    });
+
+    const form = useForm({
+        defaultValues: {
+            email: "",
+            password: "",
+        },
+        onSubmit: async ({ value }) => {
+            await authClient.signIn.email(
+                {
+                    email: value.email,
+                    password: value.password,
+                },
+                {
+                    onSuccess: () => {
+                        navigate({
+                            to: "/dashboard",
+                        });
+                        toast.success("Sign in successful");
+                    },
+                    onError: (error) => {
+                        toast.error(error.error.message || error.error.statusText);
+                    },
+                },
+            );
+        },
+        validators: {
+            onSubmit: z.object({
+                email: z.email("Invalid email address"),
+                password: z.string().min(8, "Password must be at least 8 characters"),
+            }),
+        },
+    });
+
+    return (
+        <div className="mx-auto w-full mt-10 max-w-md p-6">
+            <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.handleSubmit();
+                }}
+                className="space-y-4"
+            >
+                <div>
+                    <form.Field name="email">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Email</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="email"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error, index) => (
+                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="password">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Password</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="password"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error, index) => (
+                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={!canSubmit || isSubmitting}
+                        >
+                            {isSubmitting ? "Submitting..." : "Sign In"}
+                        </Button>
+                    )}
+                </form.Subscribe>
+            </form>
+
+            <div className="mt-4 text-center">
+                <Button
+                    variant="link"
+                    onClick={onSwitchToSignUp}
+                    className="text-indigo-600 hover:text-indigo-800"
+                >
+                    Need an account? Sign Up
+                </Button>
+            </div>
+        </div>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignUpForm({
+    onSwitchToSignIn,
+}: {
+    onSwitchToSignIn: () => void;
+}) {
+    const navigate = useNavigate({
+        from: "/",
+    });
+
+    const form = useForm({
+        defaultValues: {
+            email: "",
+            password: "",
+            name: "",
+        },
+        onSubmit: async ({ value }) => {
+            await authClient.signUp.email(
+                {
+                    email: value.email,
+                    password: value.password,
+                    name: value.name,
+                },
+                {
+                    onSuccess: () => {
+                        navigate({
+                            to: "/dashboard",
+                        });
+                        toast.success("Sign up successful");
+                    },
+                    onError: (error) => {
+                        toast.error(error.error.message || error.error.statusText);
+                    },
+                },
+            );
+        },
+        validators: {
+            onSubmit: z.object({
+                name: z.string().min(2, "Name must be at least 2 characters"),
+                email: z.email("Invalid email address"),
+                password: z.string().min(8, "Password must be at least 8 characters"),
+            }),
+        },
+    });
+
+    return (
+        <div className="mx-auto w-full mt-10 max-w-md p-6">
+            <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.handleSubmit();
+                }}
+                className="space-y-4"
+            >
+                <div>
+                    <form.Field name="name">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Name</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error, index) => (
+                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="email">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Email</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="email"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error, index) => (
+                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="password">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Password</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="password"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error, index) => (
+                                    <p key={\`\${field.name}-error-\${index}\`} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={!canSubmit || isSubmitting}
+                        >
+                            {isSubmitting ? "Submitting..." : "Sign Up"}
+                        </Button>
+                    )}
+                </form.Subscribe>
+            </form>
+
+            <div className="mt-4 text-center">
+                <Button
+                    variant="link"
+                    onClick={onSwitchToSignIn}
+                    className="text-indigo-600 hover:text-indigo-800"
+                >
+                    Already have an account? Sign In
+                </Button>
+            </div>
+        </div>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-router/src/components/user-menu.tsx.hbs", `import { useNavigate } from "@tanstack/react-router";
+
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+
+export default function UserMenu() {
+    const navigate = useNavigate();
+    const user = useQuery(api.auth.getCurrentUser)
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" />}>
+                {user?.name}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-card">
+                <DropdownMenuGroup>
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>{user?.email}</DropdownMenuItem>
+                    <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => {
+                            authClient.signOut({
+                                fetchOptions: {
+                                    onSuccess: () => {
+                                        navigate({
+                                            to: "/dashboard",
+                                        });
+                                    },
+                                },
+                            });
+                        }}
+                    >
+                        Sign Out
+                    </DropdownMenuItem>
+                </DropdownMenuGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-router/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+import {
+	convexClient,
+	crossDomainClient,
+} from "@convex-dev/better-auth/client/plugins";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+export const authClient = createAuthClient({
+	baseURL: ENV.VITE_CONVEX_SITE_URL,
+	plugins: [convexClient(), crossDomainClient()],
+});
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `import UserMenu from "@/components/user-menu";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
+
+export const Route = createFileRoute("/_auth/dashboard")({
+  component: DashboardContent,
+});
+
+function DashboardContent() {
+  const privateData = useQuery(api.privateData.get);
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>privateData: {privateData?.message}</p>
+      <UserMenu />
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
+import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
+import { useState } from "react";
+
+export const Route = createFileRoute("/_auth")({
+  component: AuthLayout,
+});
+
+function AuthLayout() {
+  const [showSignIn, setShowSignIn] = useState(false);
+
+  return (
+    <>
+      <Authenticated>
+        <Outlet />
+      </Authenticated>
+      <Unauthenticated>
+        {showSignIn ? (
+          <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+        ) : (
+          <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+        )}
+      </Unauthenticated>
+      <AuthLoading>
+        <div>Loading...</div>
+      </AuthLoading>
+    </>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-start/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignInForm({
+    onSwitchToSignUp,
+}: {
+    onSwitchToSignUp: () => void;
+}) {
+    const navigate = useNavigate({
+        from: "/",
+    });
+
+    const form = useForm({
+        defaultValues: {
+            email: "",
+            password: "",
+        },
+        onSubmit: async ({ value }) => {
+            await authClient.signIn.email(
+                {
+                    email: value.email,
+                    password: value.password,
+                },
+                {
+                    onSuccess: () => {
+                        navigate({
+                            to: "/dashboard",
+                        });
+                        toast.success("Sign in successful");
+                    },
+                    onError: (error) => {
+                        toast.error(error.error.message || error.error.statusText);
+                    },
+                },
+            );
+        },
+        validators: {
+            onSubmit: z.object({
+                email: z.email("Invalid email address"),
+                password: z.string().min(8, "Password must be at least 8 characters"),
+            }),
+        },
+    });
+
+    return (
+        <div className="mx-auto w-full mt-10 max-w-md p-6">
+            <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.handleSubmit();
+                }}
+                className="space-y-4"
+            >
+                <div>
+                    <form.Field name="email">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Email</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="email"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error) => (
+                                    <p key={error?.message} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="password">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Password</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="password"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error) => (
+                                    <p key={error?.message} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={!canSubmit || isSubmitting}
+                        >
+                            {isSubmitting ? "Submitting..." : "Sign In"}
+                        </Button>
+                    )}
+                </form.Subscribe>
+            </form>
+
+            <div className="mt-4 text-center">
+                <Button
+                    variant="link"
+                    onClick={onSwitchToSignUp}
+                    className="text-indigo-600 hover:text-indigo-800"
+                >
+                    Need an account? Sign Up
+                </Button>
+            </div>
+        </div>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-start/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import z from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export default function SignUpForm({
+    onSwitchToSignIn,
+}: {
+    onSwitchToSignIn: () => void;
+}) {
+    const navigate = useNavigate({
+        from: "/",
+    });
+
+    const form = useForm({
+        defaultValues: {
+            email: "",
+            password: "",
+            name: "",
+        },
+        onSubmit: async ({ value }) => {
+            await authClient.signUp.email(
+                {
+                    email: value.email,
+                    password: value.password,
+                    name: value.name,
+                },
+                {
+                    onSuccess: () => {
+                        navigate({
+                            to: "/dashboard",
+                        });
+                        toast.success("Sign up successful");
+                    },
+                    onError: (error) => {
+                        toast.error(error.error.message || error.error.statusText);
+                    },
+                },
+            );
+        },
+        validators: {
+            onSubmit: z.object({
+                name: z.string().min(2, "Name must be at least 2 characters"),
+                email: z.email("Invalid email address"),
+                password: z.string().min(8, "Password must be at least 8 characters"),
+            }),
+        },
+    });
+
+    return (
+        <div className="mx-auto w-full mt-10 max-w-md p-6">
+            <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.handleSubmit();
+                }}
+                className="space-y-4"
+            >
+                <div>
+                    <form.Field name="name">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Name</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error) => (
+                                    <p key={error?.message} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="email">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Email</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="email"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error) => (
+                                    <p key={error?.message} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <div>
+                    <form.Field name="password">
+                        {(field) => (
+                            <div className="space-y-2">
+                                <Label htmlFor={field.name}>Password</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="password"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                {field.state.meta.errors.map((error) => (
+                                    <p key={error?.message} className="text-red-500">
+                                        {error?.message}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </form.Field>
+                </div>
+
+                <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {({ canSubmit, isSubmitting }) => (
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={!canSubmit || isSubmitting}
+                        >
+                            {isSubmitting ? "Submitting..." : "Sign Up"}
+                        </Button>
+                    )}
+                </form.Subscribe>
+            </form>
+
+            <div className="mt-4 text-center">
+                <Button
+                    variant="link"
+                    onClick={onSwitchToSignIn}
+                    className="text-indigo-600 hover:text-indigo-800"
+                >
+                    Already have an account? Sign In
+                </Button>
+            </div>
+        </div>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-start/src/components/user-menu.tsx.hbs", `import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { authClient } from "@/lib/auth-client";
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+
+export default function UserMenu() {
+    const user = useQuery(api.auth.getCurrentUser)
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" />}>
+                {user?.name}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-card">
+                <DropdownMenuGroup>
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>{user?.email}</DropdownMenuItem>
+                    <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => {
+                            authClient.signOut({
+                                fetchOptions: {
+                                    onSuccess: () => {
+                                        location.reload();
+                                    },
+                                },
+                            });
+                        }}
+                    >
+                        Sign Out
+                    </DropdownMenuItem>
+                </DropdownMenuGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-start/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+import { convexClient } from "@convex-dev/better-auth/client/plugins";
+
+export const authClient = createAuthClient({
+  plugins: [convexClient()],
+});`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-start/src/lib/auth-server.ts.hbs", `import { convexBetterAuthReactStart } from "@convex-dev/better-auth/react-start";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+
+export const {
+	handler,
+	getToken,
+	fetchAuthQuery,
+	fetchAuthMutation,
+	fetchAuthAction,
+} = convexBetterAuthReactStart({
+	convexUrl: ENV.VITE_CONVEX_URL,
+	convexSiteUrl: ENV.VITE_CONVEX_SITE_URL,
+});
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `import UserMenu from "@/components/user-menu";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
+
+export const Route = createFileRoute("/_auth/dashboard")({
+  component: DashboardContent,
+});
+
+function DashboardContent() {
+  const privateData = useQuery(api.privateData.get);
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>privateData: {privateData?.message}</p>
+      <UserMenu />
+    </div>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+import SignUpForm from "@/components/sign-up-form";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
+import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
+import { useState } from "react";
+
+export const Route = createFileRoute("/_auth")({
+  component: AuthLayout,
+});
+
+function AuthLayout() {
+  const [showSignIn, setShowSignIn] = useState(false);
+
+  return (
+    <>
+      <Authenticated>
+        <Outlet />
+      </Authenticated>
+      <Unauthenticated>
+        {showSignIn ? (
+          <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
+        ) : (
+          <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
+        )}
+      </Unauthenticated>
+      <AuthLoading>
+        <div>Loading...</div>
+      </AuthLoading>
+    </>
+  );
+}
+`],
+  ["modules/auth/stack/better-auth/convex/shared/client/frameworks/react/tanstack-start/src/routes/api/auth/$.ts.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { handler } from "@/lib/auth-server";
+
+export const Route = createFileRoute("/api/auth/$")({
+  server: {
+    handlers: {
+      GET: ({ request }) => handler(request),
+      POST: ({ request }) => handler(request),
+    },
+  },
+});
+`],
+  ["modules/auth/stack/better-auth/loaders/svelte/dashboard.ts.hbs", `import { authClient } from '$lib/auth-client';
+import type { BetterFetchOption } from 'better-auth/client';
+import { redirect } from '@sveltejs/kit';
+{{#if (or (eq backend "self") (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker"))))}}
+import type { PageServerLoad } from './$types';
+
+export const load = (async ({ fetch, request{{#if (eq backend "self")}}, url{{/if}} }) => {
+{{else}}
+import type { PageLoad } from './$types';
+
+// The session cookie belongs to the separate API origin and is available in the browser.
+export const ssr = false;
+
+export const load = (async ({ fetch }) => {
+{{/if}}
+  const fetchOptions = {
+    customFetchImpl: fetch,
+{{#if (eq backend "self")}}
+    baseURL: new URL('/api/auth', url).toString(),
+{{/if}}
+{{#if (or (eq backend "self") (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker"))))}}
+    headers: { cookie: request.headers.get('cookie') ?? '' },
+    signal: request.signal,
+{{/if}}
+    throw: true,
+  } satisfies BetterFetchOption;
+  const session = await authClient.getSession({ fetchOptions });
+  if (!session) redirect(307, '/login');
+  return { user: session.user };
+}) satisfies {{#if (or (eq backend "self") (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker"))))}}PageServerLoad{{else}}PageLoad{{/if}};
 `],
   ["modules/auth/stack/better-auth/server/base/_gitignore", `# dependencies (bun install)
 node_modules
@@ -26383,7 +26349,7 @@ model Verification {
   @@map("verification")
 }
 `],
-  ["modules/auth/stack/better-auth/web/astro/src/components/SignInForm.astro.hbs", `---
+  ["modules/auth/stack/better-auth/shared/client/frameworks/astro/src/components/SignInForm.astro.hbs", `---
 import { authClient } from "../lib/auth-client";
 ---
 
@@ -26476,7 +26442,7 @@ import { authClient } from "../lib/auth-client";
   });
 </script>
 `],
-  ["modules/auth/stack/better-auth/web/astro/src/components/SignUpForm.astro.hbs", `---
+  ["modules/auth/stack/better-auth/shared/client/frameworks/astro/src/components/SignUpForm.astro.hbs", `---
 import { authClient } from "../lib/auth-client";
 ---
 
@@ -26583,7 +26549,7 @@ import { authClient } from "../lib/auth-client";
   });
 </script>
 `],
-  ["modules/auth/stack/better-auth/web/astro/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/astro/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/client";
 {{#if (ne backend "self")}}
 import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
 {{/if}}
@@ -26604,7 +26570,7 @@ export const authClient = createAuthClient({
 {{/if}}
 });
 `],
-  ["modules/auth/stack/better-auth/web/astro/src/pages/dashboard.astro.hbs", `---
+  ["modules/auth/stack/better-auth/shared/client/frameworks/astro/src/pages/dashboard.astro.hbs", `---
 import Layout from "../layouts/Layout.astro";
 ---
 
@@ -26697,7 +26663,7 @@ import Layout from "../layouts/Layout.astro";
   init();
 </script>
 `],
-  ["modules/auth/stack/better-auth/web/astro/src/pages/login.astro.hbs", `---
+  ["modules/auth/stack/better-auth/shared/client/frameworks/astro/src/pages/login.astro.hbs", `---
 import SignInForm from "../components/SignInForm.astro";
 import Layout from "../layouts/Layout.astro";
 ---
@@ -26708,7 +26674,7 @@ import Layout from "../layouts/Layout.astro";
   </div>
 </Layout>
 `],
-  ["modules/auth/stack/better-auth/web/astro/src/pages/signup.astro.hbs", `---
+  ["modules/auth/stack/better-auth/shared/client/frameworks/astro/src/pages/signup.astro.hbs", `---
 import SignUpForm from "../components/SignUpForm.astro";
 import Layout from "../layouts/Layout.astro";
 ---
@@ -26719,7 +26685,7 @@ import Layout from "../layouts/Layout.astro";
   </div>
 </Layout>
 `],
-  ["modules/auth/stack/better-auth/web/nuxt/app/components/SignInForm.vue.hbs", `<script setup lang="ts">
+  ["modules/auth/stack/better-auth/shared/client/frameworks/nuxt/app/components/SignInForm.vue.hbs", `<script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent, AuthFormField } from '@nuxt/ui'
 
@@ -26804,7 +26770,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   </div>
 </template>
 `],
-  ["modules/auth/stack/better-auth/web/nuxt/app/components/SignUpForm.vue.hbs", `<script setup lang="ts">
+  ["modules/auth/stack/better-auth/shared/client/frameworks/nuxt/app/components/SignUpForm.vue.hbs", `<script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent, AuthFormField } from '@nuxt/ui'
 
@@ -26899,7 +26865,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   </div>
 </template>
 `],
-  ["modules/auth/stack/better-auth/web/nuxt/app/components/UserMenu.vue.hbs", `<script setup lang="ts">
+  ["modules/auth/stack/better-auth/shared/client/frameworks/nuxt/app/components/UserMenu.vue.hbs", `<script setup lang="ts">
 
 const {$authClient} = useNuxtApp()
 const session = $authClient.useSession()
@@ -26942,19 +26908,19 @@ const handleSignOut = async () => {
   </div>
 </template>
 `],
-  ["modules/auth/stack/better-auth/web/nuxt/app/composables/useAuthFetch.ts.hbs", `export const useAuthFetch = createUseFetch({ credentials: "include" });
+  ["modules/auth/stack/better-auth/shared/client/frameworks/nuxt/app/composables/useAuthFetch.ts.hbs", `export const useAuthFetch = createUseFetch({ credentials: "include" });
 `],
-  ["modules/auth/stack/better-auth/web/nuxt/app/composables/useAuthSession.ts.hbs", `export function useAuthSession() {
+  ["modules/auth/stack/better-auth/shared/client/frameworks/nuxt/app/composables/useAuthSession.ts.hbs", `export function useAuthSession() {
   const { $authClient } = useNuxtApp();
   return $authClient.useSession(useAuthFetch);
 }
 `],
-  ["modules/auth/stack/better-auth/web/nuxt/app/middleware/auth.ts.hbs", `export default defineNuxtRouteMiddleware(async () => {
+  ["modules/auth/stack/better-auth/shared/client/frameworks/nuxt/app/middleware/auth.ts.hbs", `export default defineNuxtRouteMiddleware(async () => {
   const { data: session } = await useAuthSession();
   if (!session.value) return navigateTo("/login");
 });
 `],
-  ["modules/auth/stack/better-auth/web/nuxt/app/pages/dashboard.vue.hbs", `<script setup lang="ts">
+  ["modules/auth/stack/better-auth/shared/client/frameworks/nuxt/app/pages/dashboard.vue.hbs", `<script setup lang="ts">
 
 {{#if (eq api "orpc")}}
 import { useQuery } from '@tanstack/vue-query'
@@ -27017,7 +26983,7 @@ onServerPrefetch(async () => {
   </UContainer>
 </template>
 `],
-  ["modules/auth/stack/better-auth/web/nuxt/app/pages/login.vue.hbs", `<script setup lang="ts">
+  ["modules/auth/stack/better-auth/shared/client/frameworks/nuxt/app/pages/login.vue.hbs", `<script setup lang="ts">
 import SignInForm from "~/components/SignInForm.vue";
 import SignUpForm from "~/components/SignUpForm.vue";
 
@@ -27042,7 +27008,7 @@ watchEffect(() => {
   </UContainer>
 </template>
 `],
-  ["modules/auth/stack/better-auth/web/nuxt/app/plugins/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/vue";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/nuxt/app/plugins/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/vue";
 
 {{> getServerUrlSpaces}}
 
@@ -27073,7 +27039,7 @@ export default defineNuxtPlugin(() => {
   };
 });
 `],
-  ["modules/auth/stack/better-auth/web/react/base/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/base/src/lib/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/react";
 {{#unless (eq backend "self")}}
 {{#unless (includes frontend "next")}}
 import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
@@ -27092,7 +27058,7 @@ export const authClient = createAuthClient({
 {{/unless}}
 });
 `],
-  ["modules/auth/stack/better-auth/web/react/next/src/app/dashboard/dashboard.tsx.hbs", `"use client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/next/src/app/dashboard/dashboard.tsx.hbs", `"use client";
 
 import { authClient } from "@/lib/auth-client";
 {{#if (eq api "orpc")}}
@@ -27129,7 +27095,7 @@ export default function Dashboard({
 	);
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/next/src/app/dashboard/page.tsx.hbs", `{{#if (or (includes addons "tauri") (and (includes addons "electrobun") (or (ne backend "convex") (ne auth "better-auth"))))}}
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/next/src/app/dashboard/page.tsx.hbs", `{{#if (or (includes addons "tauri") (and (includes addons "electrobun") (or (ne backend "convex") (ne auth "better-auth"))))}}
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -27204,7 +27170,7 @@ export default async function DashboardPage() {
 }
 {{/if}}
 `],
-  ["modules/auth/stack/better-auth/web/react/next/src/app/login/page.tsx.hbs", `"use client"
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/next/src/app/login/page.tsx.hbs", `"use client"
 
 import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
@@ -27221,7 +27187,7 @@ export default function LoginPage() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/next/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/next/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import z from "zod";
@@ -27357,7 +27323,7 @@ export default function SignInForm({
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/next/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/next/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import z from "zod";
@@ -27518,7 +27484,7 @@ export default function SignUpForm({
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/next/src/components/user-menu.tsx.hbs", `import Link from "next/link";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/next/src/components/user-menu.tsx.hbs", `import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
@@ -27581,7 +27547,7 @@ export default function UserMenu() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/react-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/react-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -27718,7 +27684,7 @@ export default function SignInForm({
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/react-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/react-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -27880,7 +27846,7 @@ export default function SignUpForm({
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/react-router/src/components/user-menu.tsx.hbs", `import { Link, useNavigate } from "react-router";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/react-router/src/components/user-menu.tsx.hbs", `import { Link, useNavigate } from "react-router";
 
 import {
   DropdownMenu,
@@ -27942,7 +27908,7 @@ export default function UserMenu() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/react-router/src/routes/dashboard.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/react-router/src/routes/dashboard.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 {{#if (eq api "orpc")}}
 import { orpc } from "@/utils/orpc";
 {{/if}}
@@ -28000,7 +27966,7 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/react-router/src/routes/login.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/react-router/src/routes/login.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
 import { useState } from "react";
 
@@ -28014,7 +27980,7 @@ export default function Login() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-router/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -28150,7 +28116,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-router/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -28311,7 +28277,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/components/user-menu.tsx.hbs", `import { Link, useNavigate } from "@tanstack/react-router";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-router/src/components/user-menu.tsx.hbs", `import { Link, useNavigate } from "@tanstack/react-router";
 
 import {
   DropdownMenu,
@@ -28375,7 +28341,7 @@ export default function UserMenu() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "orpc")}}
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "orpc")}}
 import { orpc } from "@/utils/orpc";
 {{/if}}
 {{#if (eq api "trpc")}}
@@ -28412,7 +28378,7 @@ function RouteComponent() {
 	);
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_auth")({
@@ -28432,7 +28398,7 @@ function AuthLayout() {
 	return <Outlet />;
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-router/src/routes/login.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-router/src/routes/login.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -28451,7 +28417,7 @@ function RouteComponent() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-start/src/components/sign-in-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -28587,7 +28553,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-start/src/components/sign-up-form.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -28748,7 +28714,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/components/user-menu.tsx.hbs", `import { Link, useNavigate } from "@tanstack/react-router";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-start/src/components/user-menu.tsx.hbs", `import { Link, useNavigate } from "@tanstack/react-router";
 
 import {
   DropdownMenu,
@@ -28812,13 +28778,13 @@ export default function UserMenu() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/functions/get-user.ts.hbs", `import { authMiddleware } from "@/middleware/auth";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-start/src/functions/get-user.ts.hbs", `import { authMiddleware } from "@/middleware/auth";
 import { createServerFn } from "@tanstack/react-start";
 
 export const getUser = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
     return context.session
 })`],
-  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/middleware/auth.ts.hbs", `{{#if (eq backend "self")}}
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-start/src/middleware/auth.ts.hbs", `{{#if (eq backend "self")}}
 {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
 import { createAuth } from "@{{projectName}}/auth";
 {{else}}
@@ -28854,7 +28820,7 @@ export const authMiddleware = createMiddleware().server(
 );
 {{/if}}
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "trpc") }}
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "trpc") }}
 import { useTRPC } from "@/utils/trpc";
 import { useQuery } from "@tanstack/react-query";
 {{/if}}
@@ -28897,7 +28863,7 @@ function RouteComponent() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `{{#if (eq backend "self")}}
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `{{#if (eq backend "self")}}
 import { getUser } from "@/functions/get-user";
 {{else}}
 import { authClient } from "@/lib/auth-client";
@@ -28943,7 +28909,7 @@ function AuthLayout() {
   return <Outlet />;
 }
 `],
-  ["modules/auth/stack/better-auth/web/react/tanstack-start/src/routes/login.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/react/tanstack-start/src/routes/login.tsx.hbs", `import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -28962,7 +28928,7 @@ function RouteComponent() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/solid/src/components/sign-in-form.tsx.hbs", `import { useNavigate } from "@solidjs/router";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/solid/src/components/sign-in-form.tsx.hbs", `import { useNavigate } from "@solidjs/router";
 import { createSignal, onSettled, Show } from "solid-js";
 import { authClient } from "~/lib/auth-client";
 import z from "zod";
@@ -29052,7 +29018,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/solid/src/components/sign-up-form.tsx.hbs", `import { useNavigate } from "@solidjs/router";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/solid/src/components/sign-up-form.tsx.hbs", `import { useNavigate } from "@solidjs/router";
 import { createSignal, onSettled, Show } from "solid-js";
 import { authClient } from "~/lib/auth-client";
 import z from "zod";
@@ -29147,7 +29113,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/solid/src/components/user-menu.tsx.hbs", `import { useNavigate } from "@solidjs/router";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/solid/src/components/user-menu.tsx.hbs", `import { useNavigate } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
 import { authClient, useSession } from "~/lib/auth-client";
 
@@ -29203,7 +29169,7 @@ export default function UserMenu() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/solid/src/lib/auth-client.ts.hbs", `import { authClient } from "@{{projectName}}/auth/client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/solid/src/lib/auth-client.ts.hbs", `import { authClient } from "@{{projectName}}/auth/client";
 import { createSignal, onSettled } from "solid-js";
 
 export { authClient };
@@ -29219,7 +29185,7 @@ export function useSession() {
 	return session;
 }
 `],
-  ["modules/auth/stack/better-auth/web/solid/src/routes/dashboard.tsx.hbs", `import { useNavigate } from "@solidjs/router";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/solid/src/routes/dashboard.tsx.hbs", `import { useNavigate } from "@solidjs/router";
 {{#if (eq api "orpc")}}
 import { useQuery } from "@tanstack/solid-query";
 import { orpc } from "~/utils/orpc";
@@ -29264,7 +29230,7 @@ function PrivateData() {
 }
 {{/if}}
 `],
-  ["modules/auth/stack/better-auth/web/solid/src/routes/login.tsx.hbs", `import { createSignal, Match, Switch } from "solid-js";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/solid/src/routes/login.tsx.hbs", `import { createSignal, Match, Switch } from "solid-js";
 import SignInForm from "~/components/sign-in-form";
 import SignUpForm from "~/components/sign-up-form";
 
@@ -29283,7 +29249,7 @@ export default function Login() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/web/svelte/src/components/SignInForm.svelte.hbs", `<script lang="ts">
+  ["modules/auth/stack/better-auth/shared/client/frameworks/svelte/src/components/SignInForm.svelte.hbs", `<script lang="ts">
 	import { createForm } from '@tanstack/svelte-form';
 	import { z } from 'zod';
 	import { authClient } from '$lib/auth-client';
@@ -29400,7 +29366,7 @@ export default function Login() {
 	</div>
 </div>
 `],
-  ["modules/auth/stack/better-auth/web/svelte/src/components/SignUpForm.svelte.hbs", `<script lang="ts">
+  ["modules/auth/stack/better-auth/shared/client/frameworks/svelte/src/components/SignUpForm.svelte.hbs", `<script lang="ts">
 	import { createForm } from '@tanstack/svelte-form';
 	import { z } from 'zod';
 	import { authClient } from '$lib/auth-client';
@@ -29548,7 +29514,7 @@ export default function Login() {
 	</div>
 </div>
 `],
-  ["modules/auth/stack/better-auth/web/svelte/src/components/UserMenu.svelte.hbs", `<script lang="ts">
+  ["modules/auth/stack/better-auth/shared/client/frameworks/svelte/src/components/UserMenu.svelte.hbs", `<script lang="ts">
 	import { authClient } from '$lib/auth-client';
 	import { goto } from '$app/navigation';
 
@@ -29601,7 +29567,7 @@ export default function Login() {
 	{/if}
 </div>
 `],
-  ["modules/auth/stack/better-auth/web/svelte/src/lib/auth-client.ts.hbs", `{{#unless (eq backend "self")}}
+  ["modules/auth/stack/better-auth/shared/client/frameworks/svelte/src/lib/auth-client.ts.hbs", `{{#unless (eq backend "self")}}
 import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{else}}.generated{{/if}}";
 {{/unless}}
 import { createAuthClient } from "better-auth/svelte";
@@ -29620,7 +29586,7 @@ export const authClient = createAuthClient({
 {{/unless}}
 });
 `],
-  ["modules/auth/stack/better-auth/web/svelte/src/routes/dashboard/+page.svelte.hbs", `<script lang="ts">
+  ["modules/auth/stack/better-auth/shared/client/frameworks/svelte/src/routes/dashboard/+page.svelte.hbs", `<script lang="ts">
 	import type { PageProps } from './$types';
 	{{#if (eq api "orpc")}}
 	import { orpc } from '$lib/orpc';
@@ -29641,7 +29607,7 @@ export const authClient = createAuthClient({
 		{{/if}}
 	</div>
 `],
-  ["modules/auth/stack/better-auth/web/svelte/src/routes/login/+page.svelte.hbs", `<script lang="ts">
+  ["modules/auth/stack/better-auth/shared/client/frameworks/svelte/src/routes/login/+page.svelte.hbs", `<script lang="ts">
 	import SignInForm from '../../components/SignInForm.svelte';
 	import SignUpForm from '../../components/SignUpForm.svelte';
 
@@ -29653,6 +29619,1040 @@ export const authClient = createAuthClient({
 {:else}
 	<SignUpForm switchToSignIn={() => showSignIn = true} />
 {/if}
+`],
+  ["modules/auth/stack/clerk/apps/native/base/app/(auth)/_layout.tsx.hbs", `import { Redirect, Stack } from "expo-router";
+import { useAuth } from "@clerk/expo";
+
+export default function AuthRoutesLayout() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (isSignedIn) {
+    return <Redirect href={"/"} />;
+  }
+
+  return <Stack />;
+}
+`],
+  ["modules/auth/stack/clerk/apps/native/base/app/(auth)/sign-in.tsx.hbs", `import { useSignIn } from "@clerk/expo";
+import { type Href, Link, useRouter } from "expo-router";
+import React from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
+  const url = decorateUrl(href);
+  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
+  router.push(nextHref as Href);
+}
+
+export default function Page() {
+  const { signIn, errors, fetchStatus } = useSignIn();
+  const router = useRouter();
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [code, setCode] = React.useState("");
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+
+  const emailCodeFactor = signIn.supportedSecondFactors.find(
+    (factor) => factor.strategy === "email_code",
+  );
+  const requiresEmailCode =
+    signIn.status === "needs_client_trust" ||
+    (signIn.status === "needs_second_factor" && !!emailCodeFactor);
+
+  const handleSubmit = async () => {
+    setStatusMessage(null);
+
+    const { error } = await signIn.password({
+      emailAddress,
+      password,
+    });
+
+    if (error) {
+      console.error(JSON.stringify(error, null, 2));
+      setStatusMessage(error.longMessage ?? "Unable to sign in. Please try again.");
+      return;
+    }
+
+    if (signIn.status === "complete") {
+      await signIn.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else if (signIn.status === "needs_second_factor" || signIn.status === "needs_client_trust") {
+      if (emailCodeFactor) {
+        await signIn.mfa.sendEmailCode();
+        setStatusMessage(\`We sent a verification code to \${emailCodeFactor.safeIdentifier}.\`);
+      } else {
+        console.error("Second factor is required, but email_code is not available:", signIn);
+        setStatusMessage("A second factor is required, but this screen only supports email codes right now.");
+      }
+    } else {
+      console.error("Sign-in attempt not complete:", signIn);
+      setStatusMessage("Sign-in could not be completed. Check the logs for more details.");
+    }
+  };
+
+  const handleVerify = async () => {
+    setStatusMessage(null);
+
+    await signIn.mfa.verifyEmailCode({ code });
+
+    if (signIn.status === "complete") {
+      await signIn.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else {
+      console.error("Sign-in attempt not complete:", signIn);
+      setStatusMessage("That code did not complete sign-in. Please try again.");
+    }
+  };
+
+  if (requiresEmailCode) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Verify your account</Text>
+        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+        <TextInput
+          style={styles.input}
+          value={code}
+          placeholder="Enter your verification code"
+          placeholderTextColor="#666666"
+          onChangeText={(value) => setCode(value)}
+          keyboardType="numeric"
+        />
+        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            fetchStatus === "fetching" && styles.buttonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={handleVerify}
+          disabled={fetchStatus === "fetching"}
+        >
+          <Text style={styles.buttonText}>Verify</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          onPress={() => signIn.mfa.sendEmailCode()}
+        >
+          <Text style={styles.secondaryButtonText}>I need a new code</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign in</Text>
+      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+      <Text style={styles.label}>Email address</Text>
+      <TextInput
+        style={styles.input}
+        autoCapitalize="none"
+        value={emailAddress}
+        placeholder="Enter email"
+        placeholderTextColor="#666666"
+        onChangeText={(value) => setEmailAddress(value)}
+        keyboardType="email-address"
+      />
+      {errors.fields.identifier && <Text style={styles.error}>{errors.fields.identifier.message}</Text>}
+      <Text style={styles.label}>Password</Text>
+      <TextInput
+        style={styles.input}
+        value={password}
+        placeholder="Enter password"
+        placeholderTextColor="#666666"
+        secureTextEntry={true}
+        onChangeText={(value) => setPassword(value)}
+      />
+      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
+          pressed && styles.buttonPressed,
+        ]}
+        onPress={handleSubmit}
+        disabled={!emailAddress || !password || fetchStatus === "fetching"}
+      >
+        <Text style={styles.buttonText}>Sign in</Text>
+      </Pressable>
+      <View style={styles.linkContainer}>
+        <Text>Don't have an account? </Text>
+        <Link href="/sign-up">
+          <Text style={styles.linkText}>Sign up</Text>
+        </Link>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    gap: 12,
+  },
+  title: {
+    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  label: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  button: {
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  secondaryButtonText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  linkContainer: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  linkText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  error: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginTop: -8,
+  },
+  helper: {
+    color: "#555555",
+    fontSize: 13,
+  },
+});
+`],
+  ["modules/auth/stack/clerk/apps/native/base/app/(auth)/sign-up.tsx.hbs", `import { useAuth, useSignUp } from "@clerk/expo";
+import { type Href, Link, useRouter } from "expo-router";
+import React from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
+  const url = decorateUrl(href);
+  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
+  router.push(nextHref as Href);
+}
+
+export default function Page() {
+  const { signUp, errors, fetchStatus } = useSignUp();
+  const { isSignedIn } = useAuth();
+  const router = useRouter();
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [code, setCode] = React.useState("");
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    setStatusMessage(null);
+
+    const { error } = await signUp.password({
+      emailAddress,
+      password,
+    });
+
+    if (error) {
+      console.error(JSON.stringify(error, null, 2));
+      setStatusMessage(error.longMessage ?? "Unable to sign up. Please try again.");
+      return;
+    }
+
+    await signUp.verifications.sendEmailCode();
+    setStatusMessage(\`We sent a verification code to \${emailAddress}.\`);
+  };
+
+  const handleVerify = async () => {
+    setStatusMessage(null);
+
+    await signUp.verifications.verifyEmailCode({
+      code,
+    });
+
+    if (signUp.status === "complete") {
+      await signUp.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else {
+      console.error("Sign-up attempt not complete:", signUp);
+      setStatusMessage("That code did not complete sign-up. Please try again.");
+    }
+  };
+
+  if (signUp.status === "complete" || isSignedIn) {
+    return null;
+  }
+
+  if (
+    signUp.status === "missing_requirements" &&
+    signUp.unverifiedFields.includes("email_address") &&
+    signUp.missingFields.length === 0
+  ) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Verify your account</Text>
+        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+        <TextInput
+          style={styles.input}
+          value={code}
+          placeholder="Enter your verification code"
+          placeholderTextColor="#666666"
+          onChangeText={(value) => setCode(value)}
+          keyboardType="numeric"
+        />
+        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            fetchStatus === "fetching" && styles.buttonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={handleVerify}
+          disabled={fetchStatus === "fetching"}
+        >
+          <Text style={styles.buttonText}>Verify</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          onPress={() => signUp.verifications.sendEmailCode()}
+        >
+          <Text style={styles.secondaryButtonText}>I need a new code</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign up</Text>
+      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+      <Text style={styles.label}>Email address</Text>
+      <TextInput
+        style={styles.input}
+        autoCapitalize="none"
+        value={emailAddress}
+        placeholder="Enter email"
+        placeholderTextColor="#666666"
+        onChangeText={(value) => setEmailAddress(value)}
+        keyboardType="email-address"
+      />
+      {errors.fields.emailAddress && (
+        <Text style={styles.error}>{errors.fields.emailAddress.message}</Text>
+      )}
+      <Text style={styles.label}>Password</Text>
+      <TextInput
+        style={styles.input}
+        value={password}
+        placeholder="Enter password"
+        placeholderTextColor="#666666"
+        secureTextEntry={true}
+        onChangeText={(value) => setPassword(value)}
+      />
+      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
+          pressed && styles.buttonPressed,
+        ]}
+        onPress={handleSubmit}
+        disabled={!emailAddress || !password || fetchStatus === "fetching"}
+      >
+        <Text style={styles.buttonText}>Sign up</Text>
+      </Pressable>
+      <View style={styles.linkContainer}>
+        <Text>Already have an account? </Text>
+        <Link href="/sign-in">
+          <Text style={styles.linkText}>Sign in</Text>
+        </Link>
+      </View>
+      <View nativeID="clerk-captcha" />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    gap: 12,
+  },
+  title: {
+    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  label: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  button: {
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  secondaryButtonText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  linkContainer: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  linkText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  error: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginTop: -8,
+  },
+  helper: {
+    color: "#555555",
+    fontSize: 13,
+  },
+});
+`],
+  ["modules/auth/stack/clerk/apps/native/base/components/sign-out-button.tsx.hbs", `import { useClerk } from "@clerk/expo";
+import { useRouter } from "expo-router";
+import { Text, TouchableOpacity } from "react-native";
+
+export const SignOutButton = () => {
+  const { signOut } = useClerk();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.replace("/");
+    } catch (err) {
+      console.error(JSON.stringify(err, null, 2));
+    }
+  };
+
+  return (
+    <TouchableOpacity onPress={handleSignOut}>
+      <Text>Sign out</Text>
+    </TouchableOpacity>
+  );
+};
+`],
+  ["modules/auth/stack/clerk/apps/native/base/utils/clerk-auth.ts.hbs", `type ClerkTokenGetter = () => Promise<string | null>;
+
+let clerkTokenGetter: ClerkTokenGetter | null = null;
+
+export function setClerkAuthTokenGetter(getToken: ClerkTokenGetter | null) {
+	clerkTokenGetter = getToken;
+}
+
+export async function getClerkAuthToken() {
+	return (await clerkTokenGetter?.()) ?? null;
+}
+`],
+  ["modules/auth/stack/clerk/convex/apps/native/base/app/(auth)/_layout.tsx.hbs", `import { Redirect, Stack } from "expo-router";
+import { useAuth } from "@clerk/expo";
+
+export default function AuthRoutesLayout() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (isSignedIn) {
+    return <Redirect href={"/"} />;
+  }
+
+  return <Stack />;
+}
+`],
+  ["modules/auth/stack/clerk/convex/apps/native/base/app/(auth)/sign-in.tsx.hbs", `import { useSignIn } from "@clerk/expo";
+import { type Href, Link, useRouter } from "expo-router";
+import React from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
+  const url = decorateUrl(href);
+  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
+  router.push(nextHref as Href);
+}
+
+export default function Page() {
+  const { signIn, errors, fetchStatus } = useSignIn();
+  const router = useRouter();
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [code, setCode] = React.useState("");
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+
+  const emailCodeFactor = signIn.supportedSecondFactors.find(
+    (factor) => factor.strategy === "email_code",
+  );
+  const requiresEmailCode =
+    signIn.status === "needs_client_trust" ||
+    (signIn.status === "needs_second_factor" && !!emailCodeFactor);
+
+  const handleSubmit = async () => {
+    setStatusMessage(null);
+
+    const { error } = await signIn.password({
+      emailAddress,
+      password,
+    });
+
+    if (error) {
+      console.error(JSON.stringify(error, null, 2));
+      setStatusMessage(error.longMessage ?? "Unable to sign in. Please try again.");
+      return;
+    }
+
+    if (signIn.status === "complete") {
+      await signIn.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else if (signIn.status === "needs_second_factor" || signIn.status === "needs_client_trust") {
+      if (emailCodeFactor) {
+        await signIn.mfa.sendEmailCode();
+        setStatusMessage(\`We sent a verification code to \${emailCodeFactor.safeIdentifier}.\`);
+      } else {
+        console.error("Second factor is required, but email_code is not available:", signIn);
+        setStatusMessage("A second factor is required, but this screen only supports email codes right now.");
+      }
+    } else {
+      console.error("Sign-in attempt not complete:", signIn);
+      setStatusMessage("Sign-in could not be completed. Check the logs for more details.");
+    }
+  };
+
+  const handleVerify = async () => {
+    setStatusMessage(null);
+
+    await signIn.mfa.verifyEmailCode({ code });
+
+    if (signIn.status === "complete") {
+      await signIn.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else {
+      console.error("Sign-in attempt not complete:", signIn);
+      setStatusMessage("That code did not complete sign-in. Please try again.");
+    }
+  };
+
+  if (requiresEmailCode) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Verify your account</Text>
+        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+        <TextInput
+          style={styles.input}
+          value={code}
+          placeholder="Enter your verification code"
+          placeholderTextColor="#666666"
+          onChangeText={(value) => setCode(value)}
+          keyboardType="numeric"
+        />
+        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            fetchStatus === "fetching" && styles.buttonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={handleVerify}
+          disabled={fetchStatus === "fetching"}
+        >
+          <Text style={styles.buttonText}>Verify</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          onPress={() => signIn.mfa.sendEmailCode()}
+        >
+          <Text style={styles.secondaryButtonText}>I need a new code</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign in</Text>
+      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+      <Text style={styles.label}>Email address</Text>
+      <TextInput
+        style={styles.input}
+        autoCapitalize="none"
+        value={emailAddress}
+        placeholder="Enter email"
+        placeholderTextColor="#666666"
+        onChangeText={(value) => setEmailAddress(value)}
+        keyboardType="email-address"
+      />
+      {errors.fields.identifier && <Text style={styles.error}>{errors.fields.identifier.message}</Text>}
+      <Text style={styles.label}>Password</Text>
+      <TextInput
+        style={styles.input}
+        value={password}
+        placeholder="Enter password"
+        placeholderTextColor="#666666"
+        secureTextEntry={true}
+        onChangeText={(value) => setPassword(value)}
+      />
+      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
+          pressed && styles.buttonPressed,
+        ]}
+        onPress={handleSubmit}
+        disabled={!emailAddress || !password || fetchStatus === "fetching"}
+      >
+        <Text style={styles.buttonText}>Sign in</Text>
+      </Pressable>
+      <View style={styles.linkContainer}>
+        <Text>Don't have an account? </Text>
+        <Link href="/sign-up">
+          <Text style={styles.linkText}>Sign up</Text>
+        </Link>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    gap: 12,
+  },
+  title: {
+    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  label: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  button: {
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  secondaryButtonText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  linkContainer: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  linkText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  error: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginTop: -8,
+  },
+  helper: {
+    color: "#555555",
+    fontSize: 13,
+  },
+});
+`],
+  ["modules/auth/stack/clerk/convex/apps/native/base/app/(auth)/sign-up.tsx.hbs", `import { useAuth, useSignUp } from "@clerk/expo";
+import { type Href, Link, useRouter } from "expo-router";
+import React from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
+  const url = decorateUrl(href);
+  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
+  router.push(nextHref as Href);
+}
+
+export default function Page() {
+  const { signUp, errors, fetchStatus } = useSignUp();
+  const { isSignedIn } = useAuth();
+  const router = useRouter();
+  const [emailAddress, setEmailAddress] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [code, setCode] = React.useState("");
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    setStatusMessage(null);
+
+    const { error } = await signUp.password({
+      emailAddress,
+      password,
+    });
+
+    if (error) {
+      console.error(JSON.stringify(error, null, 2));
+      setStatusMessage(error.longMessage ?? "Unable to sign up. Please try again.");
+      return;
+    }
+
+    await signUp.verifications.sendEmailCode();
+    setStatusMessage(\`We sent a verification code to \${emailAddress}.\`);
+  };
+
+  const handleVerify = async () => {
+    setStatusMessage(null);
+
+    await signUp.verifications.verifyEmailCode({
+      code,
+    });
+
+    if (signUp.status === "complete") {
+      await signUp.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session.currentTask);
+            return;
+          }
+
+          pushDecoratedUrl(router, decorateUrl, "/");
+        },
+      });
+    } else {
+      console.error("Sign-up attempt not complete:", signUp);
+      setStatusMessage("That code did not complete sign-up. Please try again.");
+    }
+  };
+
+  if (signUp.status === "complete" || isSignedIn) {
+    return null;
+  }
+
+  if (
+    signUp.status === "missing_requirements" &&
+    signUp.unverifiedFields.includes("email_address") &&
+    signUp.missingFields.length === 0
+  ) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Verify your account</Text>
+        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+        <TextInput
+          style={styles.input}
+          value={code}
+          placeholder="Enter your verification code"
+          placeholderTextColor="#666666"
+          onChangeText={(value) => setCode(value)}
+          keyboardType="numeric"
+        />
+        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            fetchStatus === "fetching" && styles.buttonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={handleVerify}
+          disabled={fetchStatus === "fetching"}
+        >
+          <Text style={styles.buttonText}>Verify</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          onPress={() => signUp.verifications.sendEmailCode()}
+        >
+          <Text style={styles.secondaryButtonText}>I need a new code</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign up</Text>
+      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
+      <Text style={styles.label}>Email address</Text>
+      <TextInput
+        style={styles.input}
+        autoCapitalize="none"
+        value={emailAddress}
+        placeholder="Enter email"
+        placeholderTextColor="#666666"
+        onChangeText={(value) => setEmailAddress(value)}
+        keyboardType="email-address"
+      />
+      {errors.fields.emailAddress && (
+        <Text style={styles.error}>{errors.fields.emailAddress.message}</Text>
+      )}
+      <Text style={styles.label}>Password</Text>
+      <TextInput
+        style={styles.input}
+        value={password}
+        placeholder="Enter password"
+        placeholderTextColor="#666666"
+        secureTextEntry={true}
+        onChangeText={(value) => setPassword(value)}
+      />
+      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
+          pressed && styles.buttonPressed,
+        ]}
+        onPress={handleSubmit}
+        disabled={!emailAddress || !password || fetchStatus === "fetching"}
+      >
+        <Text style={styles.buttonText}>Sign up</Text>
+      </Pressable>
+      <View style={styles.linkContainer}>
+        <Text>Already have an account? </Text>
+        <Link href="/sign-in">
+          <Text style={styles.linkText}>Sign in</Text>
+        </Link>
+      </View>
+      <View nativeID="clerk-captcha" />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    gap: 12,
+  },
+  title: {
+    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  label: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  button: {
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  secondaryButtonText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  linkContainer: {
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 12,
+    alignItems: "center",
+  },
+  linkText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+  },
+  error: {
+    color: "#d32f2f",
+    fontSize: 12,
+    marginTop: -8,
+  },
+  helper: {
+    color: "#555555",
+    fontSize: 13,
+  },
+});
+`],
+  ["modules/auth/stack/clerk/convex/apps/native/base/components/sign-out-button.tsx.hbs", `import { useClerk } from "@clerk/expo";
+import { useRouter } from "expo-router";
+import { Text, TouchableOpacity } from "react-native";
+
+export const SignOutButton = () => {
+  // Use \`useClerk()\` to access the \`signOut()\` function
+  const { signOut } = useClerk();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      // Redirect to your desired page
+      router.replace("/");
+    } catch (err) {
+      // See https://clerk.com/docs/custom-flows/error-handling
+      // for more info on error handling
+      console.error(JSON.stringify(err, null, 2));
+    }
+  };
+
+  return (
+    <TouchableOpacity onPress={handleSignOut}>
+      <Text>Sign out</Text>
+    </TouchableOpacity>
+  );
+};
 `],
   ["modules/auth/stack/clerk/convex/backend/convex/auth.config.ts.hbs", `import type { AuthConfig } from "convex/server";
 
@@ -29685,520 +30685,7 @@ export const get = query({
 	},
 });
 `],
-  ["modules/auth/stack/clerk/convex/native/base/app/(auth)/_layout.tsx.hbs", `import { Redirect, Stack } from "expo-router";
-import { useAuth } from "@clerk/expo";
-
-export default function AuthRoutesLayout() {
-  const { isLoaded, isSignedIn } = useAuth();
-
-  if (!isLoaded) {
-    return null;
-  }
-
-  if (isSignedIn) {
-    return <Redirect href={"/"} />;
-  }
-
-  return <Stack />;
-}
-`],
-  ["modules/auth/stack/clerk/convex/native/base/app/(auth)/sign-in.tsx.hbs", `import { useSignIn } from "@clerk/expo";
-import { type Href, Link, useRouter } from "expo-router";
-import React from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-
-function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
-  const url = decorateUrl(href);
-  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
-  router.push(nextHref as Href);
-}
-
-export default function Page() {
-  const { signIn, errors, fetchStatus } = useSignIn();
-  const router = useRouter();
-  const [emailAddress, setEmailAddress] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [code, setCode] = React.useState("");
-  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
-
-  const emailCodeFactor = signIn.supportedSecondFactors.find(
-    (factor) => factor.strategy === "email_code",
-  );
-  const requiresEmailCode =
-    signIn.status === "needs_client_trust" ||
-    (signIn.status === "needs_second_factor" && !!emailCodeFactor);
-
-  const handleSubmit = async () => {
-    setStatusMessage(null);
-
-    const { error } = await signIn.password({
-      emailAddress,
-      password,
-    });
-
-    if (error) {
-      console.error(JSON.stringify(error, null, 2));
-      setStatusMessage(error.longMessage ?? "Unable to sign in. Please try again.");
-      return;
-    }
-
-    if (signIn.status === "complete") {
-      await signIn.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) {
-            console.log(session.currentTask);
-            return;
-          }
-
-          pushDecoratedUrl(router, decorateUrl, "/");
-        },
-      });
-    } else if (signIn.status === "needs_second_factor" || signIn.status === "needs_client_trust") {
-      if (emailCodeFactor) {
-        await signIn.mfa.sendEmailCode();
-        setStatusMessage(\`We sent a verification code to \${emailCodeFactor.safeIdentifier}.\`);
-      } else {
-        console.error("Second factor is required, but email_code is not available:", signIn);
-        setStatusMessage("A second factor is required, but this screen only supports email codes right now.");
-      }
-    } else {
-      console.error("Sign-in attempt not complete:", signIn);
-      setStatusMessage("Sign-in could not be completed. Check the logs for more details.");
-    }
-  };
-
-  const handleVerify = async () => {
-    setStatusMessage(null);
-
-    await signIn.mfa.verifyEmailCode({ code });
-
-    if (signIn.status === "complete") {
-      await signIn.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) {
-            console.log(session.currentTask);
-            return;
-          }
-
-          pushDecoratedUrl(router, decorateUrl, "/");
-        },
-      });
-    } else {
-      console.error("Sign-in attempt not complete:", signIn);
-      setStatusMessage("That code did not complete sign-in. Please try again.");
-    }
-  };
-
-  if (requiresEmailCode) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Verify your account</Text>
-        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
-        <TextInput
-          style={styles.input}
-          value={code}
-          placeholder="Enter your verification code"
-          placeholderTextColor="#666666"
-          onChangeText={(value) => setCode(value)}
-          keyboardType="numeric"
-        />
-        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            fetchStatus === "fetching" && styles.buttonDisabled,
-            pressed && styles.buttonPressed,
-          ]}
-          onPress={handleVerify}
-          disabled={fetchStatus === "fetching"}
-        >
-          <Text style={styles.buttonText}>Verify</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-          onPress={() => signIn.mfa.sendEmailCode()}
-        >
-          <Text style={styles.secondaryButtonText}>I need a new code</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Sign in</Text>
-      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
-      <Text style={styles.label}>Email address</Text>
-      <TextInput
-        style={styles.input}
-        autoCapitalize="none"
-        value={emailAddress}
-        placeholder="Enter email"
-        placeholderTextColor="#666666"
-        onChangeText={(value) => setEmailAddress(value)}
-        keyboardType="email-address"
-      />
-      {errors.fields.identifier && <Text style={styles.error}>{errors.fields.identifier.message}</Text>}
-      <Text style={styles.label}>Password</Text>
-      <TextInput
-        style={styles.input}
-        value={password}
-        placeholder="Enter password"
-        placeholderTextColor="#666666"
-        secureTextEntry={true}
-        onChangeText={(value) => setPassword(value)}
-      />
-      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
-          pressed && styles.buttonPressed,
-        ]}
-        onPress={handleSubmit}
-        disabled={!emailAddress || !password || fetchStatus === "fetching"}
-      >
-        <Text style={styles.buttonText}>Sign in</Text>
-      </Pressable>
-      <View style={styles.linkContainer}>
-        <Text>Don't have an account? </Text>
-        <Link href="/sign-up">
-          <Text style={styles.linkText}>Sign up</Text>
-        </Link>
-      </View>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    gap: 12,
-  },
-  title: {
-    marginBottom: 8,
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  label: {
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: "#fff",
-  },
-  button: {
-    backgroundColor: "#0a7ea4",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonPressed: {
-    opacity: 0.7,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  secondaryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  secondaryButtonText: {
-    color: "#0a7ea4",
-    fontWeight: "600",
-  },
-  linkContainer: {
-    flexDirection: "row",
-    gap: 4,
-    marginTop: 12,
-    alignItems: "center",
-  },
-  linkText: {
-    color: "#0a7ea4",
-    fontWeight: "600",
-  },
-  error: {
-    color: "#d32f2f",
-    fontSize: 12,
-    marginTop: -8,
-  },
-  helper: {
-    color: "#555555",
-    fontSize: 13,
-  },
-});
-`],
-  ["modules/auth/stack/clerk/convex/native/base/app/(auth)/sign-up.tsx.hbs", `import { useAuth, useSignUp } from "@clerk/expo";
-import { type Href, Link, useRouter } from "expo-router";
-import React from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-
-function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
-  const url = decorateUrl(href);
-  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
-  router.push(nextHref as Href);
-}
-
-export default function Page() {
-  const { signUp, errors, fetchStatus } = useSignUp();
-  const { isSignedIn } = useAuth();
-  const router = useRouter();
-  const [emailAddress, setEmailAddress] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [code, setCode] = React.useState("");
-  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
-
-  const handleSubmit = async () => {
-    setStatusMessage(null);
-
-    const { error } = await signUp.password({
-      emailAddress,
-      password,
-    });
-
-    if (error) {
-      console.error(JSON.stringify(error, null, 2));
-      setStatusMessage(error.longMessage ?? "Unable to sign up. Please try again.");
-      return;
-    }
-
-    await signUp.verifications.sendEmailCode();
-    setStatusMessage(\`We sent a verification code to \${emailAddress}.\`);
-  };
-
-  const handleVerify = async () => {
-    setStatusMessage(null);
-
-    await signUp.verifications.verifyEmailCode({
-      code,
-    });
-
-    if (signUp.status === "complete") {
-      await signUp.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) {
-            console.log(session.currentTask);
-            return;
-          }
-
-          pushDecoratedUrl(router, decorateUrl, "/");
-        },
-      });
-    } else {
-      console.error("Sign-up attempt not complete:", signUp);
-      setStatusMessage("That code did not complete sign-up. Please try again.");
-    }
-  };
-
-  if (signUp.status === "complete" || isSignedIn) {
-    return null;
-  }
-
-  if (
-    signUp.status === "missing_requirements" &&
-    signUp.unverifiedFields.includes("email_address") &&
-    signUp.missingFields.length === 0
-  ) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Verify your account</Text>
-        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
-        <TextInput
-          style={styles.input}
-          value={code}
-          placeholder="Enter your verification code"
-          placeholderTextColor="#666666"
-          onChangeText={(value) => setCode(value)}
-          keyboardType="numeric"
-        />
-        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            fetchStatus === "fetching" && styles.buttonDisabled,
-            pressed && styles.buttonPressed,
-          ]}
-          onPress={handleVerify}
-          disabled={fetchStatus === "fetching"}
-        >
-          <Text style={styles.buttonText}>Verify</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-          onPress={() => signUp.verifications.sendEmailCode()}
-        >
-          <Text style={styles.secondaryButtonText}>I need a new code</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Sign up</Text>
-      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
-      <Text style={styles.label}>Email address</Text>
-      <TextInput
-        style={styles.input}
-        autoCapitalize="none"
-        value={emailAddress}
-        placeholder="Enter email"
-        placeholderTextColor="#666666"
-        onChangeText={(value) => setEmailAddress(value)}
-        keyboardType="email-address"
-      />
-      {errors.fields.emailAddress && (
-        <Text style={styles.error}>{errors.fields.emailAddress.message}</Text>
-      )}
-      <Text style={styles.label}>Password</Text>
-      <TextInput
-        style={styles.input}
-        value={password}
-        placeholder="Enter password"
-        placeholderTextColor="#666666"
-        secureTextEntry={true}
-        onChangeText={(value) => setPassword(value)}
-      />
-      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
-          pressed && styles.buttonPressed,
-        ]}
-        onPress={handleSubmit}
-        disabled={!emailAddress || !password || fetchStatus === "fetching"}
-      >
-        <Text style={styles.buttonText}>Sign up</Text>
-      </Pressable>
-      <View style={styles.linkContainer}>
-        <Text>Already have an account? </Text>
-        <Link href="/sign-in">
-          <Text style={styles.linkText}>Sign in</Text>
-        </Link>
-      </View>
-      <View nativeID="clerk-captcha" />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    gap: 12,
-  },
-  title: {
-    marginBottom: 8,
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  label: {
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: "#fff",
-  },
-  button: {
-    backgroundColor: "#0a7ea4",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonPressed: {
-    opacity: 0.7,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  secondaryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  secondaryButtonText: {
-    color: "#0a7ea4",
-    fontWeight: "600",
-  },
-  linkContainer: {
-    flexDirection: "row",
-    gap: 4,
-    marginTop: 12,
-    alignItems: "center",
-  },
-  linkText: {
-    color: "#0a7ea4",
-    fontWeight: "600",
-  },
-  error: {
-    color: "#d32f2f",
-    fontSize: 12,
-    marginTop: -8,
-  },
-  helper: {
-    color: "#555555",
-    fontSize: 13,
-  },
-});
-`],
-  ["modules/auth/stack/clerk/convex/native/base/components/sign-out-button.tsx.hbs", `import { useClerk } from "@clerk/expo";
-import { useRouter } from "expo-router";
-import { Text, TouchableOpacity } from "react-native";
-
-export const SignOutButton = () => {
-  // Use \`useClerk()\` to access the \`signOut()\` function
-  const { signOut } = useClerk();
-  const router = useRouter();
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      // Redirect to your desired page
-      router.replace("/");
-    } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      console.error(JSON.stringify(err, null, 2));
-    }
-  };
-
-  return (
-    <TouchableOpacity onPress={handleSignOut}>
-      <Text>Sign out</Text>
-    </TouchableOpacity>
-  );
-};
-`],
-  ["modules/auth/stack/clerk/convex/web/react/next/src/app/dashboard/page.tsx.hbs", `"use client";
+  ["modules/auth/stack/clerk/convex/shared/client/frameworks/react/next/src/app/dashboard/page.tsx.hbs", `"use client";
 
 import { api } from "@{{projectName}}/backend/convex/_generated/api";
 import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
@@ -30228,7 +30715,7 @@ export default function Dashboard() {
   );
 }
 `],
-  ["modules/auth/stack/clerk/convex/web/react/next/src/proxy.ts.hbs", `import { clerkMiddleware } from "@clerk/nextjs/server";
+  ["modules/auth/stack/clerk/convex/shared/client/frameworks/react/next/src/proxy.ts.hbs", `import { clerkMiddleware } from "@clerk/nextjs/server";
 
 export default clerkMiddleware();
 
@@ -30242,7 +30729,7 @@ export const config = {
 	],
 };
 `],
-  ["modules/auth/stack/clerk/convex/web/react/react-router/src/routes/dashboard.tsx.hbs", `import { SignInButton, UserButton, useUser } from "@clerk/react-router";
+  ["modules/auth/stack/clerk/convex/shared/client/frameworks/react/react-router/src/routes/dashboard.tsx.hbs", `import { SignInButton, UserButton, useUser } from "@clerk/react-router";
 import { api } from "@{{projectName}}/backend/convex/_generated/api";
 import {
 	Authenticated,
@@ -30275,7 +30762,7 @@ export default function Dashboard() {
 	);
 }
 `],
-  ["modules/auth/stack/clerk/convex/web/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `import { UserButton, useUser } from "@clerk/react";
+  ["modules/auth/stack/clerk/convex/shared/client/frameworks/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `import { UserButton, useUser } from "@clerk/react";
 import { api } from "@{{projectName}}/backend/convex/_generated/api";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
@@ -30298,7 +30785,7 @@ function RouteComponent() {
 	);
 }
 `],
-  ["modules/auth/stack/clerk/convex/web/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import { SignInButton } from "@clerk/react";
+  ["modules/auth/stack/clerk/convex/shared/client/frameworks/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import { SignInButton } from "@clerk/react";
 import { Outlet, createFileRoute } from "@tanstack/react-router";
 import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
 
@@ -30322,7 +30809,7 @@ function AuthLayout() {
 	);
 }
 `],
-  ["modules/auth/stack/clerk/convex/web/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `import { UserButton, useUser } from "@clerk/tanstack-react-start";
+  ["modules/auth/stack/clerk/convex/shared/client/frameworks/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `import { UserButton, useUser } from "@clerk/tanstack-react-start";
 import { api } from "@{{projectName}}/backend/convex/_generated/api";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
@@ -30345,7 +30832,7 @@ function RouteComponent() {
 	);
 }
 `],
-  ["modules/auth/stack/clerk/convex/web/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `import { SignInButton } from "@clerk/tanstack-react-start";
+  ["modules/auth/stack/clerk/convex/shared/client/frameworks/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `import { SignInButton } from "@clerk/tanstack-react-start";
 import { Outlet, createFileRoute } from "@tanstack/react-router";
 import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
 
@@ -30369,7 +30856,7 @@ function AuthLayout() {
 	);
 }
 `],
-  ["modules/auth/stack/clerk/convex/web/react/tanstack-start/src/start.ts.hbs", `import { clerkMiddleware } from '@clerk/tanstack-react-start/server'
+  ["modules/auth/stack/clerk/convex/shared/client/frameworks/react/tanstack-start/src/start.ts.hbs", `import { clerkMiddleware } from '@clerk/tanstack-react-start/server'
 import { createCsrfMiddleware, createStart } from '@tanstack/react-start'
 
 const csrfMiddleware = createCsrfMiddleware({
@@ -30382,516 +30869,7 @@ export const startInstance = createStart(() => {
 	}
 })
 `],
-  ["modules/auth/stack/clerk/native/base/app/(auth)/_layout.tsx.hbs", `import { Redirect, Stack } from "expo-router";
-import { useAuth } from "@clerk/expo";
-
-export default function AuthRoutesLayout() {
-  const { isLoaded, isSignedIn } = useAuth();
-
-  if (!isLoaded) {
-    return null;
-  }
-
-  if (isSignedIn) {
-    return <Redirect href={"/"} />;
-  }
-
-  return <Stack />;
-}
-`],
-  ["modules/auth/stack/clerk/native/base/app/(auth)/sign-in.tsx.hbs", `import { useSignIn } from "@clerk/expo";
-import { type Href, Link, useRouter } from "expo-router";
-import React from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-
-function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
-  const url = decorateUrl(href);
-  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
-  router.push(nextHref as Href);
-}
-
-export default function Page() {
-  const { signIn, errors, fetchStatus } = useSignIn();
-  const router = useRouter();
-  const [emailAddress, setEmailAddress] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [code, setCode] = React.useState("");
-  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
-
-  const emailCodeFactor = signIn.supportedSecondFactors.find(
-    (factor) => factor.strategy === "email_code",
-  );
-  const requiresEmailCode =
-    signIn.status === "needs_client_trust" ||
-    (signIn.status === "needs_second_factor" && !!emailCodeFactor);
-
-  const handleSubmit = async () => {
-    setStatusMessage(null);
-
-    const { error } = await signIn.password({
-      emailAddress,
-      password,
-    });
-
-    if (error) {
-      console.error(JSON.stringify(error, null, 2));
-      setStatusMessage(error.longMessage ?? "Unable to sign in. Please try again.");
-      return;
-    }
-
-    if (signIn.status === "complete") {
-      await signIn.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) {
-            console.log(session.currentTask);
-            return;
-          }
-
-          pushDecoratedUrl(router, decorateUrl, "/");
-        },
-      });
-    } else if (signIn.status === "needs_second_factor" || signIn.status === "needs_client_trust") {
-      if (emailCodeFactor) {
-        await signIn.mfa.sendEmailCode();
-        setStatusMessage(\`We sent a verification code to \${emailCodeFactor.safeIdentifier}.\`);
-      } else {
-        console.error("Second factor is required, but email_code is not available:", signIn);
-        setStatusMessage("A second factor is required, but this screen only supports email codes right now.");
-      }
-    } else {
-      console.error("Sign-in attempt not complete:", signIn);
-      setStatusMessage("Sign-in could not be completed. Check the logs for more details.");
-    }
-  };
-
-  const handleVerify = async () => {
-    setStatusMessage(null);
-
-    await signIn.mfa.verifyEmailCode({ code });
-
-    if (signIn.status === "complete") {
-      await signIn.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) {
-            console.log(session.currentTask);
-            return;
-          }
-
-          pushDecoratedUrl(router, decorateUrl, "/");
-        },
-      });
-    } else {
-      console.error("Sign-in attempt not complete:", signIn);
-      setStatusMessage("That code did not complete sign-in. Please try again.");
-    }
-  };
-
-  if (requiresEmailCode) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Verify your account</Text>
-        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
-        <TextInput
-          style={styles.input}
-          value={code}
-          placeholder="Enter your verification code"
-          placeholderTextColor="#666666"
-          onChangeText={(value) => setCode(value)}
-          keyboardType="numeric"
-        />
-        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            fetchStatus === "fetching" && styles.buttonDisabled,
-            pressed && styles.buttonPressed,
-          ]}
-          onPress={handleVerify}
-          disabled={fetchStatus === "fetching"}
-        >
-          <Text style={styles.buttonText}>Verify</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-          onPress={() => signIn.mfa.sendEmailCode()}
-        >
-          <Text style={styles.secondaryButtonText}>I need a new code</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Sign in</Text>
-      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
-      <Text style={styles.label}>Email address</Text>
-      <TextInput
-        style={styles.input}
-        autoCapitalize="none"
-        value={emailAddress}
-        placeholder="Enter email"
-        placeholderTextColor="#666666"
-        onChangeText={(value) => setEmailAddress(value)}
-        keyboardType="email-address"
-      />
-      {errors.fields.identifier && <Text style={styles.error}>{errors.fields.identifier.message}</Text>}
-      <Text style={styles.label}>Password</Text>
-      <TextInput
-        style={styles.input}
-        value={password}
-        placeholder="Enter password"
-        placeholderTextColor="#666666"
-        secureTextEntry={true}
-        onChangeText={(value) => setPassword(value)}
-      />
-      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
-          pressed && styles.buttonPressed,
-        ]}
-        onPress={handleSubmit}
-        disabled={!emailAddress || !password || fetchStatus === "fetching"}
-      >
-        <Text style={styles.buttonText}>Sign in</Text>
-      </Pressable>
-      <View style={styles.linkContainer}>
-        <Text>Don't have an account? </Text>
-        <Link href="/sign-up">
-          <Text style={styles.linkText}>Sign up</Text>
-        </Link>
-      </View>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    gap: 12,
-  },
-  title: {
-    marginBottom: 8,
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  label: {
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: "#fff",
-  },
-  button: {
-    backgroundColor: "#0a7ea4",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonPressed: {
-    opacity: 0.7,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  secondaryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  secondaryButtonText: {
-    color: "#0a7ea4",
-    fontWeight: "600",
-  },
-  linkContainer: {
-    flexDirection: "row",
-    gap: 4,
-    marginTop: 12,
-    alignItems: "center",
-  },
-  linkText: {
-    color: "#0a7ea4",
-    fontWeight: "600",
-  },
-  error: {
-    color: "#d32f2f",
-    fontSize: 12,
-    marginTop: -8,
-  },
-  helper: {
-    color: "#555555",
-    fontSize: 13,
-  },
-});
-`],
-  ["modules/auth/stack/clerk/native/base/app/(auth)/sign-up.tsx.hbs", `import { useAuth, useSignUp } from "@clerk/expo";
-import { type Href, Link, useRouter } from "expo-router";
-import React from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-
-function pushDecoratedUrl(router: ReturnType<typeof useRouter>, decorateUrl: (url: string) => string, href: string) {
-  const url = decorateUrl(href);
-  const nextHref = url.startsWith("http") ? new URL(url).pathname : url;
-  router.push(nextHref as Href);
-}
-
-export default function Page() {
-  const { signUp, errors, fetchStatus } = useSignUp();
-  const { isSignedIn } = useAuth();
-  const router = useRouter();
-  const [emailAddress, setEmailAddress] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [code, setCode] = React.useState("");
-  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
-
-  const handleSubmit = async () => {
-    setStatusMessage(null);
-
-    const { error } = await signUp.password({
-      emailAddress,
-      password,
-    });
-
-    if (error) {
-      console.error(JSON.stringify(error, null, 2));
-      setStatusMessage(error.longMessage ?? "Unable to sign up. Please try again.");
-      return;
-    }
-
-    await signUp.verifications.sendEmailCode();
-    setStatusMessage(\`We sent a verification code to \${emailAddress}.\`);
-  };
-
-  const handleVerify = async () => {
-    setStatusMessage(null);
-
-    await signUp.verifications.verifyEmailCode({
-      code,
-    });
-
-    if (signUp.status === "complete") {
-      await signUp.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) {
-            console.log(session.currentTask);
-            return;
-          }
-
-          pushDecoratedUrl(router, decorateUrl, "/");
-        },
-      });
-    } else {
-      console.error("Sign-up attempt not complete:", signUp);
-      setStatusMessage("That code did not complete sign-up. Please try again.");
-    }
-  };
-
-  if (signUp.status === "complete" || isSignedIn) {
-    return null;
-  }
-
-  if (
-    signUp.status === "missing_requirements" &&
-    signUp.unverifiedFields.includes("email_address") &&
-    signUp.missingFields.length === 0
-  ) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Verify your account</Text>
-        {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
-        <TextInput
-          style={styles.input}
-          value={code}
-          placeholder="Enter your verification code"
-          placeholderTextColor="#666666"
-          onChangeText={(value) => setCode(value)}
-          keyboardType="numeric"
-        />
-        {errors.fields.code && <Text style={styles.error}>{errors.fields.code.message}</Text>}
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            fetchStatus === "fetching" && styles.buttonDisabled,
-            pressed && styles.buttonPressed,
-          ]}
-          onPress={handleVerify}
-          disabled={fetchStatus === "fetching"}
-        >
-          <Text style={styles.buttonText}>Verify</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
-          onPress={() => signUp.verifications.sendEmailCode()}
-        >
-          <Text style={styles.secondaryButtonText}>I need a new code</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Sign up</Text>
-      {statusMessage && <Text style={styles.helper}>{statusMessage}</Text>}
-      <Text style={styles.label}>Email address</Text>
-      <TextInput
-        style={styles.input}
-        autoCapitalize="none"
-        value={emailAddress}
-        placeholder="Enter email"
-        placeholderTextColor="#666666"
-        onChangeText={(value) => setEmailAddress(value)}
-        keyboardType="email-address"
-      />
-      {errors.fields.emailAddress && (
-        <Text style={styles.error}>{errors.fields.emailAddress.message}</Text>
-      )}
-      <Text style={styles.label}>Password</Text>
-      <TextInput
-        style={styles.input}
-        value={password}
-        placeholder="Enter password"
-        placeholderTextColor="#666666"
-        secureTextEntry={true}
-        onChangeText={(value) => setPassword(value)}
-      />
-      {errors.fields.password && <Text style={styles.error}>{errors.fields.password.message}</Text>}
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          (!emailAddress || !password || fetchStatus === "fetching") && styles.buttonDisabled,
-          pressed && styles.buttonPressed,
-        ]}
-        onPress={handleSubmit}
-        disabled={!emailAddress || !password || fetchStatus === "fetching"}
-      >
-        <Text style={styles.buttonText}>Sign up</Text>
-      </Pressable>
-      <View style={styles.linkContainer}>
-        <Text>Already have an account? </Text>
-        <Link href="/sign-in">
-          <Text style={styles.linkText}>Sign in</Text>
-        </Link>
-      </View>
-      <View nativeID="clerk-captcha" />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    gap: 12,
-  },
-  title: {
-    marginBottom: 8,
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  label: {
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: "#fff",
-  },
-  button: {
-    backgroundColor: "#0a7ea4",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonPressed: {
-    opacity: 0.7,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  secondaryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  secondaryButtonText: {
-    color: "#0a7ea4",
-    fontWeight: "600",
-  },
-  linkContainer: {
-    flexDirection: "row",
-    gap: 4,
-    marginTop: 12,
-    alignItems: "center",
-  },
-  linkText: {
-    color: "#0a7ea4",
-    fontWeight: "600",
-  },
-  error: {
-    color: "#d32f2f",
-    fontSize: 12,
-    marginTop: -8,
-  },
-  helper: {
-    color: "#555555",
-    fontSize: 13,
-  },
-});
-`],
-  ["modules/auth/stack/clerk/native/base/components/sign-out-button.tsx.hbs", `import { useClerk } from "@clerk/expo";
-import { useRouter } from "expo-router";
-import { Text, TouchableOpacity } from "react-native";
-
-export const SignOutButton = () => {
-  const { signOut } = useClerk();
-  const router = useRouter();
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.replace("/");
-    } catch (err) {
-      console.error(JSON.stringify(err, null, 2));
-    }
-  };
-
-  return (
-    <TouchableOpacity onPress={handleSignOut}>
-      <Text>Sign out</Text>
-    </TouchableOpacity>
-  );
-};
-`],
-  ["modules/auth/stack/clerk/native/base/utils/clerk-auth.ts.hbs", `type ClerkTokenGetter = () => Promise<string | null>;
+  ["modules/auth/stack/clerk/shared/client/frameworks/react/base/src/utils/clerk-auth.ts.hbs", `type ClerkTokenGetter = () => Promise<string | null>;
 
 let clerkTokenGetter: ClerkTokenGetter | null = null;
 
@@ -30903,19 +30881,7 @@ export async function getClerkAuthToken() {
 	return (await clerkTokenGetter?.()) ?? null;
 }
 `],
-  ["modules/auth/stack/clerk/web/react/base/src/utils/clerk-auth.ts.hbs", `type ClerkTokenGetter = () => Promise<string | null>;
-
-let clerkTokenGetter: ClerkTokenGetter | null = null;
-
-export function setClerkAuthTokenGetter(getToken: ClerkTokenGetter | null) {
-	clerkTokenGetter = getToken;
-}
-
-export async function getClerkAuthToken() {
-	return (await clerkTokenGetter?.()) ?? null;
-}
-`],
-  ["modules/auth/stack/clerk/web/react/next/src/app/dashboard/page.tsx.hbs", `"use client";
+  ["modules/auth/stack/clerk/shared/client/frameworks/react/next/src/app/dashboard/page.tsx.hbs", `"use client";
 
 {{#if (eq api "orpc")}}
 import { useQuery } from "@tanstack/react-query";
@@ -30974,7 +30940,7 @@ export default function Dashboard() {
   );
 }
 `],
-  ["modules/auth/stack/clerk/web/react/next/src/proxy.ts.hbs", `import { clerkMiddleware } from "@clerk/nextjs/server";
+  ["modules/auth/stack/clerk/shared/client/frameworks/react/next/src/proxy.ts.hbs", `import { clerkMiddleware } from "@clerk/nextjs/server";
 
 export default clerkMiddleware();
 
@@ -30988,7 +30954,7 @@ export const config = {
 	],
 };
 `],
-  ["modules/auth/stack/clerk/web/react/react-router/src/routes/dashboard.tsx.hbs", `{{#if (eq api "orpc")}}
+  ["modules/auth/stack/clerk/shared/client/frameworks/react/react-router/src/routes/dashboard.tsx.hbs", `{{#if (eq api "orpc")}}
 import { useQuery } from "@tanstack/react-query";
 import { orpc } from "@/utils/orpc";
 {{/if}}
@@ -31045,7 +31011,7 @@ export default function Dashboard() {
   );
 }
 `],
-  ["modules/auth/stack/clerk/web/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "orpc")}}
+  ["modules/auth/stack/clerk/shared/client/frameworks/react/tanstack-router/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "orpc")}}
 import { useQuery } from "@tanstack/react-query";
 import { orpc } from "@/utils/orpc";
 {{/if}}
@@ -31095,7 +31061,7 @@ function RouteComponent() {
 	);
 }
 `],
-  ["modules/auth/stack/clerk/web/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import { SignInButton, useUser } from "@clerk/react";
+  ["modules/auth/stack/clerk/shared/client/frameworks/react/tanstack-router/src/routes/_auth/route.tsx.hbs", `import { SignInButton, useUser } from "@clerk/react";
 import { Outlet, createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_auth")({
@@ -31120,7 +31086,7 @@ function AuthLayout() {
 	return <Outlet />;
 }
 `],
-  ["modules/auth/stack/clerk/web/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "trpc")}}
+  ["modules/auth/stack/clerk/shared/client/frameworks/react/tanstack-start/src/routes/_auth/dashboard.tsx.hbs", `{{#if (eq api "trpc")}}
 import { useTRPC } from "@/utils/trpc";
 import { useQuery } from "@tanstack/react-query";
 {{/if}}
@@ -31171,7 +31137,7 @@ function RouteComponent() {
 	);
 }
 `],
-  ["modules/auth/stack/clerk/web/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `import { SignInButton, useUser } from "@clerk/tanstack-react-start";
+  ["modules/auth/stack/clerk/shared/client/frameworks/react/tanstack-start/src/routes/_auth/route.tsx.hbs", `import { SignInButton, useUser } from "@clerk/tanstack-react-start";
 import { Outlet, createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_auth")({
@@ -31196,7 +31162,7 @@ function AuthLayout() {
 	return <Outlet />;
 }
 `],
-  ["modules/auth/stack/clerk/web/react/tanstack-start/src/start.ts.hbs", `import { clerkMiddleware } from '@clerk/tanstack-react-start/server'
+  ["modules/auth/stack/clerk/shared/client/frameworks/react/tanstack-start/src/start.ts.hbs", `import { clerkMiddleware } from '@clerk/tanstack-react-start/server'
 import { createCsrfMiddleware, createStart } from '@tanstack/react-start'
 
 const csrfMiddleware = createCsrfMiddleware({
@@ -31490,7 +31456,7 @@ export type Blog = ReturnType<typeof createBlog>;
   },
 } as const;
 `],
-  ["modules/blog/frameworks/native/apps/fullstack-web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/http-server/apps/fullstack-web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 import { BlogError, type BlogActor } from "@{{projectName}}/blog";
 import { defineAbilityFor } from "@{{projectName}}/permissions";
 import { z } from "zod";
@@ -31539,7 +31505,7 @@ export function blogFailure(error: unknown) {
   return blogResponse({ error: "server_error" }, 500);
 }
 `],
-  ["modules/blog/frameworks/native/apps/fullstack-web/src/lib/native/blog.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/http-server/apps/fullstack-web/src/lib/native/blog.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
 import { revisionInput } from "@{{projectName}}/blog";
 import { isLocale, defaultLocale } from "@{{projectName}}/i18n";
 import { z } from "zod";
@@ -32246,7 +32212,7 @@ export function createCaptchaBeforeHook(env: CaptchaConfig) {
   retry: "重新验证",
 };
 `],
-  ["modules/captcha/frameworks/native/apps/fullstack-web/src/lib/native/captcha.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
+  ["modules/captcha/frameworks/http-server/apps/fullstack-web/src/lib/native/captcha.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
 import { ENV } from "@/env.server";
 import { json } from "../product-api";
 export async function handle(request: Request, path: string): Promise<Response | undefined> {
@@ -32597,7 +32563,7 @@ export function createEventBus(): EventBus {
   },
 };
 `],
-  ["modules/core/frameworks/native/apps/fullstack-web/src/lib/product-api.ts.hbs", `import { z } from "zod";
+  ["modules/core/frameworks/http-server/apps/fullstack-web/src/lib/product-api.ts.hbs", `import { z } from "zod";
 {{#if (includes product.features "auth")}}
 import { auth } from "@{{projectName}}/app-services";
 import { enabledSocialProviders } from "./social-providers.server";
@@ -33702,7 +33668,7 @@ export type Credits = ReturnType<typeof createCredits>;
   },
 } as const;
 `],
-  ["modules/credits/frameworks/native/apps/fullstack-web/src/lib/native/credits.ts.hbs", `import { credits } from "@{{projectName}}/app-services";
+  ["modules/credits/frameworks/http-server/apps/fullstack-web/src/lib/native/credits.ts.hbs", `import { credits } from "@{{projectName}}/app-services";
 import { json, requireSession } from "../product-api";
 {{#if (includes product.features "admin")}}
 import { auth } from "@{{projectName}}/app-services";
@@ -35378,7 +35344,7 @@ export interface PaymentProvider {
   createPortalUrl?(customerRef: string, returnUrl: string): Promise<string>;
 }
 `],
-  ["modules/payment/frameworks/native/apps/fullstack-web/src/lib/native/payment.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/frameworks/http-server/apps/fullstack-web/src/lib/native/payment.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
 import { PaymentError, plans } from "@{{projectName}}/payment";
 import { isLocale{{#if (includes module.providers "mock")}}, defaultLocale{{/if}} } from "@{{projectName}}/i18n";
 import { z } from "zod";
@@ -36939,7 +36905,7 @@ export function createSeo(config: {
 }
 export type Seo = ReturnType<typeof createSeo>;
 `],
-  ["modules/seo/frameworks/native/apps/fullstack-web/src/lib/native/seo.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+  ["modules/seo/frameworks/http-server/apps/fullstack-web/src/lib/native/seo.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 import { locales } from "@{{projectName}}/i18n";
 const escape = (value: string) => value.replace(/[<>&"']/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[char]!);
 export async function handle(request: Request, path: string): Promise<Response | undefined> {
@@ -38028,7 +37994,7 @@ export function createProvider({{#if (includes module.providers "r2-binding")}}_
 {{/if}}
 }
 `],
-  ["modules/storage/frameworks/native/apps/fullstack-web/src/lib/native/storage.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
+  ["modules/storage/frameworks/http-server/apps/fullstack-web/src/lib/native/storage.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
 import { z } from "zod";
 import { json, requireSession } from "../product-api";
 import { readStorageFile, requireStorageOrigin, storageErrorResponse, StorageRequestError } from "../storage-http";
@@ -38052,7 +38018,7 @@ export async function handle(request: Request, path: string): Promise<Response |
   } catch (error) { return storageErrorResponse(error); }
 }
 `],
-  ["modules/storage/frameworks/native/apps/fullstack-web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
+  ["modules/storage/frameworks/http-server/apps/fullstack-web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
 import { z } from "zod";
 
 import { ENV } from "@/env.server";
@@ -40455,4 +40421,4 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 `]
 ]);
 
-export const TEMPLATE_COUNT = 835;
+export const TEMPLATE_COUNT = 836;

@@ -12,6 +12,8 @@ export type ApplicationRenderContext = {
   clientOrigins: string[];
   paths: Record<string, string>;
   workspaceRuntime: ProjectConfig["runtime"];
+  ownsPath: (path: string) => boolean;
+  inheritedFiles?: ReadonlyMap<string, string>;
 };
 export type RenderConfig = ProjectConfig & { auth: Auth; application?: ApplicationRenderContext };
 

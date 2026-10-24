@@ -2,10 +2,9 @@ import {
   APPLICATION_TEMPLATES,
   readApplicationCatalog,
   readFrameworkCatalog,
-  resolveApplicationConfig,
+  resolveWorkspaceCapabilities,
   resolveApplications,
 } from "@xstack/template-generator/apps";
-import { MODULE_CATALOG } from "@xstack/template-generator/modules";
 import {
   FULLSTACK_FRONTENDS,
   webFrontends,
@@ -25,9 +24,6 @@ export const APPLICATION_TECH_CATEGORIES: TechCategory[] = [
   "runtime",
   "api",
 ];
-
-export const APPLICATION_MODULE_ISSUE =
-  "Business modules currently require a Fullstack Web application; split Web Frontend/admin/backend layouts support application shells only.";
 
 /** Compatibility controls read a projection; application selections remain authoritative. */
 export function projectApplicationStack(stack: StackState): StackState {
@@ -68,63 +64,26 @@ export function projectApplicationStack(stack: StackState): StackState {
 }
 
 /** Collect errors without repairing or discarding any of the user's selections. */
+export function applicationCapabilities(stack: StackState) {
+  const config: ProjectConfig = {
+    ...stack,
+    projectName: "application-validation",
+    projectDir: "/virtual",
+    relativePath: "./virtual",
+    frontend: getStackFrontends(stack),
+    backend: getStackBackend(stack.backend),
+    addons: stack.addons.filter((addon) => addon !== "none"),
+    product: {
+      features: stack.features.filter((feature) => feature !== "none"),
+      providers: stack.providers,
+      options: stack.moduleOptions,
+    },
+    git: stack.git === "true",
+    install: false,
+  };
+  return resolveWorkspaceCapabilities(config);
+}
+
 export function applicationIssues(stack: StackState): string[] {
-  if (stack.apps === undefined) return [];
-  const plan = resolveApplications(stack.apps, APPLICATION_TEMPLATES);
-  const issues = plan.issues.map((issue) => issue.message);
-  if (!stack.apps.length) issues.push("Select at least one application");
-  if (
-    stack.features.some((feature) => feature !== "none") &&
-    !plan.apps.some((app) => app.selection.type === "fullstack-web")
-  ) {
-    issues.push(APPLICATION_MODULE_ISSUE);
-  }
-  const coreSupport = MODULE_CATALOG.get("core")?.supports;
-  const nativeWeb = plan.apps.some(
-    (app) =>
-      app.selection.type === "fullstack-web" &&
-      app.adapter.stack.backend === "self" &&
-      app.adapter.stack.api === "none" &&
-      app.adapter.stack.frontend?.some((frontend) =>
-        coreSupport?.frameworks?.some((framework) => framework === frontend),
-      ),
-  );
-  if (nativeWeb) {
-    if (coreSupport?.orms && !coreSupport.orms.includes(stack.orm)) {
-      issues.push(
-        `Web application product shell requires one of these ORMs: ${coreSupport.orms.join(", ")}`,
-      );
-    }
-    if (
-      coreSupport?.dialects &&
-      !coreSupport.dialects.some((dialect) => dialect === stack.database)
-    ) {
-      issues.push(
-        `Web application product shell requires one of these databases: ${coreSupport.dialects.join(", ")}`,
-      );
-    }
-  }
-  if (!plan.issues.length && stack.apps.length) {
-    const config: ProjectConfig = {
-      ...stack,
-      projectName: "application-validation",
-      projectDir: "/virtual",
-      relativePath: "./virtual",
-      frontend: getStackFrontends(stack),
-      backend: getStackBackend(stack.backend),
-      product: {
-        features: stack.features.filter((feature) => feature !== "none"),
-        providers: stack.providers,
-        options: stack.moduleOptions,
-      },
-      git: stack.git === "true",
-      install: false,
-    };
-    try {
-      resolveApplicationConfig(config, APPLICATION_TEMPLATES);
-    } catch (error) {
-      issues.push(error instanceof Error ? error.message : String(error));
-    }
-  }
-  return [...new Set(issues)];
+  return stack.apps === undefined ? [] : applicationCapabilities(stack).issues;
 }

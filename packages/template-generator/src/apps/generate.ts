@@ -1,8 +1,15 @@
 import type { ProjectConfig } from "@xstack/types";
 
+import { buildWorkspacePlan } from "../contributions/workspace";
 import { VirtualFileSystem } from "../core/virtual-fs";
+import { toRenderConfig } from "../modules/pipeline";
 import { processCatalogs } from "../post-process/catalogs";
+import { updateRootPackageJson, processNpmScriptApprovals } from "../post-process/package-configs";
+import { processAddonsDeps } from "../processors/addons-deps";
 import { processAgentGuidance } from "../processors/agent-guidance";
+import { processEnvDeps } from "../processors/env-deps";
+import { processTurboConfig } from "../processors/turbo-generator";
+import { processWorkspaceDeps } from "../processors/workspace-deps";
 import {
   GeneratorError,
   type ApplicationRenderContext,
@@ -12,13 +19,11 @@ import {
 } from "../types";
 import { generateReproducibleCommand } from "../utils/reproducible-command";
 import { writeXStackConfigToVfs } from "../xstack-config";
-import { requireApplicationPlan, resolveApplicationConfig } from "./config";
 import type { ResolvedApplication } from "./plan";
 
 type PackageJson = {
   name?: string;
   scripts?: Record<string, string>;
-  bin?: Record<string, string>;
 };
 type RenderApplication = (
   options: GeneratorOptions,
@@ -40,92 +45,41 @@ export async function generateApplications(
       phase: "applications",
       message: "Application templates are required",
     });
-  const config = resolveApplicationConfig(options.config, templates);
-  const plan = requireApplicationPlan(config, templates);
-  if (!plan.apps.length)
-    throw new GeneratorError({ phase: "applications", message: "Select at least one application" });
+  const plan = buildWorkspacePlan(options.config, templates);
+  const { config } = plan;
   const vfs = new VirtualFileSystem();
-  const productApps = plan.apps
-    .filter((app) => app.manifest.scope === "product")
-    .sort(
-      (a, b) =>
-        Number(b.manifest.roles.includes("backend")) - Number(a.manifest.roles.includes("backend")),
+  for (const entry of plan.applications) {
+    const { app, context } = entry;
+    // Only manifests of already-generated shared packages are inherited. App files
+    // and package implementations are never visible to another application's processors.
+    context.inheritedFiles = new Map(
+      vfs
+        .getAllFiles()
+        .filter((path) => path === "package.json" || /^packages\/[^/]+\/package\.json$/.test(path))
+        .filter(
+          (path) =>
+            app.manifest.scope !== "independent" ||
+            path === "package.json" ||
+            path === "packages/config/package.json",
+        )
+        .map((path) => [path, vfs.readFile(path)!]),
     );
-  const independentApps = plan.apps.filter((app) => app.manifest.scope === "independent");
-  const webApps = productApps.filter(
-    (app) => app.manifest.roles.includes("web-frontend") || app.manifest.roles.includes("admin"),
-  );
-  const ports = new Map(webApps.map((app, index) => [app.selection.id, 3001 + index]));
-  const clientOrigins = webApps.map((app) => `http://localhost:${ports.get(app.selection.id)}`);
-  let hasRoot = false;
-  for (const app of [...productApps, ...independentApps]) {
-    const appConfig: ProjectConfig = {
-      ...config,
-      apps: undefined,
-      ...app.adapter.stack,
-      frontend: app.adapter.stack.frontend ?? ["none"],
-      api:
-        app.manifest.scope === "product" && !app.manifest.roles.includes("backend")
-          ? config.api
-          : (app.adapter.stack.api ?? config.api),
-    };
-    const independent = app.manifest.scope === "independent";
-    if (independent) {
-      appConfig.frontend = app.adapter.stack.frontend ?? ["none"];
-      appConfig.backend = app.adapter.stack.backend ?? "none";
-      appConfig.runtime = app.adapter.stack.runtime ?? "none";
-      appConfig.api = app.adapter.stack.api ?? "none";
-      appConfig.database = "none";
-      appConfig.orm = "none";
-      appConfig.product = { features: [] };
-    }
-    const targetRoot = `apps/${app.selection.id}`;
-    const paths: ApplicationRenderContext["paths"] = { [`apps/${app.selection.type}`]: targetRoot };
-    if (
-      app.adapter.stack.frontend?.some(
-        (frontend) => frontend !== "none" && !frontend.startsWith("native-"),
-      )
-    ) {
-      paths["apps/web"] = targetRoot;
-    }
-    if (app.selection.type === "backend") paths["apps/server"] = targetRoot;
-    const tree = await render({ ...options, config: appConfig }, app, {
-      id: app.selection.id,
-      type: app.selection.type,
-      paths,
-      port: ports.get(app.selection.id) ?? 3000,
-      clientOrigins,
-      workspaceRuntime: config.runtime,
-    });
+    const tree = await render({ ...options, config: entry.config }, app, context);
     for (const file of flatten(tree.root)) {
-      const { path, content } = file;
-      const appFile = path.startsWith(`${targetRoot}/`);
-      if (path.startsWith("apps/") && !appFile) {
+      const owner = plan.ownerOf(file.path);
+      if (owner !== app.selection.id)
         throw new GeneratorError({
-          phase: "applications",
-          message: `Application ${app.selection.id} wrote outside its selected application root: ${path}`,
+          phase: "ownership",
+          message: `Application ${app.selection.id} wrote unplanned shared file ${file.path}; owner is ${owner ?? "undeclared"}`,
         });
-      }
-      if (!appFile && hasRoot && !path.startsWith("packages/")) continue;
-      const existing = vfs.readFile(path);
-      if (independent && !appFile && existing !== undefined) continue;
-      const servicePackage = /^packages\/(db|api|auth)\//.test(path);
-      if (
-        !appFile &&
-        existing !== undefined &&
-        servicePackage &&
-        !app.manifest.roles.includes("backend")
-      )
-        continue;
-      if (existing !== undefined && existing !== content) {
+      if (vfs.fileExists(file.path))
         throw new GeneratorError({
-          phase: "applications",
-          message: `Applications disagree on shared file ${path}; shared packages must have one compatible implementation`,
+          phase: "ownership",
+          message: `Shared file ${file.path} was rendered more than once`,
         });
-      }
-      vfs.writeFile(path, content, file.sourcePath);
+      vfs.writeFile(file.path, file.content, file.sourcePath);
     }
-    const packagePath = `${targetRoot}/package.json`;
+    const packagePath = `apps/${app.selection.id}/package.json`;
     const pkg = vfs.readJson<PackageJson>(packagePath);
     if (!pkg)
       throw new GeneratorError({
@@ -134,14 +88,51 @@ export async function generateApplications(
       });
     pkg.name = app.selection.id;
     vfs.writeJson(packagePath, pkg);
-    hasRoot = true;
   }
+
+  // Root dependencies are contributions from every app, not the root owner's stack.
+  // Reuse dependency processors in an explicitly root-owned view; shared packages
+  // have already been rendered and must not be processed again under another stack.
+  for (const entry of plan.applications) {
+    const rootView = new VirtualFileSystem(entry.context.paths, {
+      ownsPath: (path) => !path.startsWith("apps/") && !path.startsWith("packages/"),
+      inheritedFiles: new Map(
+        vfs
+          .getAllFiles()
+          .filter((path) => path.endsWith("/package.json"))
+          .map((path) => [path, vfs.readFile(path)!]),
+      ),
+    });
+    for (const path of ["package.json", "pnpm-workspace.yaml"]) {
+      const content = vfs.readFile(path);
+      if (content !== undefined) rootView.writeFile(path, content);
+    }
+    const renderConfig = toRenderConfig(entry.config);
+    processWorkspaceDeps(rootView, renderConfig);
+    processEnvDeps(rootView, renderConfig);
+    processAddonsDeps(rootView, renderConfig);
+    processNpmScriptApprovals(rootView, renderConfig);
+    for (const path of rootView.getAllFiles()) vfs.writeFile(path, rootView.readFile(path)!);
+  }
+  const aggregateConfig: ProjectConfig = {
+    ...config,
+    frontend: [...new Set(plan.applications.flatMap((entry) => entry.config.frontend))].filter(
+      (frontend) => frontend !== "none",
+    ),
+  };
+  const rootConfig = toRenderConfig(aggregateConfig);
+  rootConfig.application = plan.applications.find(
+    (entry) => entry.app.selection.id === plan.rootOwner,
+  )!.context;
+  updateRootPackageJson(vfs, rootConfig);
+  processTurboConfig(vfs, aggregateConfig);
   const root = vfs.readJson<PackageJson>("package.json");
   if (!root)
     throw new GeneratorError({ phase: "applications", message: "Missing workspace package.json" });
   root.scripts ??= {};
-  for (const key of Object.keys(root.scripts)) if (key.startsWith("dev:")) delete root.scripts[key];
-  for (const app of plan.apps) {
+  for (const key of Object.keys(root.scripts))
+    if (key.startsWith("dev:") && key !== "dev:setup") delete root.scripts[key];
+  for (const { app } of plan.applications) {
     const pkg = vfs.readJson<PackageJson>(`apps/${app.selection.id}/package.json`)!;
     if (pkg.scripts?.dev) {
       const id = app.selection.id;
@@ -157,24 +148,29 @@ export async function generateApplications(
     .map((path) => `varlock codegen --path ./${path.slice(0, -".env.schema".length)}`);
   if (envCommands.length) {
     root.scripts["env:generate"] = envCommands.join(" && ");
-    root.scripts.postinstall = envCommands.join(" && ");
+    const existing = (root.scripts.postinstall ?? "")
+      .split(" && ")
+      .filter((command) => command && !command.startsWith("varlock codegen --path "));
+    root.scripts.postinstall = [...existing, ...envCommands].join(" && ");
   }
   vfs.writeJson("package.json", root);
   processCatalogs(vfs, config);
-  const applications = plan.apps.map((app) => ({
-    id: app.selection.id,
-    type: app.selection.type,
-    stack: app.selection.stack,
-    roles: app.manifest.roles,
-    product: app.product ?? null,
-    bindings: app.bindings,
-  }));
-  vfs.writeJson("applications.json", applications);
+  vfs.writeJson(
+    "applications.json",
+    plan.applications.map(({ app }) => ({
+      id: app.selection.id,
+      type: app.selection.type,
+      stack: app.selection.stack,
+      roles: app.manifest.roles,
+      product: app.product ?? null,
+      bindings: app.bindings,
+    })),
+  );
   if (options.version)
     writeXStackConfigToVfs(vfs, config, options.version, generateReproducibleCommand(config));
   vfs.writeFile(
     "README.md",
-    `# ${config.projectName}\n\n## Applications\n\n${plan.apps.map((app) => `- \`apps/${app.selection.id}\`: ${app.manifest.name} (${app.manifest.roles.join(", ") || "independent"}). Run \`${config.packageManager} run dev:${app.selection.id}\`.`).join("\n")}\n\nApplication ownership and resolved connections: \`applications.json\`.\n`,
+    `# ${config.projectName}\n\n## Applications\n\n${plan.applications.map(({ app }) => `- \`apps/${app.selection.id}\`: ${app.manifest.name} (${app.manifest.roles.join(", ") || "independent"}). Run \`${config.packageManager} run dev:${app.selection.id}\`.`).join("\n")}\n\nApplication ownership and resolved connections: \`applications.json\`.\n`,
   );
   processAgentGuidance(vfs, config);
   return {

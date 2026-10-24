@@ -11,6 +11,7 @@ const BASE_IGNORE_PATTERNS = ["node_modules/**", "**/node_modules/**"] as const;
 const STAGED_PATTERN = "*.{js,ts,jsx,tsx,vue,svelte,json,jsonc,css,md}";
 
 export function processVitePlusConfig(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("vite.config.ts")) return;
   if (!config.addons.includes("vite-plus")) return;
 
   vfs.writeFile("vite.config.ts", generateVitePlusConfig(config));

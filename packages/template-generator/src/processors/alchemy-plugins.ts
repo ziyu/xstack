@@ -27,6 +27,7 @@ export function processAlchemyPlugins(vfs: VirtualFileSystem, config: RenderConf
 }
 
 function processManagedPrismaMigrations(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("packages/db")) return;
   if (config.orm !== "prisma" || !["postgres", "mysql"].includes(config.database)) return;
 
   const migrationRoot = "packages/db/prisma/migrations";

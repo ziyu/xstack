@@ -235,7 +235,7 @@ export function processVarlock(
     const ignore = `${app}/.gitignore`;
     vfs.writeFile(ignore, `${vfs.readFile(ignore) ?? ""}\n!.env.schema\n/src/${envFile}\n`);
   }
-  if (vfs.exists("packages/db/package.json")) {
+  if (vfs.ownsPath("packages/db") && vfs.exists("packages/db/package.json")) {
     const keys = config.dbSetup === "d1" ? ["NODE_ENV"] : ["NODE_ENV", "DATABASE_*"];
     vfs.writeFile(
       "packages/db/.env.schema",
@@ -252,8 +252,10 @@ export function processVarlock(
   }
   processAlchemySchema(vfs, config);
   processCloudflarePublicEnv(vfs, config);
-  vfs.writeFile("bunfig.toml", `env = false\n${vfs.readFile("bunfig.toml") ?? ""}`);
-  const root = vfs.readJson<Package>("package.json")!;
+  if (vfs.ownsPath("bunfig.toml")) {
+    vfs.writeFile("bunfig.toml", `env = false\n${vfs.readFile("bunfig.toml") ?? ""}`);
+  }
+  const root = vfs.readJson<Package>("package.json") ?? {};
   root.scripts ??= {};
   if (commands.length) {
     root.scripts["env:generate"] = commands.join(" && ");
@@ -283,7 +285,7 @@ export function processVarlock(
     vfs.writeJson(`${server}/package.json`, app);
     root.scripts["auth:generate"] = `cd ${server} && ${config.packageManager} run auth:generate`;
   }
-  vfs.writeJson("package.json", root);
+  if (vfs.ownsPath("package.json")) vfs.writeJson("package.json", root);
   if (["express", "fastify"].includes(config.backend) && config.auth === "better-auth") {
     addPackageDependency({
       vfs,

@@ -8,7 +8,10 @@ import {
 } from "@xstack/types";
 
 import { resolveApplicationConfig } from "../src/apps/config";
+import { generateApplications } from "../src/apps/generate";
 import { readFrameworkCatalog, resolveApplications } from "../src/apps/plan";
+import { buildWorkspacePlan } from "../src/contributions/workspace";
+import { VirtualFileSystem } from "../src/core/virtual-fs";
 import { generate } from "../src/generator";
 import { EMBEDDED_TEMPLATES } from "../src/templates.generated";
 import type { VirtualNode } from "../src/types";
@@ -200,7 +203,11 @@ describe("stable application types and stack adapters", () => {
       expect(output.has("apps/server/package.json")).toBe(false);
       expect(
         JSON.parse(output.get("applications.json")!).map((app: { id: string }) => app.id),
-      ).toEqual(apps.map((app) => app.id));
+      ).toEqual(
+        buildWorkspacePlan(config([...apps]), EMBEDDED_TEMPLATES).applications.map(
+          ({ app }) => app.selection.id,
+        ),
+      );
     });
   }
   test("framework app contributions target only the selected named app without rewriting content", async () => {
@@ -279,5 +286,111 @@ describe("stable application types and stack adapters", () => {
     );
     templates.set("frontend/example/shared/package.json", "{}");
     expect(() => readFrameworkCatalog(templates)).toThrow();
+  });
+  test("workspace ownership and output are independent of selection order", async () => {
+    const apps = [...split, cli];
+    const first = buildWorkspacePlan(config(apps), EMBEDDED_TEMPLATES);
+    const reversed = buildWorkspacePlan(config([...apps].reverse()), EMBEDDED_TEMPLATES);
+    expect(first.applications.map(({ app }) => app.selection.id)).toEqual([
+      "api",
+      "admin",
+      "site",
+      "tools",
+    ]);
+    expect(first.applications.map(({ context }) => [context.id, context.port])).toEqual(
+      reversed.applications.map(({ context }) => [context.id, context.port]),
+    );
+    expect(first.rootOwner).toBe("api");
+    expect(first.packageOwners.get("ui")).toBe("admin");
+    expect(first.rootFileOwners.get("package.json")).toBe("api");
+    for (const path of [
+      "packages/config/package.json",
+      "packages/ui/package.json",
+      "packages/api/package.json",
+      "packages/db/package.json",
+      "package.json",
+    ]) {
+      expect(first.applications.filter(({ context }) => context.ownsPath(path))).toHaveLength(1);
+    }
+    const outputs: Map<string, string>[] = [];
+    for (const selections of [apps, [...apps].reverse()]) {
+      const result = await generate({
+        config: config(selections),
+        templates: EMBEDDED_TEMPLATES,
+        version: "test",
+      });
+      if (result.isErr()) throw result.error;
+      const output = files(result.value.root);
+      const metadata = Bun.JSONC.parse(output.get("xstack.jsonc")!);
+      delete metadata.createdAt;
+      output.set("xstack.jsonc", JSON.stringify(metadata));
+      outputs.push(output);
+    }
+    expect(outputs[0]).toEqual(outputs[1]);
+    for (const id of ["admin", "site"]) {
+      const pkg = JSON.parse(outputs[0]!.get(`apps/${id}/package.json`)!);
+      expect(pkg.dependencies["@application-check/ui"]).toBe("workspace:*");
+      expect(pkg.dependencies["@application-check/api"]).toBe("workspace:*");
+    }
+  });
+
+  test("rejects conflicting framework shared definitions before rendering", async () => {
+    const templates = new Map(EMBEDDED_TEMPLATES);
+    templates.set(
+      "backend/server/hono/files/packages/shared/src/index.ts",
+      "export const owner = 'backend';\n",
+    );
+    templates.set("cli/node/files/packages/shared/src/index.ts", "export const owner = 'cli';\n");
+    for (const apps of [
+      [split[1]!, cli],
+      [cli, split[1]!],
+    ]) {
+      const result = await generate({ config: config(apps), templates });
+      expect(result.isErr()).toBe(true);
+      if (result.isErr()) expect(result.error.message).toContain("conflicting shared definitions");
+    }
+  });
+
+  test("never discards an unplanned shared write returned by an application", async () => {
+    await expect(
+      generateApplications(
+        { config: config([split[1]!, cli]), templates: EMBEDDED_TEMPLATES },
+        async (options, app) => {
+          const vfs = new VirtualFileSystem();
+          vfs.writeJson(`apps/${app.selection.id}/package.json`, { name: app.selection.id });
+          vfs.writeJson("package.json", { name: options.config.projectName });
+          return {
+            root: vfs.toTree(),
+            config: options.config,
+            fileCount: vfs.getFileCount(),
+            directoryCount: vfs.getDirectoryCount(),
+          };
+        },
+      ),
+    ).rejects.toThrow("unplanned shared file package.json");
+  });
+
+  test("preserves named fullstack domain packages and isolates independent CLI", async () => {
+    const selected = config([cli, { ...full, id: "customer-portal" }]);
+    selected.product = { features: ["auth", "credits"] };
+    const result = await generate({
+      config: selected,
+      templates: EMBEDDED_TEMPLATES,
+      version: "test",
+    });
+    if (result.isErr()) throw result.error;
+    const output = files(result.value.root);
+    expect(output.get("apps/customer-portal/src/services.ts")).toContain("createCredits");
+    expect(output.has("packages/credits/package.json")).toBe(true);
+    expect(output.has("packages/db/src/schema/credits.ts")).toBe(true);
+    expect(output.has("apps/customer-portal/src/app/[lang]/dashboard/credits/page.tsx")).toBe(true);
+    expect(output.get("docs/modules/core.md")).toContain("apps/customer-portal/src/services.ts");
+    expect(output.has("apps/tools/src/services.ts")).toBe(false);
+    expect(output.get("apps/tools/package.json")).not.toContain("/credits");
+    expect(
+      [...output.keys()].some(
+        (path) => path.startsWith("apps/web/") || path.startsWith("apps/fullstack-web/"),
+      ),
+    ).toBe(false);
   });
 });

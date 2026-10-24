@@ -358,7 +358,7 @@ describe("explicit application state", () => {
 
   test("rejects unsupported split modules and application provisioning rather than repairing them", async () => {
     for (const update of [
-      { apps: splitApps, features: ["auth"] },
+      { apps: splitApps, features: ["payment"] },
       { addons: ["biome"] },
       { webDeploy: "cloudflare" },
       { dbSetup: "turso" },
@@ -379,5 +379,19 @@ describe("explicit application state", () => {
         message: issues.join("\n"),
       });
     }
+  });
+
+  test("previews supported stack authentication without claiming native admin support", async () => {
+    const selected = StackStateSchema.parse({
+      ...DEFAULT_STACK,
+      apps: splitApps,
+      features: ["auth"],
+      providers: { auth: [] },
+    });
+    expect(applicationIssues(selected)).toEqual([]);
+    const output = files((await client.preview(selected)).root);
+    expect(output.has("apps/server/src/services.ts")).toBe(true);
+    expect(output.has("apps/site/src/routes/login.tsx")).toBe(true);
+    expect(output.has("packages/permission/package.json")).toBe(false);
   });
 });

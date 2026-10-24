@@ -3,6 +3,7 @@ import {
   getModulePlan,
   hasErrors,
   PRODUCT_PRESETS,
+  resolveWorkspaceCapabilities,
   type RenderConfig,
   toRenderConfig,
 } from "@xstack/template-generator";
@@ -121,6 +122,12 @@ export function withProduct(
 /** Reports automatic additions and problems of the module plan. */
 export function validateProductPlan(config: ProjectConfig): Result<void, CLIError> {
   const plan = getModulePlan(config);
+  if (config.apps) {
+    const capabilities = resolveWorkspaceCapabilities(config);
+    if (capabilities.issues.length)
+      return Result.err(new CLIError({ message: capabilities.issues.join("\n") }));
+    if (!isSilent()) for (const note of capabilities.notes) log.warn(pc.yellow(note));
+  }
   if (!isSilent()) {
     for (const note of plan.notes) log.info(pc.dim(note));
     for (const issue of plan.issues) {

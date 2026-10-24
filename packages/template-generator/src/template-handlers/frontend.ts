@@ -3,7 +3,7 @@ import type { ProjectConfig } from "@xstack/types";
 import { renderCatalogApplication } from "../apps/render";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { GeneratorError } from "../types";
-import { type TemplateData, processTemplatesFromPrefix } from "./utils";
+import type { TemplateData } from "./utils";
 
 export async function processFrontendTemplates(
   vfs: VirtualFileSystem,
@@ -32,8 +32,5 @@ export async function processFrontendTemplates(
   }
   for (const frontend of native) {
     renderCatalogApplication(vfs, templates, config, "native", frontend);
-    if (config.backend !== "convex" && (config.api === "trpc" || config.api === "orpc")) {
-      processTemplatesFromPrefix(vfs, templates, `api/${config.api}/native`, "apps/native", config);
-    }
   }
 }

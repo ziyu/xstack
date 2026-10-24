@@ -159,6 +159,7 @@ function renderPrefix(
     const selectedType = context.application?.type ?? "fullstack-web";
     if (contributionType && contributionType !== selectedType) continue;
     const destPath = vfs.resolvePath(transformFilename(relativePath));
+    if (!vfs.ownsPath(destPath)) continue;
     if (stackFiles.has(destPath)) {
       throw new GeneratorError({
         message: `Module "${context.module.id}" overwrites ${destPath} from the stack templates; declare it in "replaces"`,
@@ -181,6 +182,7 @@ function ensureWorkspacePackage(
   spec: WorkspacePackageSpec,
 ) {
   const dir = `packages/${spec.dir}`;
+  if (!vfs.ownsPath(dir)) return;
   const scope = `@${config.projectName}`;
   const pkg: PackageJson = vfs.readJson<PackageJson>(`${dir}/package.json`) ?? {
     name: `${scope}/${spec.dir}`,
@@ -244,7 +246,7 @@ export function processModuleTemplates(
       ...(config.frontend.some(
         (framework) => framework === "tanstack-start" || framework === "nuxt",
       )
-        ? ["native"]
+        ? ["http-server"]
         : []),
       ...(config.frontend.some(
         (framework) => framework === "next" || framework === "tanstack-start",
@@ -288,11 +290,11 @@ export function processModuleTemplates(
     }
   }
 
-  aggregateMessages(vfs, plan);
-  indexDbSchema(vfs);
+  if (vfs.ownsPath("packages/i18n")) aggregateMessages(vfs, plan);
+  if (vfs.ownsPath("packages/db")) indexDbSchema(vfs);
   writeNavigation(vfs, config, plan);
   if (config.frontend.includes("next")) writeProxy(vfs, plan);
-  writeModuleDocsIndex(vfs, plan);
+  if (vfs.ownsPath("docs")) writeModuleDocsIndex(vfs, plan);
 }
 
 function moduleEnv(plan: ResolvedPlan): ModuleEnvEntry[] {

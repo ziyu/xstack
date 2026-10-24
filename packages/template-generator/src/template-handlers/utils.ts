@@ -22,6 +22,7 @@ export function processSingleTemplate(
   destPath: string,
   config: ProjectConfig,
 ): void {
+  if (!vfs.ownsPath(destPath)) return;
   const templateKey = templatePath.endsWith(".hbs") ? templatePath : `${templatePath}.hbs`;
   const content = templates.get(templateKey);
 
@@ -57,6 +58,7 @@ export function processTemplatesFromPrefix(
     const relativePath = templatePath.slice(normalizedPrefix.length);
     const outputPath = transformFilename(relativePath);
     const destPath = destPrefix ? `${destPrefix}/${outputPath}` : outputPath;
+    if (!vfs.ownsPath(destPath)) continue;
 
     let processedContent: string;
     if (isBinaryFile(templatePath)) {

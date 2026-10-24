@@ -3,21 +3,31 @@ import type { Dirent } from "node:fs";
 import { memfs } from "memfs";
 import { dirname, extname, normalize, join } from "pathe";
 
-import type { VirtualDirectory, VirtualFile } from "../types";
+import { GeneratorError, type VirtualDirectory, type VirtualFile } from "../types";
 import type { JsonValue } from "./json-types";
+
+export interface VirtualFileSystemScope {
+  ownsPath: (path: string) => boolean;
+  /** Read-only dependencies; never enumerated or returned as generated output. */
+  inheritedFiles?: ReadonlyMap<string, string>;
+}
 
 export class VirtualFileSystem {
   private _fs: ReturnType<typeof memfs>["fs"];
   private _vol: ReturnType<typeof memfs>["vol"];
   private _sourcePathMap: Map<string, string> = new Map();
 
-  constructor(private readonly applicationPaths: Readonly<Record<string, string>> = {}) {
+  constructor(
+    private readonly applicationPaths: Readonly<Record<string, string>> = {},
+    private readonly scope?: VirtualFileSystemScope,
+  ) {
     const { fs, vol } = memfs();
     this._fs = fs;
     this._vol = vol;
   }
 
   writeFile(filePath: string, content: string, sourcePath?: string): void {
+    this.assertOwnsPath(filePath);
     const path = this.normalizePath(filePath);
     const dir = dirname(path);
     if (dir && dir !== "/" && dir !== ".") {
@@ -33,7 +43,7 @@ export class VirtualFileSystem {
     try {
       return this._fs.readFileSync(this.normalizePath(filePath), "utf-8") as string;
     } catch {
-      return undefined;
+      return this.scope?.inheritedFiles?.get(this.resolvePath(filePath));
     }
   }
 
@@ -42,7 +52,7 @@ export class VirtualFileSystem {
       this._fs.statSync(this.normalizePath(path));
       return true;
     } catch {
-      return false;
+      return this.scope?.inheritedFiles?.has(this.resolvePath(path)) ?? false;
     }
   }
 
@@ -50,7 +60,7 @@ export class VirtualFileSystem {
     try {
       return this._fs.statSync(this.normalizePath(filePath)).isFile();
     } catch {
-      return false;
+      return this.scope?.inheritedFiles?.has(this.resolvePath(filePath)) ?? false;
     }
   }
 
@@ -63,10 +73,12 @@ export class VirtualFileSystem {
   }
 
   mkdir(dirPath: string): void {
+    this.assertOwnsPath(dirPath);
     this._fs.mkdirSync(this.normalizePath(dirPath), { recursive: true });
   }
 
   deleteFile(filePath: string): boolean {
+    this.assertOwnsPath(filePath);
     try {
       this._fs.unlinkSync(this.normalizePath(filePath));
       return true;
@@ -76,6 +88,7 @@ export class VirtualFileSystem {
   }
 
   deleteDirectory(dirPath: string): boolean {
+    this.assertOwnsPath(dirPath);
     try {
       this._fs.rmdirSync(this.normalizePath(dirPath));
       return true;
@@ -203,6 +216,19 @@ export class VirtualFileSystem {
     });
     for (const child of node.children) {
       if (child.type === "directory") this.sortChildren(child);
+    }
+  }
+
+  ownsPath(path: string): boolean {
+    return this.scope?.ownsPath(this.resolvePath(path)) ?? true;
+  }
+
+  private assertOwnsPath(path: string): void {
+    if (!this.ownsPath(path)) {
+      throw new GeneratorError({
+        phase: "ownership",
+        message: `Unplanned write to ${this.resolvePath(path)}: this renderer does not own the path`,
+      });
     }
   }
 

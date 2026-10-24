@@ -26,6 +26,7 @@ interface TurboConfig {
 }
 
 export function processTurboConfig(vfs: VirtualFileSystem, config: ProjectConfig): void {
+  if (!vfs.ownsPath("turbo.json")) return;
   if (!config.addons.includes("turborepo")) return;
 
   const turboConfig = generateTurboConfig(config);

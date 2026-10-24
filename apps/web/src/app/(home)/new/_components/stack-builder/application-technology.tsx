@@ -9,7 +9,11 @@ import { Check, Terminal } from "lucide-react";
 
 import { TechIcon } from "@/components/ui/tech-icon";
 import { TECH_OPTIONS } from "@/lib/constant";
-import { APPLICATION_FRAMEWORKS, APPLICATION_TYPES } from "@/lib/stack-applications";
+import {
+  APPLICATION_FRAMEWORKS,
+  APPLICATION_TYPES,
+  applicationCapabilities,
+} from "@/lib/stack-applications";
 import type { StackState } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -223,6 +227,16 @@ export function ApplicationTechnology({
             </label>
           </details>
         )}
+      {applicationCapabilities(stack)
+        .notes.filter((note) => note.startsWith(`${app.id}:`))
+        .map((note) => (
+          <p
+            key={note}
+            className="rounded border border-amber-500/30 p-2 text-xs text-amber-700 dark:text-amber-300"
+          >
+            {note}
+          </p>
+        ))}
       <p className="text-xs text-fd-muted-foreground">
         Only implementations available for this application type are shown. Other applications keep
         their own selections.

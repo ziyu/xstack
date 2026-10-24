@@ -1,0 +1,204 @@
+import type { ProjectConfig } from "@xstack/types";
+
+import type { ResolvedPlan } from "../modules/types";
+import { GeneratorError } from "../types";
+import type { ContributionRequirement } from "./inventory";
+
+interface SourceContract {
+  /** Direct workspace-relative payload, excluding child framework overlays. */
+  base?: string;
+  frameworks?: Record<string, string>;
+}
+
+interface ModuleSourceContract {
+  dialects?: true;
+  frameworks?: readonly string[];
+  providers?:
+    | { mode: "inline"; source: string }
+    | { mode: "separate"; frameworks?: Record<string, Record<string, string>> };
+  integrations?: Record<string, SourceContract>;
+}
+
+interface ModuleSourceCatalog {
+  [moduleId: string]: ModuleSourceContract;
+}
+
+const UI_FRAMEWORKS = ["http-server", "next", "nuxt", "tanstack-start"];
+const REACT_UI_FRAMEWORKS = [...UI_FRAMEWORKS, "react"];
+const ADMIN_INTEGRATION: SourceContract = {
+  frameworks: {
+    next: "integrations/admin/frameworks/next",
+    "tanstack-start": "integrations/admin/frameworks/tanstack-start",
+    nuxt: "frameworks/nuxt",
+  },
+};
+const AUTH_INTEGRATION: SourceContract = {
+  frameworks: {
+    next: "integrations/email/frameworks/next",
+    react: "integrations/email/frameworks/react",
+    "tanstack-start": "integrations/email/frameworks/tanstack-start",
+    nuxt: "frameworks/nuxt/apps/fullstack-web/app/components/ProductAuth.vue.hbs",
+  },
+};
+
+/** Authored contracts, not a list derived from whatever files survived in an input template map. */
+const MODULE_SOURCES: ModuleSourceCatalog = {
+  core: { frameworks: UI_FRAMEWORKS },
+  i18n: { frameworks: ["react", "next", "tanstack-start"] },
+  auth: {
+    dialects: true,
+    frameworks: REACT_UI_FRAMEWORKS,
+    providers: { mode: "inline", source: "files/packages/auth/src/index.ts.hbs" },
+    integrations: {
+      email: AUTH_INTEGRATION,
+      sms: {
+        base: "integrations/sms/packages",
+        frameworks: {
+          next: "integrations/sms/frameworks/next",
+          react: "integrations/sms/frameworks/react",
+          "tanstack-start": "integrations/sms/frameworks/tanstack-start",
+          nuxt: "frameworks/nuxt/apps/fullstack-web/app/components/ProductAuth.vue.hbs",
+        },
+      },
+    },
+  },
+  admin: { frameworks: UI_FRAMEWORKS },
+  email: {
+    providers: { mode: "separate" },
+    integrations: { auth: { base: "integrations/auth/apps/fullstack-web" } },
+  },
+  sms: {
+    providers: { mode: "separate" },
+    integrations: { auth: { base: "integrations/auth/apps/fullstack-web" } },
+  },
+  payment: {
+    dialects: true,
+    frameworks: UI_FRAMEWORKS,
+    providers: {
+      mode: "separate",
+      frameworks: { mock: { next: "providers/mock/frameworks/next" } },
+    },
+    integrations: { admin: ADMIN_INTEGRATION },
+  },
+  credits: {
+    dialects: true,
+    frameworks: UI_FRAMEWORKS,
+    integrations: {
+      admin: ADMIN_INTEGRATION,
+      payment: { base: "integrations/payment/apps/fullstack-web" },
+    },
+  },
+  storage: {
+    dialects: true,
+    frameworks: REACT_UI_FRAMEWORKS,
+    providers: { mode: "inline", source: "files/packages/storage/src/provider.ts.hbs" },
+  },
+  ai: {
+    dialects: true,
+    frameworks: REACT_UI_FRAMEWORKS,
+    providers: { mode: "separate" },
+    integrations: {
+      credits: { base: "integrations/credits/apps/fullstack-web" },
+      storage: { base: "integrations/storage/apps/fullstack-web" },
+    },
+  },
+  blog: {
+    dialects: true,
+    frameworks: REACT_UI_FRAMEWORKS,
+    integrations: { seo: { base: "integrations/seo/apps/fullstack-web" } },
+  },
+  seo: {
+    frameworks: UI_FRAMEWORKS,
+    integrations: {
+      core: {
+        frameworks: {
+          next: "integrations/core/frameworks/next",
+          nuxt: "frameworks/nuxt",
+          "tanstack-start": "frameworks/tanstack-start",
+        },
+      },
+      payment: { base: "integrations/payment/apps/fullstack-web" },
+    },
+  },
+  affiliate: {
+    dialects: true,
+    frameworks: UI_FRAMEWORKS,
+    integrations: { admin: ADMIN_INTEGRATION },
+  },
+  captcha: {
+    frameworks: ["http-server", "react", "next", "nuxt"],
+    providers: { mode: "inline", source: "files/packages/captcha/src/index.ts.hbs" },
+  },
+};
+
+/** Resolve required native sources before rendering. Legacy stack sources have their own plan. */
+export function requiredModuleContributions(
+  config: Pick<ProjectConfig, "frontend" | "database">,
+  plan: ResolvedPlan,
+): ContributionRequirement[] {
+  const requirements: ContributionRequirement[] = [];
+  const frameworks = new Set<string>(config.frontend);
+  if (frameworks.has("tanstack-start") || frameworks.has("nuxt")) frameworks.add("http-server");
+  if (frameworks.has("next") || frameworks.has("tanstack-start")) frameworks.add("react");
+  for (const module of plan.modules) {
+    if (module.variant !== "native") continue;
+    const id = module.manifest.id;
+    const contract = MODULE_SOURCES[id];
+    if (!contract) {
+      throw new GeneratorError({
+        phase: "contributions",
+        message: `No native contribution source contract for module ${id}`,
+      });
+    }
+    const base = `modules/${id}`;
+    const requireSource = (source: string, relative: string) => {
+      requirements.push({ source, module: id, sourcePrefix: `${base}/${relative}` });
+    };
+    requireSource(`module:${id}`, "files");
+    if (contract.dialects)
+      requireSource(`module:${id}:dialect:${config.database}`, `dialects/${config.database}`);
+    for (const framework of contract.frameworks ?? []) {
+      if (frameworks.has(framework))
+        requireSource(`module:${id}:framework:${framework}`, `frameworks/${framework}`);
+    }
+    for (const provider of module.providers) {
+      const source = `module:${id}:provider:${provider}`;
+      const providerContract = contract.providers;
+      if (!providerContract) {
+        throw new GeneratorError({
+          phase: "contributions",
+          message: `No provider contribution source contract for ${id}:${provider}`,
+        });
+      }
+      requireSource(
+        source,
+        providerContract.mode === "inline"
+          ? providerContract.source
+          : `providers/${provider}/packages`,
+      );
+      if (providerContract.mode === "separate") {
+        for (const [framework, relative] of Object.entries(
+          providerContract.frameworks?.[provider] ?? {},
+        )) {
+          if (frameworks.has(framework))
+            requireSource(`${source}:framework:${framework}`, relative);
+        }
+      }
+    }
+    for (const integration of module.integrations) {
+      const source = `module:${id}:integration:${integration}`;
+      const integrationContract = contract.integrations?.[integration];
+      if (!integrationContract) {
+        throw new GeneratorError({
+          phase: "contributions",
+          message: `No integration contribution source contract for ${id}:${integration}`,
+        });
+      }
+      if (integrationContract.base) requireSource(source, integrationContract.base);
+      for (const [framework, relative] of Object.entries(integrationContract.frameworks ?? {})) {
+        if (frameworks.has(framework)) requireSource(`${source}:framework:${framework}`, relative);
+      }
+    }
+  }
+  return requirements;
+}

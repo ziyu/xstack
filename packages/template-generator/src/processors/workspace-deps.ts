@@ -23,7 +23,13 @@ export function processWorkspaceDeps(vfs: VirtualFileSystem, config: RenderConfi
   };
 
   const configDep = packages.config ? { [`@${projectName}/config`]: workspaceVersion } : {};
-  const uiDep = packages.ui ? { [`@${projectName}/ui`]: workspaceVersion } : {};
+  const uiDep =
+    packages.ui &&
+    frontend.some((item) =>
+      ["next", "tanstack-start", "react-router", "tanstack-router"].includes(item),
+    )
+      ? { [`@${projectName}/ui`]: workspaceVersion }
+      : {};
   const runtimeDevDeps = getRuntimeDevDeps(runtime);
   const commonDeps: AvailableDependencies[] = ["zod"];
   const commonDevDeps: AvailableDependencies[] = ["typescript", ...runtimeDevDeps];

@@ -31,3 +31,23 @@ export type {
   ResolvedFrameworkAdapter,
 } from "./apps/plan";
 export { resolveApplicationConfig } from "./apps/config";
+export { resolveWorkspaceCapabilities } from "./contributions/capabilities";
+export type { WorkspaceCapabilities, ModuleCapability } from "./contributions/capabilities";
+export {
+  inventoryContributions,
+  assertContributionInventory,
+  contributionMatrix,
+  queryContributions,
+} from "./contributions/inventory";
+export type {
+  ContributionInventory,
+  ContributionEntry,
+  ContributionIssue,
+} from "./contributions/inventory";
+export { planStackContributions } from "./contributions/preflight";
+export { planAuthContributions } from "./modules/stack/auth";
+export { planApiContributions } from "./template-handlers/api";
+export type { StackContribution } from "./contributions/stack";
+export { requiredModuleContributions } from "./contributions/requirements";
+export { buildWorkspacePlan } from "./contributions/workspace";
+export type { WorkspacePlan } from "./contributions/workspace";

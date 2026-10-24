@@ -5,7 +5,7 @@ import type { VirtualFileSystem } from "../core/virtual-fs";
 
 export function processAuthPlugins(vfs: VirtualFileSystem, config: ProjectConfig): void {
   const authIndexPath = "packages/auth/src/index.ts";
-  if (!vfs.exists(authIndexPath)) return;
+  if (!vfs.ownsPath(authIndexPath) || !vfs.exists(authIndexPath)) return;
 
   const content = vfs.readFile(authIndexPath);
   const project = new Project({

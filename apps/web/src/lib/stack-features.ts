@@ -7,7 +7,7 @@ import {
 } from "@xstack/template-generator/modules";
 import type { Auth } from "@xstack/types";
 
-import { APPLICATION_MODULE_ISSUE, projectApplicationStack } from "./stack-applications";
+import { applicationIssues, projectApplicationStack } from "./stack-applications";
 import { getStackBackend, getStackFrontends } from "./stack-model";
 import type { StackState } from "./types";
 
@@ -52,8 +52,14 @@ export function stackAuth(stack: StackState): Auth {
 export function featureIssue(stack: StackState, feature: string): string | null {
   const current = selectedFeatures(stack);
   if (current.includes(feature)) return null;
-  if (stack.apps !== undefined && !stack.apps.some((app) => app.type === "fullstack-web")) {
-    return APPLICATION_MODULE_ISSUE;
+  if (stack.apps !== undefined) {
+    const structural = { ...stack, providers: {}, moduleOptions: {} };
+    const existing = new Set(applicationIssues(structural));
+    return (
+      applicationIssues({ ...structural, features: [...current, feature] }).find(
+        (issue) => !existing.has(issue),
+      ) ?? null
+    );
   }
   // Provider/option errors are repaired in their controls, not by disabling a feature.
   const structuralStack = { ...stack, providers: {}, moduleOptions: {} };

@@ -31,7 +31,11 @@ export function processEnvDeps(vfs: VirtualFileSystem, config: ProjectConfig): v
     }
     addPackageDependency({ vfs, packagePath: `apps/${app}/package.json`, dependencies });
   }
-  if (config.frontend.includes("next") && config.webDeploy !== "cloudflare") {
+  if (
+    vfs.ownsPath("package.json") &&
+    config.frontend.includes("next") &&
+    config.webDeploy !== "cloudflare"
+  ) {
     const version = "npm:@varlock/nextjs-integration@1.2.2";
     if (config.packageManager === "pnpm") {
       const path = "pnpm-workspace.yaml";

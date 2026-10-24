@@ -210,6 +210,8 @@ export function addPackageDependency(options: AddDepsOptions): void {
     customDependencies = {},
     customDevDependencies = {},
   } = options;
+  // Shared manifests remain readable, but only their planned owner adds dependencies.
+  if (!vfs.ownsPath(packagePath)) return;
 
   const pkgJson = vfs.readJson<PackageJson>(packagePath);
   if (!pkgJson) return;

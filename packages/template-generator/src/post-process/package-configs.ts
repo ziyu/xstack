@@ -67,7 +67,8 @@ export function processPackageConfigs(vfs: VirtualFileSystem, config: RenderConf
 }
 
 /** Wire root scripts and package-manager settings for the selected stack. */
-function updateRootPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void {
+export function updateRootPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("package.json")) return;
   const pkgJson = vfs.readJson<PackageJson>("package.json");
   if (!pkgJson) return;
 
@@ -487,6 +488,7 @@ function compareWorkspacePackagePaths(a: string, b: string): number {
 }
 
 function updateDesktopPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("apps/desktop/package.json")) return;
   const pkgJson = vfs.readJson<PackageJson>("apps/desktop/package.json");
   if (!pkgJson) return;
 
@@ -589,6 +591,7 @@ function getLocalRunCommand(packageManager: ProjectConfig["packageManager"]): st
 }
 
 function updateDbPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("packages/db/package.json")) return;
   const pkgJson = vfs.readJson<PackageJson>("packages/db/package.json");
   if (!pkgJson) return;
 
@@ -640,6 +643,7 @@ function updateDbPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void
 }
 
 function updateAuthPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("packages/auth/package.json")) return;
   const pkgJson = vfs.readJson<PackageJson>("packages/auth/package.json");
   if (!pkgJson) return;
 
@@ -648,6 +652,7 @@ function updateAuthPackageJson(vfs: VirtualFileSystem, config: RenderConfig): vo
 }
 
 function updateApiPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("packages/api/package.json")) return;
   const pkgJson = vfs.readJson<PackageJson>("packages/api/package.json");
   if (!pkgJson) return;
 
@@ -656,6 +661,7 @@ function updateApiPackageJson(vfs: VirtualFileSystem, config: RenderConfig): voi
 }
 
 function updateConfigPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("packages/config/package.json")) return;
   const pkgJson = vfs.readJson<PackageJson>("packages/config/package.json");
   if (!pkgJson) return;
 
@@ -664,6 +670,7 @@ function updateConfigPackageJson(vfs: VirtualFileSystem, config: RenderConfig): 
 }
 
 function updateUiPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("packages/ui/package.json")) return;
   const pkgJson = vfs.readJson<PackageJson>("packages/ui/package.json");
   if (!pkgJson) return;
 
@@ -672,6 +679,7 @@ function updateUiPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void
 }
 
 function updateInfraPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("packages/infra/package.json")) return;
   const pkgJson = vfs.readJson<PackageJson>("packages/infra/package.json");
   if (!pkgJson) return;
 
@@ -680,6 +688,7 @@ function updateInfraPackageJson(vfs: VirtualFileSystem, config: RenderConfig): v
 }
 
 function updateConvexPackageJson(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("packages/backend/package.json")) return;
   const pkgJson = vfs.readJson<PackageJson>("packages/backend/package.json");
   if (!pkgJson) return;
 
@@ -744,7 +753,7 @@ export function finalizeAlchemyDevScripts(vfs: VirtualFileSystem, config: Render
     }
   }
 
-  if (rootPkg) {
+  if (rootPkg && vfs.ownsPath(rootPkgPath)) {
     vfs.writeJson(rootPkgPath, rootPkg);
   }
 }
@@ -818,6 +827,7 @@ function updateVitePlusPackages(vfs: VirtualFileSystem, config: RenderConfig): v
 }
 
 export function processNpmScriptApprovals(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("package.json")) return;
   if (config.packageManager !== "npm") return;
   const pkg = vfs.readJson<PackageJson>("package.json");
   if (!pkg) return;

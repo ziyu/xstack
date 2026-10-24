@@ -25,6 +25,7 @@ type NxConfig = {
 };
 
 export function processNxConfig(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath("nx.json")) return;
   if (!config.addons.includes("nx")) return;
 
   const nxConfig = generateNxConfig(config);
