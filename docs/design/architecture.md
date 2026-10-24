@@ -636,3 +636,32 @@ Builder 默认使用显式 apps，保留紧凑整套预设，新增 split shell 
 命名统一：类型 ID 改为 fullstack-web/web-frontend，产品角色为 web-frontend/backend/admin；manifest 必须声明 defaultDirectoryName。全栈默认 web、独立前端默认 frontend，其余类型同名。Builder 新增应用读取该默认值，重名追加 -2/-3，切换类型不覆盖自定义实例名。模板贡献目录和框架 apps 键同步迁移；旧无 apps 配置的物理 apps/web 输出保留，但不保留旧类型别名。90 项测试及 Web 类型检查通过；真实生成验证默认/自定义全栈目录与拆分布局，浏览器验证 cli/cli-2 重名处理、frontend 默认目录和文件预览。
 
 应用管理与技术栈 UI 分离：Applications 仅保留实例标签、名称、类型和增删；下方 Application technology 跟随同一选中应用显示模板实际支持的框架卡片、runtime 和依赖绑定。全栈默认不展示 API 下拉，backend 的协议放高级设置，绑定客户端显示继承协议。桌面/移动共享当前选择，数据库/工具仍为共享配置。浏览器验证 Nuxt 选择在切换 CLI 后保留、admin 仅展示已有 React Router 实现、backend 展示四种服务框架；改变 backend 为 Node+tRPC 后 frontend 显示继承协议且真实预览成功，390px 无横向溢出。
+
+## 27. 贡献体系补齐计划（检查点 6ca67b4 后，尚未实施）
+
+检查点包含应用模型、目录迁移和 Builder，但不是完整贡献适配交付。2026-10-24 盘点 embedded 模板：14 个模块的 app-scoped 贡献均只有 fullstack-web；旧 web 分支仍有 auth/stack 96 个文件、API 7 个、deploy 10 个。框架壳有 16 个实现，admin 仅 React Router；框架壳可生成不代表业务模块可用。当前没有发现 modules 下 apps/web 贡献残留，但 auth/stack/web、api/web、deploy/web 仍由独立旧 selector 处理；模块 renderPrefix 对不匹配 app 类型直接 continue，目录误写可能静默丢弃。生成项目 apps/web 是用户可选物理目录，与这些逻辑分类不同。
+
+实际 createVirtual 探测：React Router frontend/admin + Hono + auth（显式空 providers）生成成功，走旧 stack auth，admin 获得普通 login/dashboard，不是原生权限管理后台；Builder 却统一禁用拆分模块。Astro fullstack + blog 明确拒绝原生支持约束；Nuxt admin 无实现而拒绝。不能把这些情况统一标为“支持”或“不支持”。
+
+### 27.1 目标契约
+
+- 仅稳定 app type 决定贡献目录，实例 id 决定物理目录，roles 决定互斥与依赖；不把它们混成 web/server 字符串。
+- 一个 WorkspacePlan 在写文件前统一解析所有 app、模块、provider、integration、framework、dialect、API、部署选择。共享领域包/schema/migration 只生成一次，接口与服务归 backend owner（独立 backend 或 fullstack-web），页面归客户端 app。
+- 计划记录每份贡献的来源、目标 app/role、最终路径、实现类型（原生/旧栈适配）和覆盖关系。必需贡献缺失、未知目录类型、隐式覆盖、owner 冲突必须报错；合法的“当前 app 不消费”与“没有实现”必须区分。
+- 基础设施/界面共享层保留真实复用；frameworks/native 当前是 WHATWG 服务端共享代码，不是 native 移动端，迁成明确 server/http 共享语义，不计入移动能力。
+- Builder、CLI、MCP、生成器共用能力求解结果；显示完整、部分、缺失、不适用及原因。不能由 Builder 单独写“所有 split 模块禁用”，也不能把目录存在当作功能验收完成。
+- 全栈调用可以走本地服务，拆分客户端走类型化 API；鉴权、管理员权限、幂等与错误契约保持同一领域服务。不得把服务端包/数据库/密钥搬进客户端。进程内事件集成在 backend owner 内执行，不伪装成跨进程消息。
+
+### 27.2 分阶段实施与退出标准
+
+| 阶段              | 工作                                                                                                                                                 | 必须验收                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| C0 全量清单与门禁 | 逐一清点基础技术栈、modules/files/dialects/providers/integrations/frameworks、auth stack、API、addons、deploy；输出贡献矩阵与未知路径诊断            | 所有模板有分类和 owner；故意放错 apps/web 必须报错；缺失 provider/integration 不静默省略                                        |
+| C1 统一贡献计划   | 共享文件单次生成、每 app context、逻辑路径解析、依赖/env/scripts/nav/replaces 按 owner 聚合；迁移 auth/API 旧 selector                               | 自定义目录、同框架不同职责、组合顺序变化输出稳定；移除 first-wins 丢弃和 canonical web/server 写入依赖；旧单应用生成行为保留    |
+| C2 认证与权限闭环 | core/i18n/auth/admin/email/sms/captcha；显式会话边界、可信 Origin、OAuth 回调与服务端授权                                                            | 全栈与拆分注册/登录/退出/SSR；普通用户访问 admin API 被拒绝；邮件确认/短信/验证码实际钩子；不把通用 dashboard 算管理后台        |
+| C3 交易闭环       | payment/credits/affiliate；前端定价与结账、后端验签/账本、admin 订单/积分；迁移全部 provider/integration                                             | 伪造通知拒绝、重复通知只履约一次、余额并发安全、跨用户隔离；回调唯一 owner，切 app 不复制服务商秘密                             |
+| C4 内容与 AI 闭环 | storage → ai；blog/seo；上传下载、生成任务、发布管理与公开页面分别归属                                                                               | 私有文件权限、AI 扣费/退款/不确定状态、博客草稿不可公开、发布后 SEO 更新；全栈/拆分使用同一业务语义                             |
+| C5 框架矩阵扩展   | 逐框架补 frontend/admin/backend 的真实适配；先已有 Next/Start/Nuxt、React Router/Hono 验收通路，再扩到 Astro/Svelte/Solid/TanStack Router 与其余后端 | 每个标为完整的矩阵单元通过安装/类型/构建与相同业务协议测试；未覆盖项不冒充已有实现、不从列表静默消失                            |
+| C6 外围与收尾     | native 独立壳/产品客户端显式区分；PWA/desktop/addons/deploy/DB provisioning 选择目标 app；清理旧 selector/映射/文档与基线差异                        | 各部署产物、脚本、env、服务绑定指向正确 owner；无跨 app 秘密泄漏；生成后 add 保留定制与密钥，冲突零写入；全矩阵报告无未分类模板 |
+
+先落地 C0/C1，不先复制所有模块的拆分目录。每批建立全栈与拆分对照项目，覆盖不同实例名、共享包唯一性、文件归属、调用契约和权限边界。真实云服务/支付送达需要独立凭据验收，不能用本地协议夹具替代宣称。此计划不新增微服务队列、租户系统或自动升级生成代码。
