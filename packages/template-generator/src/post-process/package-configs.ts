@@ -84,7 +84,8 @@ function updateRootPackageJson(vfs: VirtualFileSystem, config: RenderConfig): vo
     ["native-bare", "native-uniwind", "native-unistyles"].includes(item),
   );
 
-  const backendPackageName = backend === "convex" ? `@${projectName}/backend` : "server";
+  const backendPackageName =
+    backend === "convex" ? `@${projectName}/backend` : (config.application?.id ?? "server");
   const dbPackageName = `@${projectName}/db`;
   const hasTurborepo = addons.includes("turborepo");
   const hasNx = addons.includes("nx");
@@ -116,11 +117,11 @@ function updateRootPackageJson(vfs: VirtualFileSystem, config: RenderConfig): vo
   }
 
   if (hasNativeApp) {
-    scripts["dev:native"] = pmConfig.filter("native", "dev");
+    scripts["dev:native"] = pmConfig.filter(config.application?.id ?? "native", "dev");
   }
 
   if (hasWebApp) {
-    scripts["dev:web"] = pmConfig.filter("web", "dev");
+    scripts["dev:web"] = pmConfig.filter(config.application?.id ?? "web", "dev");
   }
 
   if (addons.includes("electrobun")) {
@@ -214,7 +215,10 @@ function updateRootPackageJson(vfs: VirtualFileSystem, config: RenderConfig): vo
 
     const hasWranglerLocalD1 = getLocalD1Owner(config) === "wrangler";
     if (hasWranglerLocalD1) {
-      scripts["db:migrate:local"] = pmConfig.filter("web", "db:migrate:local");
+      scripts["db:migrate:local"] = pmConfig.filter(
+        config.application?.id ?? "web",
+        "db:migrate:local",
+      );
     }
   }
 

@@ -5,14 +5,14 @@ The shell every feature module plugs into.
 ## Layout
 
 {{#if (includes frontend "next")}}
-- Product pages live in `apps/web/src/app/[lang]/`.
+- Product pages live in `{{appPath "fullstack-web"}}/src/app/[lang]/`.
 {{else if (includes frontend "tanstack-start")}}
-- Product routes live in `apps/web/src/routes/`, with locale-prefixed URLs and server loaders for protected pages.
+- Product routes live in `{{appPath "fullstack-web"}}/src/routes/`, with locale-prefixed URLs and server loaders for protected pages.
 {{else}}
-- Product pages live in `apps/web/app/pages/`; server adapters live in `apps/web/server/`. Nuxt's `~/` alias points to the app and `@/` points to the shared `src/` directory.
+- Product pages live in `{{appPath "fullstack-web"}}/app/pages/`; server adapters live in `{{appPath "fullstack-web"}}/server/`. Nuxt's `~/` alias points to the app and `@/` points to the shared `src/` directory.
 {{/if}}
-- `apps/web/src/config/navigation.ts` is generated from the modules you picked. Edit it freely; it is plain data.
-- `apps/web/src/services.ts` is the composition root: every package exports a factory, and this file wires them with environment variables and each other.
+- `{{appPath "fullstack-web"}}/src/config/navigation.ts` is generated from the modules you picked. Edit it freely; it is plain data.
+- `{{appPath "fullstack-web"}}/src/services.ts` is the composition root: every package exports a factory, and this file wires them with environment variables and each other.
 
 {{#if (includes frontend "tanstack-start")}}
 ## TanStack Start workflow
@@ -21,11 +21,11 @@ From the repository root, install dependencies with `{{packageManager}} install`
 
 Use `{{packageManager}} run build` for the workspace production build and `{{packageManager}} run check-types` for generated package type checks. Start uses Vite and its native server-route handlers, not Next.js request adapters.
 
-- Every module contributes explicit locale-prefixed file routes under `apps/web/src/routes/`.
-- `apps/web/src/lib/product-data.ts` defines GET-only server functions that forward the caller's request headers to the shared native service dispatcher. Private loaders and API handlers independently enforce authentication and authorization.
-- `apps/web/src/routes/api.$.ts` forwards original WHATWG requests to `apps/web/src/lib/product-api.ts`. Module handlers live under `apps/web/src/lib/native/`; mutations validate the configured Origin, while payment webhooks delegate signature verification to the provider.
+- Every module contributes explicit locale-prefixed file routes under `{{appPath "fullstack-web"}}/src/routes/`.
+- `{{appPath "fullstack-web"}}/src/lib/product-data.ts` defines GET-only server functions that forward the caller's request headers to the shared native service dispatcher. Private loaders and API handlers independently enforce authentication and authorization.
+- `{{appPath "fullstack-web"}}/src/routes/api.$.ts` forwards original WHATWG requests to `{{appPath "fullstack-web"}}/src/lib/product-api.ts`. Module handlers live under `{{appPath "fullstack-web"}}/src/lib/native/`; mutations validate the configured Origin, while payment webhooks delegate signature verification to the provider.
 - `/api/product/*` supplies typed page data and protected administration operations. Auth, storage, AI, blog, affiliate and payment retain their documented `/api/<module>/*` URLs.
-- Auth forms, captcha, file manager, AI studio, Markdown and blog editor use the same React source templates as Next.js. Only navigation effects are supplied by `apps/web/src/lib/product-navigation.ts`.
+- Auth forms, captcha, file manager, AI studio, Markdown and blog editor use the same React source templates as Next.js. Only navigation effects are supplied by `{{appPath "fullstack-web"}}/src/lib/product-navigation.ts`.
 {{/if}}
 
 ## Domain events
@@ -43,7 +43,7 @@ Use `{{packageManager}} run build` for the workspace production build and `{{pac
    ```
 
 2. It emits them: `await events.emit("order.paid", { orderId, userId })`.
-3. Code that connects two modules lives in `apps/web/src/integrations/*.ts` and subscribes with `events.on(...)`.
+3. Code that connects two modules lives in `{{appPath "fullstack-web"}}/src/integrations/*.ts` and subscribes with `events.on(...)`.
 
 Handlers run in order and an error rejects `emit`, so a failed side effect surfaces to the caller. Replace `createEventBus` with a queue-backed implementation if you need retries; the interface stays the same.
 

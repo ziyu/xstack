@@ -37,5 +37,5 @@ A provider is one file implementing `createTransport(env): Transport | undefined
 
 ## Auth emails
 
-`apps/web/src/integrations/auth-email.ts` subscribes to `auth.verification_requested` and `auth.password_reset_requested` and sends localized emails. The copy lives in `packages/i18n/src/messages/*/auth.ts` under `emails`.
+`{{appPath "fullstack-web"}}/src/integrations/auth-email.ts` subscribes to `auth.verification_requested` and `auth.password_reset_requested` and sends localized emails. The copy lives in `packages/i18n/src/messages/*/auth.ts` under `emails`.
 {{/if}}

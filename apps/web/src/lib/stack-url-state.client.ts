@@ -1,4 +1,5 @@
 "use client";
+import { useSearchParams } from "next/navigation";
 import {
   parseAsArrayOf,
   parseAsJson,
@@ -11,10 +12,15 @@ import { useCallback, useMemo } from "react";
 import { DEFAULT_STACK, type StackState, getStackOptionIds } from "@/lib/constant";
 
 import { sanitizeStackState, type RawStackLists } from "./sanitize-stack-addons";
-import { StackModuleOptionsSchema, StackProvidersSchema } from "./stack-schema";
-import { stackUrlKeys } from "./stack-url-keys";
+import {
+  StackApplicationsSchema,
+  StackModuleOptionsSchema,
+  StackProvidersSchema,
+} from "./stack-schema";
+import { stackUrlKeys, usesDefaultApplications } from "./stack-url-keys";
 
 export const stackParsers = {
+  apps: parseAsJson(StackApplicationsSchema.parse),
   projectName: parseAsString.withDefault(DEFAULT_STACK.projectName ?? "my-xstack-app"),
   webFrontend: parseAsArrayOf(parseAsString).withDefault(DEFAULT_STACK.webFrontend),
   nativeFrontend: parseAsArrayOf(parseAsString).withDefault(DEFAULT_STACK.nativeFrontend),
@@ -69,8 +75,12 @@ export const stackQueryStatesOptions = {
   clearOnDefault: true,
 };
 
-function getStackFromQueryState(queryState: RawStackLists): StackState {
+function getStackFromQueryState(
+  queryState: RawStackLists,
+  initialApps?: StackState["apps"],
+): StackState {
   return sanitizeStackState({
+    apps: queryState.apps ?? initialApps,
     projectName: queryState.projectName,
     webFrontend: queryState.webFrontend,
     nativeFrontend: queryState.nativeFrontend,
@@ -95,8 +105,21 @@ function getStackFromQueryState(queryState: RawStackLists): StackState {
 
 export function useStackState() {
   const [queryState, setQueryState] = useQueryStates(stackParsers, stackQueryStatesOptions);
+  const searchParams = useSearchParams();
+  const initialApps = useMemo(
+    () =>
+      searchParams.has("apps")
+        ? []
+        : usesDefaultApplications(searchParams)
+          ? DEFAULT_STACK.apps
+          : undefined,
+    [searchParams],
+  );
 
-  const stack = useMemo(() => getStackFromQueryState(queryState), [queryState]);
+  const stack = useMemo(
+    () => getStackFromQueryState(queryState, initialApps),
+    [queryState, initialApps],
+  );
 
   const viewMode = queryState.viewMode;
   const selectedFile = queryState.selectedFile;
@@ -104,14 +127,14 @@ export function useStackState() {
   const updateStack = useCallback(
     async (updates: Partial<StackState> | ((prev: StackState) => Partial<StackState>)) => {
       await setQueryState((currentQueryState) => {
-        const currentStack = getStackFromQueryState(currentQueryState);
+        const currentStack = getStackFromQueryState(currentQueryState, initialApps);
         const newStack = updates instanceof Function ? updates(currentStack) : updates;
         const finalStack = sanitizeStackState({ ...currentStack, ...newStack });
 
-        return finalStack;
+        return { ...finalStack, apps: finalStack.apps ?? null };
       });
     },
-    [setQueryState],
+    [setQueryState, initialApps],
   );
 
   const setViewMode = useCallback(

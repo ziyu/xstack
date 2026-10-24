@@ -1,0 +1,8 @@
+{
+  "id": "cli",
+  "name": "Command-line application",
+  "defaultDirectoryName": "cli",
+  "roles": [],
+  "scope": "independent",
+  "requires": []
+}

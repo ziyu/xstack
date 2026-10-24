@@ -1,0 +1,8 @@
+{
+  "id": "native",
+  "name": "Native application",
+  "defaultDirectoryName": "native",
+  "roles": [],
+  "scope": "independent",
+  "requires": []
+}

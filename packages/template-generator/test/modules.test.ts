@@ -227,7 +227,7 @@ describe("module seams", () => {
 
   it("refuses module templates that overwrite undeclared stack files", async () => {
     const templates = new Map(EMBEDDED_TEMPLATES);
-    templates.set("modules/core/files/apps/web/src/components/mode-toggle.tsx", "");
+    templates.set("modules/core/files/apps/fullstack-web/src/components/mode-toggle.tsx", "");
     const result = await generate({ config: config({ features: [] }), templates });
     expect(result.isErr() && result.error.message).toContain('declare it in "replaces"');
   });

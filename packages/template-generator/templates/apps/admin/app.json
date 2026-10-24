@@ -1,0 +1,8 @@
+{
+  "id": "admin",
+  "name": "Administration application",
+  "defaultDirectoryName": "admin",
+  "roles": ["admin"],
+  "scope": "product",
+  "requires": ["backend"]
+}

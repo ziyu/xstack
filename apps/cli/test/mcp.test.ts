@@ -127,47 +127,6 @@ describe("MCP server", () => {
     });
   });
 
-  it("returns explicit create-contract guidance", async () => {
-    const { client, cleanup } = await connectInMemoryClient();
-    cleanups.push(cleanup);
-
-    const result = await client.callTool({
-      name: "xstack_get_stack_guidance",
-      arguments: {},
-    });
-
-    const payload = result.structuredContent as {
-      ok: boolean;
-      data?: {
-        createContract?: {
-          requiresExplicitFields?: string[];
-          rule?: string;
-        };
-      };
-    };
-
-    expect(payload.ok).toBe(true);
-    expect(payload.data?.createContract?.requiresExplicitFields).toEqual(
-      expect.arrayContaining([
-        "projectName",
-        "frontend",
-        "backend",
-        "runtime",
-        "database",
-        "orm",
-        "api",
-        "addons",
-        "git",
-        "packageManager",
-        "install",
-        "dbSetup",
-        "webDeploy",
-        "serverDeploy",
-      ]),
-    );
-    expect(payload.data?.createContract?.rule).toContain("full explicit stack config");
-  });
-
   it("returns all MCP planning schemas by default", async () => {
     const { client, cleanup } = await connectInMemoryClient();
     cleanups.push(cleanup);
@@ -224,12 +183,7 @@ describe("MCP server", () => {
     });
 
     expect(result.isError).toBe(true);
-    const text = getToolText(result);
-
-    expect(text).toContain("Input validation error");
-    expect(text).toContain("database");
-    expect(text).toContain("backend");
-    expect(text).toContain("packageManager");
+    expect(await fs.pathExists(path.join(SMOKE_DIR, "partial-app"))).toBe(false);
   });
 
   it("rejects create inputs that violate full schema refinements", async () => {
@@ -249,6 +203,57 @@ describe("MCP server", () => {
     expect(getToolText(result)).toContain(
       "`manualDb` and `dbSetupOptions.mode` are mutually exclusive",
     );
+  });
+
+  it("plans stable application types without legacy stack flags and rejects mixed ownership", async () => {
+    const { client, cleanup } = await connectInMemoryClient();
+    cleanups.push(cleanup);
+    const projectPath = path.join(SMOKE_DIR, "mcp-application-plan");
+    const {
+      frontend: _frontend,
+      backend: _backend,
+      runtime: _runtime,
+      api: _api,
+      ...base
+    } = getExplicitCreateInput(projectPath);
+    const input = {
+      ...base,
+      product: { features: [] },
+      apps: [
+        { id: "product", type: "fullstack-web", stack: { framework: "next" } },
+        { id: "tools", type: "cli", stack: { framework: "node", runtime: "node" } },
+      ],
+    };
+    const valid = await client.callTool({ name: "xstack_plan_project", arguments: input });
+    expect(valid.isError).not.toBe(true);
+    expect(await fs.pathExists(projectPath)).toBe(false);
+    const conflict = await client.callTool({
+      name: "xstack_plan_project",
+      arguments: {
+        ...input,
+        apps: [...input.apps, { id: "admin", type: "admin", stack: { framework: "react-router" } }],
+      },
+    });
+    expect(conflict.isError).toBe(true);
+    expect(await fs.pathExists(projectPath)).toBe(false);
+    const incomplete = await client.callTool({
+      name: "xstack_plan_project",
+      arguments: { ...base, product: { features: [] } },
+    });
+    expect(incomplete.isError).toBe(true);
+    const legacy = await client.callTool({
+      name: "xstack_plan_project",
+      arguments: { ...input, apps: [{ id: "product", template: "fullstack-next" }] },
+    });
+    expect(legacy.isError).toBe(true);
+    const unsupported = await client.callTool({
+      name: "xstack_plan_project",
+      arguments: {
+        ...input,
+        apps: [{ id: "product", type: "fullstack-web", stack: { framework: "hono" } }],
+      },
+    });
+    expect(unsupported.isError).toBe(true);
   });
 
   it("surfaces CLI compatibility errors through MCP planning", async () => {

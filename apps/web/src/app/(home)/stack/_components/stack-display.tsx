@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ShareDialog } from "@/components/ui/share-dialog";
 import { TechBadge } from "@/components/ui/tech-badge";
 import { stackSnapshot, track } from "@/lib/analytics";
+import { applicationIssues, APPLICATION_TECH_CATEGORIES } from "@/lib/stack-applications";
 import { productPlan } from "@/lib/stack-features";
 import type { LoadedStackState } from "@/lib/stack-url-state";
 import {
@@ -36,24 +37,26 @@ export function StackDisplay({ stackState }: StackDisplayProps) {
   const stack = stackState;
   const stackSummary = generateStackSummary(stack);
   const plan = productPlan(stack);
-  const configurationError = plan.issues
-    .filter((issue) => issue.level === "error")
-    .map((issue) => issue.message)
-    .join("\n");
+  const configurationError = [
+    ...applicationIssues(stack),
+    ...plan.issues.filter((issue) => issue.level === "error").map((issue) => issue.message),
+  ].join("\n");
 
   const command = generateStackCommand({
     ...stackState,
     projectName: formatProjectName(stackState.projectName),
   });
 
-  const techBadges = getSelectedTechs(stack).map((tech) => (
-    <TechBadge
-      key={`${tech.category}-${tech.id}`}
-      icon={tech.icon}
-      name={tech.name}
-      category={tech.category}
-    />
-  ));
+  const techBadges = getSelectedTechs(stack)
+    .filter((tech) => !stack.apps || !APPLICATION_TECH_CATEGORIES.includes(tech.category))
+    .map((tech) => (
+      <TechBadge
+        key={`${tech.category}-${tech.id}`}
+        icon={tech.icon}
+        name={tech.name}
+        category={tech.category}
+      />
+    ));
 
   const copyCommand = async () => {
     if (configurationError) {
@@ -148,6 +151,21 @@ export function StackDisplay({ stackState }: StackDisplayProps) {
           </ShareDialog>
         </div>
 
+        {stack.apps && (
+          <section aria-label="Applications" className="space-y-3">
+            <h2 className="font-mono text-sm font-semibold">APPLICATIONS</h2>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {stack.apps.map((app) => (
+                <div key={app.id} className="rounded border border-border p-3 text-sm">
+                  <span className="font-mono text-primary">apps/{app.id}</span>
+                  <span className="ml-3 text-muted-foreground">
+                    {app.type} · {app.stack.framework}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-primary text-xs">▶</span>

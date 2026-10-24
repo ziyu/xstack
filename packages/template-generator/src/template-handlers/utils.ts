@@ -1,5 +1,6 @@
 import type { ProjectConfig } from "@xstack/types";
 
+import { isApplicationMetadataPath } from "../apps/metadata";
 import { processTemplateString, transformFilename, isBinaryFile } from "../core/template-processor";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 
@@ -8,6 +9,7 @@ export type TemplateData = Map<string, string>;
 export function hasTemplatesWithPrefix(templates: TemplateData, prefix: string): boolean {
   const normalizedPrefix = prefix.endsWith("/") ? prefix : `${prefix}/`;
   for (const path of templates.keys()) {
+    if (isApplicationMetadataPath(path)) continue;
     if (path.startsWith(normalizedPrefix)) return true;
   }
   return false;
@@ -50,6 +52,7 @@ export function processTemplatesFromPrefix(
 
   for (const [templatePath, content] of templates) {
     if (!templatePath.startsWith(normalizedPrefix)) continue;
+    if (isApplicationMetadataPath(templatePath)) continue;
 
     const relativePath = templatePath.slice(normalizedPrefix.length);
     const outputPath = transformFilename(relativePath);

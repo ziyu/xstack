@@ -1,0 +1,8 @@
+{
+  "id": "backend",
+  "name": "Backend service",
+  "defaultDirectoryName": "backend",
+  "roles": ["backend"],
+  "scope": "product",
+  "requires": []
+}

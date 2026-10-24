@@ -1,6 +1,7 @@
 import { ORPCError, os } from "@orpc/server";
 import { EMBEDDED_TEMPLATES, generate, type VirtualNode } from "@xstack/template-generator";
 
+import { applicationIssues } from "@/lib/stack-applications";
 import { resolveStackCompatibility } from "@/lib/stack-compatibility";
 import { productPlan } from "@/lib/stack-features";
 import { StackStateSchema, stackStateToConfig } from "@/lib/stack-schema";
@@ -20,6 +21,10 @@ export const router = {
     const stack = resolveStackCompatibility(input).stack;
     const nameError = validateProjectName(formatProjectName(stack.projectName));
     if (nameError) throw new ORPCError("BAD_REQUEST", { message: nameError });
+    const appIssues = applicationIssues(stack);
+    if (appIssues.length) {
+      throw new ORPCError("BAD_REQUEST", { message: appIssues.join("\n") });
+    }
     const issues = productPlan(stack).issues.filter((issue) => issue.level === "error");
     if (issues.length) {
       throw new ORPCError("BAD_REQUEST", {

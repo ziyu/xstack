@@ -1,5 +1,8 @@
 import { Result } from "better-result";
 
+import { generateApplications } from "./apps/generate";
+import type { ResolvedApplication } from "./apps/plan";
+import { renderApplicationLayers } from "./apps/render";
 import { VirtualFileSystem } from "./core/virtual-fs";
 import {
   finalizeModules,
@@ -37,7 +40,12 @@ import {
   processExtrasTemplates,
   processDeployTemplates,
 } from "./template-handlers";
-import type { GeneratorOptions, VirtualFileTree } from "./types";
+import type {
+  ApplicationRenderContext,
+  GeneratorOptions,
+  RenderConfig,
+  VirtualFileTree,
+} from "./types";
 import { GeneratorError } from "./types";
 import { generateReproducibleCommand } from "./utils/reproducible-command";
 import { writeXStackConfigToVfs } from "./xstack-config";
@@ -62,60 +70,8 @@ export async function generate(
 ): Promise<Result<VirtualFileTree, GeneratorError>> {
   return Result.tryPromise({
     try: async () => {
-      const { templates } = options;
-      const config = toRenderConfig(options.config);
-
-      if (!templates || templates.size === 0) {
-        throw new GeneratorError({
-          message: "No templates provided. Templates must be passed via the templates option.",
-          phase: "initialization",
-        });
-      }
-
-      const vfs = new VirtualFileSystem();
-
-      await processBaseTemplate(vfs, templates, config);
-      await processFrontendTemplates(vfs, templates, config);
-      await processBackendTemplates(vfs, templates, config);
-      await processDbTemplates(vfs, templates, config);
-      await processApiTemplates(vfs, templates, config);
-      await processConfigPackage(vfs, templates, config);
-      await processUiPackage(vfs, templates, config);
-      await processStackModules(vfs, templates, config);
-      await processAddonTemplates(vfs, templates, config);
-      await processExtrasTemplates(vfs, templates, config);
-      await processDeployTemplates(vfs, templates, config);
-      processModuleTemplates(vfs, templates, config);
-
-      processPackageConfigs(vfs, config);
-      processDependencies(vfs, config);
-      finalizeAlchemyDevScripts(vfs, config);
-      processEnvVariables(vfs, config);
-      processModuleEnv(vfs, config);
-      processAuthPlugins(vfs, config);
-      processAlchemyPlugins(vfs, config);
-      processPwaPlugins(vfs, config);
-      processVarlock(vfs, templates, config);
-      finalizeModules(vfs, config);
-      processCatalogs(vfs, config);
-      processVercelConfig(vfs, config);
-      processReadme(vfs, config);
-
-      // Write xstack.jsonc config file
-      if (options.version) {
-        const reproducibleCommand = generateReproducibleCommand(config);
-        writeXStackConfigToVfs(vfs, config, options.version, reproducibleCommand);
-      }
-      processAgentGuidance(vfs, config);
-
-      const tree: VirtualFileTree = {
-        root: vfs.toTree(config.projectName),
-        fileCount: vfs.getFileCount(),
-        directoryCount: vfs.getDirectoryCount(),
-        config,
-      };
-
-      return tree;
+      if (options.config.apps) return generateApplications(options, generateApplication);
+      return generateApplication(options);
     },
     catch: (e) => {
       if (GeneratorError.is(e)) {
@@ -128,4 +84,65 @@ export async function generate(
       });
     },
   });
+}
+
+async function generateApplication(
+  options: GeneratorOptions,
+  app?: ResolvedApplication,
+  context?: ApplicationRenderContext,
+): Promise<VirtualFileTree> {
+  const { templates } = options;
+  if (!templates || templates.size === 0) {
+    throw new GeneratorError({
+      message: "No templates provided. Templates must be passed via the templates option.",
+      phase: "initialization",
+    });
+  }
+  const config: RenderConfig = toRenderConfig(options.config);
+  config.application = context;
+  const vfs = new VirtualFileSystem(
+    context?.paths ?? {
+      "apps/fullstack-web": "apps/web",
+      "apps/web-frontend": "apps/web",
+      "apps/backend": "apps/server",
+    },
+  );
+  await processBaseTemplate(vfs, templates, config);
+  if (app) {
+    renderApplicationLayers(vfs, templates, config, app.adapter);
+  } else {
+    await processFrontendTemplates(vfs, templates, config);
+    await processBackendTemplates(vfs, templates, config);
+  }
+  await processDbTemplates(vfs, templates, config);
+  await processApiTemplates(vfs, templates, config);
+  await processConfigPackage(vfs, templates, config);
+  await processUiPackage(vfs, templates, config);
+  await processStackModules(vfs, templates, config);
+  await processAddonTemplates(vfs, templates, config);
+  await processExtrasTemplates(vfs, templates, config);
+  await processDeployTemplates(vfs, templates, config);
+  processModuleTemplates(vfs, templates, config);
+  processPackageConfigs(vfs, config);
+  processDependencies(vfs, config);
+  finalizeAlchemyDevScripts(vfs, config);
+  processEnvVariables(vfs, config);
+  processModuleEnv(vfs, config);
+  processAuthPlugins(vfs, config);
+  processAlchemyPlugins(vfs, config);
+  processPwaPlugins(vfs, config);
+  processVarlock(vfs, templates, config);
+  finalizeModules(vfs, config);
+  if (!app) processCatalogs(vfs, config);
+  processVercelConfig(vfs, config);
+  processReadme(vfs, config);
+  if (options.version)
+    writeXStackConfigToVfs(vfs, config, options.version, generateReproducibleCommand(config));
+  processAgentGuidance(vfs, config);
+  return {
+    root: vfs.toTree(config.projectName),
+    fileCount: vfs.getFileCount(),
+    directoryCount: vfs.getDirectoryCount(),
+    config,
+  };
 }

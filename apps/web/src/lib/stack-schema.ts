@@ -1,4 +1,5 @@
-import { ProjectConfigSchema } from "@xstack/types";
+import { resolveApplicationConfig } from "@xstack/template-generator/apps";
+import { ApplicationSelectionSchema, ProjectConfigSchema } from "@xstack/types";
 import { z } from "zod";
 
 import { DEFAULT_STACK, TECH_OPTIONS, getStackOptionIds, type StackState } from "./constant";
@@ -13,9 +14,11 @@ export const StackModuleOptionsSchema = z.record(
   z.string(),
   z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
 );
+export const StackApplicationsSchema = z.array(ApplicationSelectionSchema);
 
 const stackFields = {
   projectName: z.string().nullable(),
+  apps: StackApplicationsSchema.optional(),
   webFrontend: z.array(option("webFrontend")),
   nativeFrontend: z.array(option("nativeFrontend")),
   runtime: option("runtime"),
@@ -40,6 +43,8 @@ export const StackUpdateSchema = z.object(stackFields).partial();
 
 export const StackStateSchema = z.object({
   projectName: stackFields.projectName.default(DEFAULT_STACK.projectName),
+  // Absence identifies legacy URLs and saved stacks; never default it to the new layout.
+  apps: stackFields.apps,
   webFrontend: stackFields.webFrontend.default(DEFAULT_STACK.webFrontend),
   nativeFrontend: stackFields.nativeFrontend.default(DEFAULT_STACK.nativeFrontend),
   runtime: stackFields.runtime.default(DEFAULT_STACK.runtime),
@@ -63,20 +68,22 @@ export const StackStateSchema = z.object({
 export function stackStateToConfig(stack: StackState) {
   const projectPath = formatProjectName(stack.projectName);
   const projectName = projectPath.split(/[\\/]/).filter(Boolean).at(-1) || "my-xstack-app";
-  return ProjectConfigSchema.parse({
-    ...stack,
-    projectName: projectName === "." ? "my-xstack-app" : projectName,
-    projectDir: "/virtual",
-    relativePath: "./virtual",
-    frontend: getStackFrontends(stack),
-    backend: getStackBackend(stack.backend),
-    addons: stack.addons.filter((id) => id !== "none"),
-    product: {
-      features: stack.features.filter((id) => id !== "none"),
-      providers: stack.providers,
-      options: stack.moduleOptions,
-    },
-    git: stack.git === "true",
-    install: false,
-  });
+  return resolveApplicationConfig(
+    ProjectConfigSchema.parse({
+      ...stack,
+      projectName: projectName === "." ? "my-xstack-app" : projectName,
+      projectDir: "/virtual",
+      relativePath: "./virtual",
+      frontend: getStackFrontends(stack),
+      backend: getStackBackend(stack.backend),
+      addons: stack.addons.filter((id) => id !== "none"),
+      product: {
+        features: stack.features.filter((id) => id !== "none"),
+        providers: stack.providers,
+        options: stack.moduleOptions,
+      },
+      git: stack.git === "true",
+      install: false,
+    }),
+  );
 }

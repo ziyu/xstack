@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { TechIcon } from "@/components/ui/tech-icon";
 import type { StackState } from "@/lib/constant";
 import { TECH_OPTIONS } from "@/lib/constant";
+import { APPLICATION_TECH_CATEGORIES } from "@/lib/stack-applications";
 import { CATEGORY_ORDER } from "@/lib/stack-utils";
 import { getCategoryDisplayName } from "@/lib/stack-validation";
 import type { TechCategory } from "@/lib/types";
@@ -16,6 +17,7 @@ type SelectedStackBadgesProps = {
 
 export function SelectedStackBadges({ stack, onRemove, onJump }: SelectedStackBadgesProps) {
   const selections = CATEGORY_ORDER.flatMap((category) => {
+    if (stack.apps !== undefined && APPLICATION_TECH_CATEGORIES.includes(category)) return [];
     const options = TECH_OPTIONS[category];
     const selectedValue = stack[category];
     if (!options || selectedValue === undefined) return [];

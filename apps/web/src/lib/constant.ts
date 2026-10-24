@@ -715,6 +715,7 @@ export function isStackOption<K extends TechCategory>(
 
 export const DEFAULT_STACK: StackState = {
   projectName: "my-xstack-app",
+  apps: [{ id: "web", type: "fullstack-web", stack: { framework: "next" } }],
   webFrontend: ["next"],
   nativeFrontend: ["none"],
   runtime: "none",
@@ -768,29 +769,91 @@ const PRODUCT_TEMPLATE_PRESETS: {
   }),
 ];
 
-export const PRESET_TEMPLATES = (
-  [
-    { id: "next", name: "Next.js" },
-    { id: "tanstack-start", name: "TanStack Start" },
-    { id: "nuxt", name: "Nuxt" },
-  ] as const
-).flatMap((framework) =>
-  PRODUCT_TEMPLATE_PRESETS.map((preset) => {
-    const database = preset.id === "saas-global" || preset.id === "full" ? "postgres" : "sqlite";
-    return {
-      ...preset,
-      id: framework.id === "next" ? preset.id : `${framework.id}-${preset.id}`,
-      name: `${framework.name} · ${preset.name} · ${database === "postgres" ? "PostgreSQL" : "SQLite"}`,
-      framework: framework.name,
-      stack: {
-        ...preset.stack,
-        webFrontend: [framework.id],
-        backend: `self-${framework.id}`,
-        database,
-      } satisfies StackState,
-    };
-  }),
-);
+export const PRESET_TEMPLATES = [
+  ...(
+    [
+      { id: "next", name: "Next.js" },
+      { id: "tanstack-start", name: "TanStack Start" },
+      { id: "nuxt", name: "Nuxt" },
+    ] as const
+  ).flatMap((framework) =>
+    PRODUCT_TEMPLATE_PRESETS.map((preset) => {
+      const database = preset.id === "saas-global" || preset.id === "full" ? "postgres" : "sqlite";
+      return {
+        ...preset,
+        id: framework.id === "next" ? preset.id : `${framework.id}-${preset.id}`,
+        name: `${framework.name} · ${preset.name} · ${database === "postgres" ? "PostgreSQL" : "SQLite"}`,
+        group: framework.name,
+        stack: {
+          ...preset.stack,
+          apps: [{ id: "web", type: "fullstack-web", stack: { framework: framework.id } }],
+          webFrontend: [framework.id],
+          backend: `self-${framework.id}`,
+          database,
+        } satisfies StackState,
+      };
+    }),
+  ),
+  {
+    id: "split-shell",
+    name: "Split apps · React Router + Hono · Shell",
+    group: "Application layouts",
+    description:
+      "Separate web frontend, administration and backend shells; no native business modules",
+    stack: {
+      ...DEFAULT_STACK,
+      apps: [
+        {
+          id: "frontend",
+          type: "web-frontend",
+          stack: { framework: "react-router" },
+          bindings: { backend: "backend" },
+        },
+        {
+          id: "admin",
+          type: "admin",
+          stack: { framework: "react-router" },
+          bindings: { backend: "backend" },
+        },
+        {
+          id: "backend",
+          type: "backend",
+          stack: { framework: "hono", runtime: "bun", api: "orpc" },
+        },
+      ],
+      webFrontend: ["react-router"],
+      nativeFrontend: ["none"],
+      backend: "hono",
+      runtime: "bun",
+      api: "orpc",
+      database: "none",
+      orm: "none",
+      features: ["none"],
+      providers: {},
+      moduleOptions: {},
+    } satisfies StackState,
+  },
+  {
+    id: "cli-shell",
+    name: "CLI only · Node.js · Shell",
+    group: "Application layouts",
+    description: "Independent command-line application without product modules",
+    stack: {
+      ...DEFAULT_STACK,
+      apps: [{ id: "cli", type: "cli", stack: { framework: "node" } }],
+      webFrontend: ["none"],
+      nativeFrontend: ["none"],
+      backend: "none",
+      runtime: "node",
+      api: "none",
+      database: "none",
+      orm: "none",
+      features: ["none"],
+      providers: {},
+      moduleOptions: {},
+    } satisfies StackState,
+  },
+];
 
 export const isStackDefault = <K extends keyof StackState>(
   stack: StackState,

@@ -36,6 +36,10 @@ export function deriveProjectName(projectName?: string, projectDirectory?: strin
 export function processFlags(options: CLIInput, projectName?: string) {
   const config: Partial<ProjectConfig> = {};
 
+  if (options.apps !== undefined) {
+    config.apps = options.apps;
+  }
+
   if (options.api) {
     config.api = options.api as API;
   }

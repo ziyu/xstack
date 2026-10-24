@@ -51,6 +51,10 @@ function addCommand(config: ProjectConfig): string {
 export function processAgentGuidance(vfs: VirtualFileSystem, config: ProjectConfig): void {
   const modules = getModulePlan(config).modules;
   const packages = workspaces(vfs);
+  const web = config.apps?.find(
+    (app) => app.type === "fullstack-web" || app.type === "web-frontend" || app.type === "admin",
+  );
+  const webRoot = web ? `apps/${web.id}` : vfs.resolvePath("apps/web");
   const scripts = vfs.readJson<{ scripts?: Record<string, string> }>("package.json")?.scripts ?? {};
   const run = `${config.packageManager} run`;
   const hasConfig = vfs.fileExists("xstack.jsonc");
@@ -82,33 +86,33 @@ export function processAgentGuidance(vfs: VirtualFileSystem, config: ProjectConf
     ...(vfs.directoryExists("packages/events")
       ? [
           `Declare typed domain events by augmenting \`EventMap\` in \`@${config.projectName}/events\`. The in-process bus awaits handlers in order; errors reject \`emit\`. It is not a durable queue and does not provide retries.`,
-          ...(vfs.directoryExists("apps/web/src/integrations")
+          ...(vfs.directoryExists(`${webRoot}/src/integrations`)
             ? [
-                "Cross-feature subscriptions live in `apps/web/src/integrations/`. Keep feature services independent; wire only the integrations for enabled modules and preserve idempotency at side-effect boundaries.",
+                `Cross-feature subscriptions live in \`${webRoot}/src/integrations/\`. Keep feature services independent; wire only the integrations for enabled modules and preserve idempotency at side-effect boundaries.`,
               ]
             : [
                 "Keep cross-feature event wiring in the application composition root, not in another module's internals.",
               ]),
         ]
       : []),
-    ...(vfs.fileExists("apps/web/src/config/navigation.ts")
+    ...(vfs.fileExists(`${webRoot}/src/config/navigation.ts`)
       ? [
-          "Update `apps/web/src/config/navigation.ts` alongside new pages; do not expose protected navigation without matching server-side authorization.",
+          `Update \`${webRoot}/src/config/navigation.ts\` alongside new pages; do not expose protected navigation without matching server-side authorization.`,
         ]
       : []),
-    ...(vfs.directoryExists("apps/web/src/app/[lang]")
+    ...(vfs.directoryExists(`${webRoot}/src/app/[lang]`)
       ? [
-          "Product pages live under `apps/web/src/app/[lang]/`; preserve locale routing and add translations in the selected i18n workspace rather than hard-coding user-facing copy.",
+          `Product pages live under \`${webRoot}/src/app/[lang]/\`; preserve locale routing and add translations in the selected i18n workspace rather than hard-coding user-facing copy.`,
         ]
       : []),
-    ...(config.frontend.includes("tanstack-start") && vfs.directoryExists("apps/web/src/routes")
+    ...(config.frontend.includes("tanstack-start") && vfs.directoryExists(`${webRoot}/src/routes`)
       ? [
-          "TanStack Start routes live in `apps/web/src/routes/`. Preserve locale-prefixed product URLs, server loader authorization and request headers; do not import server services into client components. The generated route tree is framework-owned.",
+          `TanStack Start routes live in \`${webRoot}/src/routes/\`. Preserve locale-prefixed product URLs, server loader authorization and request headers; do not import server services into client components. The generated route tree is framework-owned.`,
         ]
       : []),
-    ...(config.frontend.includes("nuxt") && vfs.directoryExists("apps/web/app/pages")
+    ...(config.frontend.includes("nuxt") && vfs.directoryExists(`${webRoot}/app/pages`)
       ? [
-          "Nuxt pages and components live in `apps/web/app/`; server API adapters live in `apps/web/server/`. Product URLs are locale-prefixed. Keep `apps/web/src/services.ts` and `env.server.ts` server-only; `@/` resolves the shared `src/` directory while `~/` resolves the Nuxt app.",
+          `Nuxt pages and components live in \`${webRoot}/app/\`; server API adapters live in \`${webRoot}/server/\`. Product URLs are locale-prefixed. Keep \`${webRoot}/src/services.ts\` and \`env.server.ts\` server-only; \`@/\` resolves the shared \`src/\` directory while \`~/\` resolves the Nuxt app.`,
         ]
       : []),
   ];
@@ -178,9 +182,9 @@ export function processAgentGuidance(vfs: VirtualFileSystem, config: ProjectConf
           "Follow each app's generated environment accessor and schema. Shared packages receive configuration from the owning app; do not add ad-hoc process.env reads.",
         ]
       : []),
-    ...(cloudflare && vfs.fileExists("apps/web/.dev.vars")
+    ...(cloudflare && vfs.fileExists(`${webRoot}/.dev.vars`)
       ? [
-          "For local workerd previews keep `apps/web/.dev.vars` synchronized with the required local values in `apps/web/.env`; both are secret-bearing and must remain uncommitted.",
+          `For local workerd previews keep \`${webRoot}/.dev.vars\` synchronized with the required local values in \`${webRoot}/.env\`; both are secret-bearing and must remain uncommitted.`,
         ]
       : []),
     "`.xstack/baseline/` is generator-owned merge ancestry, not a backup of local edits. Commit its generated manifest when present; never put secrets into it or modify it by hand. Transaction and lock files are local-only.",

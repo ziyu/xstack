@@ -1,0 +1,8 @@
+{
+  "id": "fullstack-web",
+  "name": "Fullstack web app",
+  "defaultDirectoryName": "web",
+  "roles": ["web-frontend", "backend", "admin"],
+  "scope": "product",
+  "requires": []
+}

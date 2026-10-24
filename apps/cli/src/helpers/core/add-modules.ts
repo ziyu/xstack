@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 
-import { generateReproducibleCommand } from "@xstack/template-generator";
+import { generateReproducibleCommand, resolveApplicationConfig } from "@xstack/template-generator";
 import {
   XStackConfigSchema,
   type AddInput,
@@ -127,7 +127,10 @@ export function addFeatureModules(projectDir: string, input: AddInput) {
       // Preserve optional representation on repeated additions for a true no-op.
       if (isDeepStrictEqual(product.providers, {})) delete product.providers;
       if (isDeepStrictEqual(product.options, {})) delete product.options;
-      const nextConfig = { ...config, product };
+      const nextConfig =
+        config.apps === undefined
+          ? { ...config, product }
+          : resolveApplicationConfig({ ...config, product });
       const validation = validateProductPlan(nextConfig);
       if (validation.isErr()) throw new ModuleAddError({ message: validation.error.message });
       const metadataBytes = await readProjectFile(projectDir, "xstack.jsonc");

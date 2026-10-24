@@ -2,6 +2,7 @@ import { type StackState, TECH_OPTIONS } from "@/lib/constant";
 import { SITE_URL } from "@/lib/site";
 import { stackUrlKeys } from "@/lib/stack-url-keys";
 
+import { APPLICATION_TECH_CATEGORIES } from "./stack-applications";
 import { productPlan } from "./stack-features";
 import { getStackBackend, getStackFrontends, isSelfHostedFullstackBackend } from "./stack-model";
 
@@ -58,6 +59,7 @@ export type SelectedTech = {
 export function getSelectedTechs(stack: StackState): SelectedTech[] {
   const selected: SelectedTech[] = [];
   for (const category of CATEGORY_ORDER) {
+    if (stack.apps !== undefined && APPLICATION_TECH_CATEGORIES.includes(category)) continue;
     const options = TECH_OPTIONS[category];
     const value = stack[category];
     if (!options || value === undefined) continue;
@@ -82,6 +84,7 @@ export function getSelectedTechs(stack: StackState): SelectedTech[] {
 
 export function generateStackSummary(stack: StackState) {
   const selectedTechs = CATEGORY_ORDER.flatMap((category) => {
+    if (stack.apps !== undefined && APPLICATION_TECH_CATEGORIES.includes(category)) return [];
     const options = TECH_OPTIONS[category];
     const selectedValue = stack[category];
 
@@ -103,7 +106,10 @@ export function generateStackSummary(stack: StackState) {
     return selectedValue ? getTechNames(selectedValue) : [];
   });
 
-  return selectedTechs.length > 0 ? selectedTechs.join(" • ") : "Custom stack";
+  const applications =
+    stack.apps?.map((app) => `${app.id} (${app.stack.framework ?? app.type})`) ?? [];
+  const summary = [...applications, ...selectedTechs];
+  return summary.length > 0 ? summary.join(" • ") : "Custom stack";
 }
 
 export function getDesktopBuildNote(stack: Pick<StackState, "addons" | "backend" | "webFrontend">) {
@@ -165,10 +171,14 @@ export function generateStackCommand(stack: StackState) {
   }
 
   const flags = [
-    `--frontend ${getStackFrontends(stack).join(" ")}`,
-    `--backend ${getStackBackend(stack.backend)}`,
-    `--runtime ${stack.runtime}`,
-    `--api ${stack.api}`,
+    ...(stack.apps !== undefined
+      ? [`--apps ${quoteShellArgument(JSON.stringify(stack.apps))}`]
+      : [
+          `--frontend ${getStackFrontends(stack).join(" ")}`,
+          `--backend ${getStackBackend(stack.backend)}`,
+          `--runtime ${stack.runtime}`,
+          `--api ${stack.api}`,
+        ]),
     `--database ${stack.database}`,
     `--orm ${stack.orm}`,
     `--db-setup ${stack.dbSetup}`,
@@ -228,10 +238,10 @@ function serializeStackToSearchString(stack: StackState) {
     if (value !== undefined) {
       stackParams.set(
         urlKey as string,
-        Array.isArray(value)
-          ? value.join(",")
-          : value !== null && typeof value === "object"
-            ? JSON.stringify(value)
+        ["apps", "providers", "moduleOptions"].includes(stackKey)
+          ? JSON.stringify(value)
+          : Array.isArray(value)
+            ? value.join(",")
             : String(value),
       );
     }

@@ -1,6 +1,7 @@
 import { TASK_RUNNER_ADDONS, OBSERVABILITY_ADDONS, type Addons } from "@xstack/types";
 
 import { DEFAULT_STACK, type StackState, TECH_OPTIONS } from "./constant";
+import { projectApplicationStack } from "./stack-applications";
 import { StackModuleOptionsSchema, StackProvidersSchema } from "./stack-schema";
 
 const validWebFrontendIds = TECH_OPTIONS.webFrontend.map((option) => option.id);
@@ -85,8 +86,9 @@ export function sanitizeNativeFrontends(nativeFrontend: readonly string[] | null
 
 export type RawStackLists = Omit<
   StackState,
-  "webFrontend" | "nativeFrontend" | "addons" | "features"
+  "webFrontend" | "nativeFrontend" | "addons" | "features" | "apps"
 > & {
+  apps?: StackState["apps"] | null;
   webFrontend: string[];
   nativeFrontend: string[];
   addons: string[];
@@ -94,8 +96,14 @@ export type RawStackLists = Omit<
 };
 
 export function sanitizeStackState(stack: RawStackLists): StackState {
+  // Explicit layouts are validated, not repaired. In particular, never remove
+  // incompatible features or addons while the user is editing an application.
+  if (stack.apps != null) {
+    return projectApplicationStack({ ...stack, apps: stack.apps } as StackState);
+  }
   return {
     ...stack,
+    apps: undefined,
     webFrontend: sanitizeWebFrontends(stack.webFrontend),
     nativeFrontend: sanitizeNativeFrontends(stack.nativeFrontend),
     addons: sanitizeAddons(stack.addons),

@@ -1,7 +1,7 @@
 import path from "node:path";
 
-import { generateReproducibleCommand } from "@xstack/template-generator";
 import { intro, log, outro } from "@clack/prompts";
+import { generateReproducibleCommand, resolveApplicationConfig } from "@xstack/template-generator";
 import { Result, UnhandledException } from "better-result";
 import pc from "picocolors";
 
@@ -325,7 +325,34 @@ async function createProjectHandlerInternal(
 
     // Build config
     let config: ProjectConfig;
-    if (cliInput.yes) {
+    if (cliInput.apps !== undefined) {
+      const flagConfigResult = processProvidedFlagsWithoutValidation(cliInput, finalBaseName);
+      if (flagConfigResult.isErr()) {
+        return Result.err(
+          new CLIError({ message: flagConfigResult.error.message, cause: flagConfigResult.error }),
+        );
+      }
+      const applicationConfig = withProduct(
+        {
+          ...getDefaultConfig(),
+          ...flagConfigResult.value,
+          projectName: finalBaseName,
+          projectDir: finalResolvedPath,
+          relativePath: finalPathInput,
+        },
+        decidedProduct(cliInput),
+      );
+      const resolved = Result.try({
+        try: () => resolveApplicationConfig(applicationConfig),
+        catch: (cause) =>
+          new CLIError({
+            message: cause instanceof Error ? cause.message : String(cause),
+            cause,
+          }),
+      });
+      if (resolved.isErr()) return Result.err(resolved.error);
+      config = resolved.value;
+    } else if (cliInput.yes) {
       const flagConfigResult = processProvidedFlagsWithoutValidation(cliInput, finalBaseName);
       if (flagConfigResult.isErr()) {
         return Result.err(

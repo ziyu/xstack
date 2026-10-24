@@ -21,7 +21,7 @@ The generated OpenNext adapter obtains `STORAGE_BUCKET` from `getCloudflareConte
 The generated package uses the official `ali-oss` SDK and `@types/ali-oss` development types.
 
 1. Create an OSS bucket in your selected region. Set its ACL to **private** and enable the account/bucket block-public-access controls. Do not add anonymous read policies.
-2. Set `OSS_REGION` (for example `oss-cn-hangzhou`), `OSS_BUCKET`, `OSS_ACCESS_KEY_ID` and `OSS_ACCESS_KEY_SECRET` in `apps/web/.env` or your server's secret manager. `OSS_SECURITY_TOKEN` is optional for temporary credentials; rotate all temporary credentials before expiration.
+2. Set `OSS_REGION` (for example `oss-cn-hangzhou`), `OSS_BUCKET`, `OSS_ACCESS_KEY_ID` and `OSS_ACCESS_KEY_SECRET` in `{{appPath "fullstack-web"}}/.env` or your server's secret manager. `OSS_SECURITY_TOKEN` is optional for temporary credentials; rotate all temporary credentials before expiration.
 3. Use a dedicated RAM identity. Grant only `oss:PutObject`, `oss:GetObject` and `oss:DeleteObject` on this bucket's application objects (`acs:oss:*:*:<bucket>/*`, narrowed to the generated application object prefix when deploying). Do not grant bucket administration, ACL administration, public access or wildcard-account permissions. Bucket enumeration is not needed: the application lists its own database rows.
 
 See [OSS Node.js SDK documentation](https://www.alibabacloud.com/help/en/oss/developer-reference/node-js) and [RAM policies for OSS](https://www.alibabacloud.com/help/en/oss/user-guide/overview-10).
@@ -30,7 +30,7 @@ See [OSS Node.js SDK documentation](https://www.alibabacloud.com/help/en/oss/dev
 The generated package uses the official `cos-nodejs-sdk-v5` SDK, which includes its TypeScript declarations.
 
 1. Create a COS bucket and choose **private read/write**. Keep public access disabled and do not add anonymous read policies.
-2. Set `COS_REGION` (for example `ap-guangzhou`), `COS_BUCKET` (including the APPID suffix), `COS_SECRET_ID` and `COS_SECRET_KEY` in `apps/web/.env` or your server's secret manager. `COS_SECURITY_TOKEN` is optional for temporary credentials; rotate all temporary credentials before expiration.
+2. Set `COS_REGION` (for example `ap-guangzhou`), `COS_BUCKET` (including the APPID suffix), `COS_SECRET_ID` and `COS_SECRET_KEY` in `{{appPath "fullstack-web"}}/.env` or your server's secret manager. `COS_SECURITY_TOKEN` is optional for temporary credentials; rotate all temporary credentials before expiration.
 3. Use a dedicated CAM identity. Grant only `name/cos:PutObject`, `name/cos:GetObject` and `name/cos:DeleteObject` on this bucket's application objects (`qcs::cos:<region>:uid/<APPID>:<bucket>/*`, narrowed to the generated application object prefix when deploying). Do not grant bucket administration, ACL administration, public access or wildcard-account permissions. Bucket enumeration is not needed: the application lists its own database rows.
 
 See [COS Node.js SDK documentation](https://www.tencentcloud.com/document/product/436/8629) and [COS access management](https://www.tencentcloud.com/document/product/436/10313).

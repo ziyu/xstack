@@ -1,5 +1,6 @@
 import type { ProjectConfig } from "@xstack/types";
 
+import { renderCatalogApplication } from "../apps/render";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { type TemplateData, processTemplatesFromPrefix } from "./utils";
 
@@ -23,12 +24,5 @@ export async function processBackendTemplates(
 
   if (config.backend === "self") return;
 
-  processTemplatesFromPrefix(vfs, templates, "backend/server/base", "apps/server", config);
-  processTemplatesFromPrefix(
-    vfs,
-    templates,
-    `backend/server/${config.backend}`,
-    "apps/server",
-    config,
-  );
+  renderCatalogApplication(vfs, templates, config, "backend", config.backend);
 }

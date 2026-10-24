@@ -26,7 +26,7 @@ ability.can("access", "Admin");
 Admins `manage` everything. Add roles or finer rules in `defineAbilityFor`, and register new subjects through declaration merging on `SubjectMap`.
 
 {{#if (includes frontend "next")}}
-Pages call `requireAdmin(locale)` from `apps/web/src/lib/admin.ts`.
+Pages call `requireAdmin(locale)` from `{{appPath "fullstack-web"}}/src/lib/admin.ts`.
 {{else}}
 Protected page loaders and API handlers check the authenticated session's admin role on the server. Hiding a navigation item is not authorization.
 {{/if}}
@@ -34,10 +34,10 @@ Protected page loaders and API handlers check the authenticated session's admin 
 ## Adding pages
 
 {{#if (includes frontend "next")}}
-Create `apps/web/src/app/[lang]/admin/<page>/page.tsx`.
+Create `{{appPath "fullstack-web"}}/src/app/[lang]/admin/<page>/page.tsx`.
 {{else if (includes frontend "tanstack-start")}}
-Add a locale-prefixed admin route under `apps/web/src/routes/` with a server-authorized loader.
+Add a locale-prefixed admin route under `{{appPath "fullstack-web"}}/src/routes/` with a server-authorized loader.
 {{else}}
-Add the page in `apps/web/app/pages/` and its protected data handler in `apps/web/server/`.
+Add the page in `{{appPath "fullstack-web"}}/app/pages/` and its protected data handler in `{{appPath "fullstack-web"}}/server/`.
 {{/if}}
-Add an entry to `navigation.admin` in `apps/web/src/config/navigation.ts`. Modules such as payment and credits add their pages this way.
+Add an entry to `navigation.admin` in `{{appPath "fullstack-web"}}/src/config/navigation.ts`. Modules such as payment and credits add their pages this way.

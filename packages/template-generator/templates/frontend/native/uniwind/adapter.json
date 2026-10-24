@@ -1,0 +1,12 @@
+{
+  "id": "native-uniwind",
+  "apps": {
+    "native": {
+      "stack": {
+        "frontend": ["native-uniwind"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}

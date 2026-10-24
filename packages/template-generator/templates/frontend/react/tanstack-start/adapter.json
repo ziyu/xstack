@@ -1,0 +1,20 @@
+{
+  "id": "tanstack-start",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": ["tanstack-start"],
+        "backend": "self",
+        "runtime": "none",
+        "api": "none"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": ["tanstack-start"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}

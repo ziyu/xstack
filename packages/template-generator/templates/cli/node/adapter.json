@@ -1,0 +1,11 @@
+{
+  "id": "node",
+  "apps": {
+    "cli": {
+      "stack": {
+        "runtime": "node",
+        "api": "none"
+      }
+    }
+  }
+}

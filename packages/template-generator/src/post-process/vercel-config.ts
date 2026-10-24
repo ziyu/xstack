@@ -3,8 +3,8 @@
  * Builds vercel.json programmatically (Vercel Services: web + server in one project)
  */
 
-import type { ProjectConfig } from "@xstack/types";
 import type { ServiceConfig, Services } from "@vercel/build-utils";
+import type { ProjectConfig } from "@xstack/types";
 
 import type { VirtualFileSystem } from "../core/virtual-fs";
 

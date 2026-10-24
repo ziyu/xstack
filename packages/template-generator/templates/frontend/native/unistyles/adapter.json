@@ -1,0 +1,12 @@
+{
+  "id": "native-unistyles",
+  "apps": {
+    "native": {
+      "stack": {
+        "frontend": ["native-unistyles"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}

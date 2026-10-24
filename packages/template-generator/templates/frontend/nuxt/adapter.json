@@ -1,0 +1,20 @@
+{
+  "id": "nuxt",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": ["nuxt"],
+        "backend": "self",
+        "runtime": "none",
+        "api": "none"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": ["nuxt"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}

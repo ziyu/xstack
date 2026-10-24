@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+import { parseArgs } from "node:util";
+
+try {
+  const { values, positionals } = parseArgs({
+    allowPositionals: true,
+    options: { help: { type: "boolean", short: "h" }, name: { type: "string" } },
+  });
+  const command = positionals[0];
+  if (values.help || !command) {
+    console.log("{{application.id}}\n\nUsage: {{application.id}} greet [--name <name>]\n       {{application.id}} --help");
+  } else if (command === "greet" && positionals.length === 1) {
+    console.log(`Hello, ${values.name ?? "world"}!`);
+  } else {
+    throw new Error(`Unknown command: ${positionals.join(" ")}`);
+  }
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+}

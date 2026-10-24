@@ -5,7 +5,15 @@ import { TaggedError } from "better-result";
  * The config stack templates and processors render with: the project config plus the
  * auth engine derived from the module plan.
  */
-export type RenderConfig = ProjectConfig & { auth: Auth };
+export type ApplicationRenderContext = {
+  id: string;
+  type: string;
+  port: number;
+  clientOrigins: string[];
+  paths: Record<string, string>;
+  workspaceRuntime: ProjectConfig["runtime"];
+};
+export type RenderConfig = ProjectConfig & { auth: Auth; application?: ApplicationRenderContext };
 
 export interface VirtualFile {
   type: "file";

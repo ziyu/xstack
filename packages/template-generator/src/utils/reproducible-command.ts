@@ -45,6 +45,11 @@ export function generateReproducibleCommand(config: ProjectConfig): string {
   const frontend = normalizeMultiValues(config.frontend);
   const addons = normalizeMultiValues(config.addons);
 
+  if (config.apps !== undefined) {
+    const applications = JSON.stringify(config.apps).replace(/'/g, "'\\''");
+    flags.push(`--apps '${applications}'`);
+  }
+
   flags.push(formatMultiFlag("--frontend", frontend));
 
   flags.push(`--backend ${config.backend}`);

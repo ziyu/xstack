@@ -7,6 +7,7 @@ import {
 } from "@xstack/template-generator/modules";
 import type { Auth } from "@xstack/types";
 
+import { APPLICATION_MODULE_ISSUE, projectApplicationStack } from "./stack-applications";
 import { getStackBackend, getStackFrontends } from "./stack-model";
 import type { StackState } from "./types";
 
@@ -15,6 +16,7 @@ export function selectedFeatures(stack: Pick<StackState, "features">): string[] 
 }
 
 function stackContext(stack: StackState): StackContext {
+  stack = projectApplicationStack(stack);
   return {
     projectName: stack.projectName ?? "my-xstack-app",
     frontend: getStackFrontends(stack),
@@ -50,6 +52,9 @@ export function stackAuth(stack: StackState): Auth {
 export function featureIssue(stack: StackState, feature: string): string | null {
   const current = selectedFeatures(stack);
   if (current.includes(feature)) return null;
+  if (stack.apps !== undefined && !stack.apps.some((app) => app.type === "fullstack-web")) {
+    return APPLICATION_MODULE_ISSUE;
+  }
   // Provider/option errors are repaired in their controls, not by disabling a feature.
   const structuralStack = { ...stack, providers: {}, moduleOptions: {} };
   const known = new Set(
@@ -72,6 +77,7 @@ export type FeatureRemoval = { feature: string; reason: string };
 export type ResolvedFeatures = { features: string[]; removed: FeatureRemoval[] };
 
 export function resolvableFeatures(stack: StackState): ResolvedFeatures {
+  if (stack.apps !== undefined) return { features: selectedFeatures(stack), removed: [] };
   let features = selectedFeatures(stack);
   const removed: FeatureRemoval[] = [];
   while (features.length) {

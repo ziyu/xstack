@@ -27,6 +27,21 @@ Use a predefined project template:
 xstack --template t3
 ```
 
+### `--apps <json>`
+
+Select named application instances using stable type manifests in `templates/apps/<type>/app.json`. Technology source lives in its existing directory with `apps/<type>` contributions, for example `frontend/astro/apps/web-frontend` and `backend/server/hono/apps/backend`. An adjacent `adapter.json` declares supported app types and stack defaults; paths follow the directory convention rather than a source/target mapping. Module contributions retain `modules/<module>/frameworks/<framework>/apps/<type>`.
+
+```bash
+xstack my-product --yes --apps '[{"id":"product","type":"fullstack-web","stack":{"framework":"next"}},{"id":"tools","type":"cli","stack":{"framework":"node","runtime":"node"}}]'
+xstack my-product --yes --apps '[{"id":"frontend","type":"web-frontend","stack":{"framework":"react-router"}},{"id":"api","type":"backend","stack":{"framework":"hono","runtime":"node","api":"orpc"}},{"id":"admin","type":"admin","stack":{"framework":"react-router"}}]'
+```
+
+Each instance is `{id,type,stack,product?,bindings?}`. Types `fullstack-web`, `web-frontend`, `backend`, `admin`, `cli` and `native` are stable responsibilities, not framework names. `fullstack-web` owns the `web-frontend`, `backend` and `admin` roles and cannot coexist with split owners in the same product. Independent CLI applications can coexist with either layout. `stack.framework` is required by resolution; runtime/API are optional adapter choices (native fullstack defaults to `none`/`none`, Hono to `bun`/`orpc`). Switching a Fullstack Web app from Next to Nuxt leaves its type and roles unchanged. Optional `product` defaults to `main`; optional `bindings` names required-role owners, for example `{"backend":"api"}`. Missing owners, conflicting roles, cycles, unsupported type/framework combinations and unsafe IDs are errors. The old `web`/`site` type IDs and `template` field are rejected. Configuration, MCP and reproducible commands retain `apps`; generated output is under `apps/<id>`.
+
+Every type manifest requires `defaultDirectoryName`, separate from its stable type ID and the instance's custom `id`. Builder additions and legacy conversion suggest `web` for `fullstack-web`, `frontend` for `web-frontend`, and `backend`, `admin`, `cli` or `native` for those types, adding numeric suffixes when occupied. Renaming an instance changes its output directory; switching its type preserves that name. Legacy configurations without `apps` retain physical `apps/web` output.
+
+Explicit layouts currently support one product plus independent applications, with `dbSetup`, `webDeploy` and `serverDeploy` set to `none`, and no addons other than Turborepo. Split templates provide application shells and the declared API connection; native business modules retain their compatibility restrictions. Builder's **Applications** editor manages named instances and their individual frameworks, while shared database and tooling remain project-level. Its commands and file previews use the same `apps` configuration as CLI and MCP.
+
 ### `--manual-db`
 
 Skip automatic database setup prompts and use manual database configuration.

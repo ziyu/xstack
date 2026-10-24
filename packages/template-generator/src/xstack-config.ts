@@ -32,6 +32,7 @@ export function writeXStackConfigToVfs(
     webDeploy: projectConfig.webDeploy,
     serverDeploy: projectConfig.serverDeploy,
     product: projectConfig.product,
+    apps: projectConfig.apps,
   };
 
   const baseContent = {

@@ -46,6 +46,38 @@ test("create-json preserves dry-run behavior and emits a JSON result", async () 
   expect(await fs.pathExists(join(SMOKE_DIR, "json-dry-run"))).toBe(false);
 });
 
+test("create-json persists stable app selections and writes each instance directory", async () => {
+  const apps = [{ id: "tools", type: "cli", stack: { framework: "node", runtime: "node" } }];
+  const projectName = "stable-application-cli";
+  const { stdout } = await runCli(
+    [
+      "create-json",
+      "--json",
+      JSON.stringify({
+        projectName,
+        apps,
+        yes: true,
+        install: false,
+        git: false,
+        disableAnalytics: true,
+      }),
+    ],
+    { XSTACK_SKIP_EXTERNAL_COMMANDS: "1" },
+  );
+  const result = JSON.parse(stdout);
+  expect(result.success).toBe(true);
+  expect(result.projectConfig.apps).toEqual(apps);
+  const projectDir = join(SMOKE_DIR, projectName);
+  const saved = parse(await fs.readFile(join(projectDir, "xstack.jsonc"), "utf8"));
+  expect(saved.apps).toEqual(apps);
+  const manifest = JSON.parse(
+    await fs.readFile(join(projectDir, "apps/tools/package.json"), "utf8"),
+  );
+  expect(manifest.name).toBe("tools");
+  expect(await fs.pathExists(join(projectDir, "apps/tools/src/index.js"))).toBe(true);
+  expect(await fs.pathExists(join(projectDir, "apps/cli"))).toBe(false);
+});
+
 test("default create respects negated flags and add-json creates a workspace package", async () => {
   const projectDir = join(SMOKE_DIR, "command-output");
   await runCli([

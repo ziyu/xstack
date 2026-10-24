@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 
 import { ActionButtons } from "../action-buttons";
 import { PreviewPanel, useStackPreview } from "../preview-panel";
+import { ApplicationEditor } from "./application-editor";
+import { ApplicationTechnology } from "./application-technology";
 import { CategoryNav, scrollToCategorySection } from "./category-nav";
 import { ProductOptions } from "./product-options";
 import { SelectedStackBadges } from "./selected-stack-badges";
@@ -56,10 +58,15 @@ export function StackBuilder() {
     viewMode,
   } = useStackBuilder();
   const effectiveStack = compatibilityAnalysis.stack;
-  const preview = useStackPreview(effectiveStack, viewMode === "preview");
+  const preview = useStackPreview(effectiveStack, viewMode === "preview" && !configurationError);
   const desktopBuildNote = getDesktopBuildNote(effectiveStack);
   const displayCommand = formatStackCommandForDisplay(command);
   const [commandExpanded, setCommandExpanded] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState(0);
+  const applicationIndex = Math.min(
+    selectedApplication,
+    Math.max(0, (effectiveStack.apps?.length ?? 0) - 1),
+  );
   const isCommandMultiline = displayCommand !== command;
   const selectedPreset = findMatchingPreset(effectiveStack);
 
@@ -90,9 +97,9 @@ export function StackBuilder() {
           <option value="" disabled>
             Custom configuration
           </option>
-          {[...new Set(PRESET_TEMPLATES.map((preset) => preset.framework))].map((framework) => (
-            <optgroup key={framework} label={framework}>
-              {PRESET_TEMPLATES.filter((preset) => preset.framework === framework).map((preset) => (
+          {[...new Set(PRESET_TEMPLATES.map((preset) => preset.group))].map((group) => (
+            <optgroup key={group} label={group}>
+              {PRESET_TEMPLATES.filter((preset) => preset.group === group).map((preset) => (
                 <option key={preset.id} value={preset.id}>
                   {preset.name}
                 </option>
@@ -130,12 +137,16 @@ export function StackBuilder() {
               </button>
               <button
                 type="button"
+                disabled={!!configurationError}
+                title={
+                  configurationError ? "Resolve configuration errors before previewing" : undefined
+                }
                 onClick={() => {
                   track("builder_mobile_tab", { tab: "preview" });
                   setMobileTab("preview");
                 }}
                 className={cn(
-                  "builder-focus-ring -m-2 flex items-center gap-1.5 p-2 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors duration-150",
+                  "builder-focus-ring -m-2 flex items-center gap-1.5 p-2 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50",
                   mobileTab === "preview"
                     ? "text-primary"
                     : "text-fd-muted-foreground hover:text-fd-foreground",
@@ -342,6 +353,12 @@ export function StackBuilder() {
                 </button>
                 <button
                   type="button"
+                  disabled={!!configurationError}
+                  title={
+                    configurationError
+                      ? "Resolve configuration errors before previewing"
+                      : undefined
+                  }
                   onClick={() => {
                     track("builder_view_mode", { mode: "preview" });
                     startTransition(() => {
@@ -349,7 +366,7 @@ export function StackBuilder() {
                     });
                   }}
                   className={cn(
-                    "builder-focus-ring -m-2 flex items-center gap-1.5 p-2 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors duration-150",
+                    "builder-focus-ring -m-2 flex items-center gap-1.5 p-2 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50",
                     viewMode === "preview"
                       ? "text-primary"
                       : "text-fd-muted-foreground hover:text-fd-foreground",
@@ -369,6 +386,28 @@ export function StackBuilder() {
                 <ScrollArea className="h-full overflow-hidden scroll-smooth">
                   <main className="@container p-2 sm:p-4">
                     {templatePresets}
+                    <ApplicationEditor
+                      stack={effectiveStack}
+                      onChange={setStack}
+                      selectedIndex={applicationIndex}
+                      onSelect={setSelectedApplication}
+                    />
+                    <ApplicationTechnology
+                      stack={effectiveStack}
+                      onChange={setStack}
+                      selectedIndex={applicationIndex}
+                    />
+                    {configurationError && (
+                      <div
+                        role="alert"
+                        className="mb-4 whitespace-pre-line rounded border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"
+                      >
+                        <p className="mb-1 font-medium">
+                          Resolve configuration errors to copy or preview
+                        </p>
+                        {configurationError}
+                      </div>
+                    )}
                     <TechCategories
                       mode="desktop"
                       stack={effectiveStack}
@@ -386,8 +425,9 @@ export function StackBuilder() {
                         Infrastructure & tooling
                       </summary>
                       <p className="my-3 text-xs text-fd-muted-foreground">
-                        Native product modules target Next.js full-stack with Drizzle. Other stacks
-                        only expose modules they support.
+                        {effectiveStack.apps !== undefined
+                          ? "Shared database and tooling. Each application owns its framework and runtime."
+                          : "Project-wide technology, database and tooling. Available product modules depend on the selected stack."}
                       </p>
                       <TechCategories
                         mode="desktop"
@@ -537,6 +577,28 @@ export function StackBuilder() {
                   </div>
 
                   {templatePresets}
+                  <ApplicationEditor
+                    stack={effectiveStack}
+                    onChange={setStack}
+                    selectedIndex={applicationIndex}
+                    onSelect={setSelectedApplication}
+                  />
+                  <ApplicationTechnology
+                    stack={effectiveStack}
+                    onChange={setStack}
+                    selectedIndex={applicationIndex}
+                  />
+                  {configurationError && (
+                    <div
+                      role="alert"
+                      className="mb-4 whitespace-pre-line rounded border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"
+                    >
+                      <p className="mb-1 font-medium">
+                        Resolve configuration errors to copy or preview
+                      </p>
+                      {configurationError}
+                    </div>
+                  )}
                   <TechCategories
                     mode="mobile"
                     stack={effectiveStack}
@@ -554,7 +616,9 @@ export function StackBuilder() {
                       Infrastructure & tooling
                     </summary>
                     <p className="my-3 text-xs text-fd-muted-foreground">
-                      Native product modules target Next.js full-stack with Drizzle.
+                      {effectiveStack.apps !== undefined
+                        ? "Shared database and tooling. Each application owns its framework and runtime."
+                        : "Project-wide technology, database and tooling. Available product modules depend on the selected stack."}
                     </p>
                     <TechCategories
                       mode="mobile"

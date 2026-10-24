@@ -1,6 +1,12 @@
 import type { z } from "zod";
 
 import type {
+  ApplicationIdSchema,
+  ApplicationRoleSchema,
+  ApplicationSelectionSchema,
+  ApplicationSelectionStackSchema,
+} from "./applications";
+import type {
   DatabaseSchema,
   ORMSchema,
   BackendSchema,
@@ -26,6 +32,10 @@ import type {
   InitResultSchema,
   ProductConfigSchema,
   ProductPresetSchema,
+  ApplicationManifestSchema,
+  ApplicationStackSchema,
+  ApplicationAdapterSchema,
+  FrameworkAdapterSchema,
 } from "./schemas";
 
 // Inferred types from Zod schemas
@@ -55,6 +65,14 @@ export type XStackConfig = z.infer<typeof XStackConfigSchema>;
 export type InitResult = z.infer<typeof InitResultSchema>;
 export type ProductConfig = z.infer<typeof ProductConfigSchema>;
 export type ProductPreset = z.infer<typeof ProductPresetSchema>;
+export type ApplicationId = z.infer<typeof ApplicationIdSchema>;
+export type ApplicationRole = z.infer<typeof ApplicationRoleSchema>;
+export type ApplicationSelection = z.infer<typeof ApplicationSelectionSchema>;
+export type ApplicationStack = z.infer<typeof ApplicationStackSchema>;
+export type ApplicationManifest = z.infer<typeof ApplicationManifestSchema>;
+export type ApplicationSelectionStack = z.infer<typeof ApplicationSelectionStackSchema>;
+export type ApplicationAdapter = z.infer<typeof ApplicationAdapterSchema>;
+export type FrameworkAdapter = z.infer<typeof FrameworkAdapterSchema>;
 
 export type WebFrontend = Extract<
   Frontend,

@@ -45,8 +45,11 @@ export function replaceStackFiles(
 ): string[] {
   const files = vfs.getAllFiles();
   const deleted: string[] = [];
-  for (const path of paths) {
-    const targets = path.endsWith("/") ? files.filter((file) => file.startsWith(path)) : [path];
+  for (const logicalPath of paths) {
+    const path = vfs.resolvePath(logicalPath).replace(/\/$/, "");
+    const targets = logicalPath.endsWith("/")
+      ? files.filter((file) => file.startsWith(`${path}/`))
+      : [path];
     if (!targets.length || !targets.every((file) => vfs.exists(file))) {
       throw new GeneratorError({
         message: `Module "${module}" replaces ${path}, which the stack templates no longer generate`,

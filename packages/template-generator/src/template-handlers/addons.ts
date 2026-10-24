@@ -20,14 +20,32 @@ export async function processAddonTemplates(
       if (
         config.frontend.some((frontend) => ["solid", "react-router", "next"].includes(frontend))
       ) {
-        processTemplatesFromPrefix(vfs, templates, "addons/pwa/apps/web/ssr", "apps/web", config);
+        processTemplatesFromPrefix(
+          vfs,
+          templates,
+          "addons/pwa/apps/fullstack-web/ssr",
+          "apps/web",
+          config,
+        );
       }
       if (config.frontend.includes("next")) {
-        processTemplatesFromPrefix(vfs, templates, "addons/pwa/apps/web/next", "apps/web", config);
+        processTemplatesFromPrefix(
+          vfs,
+          templates,
+          "addons/pwa/apps/fullstack-web/next",
+          "apps/web",
+          config,
+        );
       } else if (
         config.frontend.some((f) => ["tanstack-router", "react-router", "solid"].includes(f))
       ) {
-        processTemplatesFromPrefix(vfs, templates, "addons/pwa/apps/web/vite", "apps/web", config);
+        processTemplatesFromPrefix(
+          vfs,
+          templates,
+          "addons/pwa/apps/fullstack-web/vite",
+          "apps/web",
+          config,
+        );
       }
       continue;
     }

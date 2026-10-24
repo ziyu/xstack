@@ -26,6 +26,7 @@ export { Result } from "better-result";
 
 // Re-export types needed for configuration options
 export type {
+  ApplicationSelection,
   Database,
   ORM,
   Backend,

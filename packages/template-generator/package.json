@@ -3,11 +3,11 @@
   "version": "3.47.0",
   "description": "Virtual file system generator for xstack templates - works in browsers and Node.js",
   "keywords": [
-    "xstack",
     "cli",
     "template-generator",
     "typescript",
-    "virtual-fs"
+    "virtual-fs",
+    "xstack"
   ],
   "homepage": "https://xstack.dev/",
   "license": "MIT",
@@ -34,6 +34,10 @@
     "./modules": {
       "types": "./dist/modules/index.d.mts",
       "default": "./dist/modules/index.mjs"
+    },
+    "./apps": {
+      "types": "./dist/apps/index.d.mts",
+      "default": "./dist/apps/index.mjs"
     },
     "./template-reader": {
       "types": "./dist/core/template-reader.d.mts",

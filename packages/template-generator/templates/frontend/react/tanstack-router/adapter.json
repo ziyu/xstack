@@ -1,0 +1,12 @@
+{
+  "id": "tanstack-router",
+  "apps": {
+    "web-frontend": {
+      "stack": {
+        "frontend": ["tanstack-router"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}

@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  ApplicationIdSchema,
+  ApplicationRoleSchema,
+  ApplicationSelectionSchema,
+} from "./applications";
 import { TASK_RUNNER_ADDONS, OBSERVABILITY_ADDONS } from "./compatibility";
 
 export const DatabaseSchema = z
@@ -93,6 +98,46 @@ export const DatabaseSetupSchema = z
   .describe("Database hosting setup");
 
 export const APISchema = z.enum(["trpc", "orpc", "none"]).describe("API type");
+
+export const ApplicationStackSchema = z.strictObject({
+  frontend: z.array(FrontendSchema).optional(),
+  backend: BackendSchema.optional(),
+  runtime: RuntimeSchema.optional(),
+  api: APISchema.optional(),
+});
+
+export const ApplicationManifestSchema = z
+  .strictObject({
+    id: ApplicationIdSchema,
+    name: z.string().min(1),
+    defaultDirectoryName: ApplicationIdSchema,
+    roles: z.array(ApplicationRoleSchema),
+    scope: z.enum(["product", "independent"]),
+    requires: z.array(ApplicationRoleSchema),
+  })
+  .superRefine((manifest, ctx) => {
+    for (const key of ["roles", "requires"] as const) {
+      if (new Set(manifest[key]).size !== manifest[key].length) {
+        ctx.addIssue({ code: "custom", path: [key], message: `${key} must be unique` });
+      }
+      if (manifest.scope === "independent" && manifest[key].length > 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: "Independent applications cannot own or require product roles",
+        });
+      }
+    }
+  });
+
+export const ApplicationAdapterSchema = z.strictObject({
+  stack: ApplicationStackSchema,
+});
+
+export const FrameworkAdapterSchema = z.strictObject({
+  id: ApplicationIdSchema,
+  apps: z.record(ApplicationIdSchema, ApplicationAdapterSchema),
+});
 
 /** Engine the auth module's stack templates render; derived from the module plan, never a stack choice. */
 export const AuthSchema = z
@@ -553,6 +598,7 @@ export const CreateInputSchema = z
     manualDb: z.boolean().optional(),
     preset: ProductPresetSchema.optional(),
     product: ProductConfigSchema.optional(),
+    apps: z.array(ApplicationSelectionSchema).optional(),
   })
   .strict()
   .refine((input) => !(input.manualDb !== undefined && input.dbSetupOptions?.mode !== undefined), {
@@ -638,6 +684,7 @@ export const ProjectConfigSchema = z.object({
   webDeploy: WebDeploySchema,
   serverDeploy: ServerDeploySchema,
   product: ProductConfigSchema.optional(),
+  apps: z.array(ApplicationSelectionSchema).optional(),
 });
 
 export const XStackConfigSchema = z.object({
@@ -658,6 +705,7 @@ export const XStackConfigSchema = z.object({
   webDeploy: WebDeploySchema,
   serverDeploy: ServerDeploySchema,
   product: ProductConfigSchema.optional(),
+  apps: z.array(ApplicationSelectionSchema).optional(),
 });
 
 export const XStackConfigFileSchema = XStackConfigSchema.safeExtend({

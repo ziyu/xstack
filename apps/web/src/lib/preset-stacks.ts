@@ -6,12 +6,25 @@ function configurationKey(stack: StackState) {
     projectName: _,
     providers,
     moduleOptions,
+    apps,
     ...configuration
   } = resolveStackCompatibility(stack).stack;
   const entries = [
     ...Object.entries(configuration)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, value]) => [key, Array.isArray(value) ? [...value].sort() : value]),
+    [
+      "apps",
+      apps
+        ?.map((app) => ({
+          id: app.id,
+          type: app.type,
+          product: app.product ?? "main",
+          stack: Object.entries(app.stack).sort(([a], [b]) => a.localeCompare(b)),
+          bindings: Object.entries(app.bindings ?? {}).sort(([a], [b]) => a.localeCompare(b)),
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id)),
+    ],
     [
       "providers",
       Object.entries(providers)

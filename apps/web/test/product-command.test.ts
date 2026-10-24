@@ -23,6 +23,9 @@ test("builder command creates the requested provider-specific product without pr
       moduleOptions: { i18n: { locales: "zh-CN" }, credits: { signupBonus: 50 } },
     };
     const command = generateStackCommand(stack);
+    expect(command).toContain("--apps '");
+    expect(command).not.toContain("--frontend ");
+    expect(command).not.toContain("--backend ");
     const prefix = "bun create xstack@latest ";
     expect(command.startsWith(prefix)).toBe(true);
     const cli = resolve(import.meta.dir, "../../cli/dist/cli.mjs");
@@ -63,6 +66,7 @@ test("builder command creates the requested provider-specific product without pr
       Bun.JSONC.parse(await readFile(join(project, "xstack.jsonc"), "utf8")),
     );
     expect(config.product?.providers).toEqual(stack.providers);
+    expect(config.apps).toEqual(stack.apps);
     expect(Number(config.product?.options?.credits?.signupBonus)).toBe(50);
     expect(
       await readFile(join(project, "apps/web/src/integrations/credits-signup.ts"), "utf8"),

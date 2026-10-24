@@ -1,0 +1,12 @@
+{
+  "id": "fastify",
+  "apps": {
+    "backend": {
+      "stack": {
+        "backend": "fastify",
+        "runtime": "bun",
+        "api": "orpc"
+      }
+    }
+  }
+}

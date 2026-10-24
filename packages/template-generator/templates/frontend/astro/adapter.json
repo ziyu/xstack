@@ -1,0 +1,20 @@
+{
+  "id": "astro",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": ["astro"],
+        "backend": "self",
+        "runtime": "none",
+        "api": "orpc"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": ["astro"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}

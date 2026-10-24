@@ -1,3 +1,4 @@
+import { resolveApplicationConfig } from "@xstack/template-generator";
 import { Result } from "better-result";
 
 import type { CLIInput, ProjectConfig } from "./types";
@@ -31,7 +32,7 @@ function validateYesFlagCombination(
     return Result.ok(undefined);
   }
   // Product mode pins the stack itself and rejects incompatible flags with specific messages.
-  if (options.preset || options.product) {
+  if (options.apps !== undefined || options.preset || options.product) {
     return Result.ok(undefined);
   }
 
@@ -142,6 +143,17 @@ export function validateConfigCompatibility(
 }
 
 export function validateResolvedConfigCompatibility(config: ProjectConfig): ValidationResult<void> {
+  if (config.apps !== undefined) {
+    const resolved = Result.try({
+      try: () => resolveApplicationConfig(config),
+      catch: (cause) =>
+        new ValidationError({
+          message: cause instanceof Error ? cause.message : String(cause),
+        }),
+    });
+    if (resolved.isErr()) return Result.err(resolved.error);
+    return validateConfigForProgrammaticUse(resolved.value);
+  }
   return validateFullConfig(config, coreStackFlags, config);
 }
 

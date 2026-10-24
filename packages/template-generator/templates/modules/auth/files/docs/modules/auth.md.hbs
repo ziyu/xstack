@@ -1,6 +1,6 @@
 # Authentication
 
-Built on [Better Auth](https://better-auth.com). The `packages/auth` package exports `createAuth(env, db, events)`; `apps/web/src/services.ts` creates the instance.
+Built on [Better Auth](https://better-auth.com). The `packages/auth` package exports `createAuth(env, db, events)`; `{{appPath "fullstack-web"}}/src/services.ts` creates the instance.
 
 The HTTP boundary is `/api/auth/**` on every framework. {{#if (includes frontend "next")}}Next.js uses the Better Auth `nextCookies` adapter.{{else if (includes frontend "tanstack-start")}}TanStack Start uses `tanstackStartCookies` as the last auth plugin so server API calls can propagate session cookies.{{else}}Nuxt forwards the H3 request to the Better Auth WHATWG handler and returns its response, including every session cookie.{{/if}} Never cache authenticated responses or expose the server service graph to client bundles.
 
@@ -65,7 +65,7 @@ No inline QR script or provider secret is sent to the browser. AppSecret and tok
 | `auth.phone_verification_requested` | A phone OTP should be sent; payload is `{ phoneNumber, code }` |
 {{/if}}
 
-Subscribe in `apps/web/src/integrations/*.ts`.
+Subscribe in `{{appPath "fullstack-web"}}/src/integrations/*.ts`.
 
 {{#if (includes module.integrations "sms")}}
 ## Phone sign-up and sign-in
@@ -99,7 +99,7 @@ Use the generated framework's protected page loader and preserve incoming reques
 
 ## Schema changes
 
-After adding Better Auth plugins, regenerate the schema with `bun run auth:generate` in `apps/web`, then `bun run db:push`.
+After adding Better Auth plugins, regenerate the schema with `bun run auth:generate` in `{{appPath "fullstack-web"}}`, then `bun run db:push`.
 {{#if (includes module.integrations "sms")}}
 
 The generated Drizzle auth schema already includes nullable, unique `user.phoneNumber`, `phoneNumberVerified`, `phone_otp_challenge`, and `rate_limit` for {{database}}. Preserve the custom challenge table when regenerating Better Auth's schema: it is managed by this integration rather than the upstream phone plugin. Apply the schema to the deployment database before accepting phone sign-ins.

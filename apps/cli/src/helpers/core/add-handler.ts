@@ -470,6 +470,18 @@ async function addHandlerInternal(
     );
   }
 
+  if (
+    existingConfig.apps !== undefined &&
+    (!input.package || input.addons?.some((addon) => addon !== "none"))
+  ) {
+    return Result.err(
+      new CLIError({
+        message:
+          "Adding addons to explicit application layouts is not supported: addon setup assumes fixed app directories. Feature modules can still be added with --features.",
+      }),
+    );
+  }
+
   if (!isSilent()) {
     log.info(pc.dim(`Detected project: ${existingConfig.projectName}`));
   }
@@ -572,6 +584,7 @@ async function addHandlerInternal(
     frontend: existingConfig.frontend,
     addons: addonsToAdd, // Only the new addons for template processing
     product: existingConfig.product,
+    apps: existingConfig.apps,
     git: false,
     packageManager: input.packageManager || existingConfig.packageManager,
     install: input.install ?? false,

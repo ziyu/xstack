@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { type BuilderCopySource, stackSnapshot, track } from "@/lib/analytics";
 import { DEFAULT_STACK, PRESET_TEMPLATES, type StackState, TECH_OPTIONS } from "@/lib/constant";
 import { sanitizeAddons, sanitizeFeatures } from "@/lib/sanitize-stack-addons";
+import { APPLICATION_TECH_CATEGORIES, applicationIssues } from "@/lib/stack-applications";
 import { applyStackUpdate, resolveStackCompatibility } from "@/lib/stack-compatibility";
 import { productPlan } from "@/lib/stack-features";
 import { StackStateSchema, StackUpdateSchema } from "@/lib/stack-schema";
@@ -69,7 +70,10 @@ export function getTechSelectionUpdate(
   techId: string,
 ): Partial<StackState> {
   const effectiveStack = resolveStackCompatibility(stack).stack;
-  if (!isOptionCompatible(effectiveStack, category, techId)) {
+  if (
+    !isTechSelected(effectiveStack, category, techId) &&
+    !isOptionCompatible(effectiveStack, category, techId)
+  ) {
     return {};
   }
 
@@ -180,12 +184,15 @@ export function useStackBuilder() {
   const effectiveStack = compatibilityAnalysis.stack;
   const projectNameError = validateProjectName(formatProjectName(stack.projectName));
   const configurationError =
-    projectNameError ||
-    productPlan(effectiveStack)
-      .issues.filter((issue) => issue.level === "error")
-      .map((issue) => issue.message)
-      .join("\n") ||
-    null;
+    [
+      ...(projectNameError ? [projectNameError] : []),
+      ...applicationIssues(effectiveStack),
+      ...productPlan(effectiveStack)
+        .issues.filter((issue) => issue.level === "error")
+        .map((issue) => issue.message),
+    ]
+      .filter((message, index, messages) => messages.indexOf(message) === index)
+      .join("\n") || null;
 
   useEffect(() => {
     try {
@@ -207,7 +214,10 @@ export function useStackBuilder() {
   }, [effectiveStack]);
 
   const categoryProgress = useMemo<Array<CategoryProgressItem>>(() => {
-    return CATEGORY_LIST.map((category) => {
+    return CATEGORY_LIST.filter(
+      (category) =>
+        effectiveStack.apps === undefined || !APPLICATION_TECH_CATEGORIES.includes(category),
+    ).map((category) => {
       const options = TECH_OPTIONS[category] || [];
       const selectedValue = effectiveStack[category];
       const realOptionCount = options.filter((option) => option.id !== "none").length;
@@ -310,7 +320,7 @@ export function useStackBuilder() {
     }
 
     startTransition(() => {
-      setStack(lastSavedStack);
+      setStack({ ...lastSavedStack, apps: lastSavedStack.apps });
     });
 
     contentRef.current?.scrollTo(0, 0);

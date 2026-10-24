@@ -7,15 +7,21 @@ import {
   parseAsString as parseAsStringServer,
   type UrlKeys,
 } from "nuqs/server";
+import { z } from "zod";
 
 import { DEFAULT_STACK, type StackState, getStackOptionIds } from "@/lib/constant";
 import { resolveStackCompatibility } from "@/lib/stack-compatibility";
-import { stackUrlKeys } from "@/lib/stack-url-keys";
+import { stackUrlKeys, usesDefaultApplications } from "@/lib/stack-url-keys";
 
 import { sanitizeStackState } from "./sanitize-stack-addons";
-import { StackModuleOptionsSchema, StackProvidersSchema } from "./stack-schema";
+import {
+  StackApplicationsSchema,
+  StackModuleOptionsSchema,
+  StackProvidersSchema,
+} from "./stack-schema";
 
 const serverStackParsers = {
+  apps: parseAsJson(StackApplicationsSchema.parse),
   projectName: parseAsStringServer.withDefault(DEFAULT_STACK.projectName || "my-xstack-app"),
   webFrontend: parseAsArrayOfServer(parseAsStringServer).withDefault(DEFAULT_STACK.webFrontend),
   nativeFrontend: parseAsArrayOfServer(parseAsStringServer).withDefault(
@@ -74,8 +80,30 @@ export const serializeStackParams = createSerializer(serverStackParsers, {
 export async function loadStackParams(
   searchParams: Parameters<typeof rawLoadStackParams>[0],
 ): Promise<StackState> {
-  const stackState = await rawLoadStackParams(searchParams);
-  return resolveStackCompatibility(sanitizeStackState(stackState)).stack;
+  const input = await searchParams;
+  const textInput = z.string().safeParse(input);
+  const params =
+    input instanceof URLSearchParams
+      ? input
+      : input instanceof URL
+        ? input.searchParams
+        : input instanceof Request
+          ? new URL(input.url).searchParams
+          : textInput.success
+            ? URL.canParse(textInput.data)
+              ? new URL(textInput.data).searchParams
+              : new URLSearchParams(textInput.data)
+            : {
+                has: (key: string) =>
+                  Object.entries(input).some(
+                    ([name, value]) => name === key && value !== undefined,
+                  ),
+              };
+  const stackState = await rawLoadStackParams(input);
+  const apps =
+    stackState.apps ??
+    (params.has("apps") ? [] : usesDefaultApplications(params) ? DEFAULT_STACK.apps : undefined);
+  return resolveStackCompatibility(sanitizeStackState({ ...stackState, apps })).stack;
 }
 
 export type LoadedStackState = Awaited<ReturnType<typeof loadStackParams>>;

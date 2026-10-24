@@ -8,6 +8,7 @@ import {
   AddonOptionsSchema,
   AddonsSchema,
   APISchema,
+  ApplicationSelectionSchema,
   BackendSchema,
   CreateInputSchema,
   DatabaseSchema,
@@ -36,14 +37,23 @@ const SchemaToolInputSchema = z.object({
 
 const McpCreateProjectInputSchema = CreateInputSchema.safeExtend({
   projectName: z.string().describe("Project name or relative path"),
+  apps: z
+    .array(ApplicationSelectionSchema)
+    .optional()
+    .describe(
+      "Applications with stable types and separate framework/runtime/API stacks; adapters derive implementation defaults.",
+    ),
   frontend: z
     .array(FrontendSchema)
-    .describe("Explicit frontend app surfaces. Do not use native frontends as styling options."),
-  backend: BackendSchema.describe("Explicit backend framework"),
-  runtime: RuntimeSchema.describe("Explicit runtime environment"),
+    .optional()
+    .describe(
+      "Explicit frontend app surfaces, required unless apps selects application types and stacks.",
+    ),
+  backend: BackendSchema.optional().describe("Explicit backend framework, required without apps"),
+  runtime: RuntimeSchema.optional().describe("Explicit runtime environment, required without apps"),
   database: DatabaseSchema.describe("Explicit database choice"),
   orm: ORMSchema.describe("Explicit ORM choice"),
-  api: APISchema.describe("Explicit API layer"),
+  api: APISchema.optional().describe("Explicit API layer, required without apps"),
   addons: z.array(AddonsSchema).describe("Explicit addon list. Use [] when no addons are needed."),
   git: z.boolean().describe("Whether to initialize a git repository"),
   packageManager: PackageManagerSchema.describe("Explicit package manager"),
@@ -54,9 +64,22 @@ const McpCreateProjectInputSchema = CreateInputSchema.safeExtend({
   addonOptions: AddonOptionsSchema.optional(),
   dbSetupOptions: DbSetupOptionsSchema.optional(),
   directoryConflict: DirectoryConflictSchema.optional(),
-}).describe(
-  "Explicit xstack project configuration for MCP use. Provide the full stack config instead of relying on inferred defaults.",
-);
+})
+  .superRefine((input, context) => {
+    if (input.apps !== undefined) return;
+    for (const field of ["frontend", "backend", "runtime", "api"] as const) {
+      if (input[field] === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: [field],
+          message: `${field} is required when apps is omitted`,
+        });
+      }
+    }
+  })
+  .describe(
+    "Explicit xstack project configuration. Supply apps with type and stack to resolve adapters, or provide the full single-app stack config.",
+  );
 
 type SchemaToolInput = {
   name?: SchemaName;
@@ -116,7 +139,7 @@ function getStackGuidance() {
   return {
     workflow: [
       "Call xstack_get_schema or xstack_get_stack_guidance before constructing a config if the request is ambiguous.",
-      "For project creation, build a full explicit config before calling xstack_plan_project.",
+      "For project creation, provide explicit application selections or a full legacy stack config before calling xstack_plan_project.",
       "Always call xstack_plan_project before xstack_create_project.",
       "Only call xstack_create_project after the plan succeeds and matches the user's intent.",
       "Use xstack_plan_addons before xstack_add_addons when adding addons or scaffolding a workspace package in an existing project.",
@@ -124,12 +147,8 @@ function getStackGuidance() {
     createContract: {
       requiresExplicitFields: [
         "projectName",
-        "frontend",
-        "backend",
-        "runtime",
         "database",
         "orm",
-        "api",
         "addons",
         "git",
         "packageManager",
@@ -138,10 +157,19 @@ function getStackGuidance() {
         "webDeploy",
         "serverDeploy",
       ],
-      optionalFields: ["preset", "product", "addonOptions", "dbSetupOptions", "directoryConflict"],
-      rule: "Do not call xstack_plan_project or xstack_create_project with a partial payload. MCP project creation requires the full explicit stack config.",
+      optionalFields: [
+        "apps",
+        "preset",
+        "product",
+        "addonOptions",
+        "dbSetupOptions",
+        "directoryConflict",
+      ],
+      legacyStackFields: ["frontend", "backend", "runtime", "api"],
+      rule: "Supply all required fields and either apps or the explicit legacyStackFields. Application manifests determine the stack when apps is present.",
     },
     fieldNotes: {
+      apps: "apps is a structured array of {id, template, product?, bindings?}. Product apps cannot overlap roles in the same product; bindings reference application IDs. Independent apps omit product and bindings.",
       frontend:
         "frontend is for app surfaces only. Choose explicit app targets such as next, react-router, tanstack-router, native-bare, native-uniwind, or native-unistyles.",
       addons: "addons must be an explicit array. Use [] when no addons are requested.",
@@ -236,7 +264,7 @@ export function createXStackMcpServer() {
     {
       title: "Plan xstack Project",
       description:
-        "Validate and preview a xstack project creation without writing files or provisioning resources. Always use this before xstack_create_project. This tool requires an explicit full stack config rather than a partial payload with inferred defaults.",
+        "Validate and preview a xstack project creation without writing files or provisioning resources. Always use this before xstack_create_project. Supply application selections in apps or the full legacy stack, plus explicit database, addons, and execution settings.",
       inputSchema: McpCreateProjectInputSchema,
       outputSchema: ToolResponseSchema,
       annotations: {
@@ -282,7 +310,7 @@ export function createXStackMcpServer() {
     {
       title: "Create xstack Project",
       description:
-        "Create a xstack project on disk using the same silent programmatic flow as the CLI JSON API. Call this only after xstack_plan_project succeeds and the plan clearly matches the user's intent. This tool requires an explicit full stack config.",
+        "Create a xstack project on disk using the same silent programmatic flow as the CLI JSON API. Call this only after xstack_plan_project succeeds and the plan matches the user's intent. Supply apps or the explicit legacy stack, plus database, addons, and execution settings.",
       inputSchema: McpCreateProjectInputSchema,
       outputSchema: ToolResponseSchema,
       annotations: {

@@ -23,3 +23,11 @@ export { MODULE_CATALOG } from "./modules/catalog";
 export { resolveModules, toSelection, hasErrors, toDeployTarget } from "./modules/resolver";
 export { PRODUCT_PRESETS } from "./modules/presets";
 export { getModulePlan, toRenderConfig } from "./modules/pipeline";
+export { readApplicationCatalog, readFrameworkCatalog, resolveApplications } from "./apps/plan";
+export type {
+  ApplicationPlan,
+  ResolvedApplication,
+  ResolvedApplicationAdapter,
+  ResolvedFrameworkAdapter,
+} from "./apps/plan";
+export { resolveApplicationConfig } from "./apps/config";

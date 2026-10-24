@@ -1,0 +1,20 @@
+{
+  "id": "solid",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": ["solid"],
+        "backend": "self",
+        "runtime": "none",
+        "api": "orpc"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": ["solid"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ import { TechIcon } from "@/components/ui/tech-icon";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { StackState } from "@/lib/constant";
 import { TECH_OPTIONS } from "@/lib/constant";
+import { APPLICATION_TECH_CATEGORIES } from "@/lib/stack-applications";
 import { CATEGORY_ORDER } from "@/lib/stack-utils";
 import {
   getCategoryDisplayName,
@@ -50,7 +51,11 @@ export function TechCategories({
   const isDesktop = mode === "desktop";
   const categories = (
     selectedCategories ?? (showAllCategories ? CATEGORY_ORDER : [CATEGORY_ORDER[0]])
-  ).filter((category) => !excludeCategories.includes(category));
+  ).filter(
+    (category) =>
+      !excludeCategories.includes(category) &&
+      (stack.apps === undefined || !APPLICATION_TECH_CATEGORIES.includes(category)),
+  );
 
   return (
     <>
@@ -100,14 +105,21 @@ export function TechCategories({
               {categoryOptions.map((tech) => {
                 const category = categoryKey as keyof StackState;
                 const isSelected = getIsSelected(stack, category, tech.id);
-                const isDisabled = !isOptionCompatible(stack, categoryKey as TechCategory, tech.id);
+                const applicationReason =
+                  stack.apps !== undefined &&
+                  ((["dbSetup", "webDeploy", "serverDeploy"].includes(categoryKey) &&
+                    tech.id !== "none") ||
+                    (categoryKey === "addons" && !["none", "turborepo"].includes(tech.id)))
+                    ? "Application layouts currently support no managed deployment or database setup, and only the Turborepo addon."
+                    : undefined;
+                const isDisabled =
+                  !isSelected &&
+                  (!!applicationReason ||
+                    !isOptionCompatible(stack, categoryKey as TechCategory, tech.id));
                 const isExperimental = "experimental" in tech && tech.experimental;
-                const disabledReason = getDisabledReason(
-                  stack,
-                  categoryKey as TechCategory,
-                  tech.id,
-                );
-
+                const disabledReason =
+                  applicationReason ??
+                  getDisabledReason(stack, categoryKey as TechCategory, tech.id);
                 const card = (
                   <button
                     type="button"

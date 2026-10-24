@@ -22,9 +22,9 @@ await credits.adjust(userId, -20, "manual correction");
 ## Sources
 
 {{#if module.options.signupBonus}}
-- **Sign-up bonus:** {{module.options.signupBonus}} credits for each new account (`apps/web/src/integrations/credits-signup.ts`).
+- **Sign-up bonus:** {{module.options.signupBonus}} credits for each new account (`{{appPath "fullstack-web"}}/src/integrations/credits-signup.ts`).
 {{else}}
-- **Sign-up bonus:** disabled. Set the credits `signupBonus` option, or edit `apps/web/src/integrations/credits-signup.ts`.
+- **Sign-up bonus:** disabled. Set the credits `signupBonus` option, or edit `{{appPath "fullstack-web"}}/src/integrations/credits-signup.ts`.
 {{/if}}
 {{#if (includes module.integrations "payment")}}
 - **Purchases:** each paid order grants its plan's `credits` (`packages/payment/src/plans.ts`), keyed by `order:<orderId>`. Subscription renewals grant them again every period.

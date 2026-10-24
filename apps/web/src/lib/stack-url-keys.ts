@@ -6,6 +6,7 @@ type StackUrlState = StackState & { viewMode: string; selectedFile: string };
 
 export const stackUrlKeys: UrlKeys<StackUrlState> = {
   projectName: "name",
+  apps: "apps",
   webFrontend: "fe-w",
   nativeFrontend: "fe-n",
   runtime: "rt",
@@ -27,3 +28,11 @@ export const stackUrlKeys: UrlKeys<StackUrlState> = {
   viewMode: "view",
   selectedFile: "file",
 };
+
+/** Names and view controls do not opt a fresh Builder into legacy technology mode. */
+export function usesDefaultApplications(params: { has: (key: string) => boolean }): boolean {
+  return !Object.entries(stackUrlKeys).some(
+    ([key, urlKey]) =>
+      !["projectName", "viewMode", "selectedFile"].includes(key) && params.has(urlKey),
+  );
+}

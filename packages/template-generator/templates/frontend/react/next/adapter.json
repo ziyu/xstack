@@ -1,0 +1,20 @@
+{
+  "id": "next",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": ["next"],
+        "backend": "self",
+        "runtime": "none",
+        "api": "none"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": ["next"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}

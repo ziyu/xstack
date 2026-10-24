@@ -38,6 +38,7 @@ export async function detectProjectConfig(projectDir: string) {
           frontend: xstackConfig.frontend,
           addons: xstackConfig.addons,
           product: xstackConfig.product,
+          apps: xstackConfig.apps,
           packageManager: xstackConfig.packageManager,
           dbSetup: xstackConfig.dbSetup,
           api: xstackConfig.api,

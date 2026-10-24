@@ -614,3 +614,25 @@ Start 与 Nuxt 的真实本地生产产物通过同套 HTTP 验收：验证码�
 验收修复：共享 site 配置遗漏、废弃框架 Header、Start 当前 validator API、Next 导入泄漏、Nuxt Unhead link 字面量类型、空 .env 覆盖 schema 默认值、Start 非法分页静默转为第一页、SSR 已登录导航闪烁。Nuxt 元数据中脚本文本位于转义的引号属性内并不可执行，改进测试使用 HTML 解析器识别真实脚本节点，未添加无意义 HTML 重写。Cloudflare 原生产品仍限定 Next/OpenNext+D1/R2；Start/Nuxt 的该部署组合明确拒绝，不宣称已实现。
 
 Builder 验收补充：预设改为紧凑下拉框，按 Next.js/TanStack Start/Nuxt 分组，每组包含 Shell、Starter、Global SaaS、Full。每项是完整配置，Shell/Starter 固定 SQLite、SaaS/Full 固定 PostgreSQL，均使用 Drizzle；选择后替换技术栈、模块、服务商和选项，仅保留项目名。下方修改后按实际配置识别为 Custom configuration，分享 URL 恢复匹配预设。桌面预设区为单行，手机无横向溢出；完整替换、自定义状态和真实文件预览通过，Web 测试 22 项通过。
+
+## 25. P6 应用模型与模板所有权
+
+应用类型与技术栈分离：稳定类型为 fullstack-web/web-frontend/backend/admin/cli（另保留 native），`templates/apps/<type>/app.json` 声明 id、name、必填 defaultDirectoryName、scope、roles、requires。实例为 `{ id, type, stack: { framework?, runtime?, api? }, product?, bindings? }`；当前求解要求显式 framework。id 决定 workspace/目录，不编码框架。defaultDirectoryName 仅用于新增或 legacy 转换时建议目录名：fullstack-web → web、web-frontend → frontend，其余 backend/admin/cli/native 各自同名；重名自动追加数字后缀，切换类型保留用户已选实例名。实现留在原技术栈目录：例如 `frontend/astro/apps/web-frontend`、`frontend/react/next/apps/fullstack-web`、`backend/server/hono/apps/backend`、`cli/node/apps/cli`。就地 adapter.json 只声明支持的 app 类型及 stack 默认值，不含 source/target/layers；按祖先 shared、本地 shared、选中的 apps/<type> 目录顺序合成，files 贡献工作区文件。没有顶层 frameworks 目录或跨目录映射清单。声明 app 必须有自己的实现文件，只有 shared 不算支持。fullstack-web 无论 Next 或 Nuxt 都拥有 web-frontend/backend/admin；拆分类型各拥有对应角色。产品组默认 main，同组每个角色只有一个 owner；独立 CLI/native 无产品角色。旧 web/site 类型 ID、site 角色、template 字段及框架限定应用类型不保留；无 apps 的 legacy 配置仍保留物理 apps/web 输出。重复 ID、危险路径、缺依赖、错误/跨产品绑定和循环均拒绝；当前生成器只支持一个产品组。
+
+生成器写入前求解布局；复用 `frameworks/<framework>/apps/<appType>` 模块贡献目录，按选中类型直接写到 `apps/<id>`，不做全局字符串路径替换。领域服务包归 backend owner；共享文件冲突拒绝。依赖 catalog 在组合后计算，环境 codegen、开发脚本、数据库环境导入按实际 owner 路径生成。CLI --apps JSON、create/createVirtual、MCP、保存配置、复现命令和模块基线保留完整实例；没有新增 Builder 多应用界面。runtime/API 从 adapter 默认值及显式 stack 配置推导：原生全栈 web 为 none/none，Hono 默认 bun/orpc，Node CLI 使用 node。固定路径的部署、DB provisioning 和非 Turborepo addon 对显式布局报错。
+
+边界：拆分 web-frontend/backend/admin 提供应用壳与 oRPC 连接，不代表所有原生业务模块已经远程化；各模块仍受已有兼容性限制。本轮稳定类型与适配器切换、角色冲突、未知组合、独立 CLI、真实输出目录及贡献内容保留由测试覆盖；本节不将旧模型的安装/构建记录当作新模型验收结果。
+
+稳定模型验收：76 项生成器/Web/CLI/MCP 测试通过，类型检查与本次改动定向 lint 通过。相同 web 类型切换 Next/Nuxt/Start，auth+credits 与独立 CLI 均生成成功；旧 Svelte/Solid/Astro self 配置保持可生成。命名 web + auth/credits + CLI 实际安装、类型检查、生产构建、SQLite schema 应用通过，真实注册、会话、积分页、匿名访问拒绝通过。site + Hono backend + admin + CLI 实际安装、类型检查、构建和并行 HTTP 通过；两个浏览器客户端均显示 API Connected，第三方 Origin 被拒绝。实际 CLI 创建独立应用、冲突前零目录写入、配置保存及命名 web 的模块追加通过。Bun TLS 安装问题通过显式系统 CA 文件解决，未关闭验证；直接 generator 产物的 packageManager 仍为预览占位 latest，验收数据库命令直接运行 workspace，实际 CLI 创建会填充本机版本。没有宣称直接预览产物的 Turbo 根命令已通过。
+
+技术栈目录归位验收：移除顶层 frameworks 与 manifest layers/source/target；16 个技术栈清单均与实际实现同目录，shared 共享资源，apps/<type> 持有包配置、框架配置和入口。目录发现拒绝声明无实现、未声明 app 目录、重复技术栈 ID、非法路径；metadata 不输出到应用。78 项生成器/Web/CLI/MCP 测试通过，相关类型检查和定向 lint 通过。Next auth+credits web+CLI、React Router site/admin+Hono+CLI、Astro site+Hono+CLI 三套实际安装、全部 workspace 类型检查和构建通过；Next 真实注册/会话/积分页/匿名拒绝通过，React Router 两端及 Astro 浏览器均显示 API Connected。旧六种 self 前端、四种独立后端和三种 native 命名应用生成通过；移动后的 favicon 二进制与打包副本 SHA-256 一致。Astro check 留有原模板未使用 data 的 1 条 hint（0 errors/0 warnings），未为本次目录迁移修改无关业务代码。
+
+## 26. Builder 多应用编辑
+
+Builder 默认使用显式 apps，保留紧凑整套预设，新增 split shell 与独立 CLI 预设。应用标签页编辑名称、稳定类型、技术框架、runtime/API 和依赖绑定；选项来自模板元数据及实现目录生成的轻量浏览器清单，不将完整模板或 Node 渲染器打入客户端。显式应用模式隐藏原全局 frontend/backend/runtime/API 控件，保留共享数据库和工具配置。角色占用禁选；重命名同步绑定；删除依赖后保留原选择并报告错误，不自动丢弃应用或模块。命令输出 --apps JSON，分享 URL、保存/加载和实际 oRPC 文件预览贯通。旧分享链接保留 legacy 控件并提供显式转换。
+
+验收：Web 与浏览器 catalog 合计 30 项测试通过，Web 类型检查和本次定向 lint 通过。真实浏览器验证全栈+CLI 的生成目录、split backend 重命名与引用同步、移除 backend 的明确错误、Nuxt 切换预览、旧 URL 转换、四应用保存/加载/刷新恢复；移动 390px 无横向溢出。开发服务保持在 localhost:3333/new 供用户查看。原生业务模块仍要求支持的 web 布局；split 与 CLI 的不可用功能禁选且说明原因。
+
+命名统一：类型 ID 改为 fullstack-web/web-frontend，产品角色为 web-frontend/backend/admin；manifest 必须声明 defaultDirectoryName。全栈默认 web、独立前端默认 frontend，其余类型同名。Builder 新增应用读取该默认值，重名追加 -2/-3，切换类型不覆盖自定义实例名。模板贡献目录和框架 apps 键同步迁移；旧无 apps 配置的物理 apps/web 输出保留，但不保留旧类型别名。90 项测试及 Web 类型检查通过；真实生成验证默认/自定义全栈目录与拆分布局，浏览器验证 cli/cli-2 重名处理、frontend 默认目录和文件预览。
+
+应用管理与技术栈 UI 分离：Applications 仅保留实例标签、名称、类型和增删；下方 Application technology 跟随同一选中应用显示模板实际支持的框架卡片、runtime 和依赖绑定。全栈默认不展示 API 下拉，backend 的协议放高级设置，绑定客户端显示继承协议。桌面/移动共享当前选择，数据库/工具仍为共享配置。浏览器验证 Nuxt 选择在切换 CLI 后保留、admin 仅展示已有 React Router 实现、backend 展示四种服务框架；改变 backend 为 Node+tRPC 后 frontend 显示继承协议且真实预览成功，390px 无横向溢出。

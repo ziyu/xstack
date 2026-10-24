@@ -1,4 +1,5 @@
 import type {
+  ApplicationSelection,
   Backend,
   FullstackFrontend,
   NativeFrontend,
@@ -18,6 +19,7 @@ export type StackState = Pick<
   | "webDeploy"
   | "serverDeploy"
 > & {
+  apps?: ApplicationSelection[];
   projectName: string | null;
   webFrontend: WebFrontend[];
   nativeFrontend: NativeFrontend[];
@@ -33,7 +35,7 @@ export type StackState = Pick<
 
 export type TechCategory = Exclude<
   keyof StackState,
-  "projectName" | "yolo" | "providers" | "moduleOptions"
+  "projectName" | "yolo" | "providers" | "moduleOptions" | "apps"
 >;
 type StackOptionIds = {
   [K in TechCategory]: Extract<StackState[K] extends (infer Id)[] ? Id : StackState[K], string>;

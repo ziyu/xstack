@@ -6,6 +6,7 @@ export default defineConfig({
     "src/fs-writer.ts",
     "src/core/template-reader.ts",
     "src/modules/index.ts",
+    "src/apps/index.ts",
   ],
   format: ["esm"],
   clean: true,

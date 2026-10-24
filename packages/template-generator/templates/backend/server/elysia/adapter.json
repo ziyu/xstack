@@ -1,0 +1,12 @@
+{
+  "id": "elysia",
+  "apps": {
+    "backend": {
+      "stack": {
+        "backend": "elysia",
+        "runtime": "bun",
+        "api": "orpc"
+      }
+    }
+  }
+}

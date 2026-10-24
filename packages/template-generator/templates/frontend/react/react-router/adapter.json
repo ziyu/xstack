@@ -1,0 +1,19 @@
+{
+  "id": "react-router",
+  "apps": {
+    "web-frontend": {
+      "stack": {
+        "frontend": ["react-router"],
+        "runtime": "none",
+        "api": "none"
+      }
+    },
+    "admin": {
+      "stack": {
+        "frontend": ["react-router"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}

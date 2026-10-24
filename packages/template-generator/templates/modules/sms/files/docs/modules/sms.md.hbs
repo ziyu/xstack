@@ -96,5 +96,5 @@ No adapter automatically retries OTP sends: after a timeout, the provider may al
 
 ## Phone authentication integration
 
-`apps/web/src/integrations/auth-sms.ts` subscribes to `auth.phone_verification_requested` and awaits `sms.sendOtp({ phoneNumber, code })`. Authentication owns code generation and verification; SMS owns sending. Auth does not import the SMS package. The phone-login flow uses six-digit codes with a five-minute expiry.
+`{{appPath "fullstack-web"}}/src/integrations/auth-sms.ts` subscribes to `auth.phone_verification_requested` and awaits `sms.sendOtp({ phoneNumber, code })`. Authentication owns code generation and verification; SMS owns sending. Auth does not import the SMS package. The phone-login flow uses six-digit codes with a five-minute expiry.
 {{/if}}

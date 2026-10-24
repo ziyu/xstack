@@ -11,7 +11,7 @@ export class VirtualFileSystem {
   private _vol: ReturnType<typeof memfs>["vol"];
   private _sourcePathMap: Map<string, string> = new Map();
 
-  constructor() {
+  constructor(private readonly applicationPaths: Readonly<Record<string, string>> = {}) {
     const { fs, vol } = memfs();
     this._fs = fs;
     this._vol = vol;
@@ -206,7 +206,18 @@ export class VirtualFileSystem {
     }
   }
 
+  /** Resolve logical contribution paths before filesystem access; enumeration returns physical paths. */
+  resolvePath(path: string): string {
+    const normalized = normalize(path).replace(/^\/+/, "");
+    for (const [logical, actual] of Object.entries(this.applicationPaths)) {
+      if (normalized === logical || normalized.startsWith(`${logical}/`)) {
+        return actual + normalized.slice(logical.length);
+      }
+    }
+    return normalized;
+  }
+
   private normalizePath(p: string): string {
-    return "/" + normalize(p).replace(/^\/+/, "");
+    return "/" + this.resolvePath(p);
   }
 }

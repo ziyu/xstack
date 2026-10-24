@@ -1,0 +1,8 @@
+{
+  "id": "web-frontend",
+  "name": "Web frontend application",
+  "defaultDirectoryName": "frontend",
+  "roles": ["web-frontend"],
+  "scope": "product",
+  "requires": ["backend"]
+}

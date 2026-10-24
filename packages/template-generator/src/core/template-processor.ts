@@ -2,6 +2,13 @@ import { type ProjectConfig, usesAlchemyManagedDatabase } from "@xstack/types";
 import Handlebars from "handlebars";
 import isBinaryPath from "is-binary-path";
 
+Handlebars.registerHelper("appPath", (type: string, options: Handlebars.HelperOptions) => {
+  const logical = `apps/${type}`;
+  return (
+    options.data?.root?.application?.paths?.[logical] ??
+    (type === "fullstack-web" ? "apps/web" : logical)
+  );
+});
 Handlebars.registerHelper("eq", (a, b) => a === b);
 Handlebars.registerHelper("ne", (a, b) => a !== b);
 Handlebars.registerHelper("and", (...args) => args.slice(0, -1).every(Boolean));

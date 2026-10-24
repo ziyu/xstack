@@ -139,7 +139,7 @@ function processAlchemySchema(vfs: VirtualFileSystem, config: RenderConfig): voi
     const keys = new Set(["NODE_ENV", ...schemaKeys(vfs, app, config)]);
     const pick = [...inputs].filter((key) => keys.has(key));
     if (!pick.length) continue;
-    imports.push(`# @import(../../${app}/, pick=[${pick.join(", ")}])`);
+    imports.push(`# @import(../../${vfs.resolvePath(app)}/, pick=[${pick.join(", ")}])`);
     for (const key of pick) inputs.delete(key);
   }
   vfs.writeFile(
@@ -163,8 +163,10 @@ function processCloudflarePublicEnv(vfs: VirtualFileSystem, config: RenderConfig
       .getAllFiles()
       .some(
         (file) =>
-          file.startsWith("apps/web/") &&
-          vfs.readFile(file)?.includes(`from "${importPath(file, "apps/web/src/env.public")}"`),
+          file.startsWith(`${vfs.resolvePath("apps/web")}/`) &&
+          vfs
+            .readFile(file)
+            ?.includes(`from "${importPath(file, vfs.resolvePath("apps/web/src/env.public"))}"`),
       )
   )
     return;
@@ -207,7 +209,7 @@ export function processVarlock(
   templates: TemplateData,
   config: RenderConfig,
 ): void {
-  const server = config.backend === "self" ? "apps/web" : "apps/server";
+  const server = vfs.resolvePath(config.backend === "self" ? "apps/web" : "apps/server");
   const commands: string[] = [];
   const allKeys = new Set([
     "NODE_ENV",
@@ -229,7 +231,7 @@ export function processVarlock(
     const pkg = vfs.readJson<Package>(`${app}/package.json`)!;
     pkg.scripts = { ...pkg.scripts, "env:generate": "varlock codegen" };
     vfs.writeJson(`${app}/package.json`, pkg);
-    commands.push(`varlock codegen --path ./${app}/`);
+    commands.push(`varlock codegen --path ./${vfs.resolvePath(app)}/`);
     const ignore = `${app}/.gitignore`;
     vfs.writeFile(ignore, `${vfs.readFile(ignore) ?? ""}\n!.env.schema\n/src/${envFile}\n`);
   }
@@ -264,7 +266,8 @@ export function processVarlock(
     (config.orm === "drizzle" || config.orm === "prisma") &&
     config.runtime !== "workers" &&
     config.serverDeploy !== "cloudflare" &&
-    !(config.backend === "self" && config.webDeploy === "cloudflare")
+    !(config.backend === "self" && config.webDeploy === "cloudflare") &&
+    vfs.exists(`${server}/package.json`)
   ) {
     const execute =
       config.packageManager === "bun"
@@ -288,7 +291,11 @@ export function processVarlock(
       dependencies: ["better-auth"],
     });
   }
-  if (config.backend !== "none" && config.backend !== "convex") {
+  if (
+    config.backend !== "none" &&
+    config.backend !== "convex" &&
+    vfs.exists(`${server}/package.json`)
+  ) {
     processSingleTemplate(
       vfs,
       templates,
@@ -309,10 +316,10 @@ export function processVarlock(
       `@${config.projectName}/app-services`,
       importPath(file, `${server}/src/services`),
     );
-    if (file !== "apps/web/src/client.ts") {
+    if (file !== vfs.resolvePath("apps/web/src/client.ts")) {
       content = content.replaceAll(
         `@${config.projectName}/auth/client`,
-        importPath(file, "apps/web/src/client"),
+        importPath(file, vfs.resolvePath("apps/web/src/client")),
       );
     }
     if (app === server) {

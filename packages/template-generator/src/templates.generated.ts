@@ -238,15 +238,15 @@ pre-commit:
     #   run: {{packageManagerRunCmd}} lint
 {{/if}}
 `],
-  ["addons/pwa/apps/web/next/public/favicon/apple-touch-icon.png", `[Binary file]`],
-  ["addons/pwa/apps/web/next/public/favicon/favicon-96x96.png", `[Binary file]`],
-  ["addons/pwa/apps/web/next/public/favicon/favicon.svg", `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="92" height="92"><svg width="92" height="92" viewBox="0 0 92 92" fill="none" xmlns="http://www.w3.org/2000/svg">
+  ["addons/pwa/apps/fullstack-web/next/public/favicon/apple-touch-icon.png", `[Binary file]`],
+  ["addons/pwa/apps/fullstack-web/next/public/favicon/favicon-96x96.png", `[Binary file]`],
+  ["addons/pwa/apps/fullstack-web/next/public/favicon/favicon.svg", `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="92" height="92"><svg width="92" height="92" viewBox="0 0 92 92" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect x="8" y="8" width="76" height="76" rx="12" fill="#F5EEFF" stroke="#B79AFF" stroke-width="3"></rect>
   <text x="46" y="56" text-anchor="middle" font-family="monospace" font-size="40" fill="#8F5BFF">$<tspan dx="0" dy="0">_</tspan></text>
 </svg><style>@media (prefers-color-scheme: light) { :root { filter: none; } }
 @media (prefers-color-scheme: dark) { :root { filter: none; } }
 </style></svg>`],
-  ["addons/pwa/apps/web/next/public/favicon/site.webmanifest.hbs", `{
+  ["addons/pwa/apps/fullstack-web/next/public/favicon/site.webmanifest.hbs", `{
 	"name": "{{projectName}}",
 	"short_name": "{{projectName}}",
 	"icons": [
@@ -268,9 +268,9 @@ pre-commit:
 	"display": "standalone"
 }
 `],
-  ["addons/pwa/apps/web/next/public/favicon/web-app-manifest-192x192.png", `[Binary file]`],
-  ["addons/pwa/apps/web/next/public/favicon/web-app-manifest-512x512.png", `[Binary file]`],
-  ["addons/pwa/apps/web/next/public/sw.js", `// Bump this version when changing offline.html so installed apps refresh it.
+  ["addons/pwa/apps/fullstack-web/next/public/favicon/web-app-manifest-192x192.png", `[Binary file]`],
+  ["addons/pwa/apps/fullstack-web/next/public/favicon/web-app-manifest-512x512.png", `[Binary file]`],
+  ["addons/pwa/apps/fullstack-web/next/public/sw.js", `// Bump this version when changing offline.html so installed apps refresh it.
 const CACHE_NAME = "xstack-pwa-offline-v1";
 const OFFLINE_URL = "/offline.html";
 
@@ -307,7 +307,7 @@ self.addEventListener("fetch", (event) => {
   );
 });
 `],
-  ["addons/pwa/apps/web/next/pwa.config.ts", `import type { NextConfig } from "next";
+  ["addons/pwa/apps/fullstack-web/next/pwa.config.ts", `import type { NextConfig } from "next";
 
 export function withPwa(config: NextConfig): NextConfig {
   // Static exports need these headers configured at the hosting layer.
@@ -330,7 +330,7 @@ export function withPwa(config: NextConfig): NextConfig {
   };
 }
 `],
-  ["addons/pwa/apps/web/next/src/app/manifest.ts.hbs", `import type { MetadataRoute } from "next";
+  ["addons/pwa/apps/fullstack-web/next/src/app/manifest.ts.hbs", `import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
 	return {
@@ -357,7 +357,7 @@ export default function manifest(): MetadataRoute.Manifest {
 	};
 }
 `],
-  ["addons/pwa/apps/web/next/src/components/pwa-registration.tsx", `"use client";
+  ["addons/pwa/apps/fullstack-web/next/src/components/pwa-registration.tsx", `"use client";
 
 import { useEffect } from "react";
 
@@ -372,7 +372,7 @@ export default function PwaRegistration() {
   return null;
 }
 `],
-  ["addons/pwa/apps/web/ssr/public/offline.html", `<!doctype html>
+  ["addons/pwa/apps/fullstack-web/ssr/public/offline.html", `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -403,8 +403,8 @@ export default function PwaRegistration() {
   </body>
 </html>
 `],
-  ["addons/pwa/apps/web/vite/public/logo.png", `[Binary file]`],
-  ["addons/pwa/apps/web/vite/pwa-assets.config.ts.hbs", `import {
+  ["addons/pwa/apps/fullstack-web/vite/public/logo.png", `[Binary file]`],
+  ["addons/pwa/apps/fullstack-web/vite/pwa-assets.config.ts.hbs", `import {
   defineConfig,
   minimal2023Preset as preset,
 } from "@vite-pwa/assets-generator/config";
@@ -2677,6 +2677,60 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
 });
 {{/if}}
 `],
+  ["apps/admin/app.json", `{
+  "id": "admin",
+  "name": "Administration application",
+  "defaultDirectoryName": "admin",
+  "roles": ["admin"],
+  "scope": "product",
+  "requires": ["backend"]
+}
+`],
+  ["apps/backend/app.json", `{
+  "id": "backend",
+  "name": "Backend service",
+  "defaultDirectoryName": "backend",
+  "roles": ["backend"],
+  "scope": "product",
+  "requires": []
+}
+`],
+  ["apps/cli/app.json", `{
+  "id": "cli",
+  "name": "Command-line application",
+  "defaultDirectoryName": "cli",
+  "roles": [],
+  "scope": "independent",
+  "requires": []
+}
+`],
+  ["apps/fullstack-web/app.json", `{
+  "id": "fullstack-web",
+  "name": "Fullstack web app",
+  "defaultDirectoryName": "web",
+  "roles": ["web-frontend", "backend", "admin"],
+  "scope": "product",
+  "requires": []
+}
+`],
+  ["apps/native/app.json", `{
+  "id": "native",
+  "name": "Native application",
+  "defaultDirectoryName": "native",
+  "roles": [],
+  "scope": "independent",
+  "requires": []
+}
+`],
+  ["apps/web-frontend/app.json", `{
+  "id": "web-frontend",
+  "name": "Web frontend application",
+  "defaultDirectoryName": "frontend",
+  "roles": ["web-frontend"],
+  "scope": "product",
+  "requires": ["backend"]
+}
+`],
   ["backend/convex/packages/backend/_gitignore", `
 .env.local
 `],
@@ -2916,117 +2970,20 @@ export default defineSchema({
   "dependencies": {}
 }
 `],
-  ["backend/server/base/_gitignore", `# prod
-dist/
-/build
-/out/
-
-# dev
-.yarn/
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-.vscode/*
-!.vscode/launch.json
-!.vscode/*.code-snippets
-.idea/workspace.xml
-.idea/usage.statistics.xml
-.idea/shelf
-.wrangler
-.alchemy
-/.next/
-.vercel
-prisma/generated/
-
-
-# deps
-node_modules/
-/node_modules
-/.pnp
-.pnp.*
-
-# env
-.env*
-.env.production
-!.env.example
-.dev.vars
-
-# logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# misc
-.DS_Store
-*.pem
-
-# local db
-*.db*
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-`],
-  ["backend/server/base/package.json.hbs", `{
-	"name": "server",
-	"main": "src/index.ts",
-	"type": "module",
-	"scripts": {
-		"build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsdown",
-		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit",
-		"compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server"
-	},
-	"dependencies": {},
-	{{#if (eq dbSetup 'supabase')}}
-	"trustedDependencies": [
-        "supabase"
-    ],
-    {{/if}}
-	"devDependencies": {}
-}
-`],
-  ["backend/server/base/tsconfig.json.hbs", `{
-  "extends": "@{{projectName}}/config/tsconfig.base.json",
-  {{#if (eq api "orpc")}}
-  "references": [{ "path": "../../packages/api" }],
-  {{/if}}
-  "compilerOptions": {
-    "noEmit": true,
-		"paths": {
-      "@/*": ["./src/*"]
-    },
-    "jsx": "react-jsx"{{#if (eq backend "hono")}},
-    "jsxImportSource": "hono/jsx"{{/if}}
+  ["backend/server/elysia/adapter.json", `{
+  "id": "elysia",
+  "apps": {
+    "backend": {
+      "stack": {
+        "backend": "elysia",
+        "runtime": "bun",
+        "api": "orpc"
+      }
+    }
   }
 }
 `],
-  ["backend/server/base/tsdown.config.ts.hbs", `import { defineConfig } from "tsdown";
-{{#if (and (eq runtime "workers") (eq orm "prisma"))}}
-import { unwasm } from "unwasm/plugin";
-{{/if}}
-
-export default defineConfig({
-  entry: "./src/index.ts",
-  format: "esm",
-  outDir: "./dist",
-  clean: true,
-  {{#if (and (eq runtime "workers") (eq orm "prisma"))}}
-  plugins: [unwasm({ esmImport: true })],
-  {{/if}}
-  deps: {
-    alwaysBundle: [/@{{projectName}}\\/.*/],
-    {{#if (eq runtime "workers")}}
-    neverBundle: ["cloudflare:workers"],
-    {{/if}}
-  },
-});
-`],
-  ["backend/server/elysia/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+  ["backend/server/elysia/apps/backend/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
 {{#if (eq runtime "node")}}
 import { node } from "@elysiajs/node";
 {{/if}}
@@ -3075,7 +3032,7 @@ const apiHandler = new OpenAPIHandler(appRouter, {
 {{#if (eq serverDeploy "vercel")}}const app = {{/if}}{{#if (eq runtime "node")}}new Elysia({ adapter: node() }){{else}}new Elysia(){{/if}}
 	.use(
 		cors({
-			origin: {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}},
+            origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
 			methods: ["GET", "POST", "OPTIONS"],
 {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
 			allowedHeaders: ["Content-Type", "Authorization"],
@@ -3151,7 +3108,20 @@ if (!process.env.VERCEL) {
 	});
 {{/if}}
 `],
-  ["backend/server/express/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+  ["backend/server/express/adapter.json", `{
+  "id": "express",
+  "apps": {
+    "backend": {
+      "stack": {
+        "backend": "express",
+        "runtime": "bun",
+        "api": "orpc"
+      }
+    }
+  }
+}
+`],
+  ["backend/server/express/apps/backend/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
 {{#if (eq api "trpc")}}
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { createContext } from "@{{projectName}}/api/context";
@@ -3180,7 +3150,7 @@ const app = express();
 
 app.use(
 	cors({
-		origin: {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}},
+        origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
 		methods: ["GET", "POST", "OPTIONS"],
 {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
 		allowedHeaders: ["Content-Type", "Authorization"],
@@ -3258,7 +3228,20 @@ app.listen(3000, () => {
 	console.log("Server is running on http://localhost:3000");
 });
 `],
-  ["backend/server/fastify/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+  ["backend/server/fastify/adapter.json", `{
+  "id": "fastify",
+  "apps": {
+    "backend": {
+      "stack": {
+        "backend": "fastify",
+        "runtime": "bun",
+        "api": "orpc"
+      }
+    }
+  }
+}
+`],
+  ["backend/server/fastify/apps/backend/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
 import Fastify from "fastify";
 import fastifyCors from "@fastify/cors";
 
@@ -3287,7 +3270,7 @@ import { clerkPlugin } from "@clerk/fastify";
 {{/if}}
 
 const baseCorsConfig = {
-	origin: {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}},
+    origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
 	methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 	allowedHeaders: [
 		"Content-Type",
@@ -3425,7 +3408,20 @@ fastify.listen({ port: 3000{{#if (or (eq serverDeploy "docker") (eq serverDeploy
 	console.log("Server running on port 3000");
 });
 `],
-  ["backend/server/hono/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+  ["backend/server/hono/adapter.json", `{
+  "id": "hono",
+  "apps": {
+    "backend": {
+      "stack": {
+        "backend": "hono",
+        "runtime": "bun",
+        "api": "orpc"
+      }
+    }
+  }
+}
+`],
+  ["backend/server/hono/apps/backend/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
 {{#if (eq api "orpc")}}
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -3457,7 +3453,7 @@ app.use(logger());
 app.use(
 	"/*",
 	cors({
-		origin: {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}},
+        origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
 		allowMethods: ["GET", "POST", "OPTIONS"],
 {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
 		allowHeaders: ["Content-Type", "Authorization"],
@@ -3576,6 +3572,116 @@ export default app;
 {{/if}}
 {{/if}}
 `],
+  ["backend/server/shared/_gitignore", `# prod
+dist/
+/build
+/out/
+
+# dev
+.yarn/
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+.vscode/*
+!.vscode/launch.json
+!.vscode/*.code-snippets
+.idea/workspace.xml
+.idea/usage.statistics.xml
+.idea/shelf
+.wrangler
+.alchemy
+/.next/
+.vercel
+prisma/generated/
+
+
+# deps
+node_modules/
+/node_modules
+/.pnp
+.pnp.*
+
+# env
+.env*
+.env.production
+!.env.example
+.dev.vars
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# misc
+.DS_Store
+*.pem
+
+# local db
+*.db*
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+`],
+  ["backend/server/shared/package.json.hbs", `{
+	"name": "server",
+	"main": "src/index.ts",
+	"type": "module",
+	"scripts": {
+		"build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsdown",
+		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit",
+		"compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server"
+	},
+	"dependencies": {},
+	{{#if (eq dbSetup 'supabase')}}
+	"trustedDependencies": [
+        "supabase"
+    ],
+    {{/if}}
+	"devDependencies": {}
+}
+`],
+  ["backend/server/shared/tsconfig.json.hbs", `{
+  "extends": "@{{projectName}}/config/tsconfig.base.json",
+  {{#if (eq api "orpc")}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "compilerOptions": {
+    "noEmit": true,
+		"paths": {
+      "@/*": ["./src/*"]
+    },
+    "jsx": "react-jsx"{{#if (eq backend "hono")}},
+    "jsxImportSource": "hono/jsx"{{/if}}
+  }
+}
+`],
+  ["backend/server/shared/tsdown.config.ts.hbs", `import { defineConfig } from "tsdown";
+{{#if (and (eq runtime "workers") (eq orm "prisma"))}}
+import { unwasm } from "unwasm/plugin";
+{{/if}}
+
+export default defineConfig({
+  entry: "./src/index.ts",
+  format: "esm",
+  outDir: "./dist",
+  clean: true,
+  {{#if (and (eq runtime "workers") (eq orm "prisma"))}}
+  plugins: [unwasm({ esmImport: true })],
+  {{/if}}
+  deps: {
+    alwaysBundle: [/@{{projectName}}\\/.*/],
+    {{#if (eq runtime "workers")}}
+    neverBundle: ["cloudflare:workers"],
+    {{/if}}
+  },
+});
+`],
   ["base/_gitignore", `# Dependencies
 node_modules
 .pnp
@@ -3656,6 +3762,52 @@ temp
 `],
   ["base/tsconfig.json.hbs", `{
   "extends": "@{{projectName}}/config/tsconfig.base.json",
+}
+`],
+  ["cli/node/adapter.json", `{
+  "id": "node",
+  "apps": {
+    "cli": {
+      "stack": {
+        "runtime": "node",
+        "api": "none"
+      }
+    }
+  }
+}
+`],
+  ["cli/node/apps/cli/package.json.hbs", `{
+  "name": "cli",
+  "private": true,
+  "type": "module",
+  "bin": { "{{application.id}}": "./src/index.js" },
+  "scripts": {
+    "dev": "node src/index.js --help",
+    "start": "node src/index.js",
+    "build": "node --check src/index.js",
+    "check-types": "node --check src/index.js"
+  }
+}
+`],
+  ["cli/node/apps/cli/src/index.js.hbs", `#!/usr/bin/env node
+import { parseArgs } from "node:util";
+
+try {
+  const { values, positionals } = parseArgs({
+    allowPositionals: true,
+    options: { help: { type: "boolean", short: "h" }, name: { type: "string" } },
+  });
+  const command = positionals[0];
+  if (values.help || !command) {
+    console.log("{{application.id}}\\n\\nUsage: {{application.id}} greet [--name <name>]\\n       {{application.id}} --help");
+  } else if (command === "greet" && positionals.length === 1) {
+    console.log(\`Hello, \${values.name ?? "world"}!\`);
+  } else {
+    throw new Error(\`Unknown command: \${positionals.join(" ")}\`);
+  }
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
 }
 `],
   ["db-setup/docker-compose/mongodb/docker-compose.yml.hbs", `name: {{projectName}}
@@ -5652,32 +5804,32 @@ declare module "cloudflare:workers" {
   }
 }
 `],
-  ["frontend/astro/_gitignore", `# build output
-dist/
-
-# generated types
-.astro/
-
-# dependencies
-node_modules/
-
-# logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# environment variables
-.env
-.env.production
-
-# macOS-specific files
-.DS_Store
-
-# jetbrains setting folder
-.idea/
+  ["frontend/astro/adapter.json", `{
+  "id": "astro",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": [
+          "astro"
+        ],
+        "backend": "self",
+        "runtime": "none",
+        "api": "orpc"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": [
+          "astro"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}
 `],
-  ["frontend/astro/astro.config.mjs.hbs", `// @ts-check
+  ["frontend/astro/apps/fullstack-web/astro.config.mjs.hbs", `// @ts-check
 import tailwindcss from "@tailwindcss/vite";
 {{#unless (eq webDeploy "cloudflare")}}
 import varlockAstroIntegration from "@varlock/astro-integration";
@@ -5712,13 +5864,13 @@ export default defineConfig({
   },
 });
 `],
-  ["frontend/astro/package.json.hbs", `{
+  ["frontend/astro/apps/fullstack-web/package.json.hbs", `{
   "name": "web",
   "type": "module",
   "private": true,
   "version": "0.0.1",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "astro dev{{#if application}} --port {{application.port}}{{/if}}",
 {{#unless (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
     "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}astro build",
 
@@ -5739,7 +5891,230 @@ export default defineConfig({
   }
 }
 `],
-  ["frontend/astro/public/favicon.svg", `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 128 128">
+  ["frontend/astro/apps/fullstack-web/src/pages/index.astro.hbs", `---
+import Layout from "../layouts/Layout.astro";
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+---
+
+<Layout title="{{projectName}}">
+  <div class="container mx-auto max-w-3xl px-4 py-2">
+    <pre class="overflow-x-auto font-mono text-sm text-white">{TITLE_TEXT}</pre>
+    <div class="grid gap-6">
+      {{#if (eq api "orpc")}}
+      <section class="rounded-lg border border-neutral-700 p-4">
+        <h2 class="mb-2 font-medium text-white">API Status</h2>
+        <div class="flex items-center gap-2" id="api-status">
+          <div class="h-2 w-2 rounded-full bg-orange-400" id="status-dot"></div>
+          <span class="text-sm text-neutral-400" id="status-text">Checking...</span>
+        </div>
+      </section>
+      {{/if}}
+    </div>
+  </div>
+</Layout>
+
+{{#if (eq api "orpc")}}
+<script>
+  import { orpc } from "../lib/orpc";
+
+  const statusDot = document.getElementById("status-dot")!;
+  const statusText = document.getElementById("status-text")!;
+
+  async function checkHealth() {
+    try {
+      const data = await orpc.healthCheck();
+      statusDot.className = "h-2 w-2 rounded-full bg-green-500";
+      statusText.textContent = "Connected";
+    } catch (error) {
+      statusDot.className = "h-2 w-2 rounded-full bg-red-500";
+      statusText.textContent = "Disconnected";
+    }
+  }
+
+  checkHealth();
+</script>
+{{/if}}
+`],
+  ["frontend/astro/apps/fullstack-web/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "extends": "astro/tsconfigs/strict",
+  "include": [".astro/types.d.ts", "**/*"],
+  "exclude": ["dist"]
+}
+`],
+  ["frontend/astro/apps/web-frontend/astro.config.mjs.hbs", `// @ts-check
+import tailwindcss from "@tailwindcss/vite";
+{{#unless (eq webDeploy "cloudflare")}}
+import varlockAstroIntegration from "@varlock/astro-integration";
+{{/unless}}
+import { defineConfig } from "astro/config";
+{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+{{else if (eq webDeploy "vercel")}}
+import vercel from "@astrojs/vercel";
+{{else if (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
+{{else}}
+import node from "@astrojs/node";
+{{/if}}
+
+// https://astro.build/config
+export default defineConfig({
+{{#unless (eq webDeploy "cloudflare")}}
+  integrations: [varlockAstroIntegration({ ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}" })],
+{{/unless}}
+{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+  output: "static",
+{{else if (eq webDeploy "vercel")}}
+  output: "server",
+  adapter: vercel(),
+{{else if (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
+  output: "server",
+{{else}}
+  output: "server",
+  adapter: node({ mode: "standalone" }),
+{{/if}}
+  vite: {
+    plugins: [tailwindcss()],
+  },
+});
+`],
+  ["frontend/astro/apps/web-frontend/package.json.hbs", `{
+  "name": "web",
+  "type": "module",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev{{#if application}} --port {{application.port}}{{/if}}",
+{{#unless (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}astro build",
+
+{{/unless}}
+		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}astro check",
+{{#unless (or (eq webDeploy "cloudflare") (eq webDeploy "prisma"))}}
+    "preview": "astro preview",
+{{/unless}}
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^7.3.1"
+  },
+  "devDependencies": {
+		"@astrojs/check": "^0.9.10",
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}
+`],
+  ["frontend/astro/apps/web-frontend/src/pages/index.astro.hbs", `---
+import Layout from "../layouts/Layout.astro";
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+---
+
+<Layout title="{{projectName}}">
+  <div class="container mx-auto max-w-3xl px-4 py-2">
+    <pre class="overflow-x-auto font-mono text-sm text-white">{TITLE_TEXT}</pre>
+    <div class="grid gap-6">
+      {{#if (eq api "orpc")}}
+      <section class="rounded-lg border border-neutral-700 p-4">
+        <h2 class="mb-2 font-medium text-white">API Status</h2>
+        <div class="flex items-center gap-2" id="api-status">
+          <div class="h-2 w-2 rounded-full bg-orange-400" id="status-dot"></div>
+          <span class="text-sm text-neutral-400" id="status-text">Checking...</span>
+        </div>
+      </section>
+      {{/if}}
+    </div>
+  </div>
+</Layout>
+
+{{#if (eq api "orpc")}}
+<script>
+  import { orpc } from "../lib/orpc";
+
+  const statusDot = document.getElementById("status-dot")!;
+  const statusText = document.getElementById("status-text")!;
+
+  async function checkHealth() {
+    try {
+      const data = await orpc.healthCheck();
+      statusDot.className = "h-2 w-2 rounded-full bg-green-500";
+      statusText.textContent = "Connected";
+    } catch (error) {
+      statusDot.className = "h-2 w-2 rounded-full bg-red-500";
+      statusText.textContent = "Disconnected";
+    }
+  }
+
+  checkHealth();
+</script>
+{{/if}}
+`],
+  ["frontend/astro/apps/web-frontend/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "extends": "astro/tsconfigs/strict",
+  "include": [".astro/types.d.ts", "**/*"],
+  "exclude": ["dist"]
+}
+`],
+  ["frontend/astro/shared/_gitignore", `# build output
+dist/
+
+# generated types
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# environment variables
+.env
+.env.production
+
+# macOS-specific files
+.DS_Store
+
+# jetbrains setting folder
+.idea/
+`],
+  ["frontend/astro/shared/public/favicon.svg", `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 128 128">
     <path d="M50.4 78.5a75.1 75.1 0 0 0-28.5 6.9l24.2-65.7c.7-2 1.9-3.2 3.4-3.2h29c1.5 0 2.7 1.2 3.4 3.2l24.2 65.7s-11.6-7-28.5-7L67 45.5c-.4-1.7-1.6-2.8-2.9-2.8-1.3 0-2.5 1.1-2.9 2.7L50.4 78.5Zm-1.1 28.2Zm-4.2-20.2c-2 6.6-.6 15.8 4.2 20.2a17.5 17.5 0 0 1 .2-.7 5.5 5.5 0 0 1 5.7-4.5c2.8.1 4.3 1.5 4.7 4.7.2 1.1.2 2.3.2 3.5v.4c0 2.7.7 5.2 2.2 7.4a13 13 0 0 0 5.7 4.9v-.3l-.2-.3c-1.8-5.6-.5-9.5 4.4-12.8l1.5-1a73 73 0 0 0 3.2-2.2 16 16 0 0 0 6.8-11.4c.3-2 .1-4-.6-6l-.8.6-1.6 1a37 37 0 0 1-22.4 2.7c-5-.7-9.7-2-13.2-6.2Z" />
     <style>
         path { fill: #000; }
@@ -5749,7 +6124,7 @@ export default defineConfig({
     </style>
 </svg>
 `],
-  ["frontend/astro/src/components/Header.astro.hbs", `---
+  ["frontend/astro/shared/src/components/Header.astro.hbs", `---
 const links = [
   { to: "/", label: "Home" },
   {{#if (eq auth "better-auth")}}
@@ -5825,7 +6200,7 @@ const links = [
 </script>
 {{/if}}
 `],
-  ["frontend/astro/src/layouts/Layout.astro.hbs", `---
+  ["frontend/astro/shared/src/layouts/Layout.astro.hbs", `---
 import "../styles/global.css";
 import Header from "../components/Header.astro";
 
@@ -5851,66 +6226,7 @@ const { title = "{{projectName}}" } = Astro.props;
   </body>
 </html>
 `],
-  ["frontend/astro/src/pages/index.astro.hbs", `---
-import Layout from "../layouts/Layout.astro";
-
-const TITLE_TEXT = \`
- ██████╗ ███████╗████████╗████████╗███████╗██████╗
- ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
- ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
- ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
- ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
- ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
-
- ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
- ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
-    ██║       ███████╗   ██║   ███████║██║     █████╔╝
-    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
-    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
-    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
- \`;
----
-
-<Layout title="{{projectName}}">
-  <div class="container mx-auto max-w-3xl px-4 py-2">
-    <pre class="overflow-x-auto font-mono text-sm text-white">{TITLE_TEXT}</pre>
-    <div class="grid gap-6">
-      {{#if (eq api "orpc")}}
-      <section class="rounded-lg border border-neutral-700 p-4">
-        <h2 class="mb-2 font-medium text-white">API Status</h2>
-        <div class="flex items-center gap-2" id="api-status">
-          <div class="h-2 w-2 rounded-full bg-orange-400" id="status-dot"></div>
-          <span class="text-sm text-neutral-400" id="status-text">Checking...</span>
-        </div>
-      </section>
-      {{/if}}
-    </div>
-  </div>
-</Layout>
-
-{{#if (eq api "orpc")}}
-<script>
-  import { orpc } from "../lib/orpc";
-
-  const statusDot = document.getElementById("status-dot")!;
-  const statusText = document.getElementById("status-text")!;
-
-  async function checkHealth() {
-    try {
-      const data = await orpc.healthCheck();
-      statusDot.className = "h-2 w-2 rounded-full bg-green-500";
-      statusText.textContent = "Connected";
-    } catch (error) {
-      statusDot.className = "h-2 w-2 rounded-full bg-red-500";
-      statusText.textContent = "Disconnected";
-    }
-  }
-
-  checkHealth();
-</script>
-{{/if}}
-`],
-  ["frontend/astro/src/styles/global.css", `@import "tailwindcss";
+  ["frontend/astro/shared/src/styles/global.css", `@import "tailwindcss";
 
 /* Add your theme customizations here. */
 /* See the TailwindCSS v4 docs for more info: https://tailwindcss.com/docs/v4-beta */
@@ -5919,16 +6235,22 @@ const TITLE_TEXT = \`
   --font-sans: "Inter", sans-serif;
 }
 `],
-  ["frontend/astro/tsconfig.json.hbs", `{
-  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
-  "references": [{ "path": "../../packages/api" }],
-  {{/if}}
-  "extends": "astro/tsconfigs/strict",
-  "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist"]
+  ["frontend/native/bare/adapter.json", `{
+  "id": "native-bare",
+  "apps": {
+    "native": {
+      "stack": {
+        "frontend": [
+          "native-bare"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
 }
 `],
-  ["frontend/native/bare/_gitignore", `# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+  ["frontend/native/bare/apps/native/_gitignore", `# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 # dependencies
 node_modules/
@@ -5970,7 +6292,7 @@ yarn-error.*
 /ios
 /android
 `],
-  ["frontend/native/bare/app.json.hbs", `{
+  ["frontend/native/bare/apps/native/app.json.hbs", `{
 	"expo": {
 		"name": "{{projectName}}",
 		"slug": "{{projectName}}",
@@ -6019,7 +6341,7 @@ yarn-error.*
 	}
 }
 `],
-  ["frontend/native/bare/app/_layout.tsx.hbs", `{{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
+  ["frontend/native/bare/apps/native/app/_layout.tsx.hbs", `{{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
 import { useEffect } from "react";
 import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
 {{/if}}
@@ -6211,7 +6533,7 @@ export default function RootLayout() {
   );
 }
 `],
-  ["frontend/native/bare/app/(drawer)/_layout.tsx.hbs", `import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+  ["frontend/native/bare/apps/native/app/(drawer)/_layout.tsx.hbs", `import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Link } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useColorScheme } from "@/lib/use-color-scheme";
@@ -6274,7 +6596,7 @@ const DrawerLayout = () => {
 export default DrawerLayout;
 
 `],
-  ["frontend/native/bare/app/(drawer)/(tabs)/_layout.tsx.hbs", `import { TabBarIcon } from "@/components/tabbar-icon";
+  ["frontend/native/bare/apps/native/app/(drawer)/(tabs)/_layout.tsx.hbs", `import { TabBarIcon } from "@/components/tabbar-icon";
 import { useColorScheme } from "@/lib/use-color-scheme";
 import { Tabs } from "expo-router";
 import { NAV_THEME } from "@/lib/constants";
@@ -6316,7 +6638,7 @@ export default function TabLayout() {
 }
 
 `],
-  ["frontend/native/bare/app/(drawer)/(tabs)/index.tsx.hbs", `import { Container } from "@/components/container";
+  ["frontend/native/bare/apps/native/app/(drawer)/(tabs)/index.tsx.hbs", `import { Container } from "@/components/container";
 import { Column, Host, Text as ExpoUIText } from "@expo/ui";
 import { ScrollView, View, StyleSheet } from "react-native";
 import { useColorScheme } from "@/lib/use-color-scheme";
@@ -6361,7 +6683,7 @@ const styles = StyleSheet.create({
   },
 });
 `],
-  ["frontend/native/bare/app/(drawer)/(tabs)/two.tsx.hbs", `import { Container } from "@/components/container";
+  ["frontend/native/bare/apps/native/app/(drawer)/(tabs)/two.tsx.hbs", `import { Container } from "@/components/container";
 import { Column, Host, Text as ExpoUIText } from "@expo/ui";
 import { ScrollView, View, StyleSheet } from "react-native";
 import { useColorScheme } from "@/lib/use-color-scheme";
@@ -6406,7 +6728,7 @@ const styles = StyleSheet.create({
   },
 });
 `],
-  ["frontend/native/bare/app/(drawer)/index.tsx.hbs", `import { {{#if (or (eq auth "clerk") (eq auth "better-auth"))}}Button, {{/if}}Column, Host, Text as ExpoUIText } from "@expo/ui";
+  ["frontend/native/bare/apps/native/app/(drawer)/index.tsx.hbs", `import { {{#if (or (eq auth "clerk") (eq auth "better-auth"))}}Button, {{/if}}Column, Host, Text as ExpoUIText } from "@expo/ui";
 import { View, ScrollView, StyleSheet } from "react-native";
 import { Container } from "@/components/container";
 import { useColorScheme } from "@/lib/use-color-scheme";
@@ -6739,7 +7061,7 @@ marginBottom: 8,
 },
 });
 `],
-  ["frontend/native/bare/app/+not-found.tsx.hbs", `import { Container } from "@/components/container";
+  ["frontend/native/bare/apps/native/app/+not-found.tsx.hbs", `import { Container } from "@/components/container";
 import { Button, Column, Host, Text as ExpoUIText } from "@expo/ui";
 import { Stack, router } from "expo-router";
 import { Text, View, StyleSheet } from "react-native";
@@ -6800,7 +7122,7 @@ const styles = StyleSheet.create({
   },
 });
 `],
-  ["frontend/native/bare/app/modal.tsx.hbs", `import { Container } from "@/components/container";
+  ["frontend/native/bare/apps/native/app/modal.tsx.hbs", `import { Container } from "@/components/container";
 import { Button, Column, Host, Text as ExpoUIText } from "@expo/ui";
 import { View, StyleSheet } from "react-native";
 import { useColorScheme } from "@/lib/use-color-scheme";
@@ -6845,12 +7167,12 @@ const styles = StyleSheet.create({
   },
 });
 `],
-  ["frontend/native/bare/babel.config.js.hbs", `module.exports = {
+  ["frontend/native/bare/apps/native/babel.config.js.hbs", `module.exports = {
   presets: ["babel-preset-expo"],
   plugins: [require("@varlock/expo-integration/babel-plugin")],
 };
 `],
-  ["frontend/native/bare/components/container.tsx.hbs", `import React from "react";
+  ["frontend/native/bare/apps/native/components/container.tsx.hbs", `import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "@/lib/use-color-scheme";
 import { NAV_THEME } from "@/lib/constants";
@@ -6878,7 +7200,7 @@ const styles = StyleSheet.create({
   },
 });
 `],
-  ["frontend/native/bare/components/header-button.tsx.hbs", `import FontAwesome from "@expo/vector-icons/FontAwesome";
+  ["frontend/native/bare/apps/native/components/header-button.tsx.hbs", `import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { forwardRef, type ComponentRef } from "react";
 import { Pressable, StyleSheet } from "react-native";
 import { useColorScheme } from "@/lib/use-color-scheme";
@@ -6926,7 +7248,7 @@ const styles = StyleSheet.create({
 });
 
 `],
-  ["frontend/native/bare/components/tabbar-icon.tsx.hbs", `import FontAwesome from "@expo/vector-icons/FontAwesome";
+  ["frontend/native/bare/apps/native/components/tabbar-icon.tsx.hbs", `import FontAwesome from "@expo/vector-icons/FontAwesome";
 import type { TextStyle } from "react-native";
 
 type FontAwesomeProps = React.ComponentProps<typeof FontAwesome>;
@@ -6939,7 +7261,7 @@ export const TabBarIcon = (props: {
   return <FontAwesome size={24} style={[{ marginBottom: -3, color }]} {...iconProps} />;
 };
 `],
-  ["frontend/native/bare/lib/constants.ts.hbs", `export const NAV_THEME = {
+  ["frontend/native/bare/apps/native/lib/constants.ts.hbs", `export const NAV_THEME = {
   light: {
     background: "hsl(0 0% 100%)",
     border: "hsl(220 13% 91%)",
@@ -6959,7 +7281,7 @@ export const TabBarIcon = (props: {
 };
 
 `],
-  ["frontend/native/bare/lib/use-color-scheme.ts.hbs", `import { useColorScheme as useRNColorScheme } from "react-native";
+  ["frontend/native/bare/apps/native/lib/use-color-scheme.ts.hbs", `import { useColorScheme as useRNColorScheme } from "react-native";
 
 export function useColorScheme() {
   const systemColorScheme = useRNColorScheme();
@@ -6980,7 +7302,7 @@ export function useColorScheme() {
 }
 
 `],
-  ["frontend/native/bare/metro.config.js.hbs", `const { withVarlockMetroConfig } = require("@varlock/expo-integration/metro-config");
+  ["frontend/native/bare/apps/native/metro.config.js.hbs", `const { withVarlockMetroConfig } = require("@varlock/expo-integration/metro-config");
 // Learn more https://docs.expo.io/guides/customizing-metro
 const { getDefaultConfig } = require("expo/metro-config");
 
@@ -6998,7 +7320,7 @@ config.resolver.blockList = [
 
 module.exports = withVarlockMetroConfig(config);
 `],
-  ["frontend/native/bare/package.json.hbs", `{
+  ["frontend/native/bare/apps/native/package.json.hbs", `{
   "name": "native",
   "version": "1.0.0",
   "main": "expo-router/entry",
@@ -7044,7 +7366,7 @@ module.exports = withVarlockMetroConfig(config);
   "private": true
 }
 `],
-  ["frontend/native/bare/tsconfig.json.hbs", `{
+  ["frontend/native/bare/apps/native/tsconfig.json.hbs", `{
   {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
   "references": [{ "path": "../../packages/api" }],
   {{/if}}
@@ -7059,17 +7381,32 @@ module.exports = withVarlockMetroConfig(config);
 }
 
 `],
-  ["frontend/native/base/assets/images/android-icon-background.png", `[Binary file]`],
-  ["frontend/native/base/assets/images/android-icon-foreground.png", `[Binary file]`],
-  ["frontend/native/base/assets/images/android-icon-monochrome.png", `[Binary file]`],
-  ["frontend/native/base/assets/images/favicon.png", `[Binary file]`],
-  ["frontend/native/base/assets/images/icon.png", `[Binary file]`],
-  ["frontend/native/base/assets/images/partial-react-logo.png", `[Binary file]`],
-  ["frontend/native/base/assets/images/react-logo.png", `[Binary file]`],
-  ["frontend/native/base/assets/images/react-logo@2x.png", `[Binary file]`],
-  ["frontend/native/base/assets/images/react-logo@3x.png", `[Binary file]`],
-  ["frontend/native/base/assets/images/splash-icon.png", `[Binary file]`],
-  ["frontend/native/unistyles/_gitignore", `# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+  ["frontend/native/shared/assets/images/android-icon-background.png", `[Binary file]`],
+  ["frontend/native/shared/assets/images/android-icon-foreground.png", `[Binary file]`],
+  ["frontend/native/shared/assets/images/android-icon-monochrome.png", `[Binary file]`],
+  ["frontend/native/shared/assets/images/favicon.png", `[Binary file]`],
+  ["frontend/native/shared/assets/images/icon.png", `[Binary file]`],
+  ["frontend/native/shared/assets/images/partial-react-logo.png", `[Binary file]`],
+  ["frontend/native/shared/assets/images/react-logo.png", `[Binary file]`],
+  ["frontend/native/shared/assets/images/react-logo@2x.png", `[Binary file]`],
+  ["frontend/native/shared/assets/images/react-logo@3x.png", `[Binary file]`],
+  ["frontend/native/shared/assets/images/splash-icon.png", `[Binary file]`],
+  ["frontend/native/unistyles/adapter.json", `{
+  "id": "native-unistyles",
+  "apps": {
+    "native": {
+      "stack": {
+        "frontend": [
+          "native-unistyles"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}
+`],
+  ["frontend/native/unistyles/apps/native/_gitignore", `# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 # dependencies
 node_modules/
@@ -7111,7 +7448,7 @@ yarn-error.*
 /ios
 /android
 `],
-  ["frontend/native/unistyles/app.json.hbs", `{
+  ["frontend/native/unistyles/apps/native/app.json.hbs", `{
   "expo": {
     "name": "{{projectName}}",
     "slug": "{{projectName}}",
@@ -7160,7 +7497,7 @@ yarn-error.*
   }
 }
 `],
-  ["frontend/native/unistyles/app/_layout.tsx.hbs", `import "@/unistyles";
+  ["frontend/native/unistyles/apps/native/app/_layout.tsx.hbs", `import "@/unistyles";
 {{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
 import { useEffect } from "react";
 import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
@@ -7407,7 +7744,7 @@ export default function RootLayout() {
   );
 }
 `],
-  ["frontend/native/unistyles/app/(drawer)/_layout.tsx.hbs", `import "@/unistyles";
+  ["frontend/native/unistyles/apps/native/app/(drawer)/_layout.tsx.hbs", `import "@/unistyles";
 
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Link } from "expo-router";
@@ -7469,7 +7806,7 @@ const DrawerLayout = () => {
 
 export default DrawerLayout;
 `],
-  ["frontend/native/unistyles/app/(drawer)/(tabs)/_layout.tsx.hbs", `import "@/unistyles";
+  ["frontend/native/unistyles/apps/native/app/(drawer)/(tabs)/_layout.tsx.hbs", `import "@/unistyles";
 
 import { Tabs } from "expo-router";
 import { useUnistyles } from "react-native-unistyles";
@@ -7511,7 +7848,7 @@ export default function TabLayout() {
   );
 }
 `],
-  ["frontend/native/unistyles/app/(drawer)/(tabs)/index.tsx.hbs", `import "@/unistyles";
+  ["frontend/native/unistyles/apps/native/app/(drawer)/(tabs)/index.tsx.hbs", `import "@/unistyles";
 
 import { Container } from "@/components/container";
 import { ScrollView, Text, View } from "react-native";
@@ -7551,7 +7888,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 `],
-  ["frontend/native/unistyles/app/(drawer)/(tabs)/two.tsx.hbs", `import "@/unistyles";
+  ["frontend/native/unistyles/apps/native/app/(drawer)/(tabs)/two.tsx.hbs", `import "@/unistyles";
 
 import { Container } from "@/components/container";
 import { ScrollView, Text, View } from "react-native";
@@ -7591,7 +7928,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 `],
-  ["frontend/native/unistyles/app/(drawer)/index.tsx.hbs", `import "@/unistyles";
+  ["frontend/native/unistyles/apps/native/app/(drawer)/index.tsx.hbs", `import "@/unistyles";
 
 import { ScrollView, Text, View, TouchableOpacity } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -7960,7 +8297,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 `],
-  ["frontend/native/unistyles/app/+html.tsx.hbs", `import { ScrollViewStyleReset, useServerDocumentContext } from "expo-router/html";
+  ["frontend/native/unistyles/apps/native/app/+html.tsx.hbs", `import { ScrollViewStyleReset, useServerDocumentContext } from "expo-router/html";
 import { type PropsWithChildren } from "react";
 
 import "../unistyles";
@@ -7996,7 +8333,7 @@ export default function Root({ children }: PropsWithChildren) {
   );
 }
 `],
-  ["frontend/native/unistyles/app/+not-found.tsx.hbs", `import "@/unistyles";
+  ["frontend/native/unistyles/apps/native/app/+not-found.tsx.hbs", `import "@/unistyles";
 
 import { Link, Stack } from "expo-router";
 import { Text, View } from "react-native";
@@ -8064,7 +8401,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 `],
-  ["frontend/native/unistyles/app/modal.tsx.hbs", `import "@/unistyles";
+  ["frontend/native/unistyles/apps/native/app/modal.tsx.hbs", `import "@/unistyles";
 
 import { Container } from "@/components/container";
 import { Text, View } from "react-native";
@@ -8100,7 +8437,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 `],
-  ["frontend/native/unistyles/babel.config.js.hbs", `module.exports = (api) => {
+  ["frontend/native/unistyles/apps/native/babel.config.js.hbs", `module.exports = (api) => {
 	api.cache(true);
 
 	return {
@@ -8118,7 +8455,7 @@ const styles = StyleSheet.create((theme) => ({
 	};
 };
 `],
-  ["frontend/native/unistyles/breakpoints.ts.hbs", `export const breakpoints = {
+  ["frontend/native/unistyles/apps/native/breakpoints.ts.hbs", `export const breakpoints = {
   xs: 0,
   sm: 576,
   md: 768,
@@ -8128,7 +8465,7 @@ const styles = StyleSheet.create((theme) => ({
   tvLike: 4000,
 } as const;
 `],
-  ["frontend/native/unistyles/components/container.tsx.hbs", `import "@/unistyles";
+  ["frontend/native/unistyles/apps/native/components/container.tsx.hbs", `import "@/unistyles";
 
 import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8146,7 +8483,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
 }));
 `],
-  ["frontend/native/unistyles/components/header-button.tsx.hbs", `import "@/unistyles";
+  ["frontend/native/unistyles/apps/native/components/header-button.tsx.hbs", `import "@/unistyles";
 
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { forwardRef, type ComponentRef } from "react";
@@ -8185,7 +8522,7 @@ const styles = StyleSheet.create((theme) => ({
   },
 }));
 `],
-  ["frontend/native/unistyles/components/tabbar-icon.tsx.hbs", `import FontAwesome from "@expo/vector-icons/FontAwesome";
+  ["frontend/native/unistyles/apps/native/components/tabbar-icon.tsx.hbs", `import FontAwesome from "@expo/vector-icons/FontAwesome";
 import type { TextStyle } from "react-native";
 
 type FontAwesomeProps = React.ComponentProps<typeof FontAwesome>;
@@ -8198,10 +8535,10 @@ export const TabBarIcon = (props: {
   return <FontAwesome size={24} style={[{ marginBottom: -3, color }]} {...iconProps} />;
 };
 `],
-  ["frontend/native/unistyles/index.js.hbs", `import './unistyles';
+  ["frontend/native/unistyles/apps/native/index.js.hbs", `import './unistyles';
 import 'expo-router/entry';
 `],
-  ["frontend/native/unistyles/metro.config.js.hbs", `const { withVarlockMetroConfig } = require("@varlock/expo-integration/metro-config");
+  ["frontend/native/unistyles/apps/native/metro.config.js.hbs", `const { withVarlockMetroConfig } = require("@varlock/expo-integration/metro-config");
 const { getDefaultConfig } = require("expo/metro-config");
 
 const config = getDefaultConfig(__dirname);
@@ -8218,7 +8555,7 @@ config.resolver.blockList = [
 
 module.exports = withVarlockMetroConfig(config);
 `],
-  ["frontend/native/unistyles/package.json.hbs", `{
+  ["frontend/native/unistyles/apps/native/package.json.hbs", `{
   "name": "native",
   "version": "1.0.0",
   "private": true,
@@ -8265,7 +8602,7 @@ module.exports = withVarlockMetroConfig(config);
   }
 }
 `],
-  ["frontend/native/unistyles/theme.ts.hbs", `const sharedColors = {
+  ["frontend/native/unistyles/apps/native/theme.ts.hbs", `const sharedColors = {
   success: "#22C55E",
   destructive: "#EF4444",
   destructiveForeground: "#FFFFFF",
@@ -8365,7 +8702,7 @@ export const darkTheme = {
   },
 } as const;
 `],
-  ["frontend/native/unistyles/tsconfig.json.hbs", `{
+  ["frontend/native/unistyles/apps/native/tsconfig.json.hbs", `{
   {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
   "references": [{ "path": "../../packages/api" }],
   {{/if}}
@@ -8380,7 +8717,7 @@ export const darkTheme = {
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }
 `],
-  ["frontend/native/unistyles/unistyles.ts.hbs", `import { StyleSheet } from "react-native-unistyles";
+  ["frontend/native/unistyles/apps/native/unistyles.ts.hbs", `import { StyleSheet } from "react-native-unistyles";
 
 import { breakpoints } from "./breakpoints";
 import { darkTheme, lightTheme } from "./theme";
@@ -8408,7 +8745,22 @@ StyleSheet.configure({
   },
 });
 `],
-  ["frontend/native/uniwind/_gitignore", `# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+  ["frontend/native/uniwind/adapter.json", `{
+  "id": "native-uniwind",
+  "apps": {
+    "native": {
+      "stack": {
+        "frontend": [
+          "native-uniwind"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}
+`],
+  ["frontend/native/uniwind/apps/native/_gitignore", `# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 # dependencies
 node_modules/
@@ -8453,7 +8805,7 @@ yarn-error.*
 # UniWind generated types
 uniwind-types.d.ts
 `],
-  ["frontend/native/uniwind/app.json.hbs", `{
+  ["frontend/native/uniwind/apps/native/app.json.hbs", `{
   "expo": {
     "name": "{{projectName}}",
     "slug": "{{projectName}}",
@@ -8503,7 +8855,7 @@ uniwind-types.d.ts
   }
 }
 `],
-  ["frontend/native/uniwind/app/_layout.tsx.hbs", `{{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
+  ["frontend/native/uniwind/apps/native/app/_layout.tsx.hbs", `{{#if (and (eq auth "clerk") (ne api "none") (ne backend "convex"))}}
 import { useEffect } from "react";
 import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
 {{/if}}
@@ -8687,7 +9039,7 @@ export default function Layout() {
   );
 }
 `],
-  ["frontend/native/uniwind/app/(drawer)/_layout.tsx.hbs", `import React, { useCallback } from "react";
+  ["frontend/native/uniwind/apps/native/app/(drawer)/_layout.tsx.hbs", `import React, { useCallback } from "react";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Link } from "expo-router";
 import { Drawer } from "expo-router/drawer";
@@ -8750,7 +9102,7 @@ function DrawerLayout() {
 }
 
 export default DrawerLayout;`],
-  ["frontend/native/uniwind/app/(drawer)/(tabs)/_layout.tsx.hbs", `import { Tabs } from "expo-router";
+  ["frontend/native/uniwind/apps/native/app/(drawer)/(tabs)/_layout.tsx.hbs", `import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useThemeColor } from "heroui-native";
 
@@ -8797,7 +9149,7 @@ export default function TabLayout() {
 	);
 }
 `],
-  ["frontend/native/uniwind/app/(drawer)/(tabs)/index.tsx.hbs", `import { Container } from "@/components/container";
+  ["frontend/native/uniwind/apps/native/app/(drawer)/(tabs)/index.tsx.hbs", `import { Container } from "@/components/container";
 import { Text, View } from "react-native";
 import { Card } from "heroui-native";
 
@@ -8813,7 +9165,7 @@ export default function Home() {
 	);
 }
 `],
-  ["frontend/native/uniwind/app/(drawer)/(tabs)/two.tsx.hbs", `import { Container } from "@/components/container";
+  ["frontend/native/uniwind/apps/native/app/(drawer)/(tabs)/two.tsx.hbs", `import { Container } from "@/components/container";
 import { Text, View } from "react-native";
 import { Card } from "heroui-native";
 
@@ -8829,7 +9181,7 @@ export default function TabTwo() {
 	);
 }
 `],
-  ["frontend/native/uniwind/app/(drawer)/index.tsx.hbs", `import { Text, View } from "react-native";
+  ["frontend/native/uniwind/apps/native/app/(drawer)/index.tsx.hbs", `import { Text, View } from "react-native";
 import { Container } from "@/components/container";
 {{#if (eq api "orpc")}}
 import { useQuery } from "@tanstack/react-query";
@@ -9059,7 +9411,7 @@ return (
 );
 }
 `],
-  ["frontend/native/uniwind/app/+not-found.tsx.hbs", `import { Link, Stack } from "expo-router";
+  ["frontend/native/uniwind/apps/native/app/+not-found.tsx.hbs", `import { Link, Stack } from "expo-router";
 import { Button, Surface } from "heroui-native";
 import { Text, View } from "react-native";
 
@@ -9087,7 +9439,7 @@ export default function NotFoundScreen() {
 	);
 }
 `],
-  ["frontend/native/uniwind/app/modal.tsx.hbs", `import { Ionicons } from "@expo/vector-icons";
+  ["frontend/native/uniwind/apps/native/app/modal.tsx.hbs", `import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Button, Surface, useThemeColor } from "heroui-native";
 import { Text, View } from "react-native";
@@ -9125,12 +9477,12 @@ function Modal() {
 
 export default Modal;
 `],
-  ["frontend/native/uniwind/babel.config.js.hbs", `module.exports = {
+  ["frontend/native/uniwind/apps/native/babel.config.js.hbs", `module.exports = {
   presets: ["babel-preset-expo"],
   plugins: [require("@varlock/expo-integration/babel-plugin")],
 };
 `],
-  ["frontend/native/uniwind/components/container.tsx.hbs", `import { cn } from "heroui-native";
+  ["frontend/native/uniwind/apps/native/components/container.tsx.hbs", `import { cn } from "heroui-native";
 import { type PropsWithChildren } from "react";
 import { ScrollView, View, type ScrollViewProps, type ViewProps } from "react-native";
 import Animated, { type AnimatedProps } from "react-native-reanimated";
@@ -9177,7 +9529,7 @@ export function Container({
   );
 }
 `],
-  ["frontend/native/uniwind/components/theme-toggle.tsx.hbs", `import { Ionicons } from '@expo/vector-icons';
+  ["frontend/native/uniwind/apps/native/components/theme-toggle.tsx.hbs", `import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Platform, Pressable } from 'react-native';
 import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
@@ -9213,7 +9565,7 @@ export function ThemeToggle() {
 }
 
 `],
-  ["frontend/native/uniwind/contexts/app-theme-context.tsx.hbs", `import React, { createContext, useCallback, useContext, useMemo } from 'react';
+  ["frontend/native/uniwind/apps/native/contexts/app-theme-context.tsx.hbs", `import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { Uniwind, useUniwind } from 'uniwind';
 
 type ThemeName = 'light' | 'dark';
@@ -9276,11 +9628,11 @@ export function useAppTheme() {
 }
 
 `],
-  ["frontend/native/uniwind/global.css", `@import "tailwindcss";
+  ["frontend/native/uniwind/apps/native/global.css", `@import "tailwindcss";
 @import "uniwind";
 @import "heroui-native/styles";
 `],
-  ["frontend/native/uniwind/metro.config.js.hbs", `const { withVarlockMetroConfig } = require("@varlock/expo-integration/metro-config");
+  ["frontend/native/uniwind/apps/native/metro.config.js.hbs", `const { withVarlockMetroConfig } = require("@varlock/expo-integration/metro-config");
 const { getDefaultConfig } = require("expo/metro-config");
 const { withUniwindConfig } = require("uniwind/metro");
 const { wrapWithReanimatedMetroConfig } = require("react-native-reanimated/metro-config");
@@ -9305,7 +9657,7 @@ const uniwindConfig = withUniwindConfig(wrapWithReanimatedMetroConfig(config), {
 
 module.exports = withVarlockMetroConfig(uniwindConfig);
 `],
-  ["frontend/native/uniwind/package.json.hbs", `{
+  ["frontend/native/uniwind/apps/native/package.json.hbs", `{
   "name": "native",
   "version": "1.0.0",
   "private": true,
@@ -9360,7 +9712,7 @@ module.exports = withVarlockMetroConfig(uniwindConfig);
   }
 }
 `],
-  ["frontend/native/uniwind/tsconfig.json.hbs", `{
+  ["frontend/native/uniwind/apps/native/tsconfig.json.hbs", `{
   {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
   "references": [{ "path": "../../packages/api" }],
   {{/if}}
@@ -9380,39 +9732,36 @@ module.exports = withVarlockMetroConfig(uniwindConfig);
   ]
 }
 `],
-  ["frontend/native/uniwind/uniwind-env.d.ts", `/// <reference types="uniwind/types" />
+  ["frontend/native/uniwind/apps/native/uniwind-env.d.ts", `/// <reference types="uniwind/types" />
 
 declare module "*.css";
 `],
-  ["frontend/nuxt/_gitignore", `# Nuxt dev/build outputs
-.output
-.data
-.nuxt
-.nitro
-.cache
-dist
-.wrangler
-.alchemy
-
-# Node dependencies
-node_modules
-
-# Logs
-logs
-*.log
-
-# Misc
-.DS_Store
-.fleet
-.idea
-
-# Local env files
-.env
-.env.*
-!.env.example
-
+  ["frontend/nuxt/adapter.json", `{
+  "id": "nuxt",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": [
+          "nuxt"
+        ],
+        "backend": "self",
+        "runtime": "none",
+        "api": "none"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": [
+          "nuxt"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}
 `],
-  ["frontend/nuxt/app/app.config.ts.hbs", `export default defineAppConfig({
+  ["frontend/nuxt/apps/fullstack-web/app/app.config.ts.hbs", `export default defineAppConfig({
   ui: {
     colors: {
       primary: 'emerald',
@@ -9421,7 +9770,7 @@ logs
   }
 })
 `],
-  ["frontend/nuxt/app/app.vue.hbs", `<script setup lang="ts">
+  ["frontend/nuxt/apps/fullstack-web/app/app.vue.hbs", `<script setup lang="ts">
 {{#if (eq api "orpc")}}
 import { VueQueryDevtools } from '@tanstack/vue-query-devtools'
 {{/if}}
@@ -9441,50 +9790,7 @@ import { VueQueryDevtools } from '@tanstack/vue-query-devtools'
     {{/if}}
 </template>
 `],
-  ["frontend/nuxt/app/assets/css/main.css", `@import "tailwindcss";
-@import "@nuxt/ui";
-`],
-  ["frontend/nuxt/app/components/Header.vue.hbs", `<script setup lang="ts">
-import type { NavigationMenuItem } from '@nuxt/ui'
-{{#if (eq auth "better-auth")}}
-import UserMenu from './UserMenu.vue'
-{{/if}}
-
-const route = useRoute()
-
-const items = computed<NavigationMenuItem[]>(() => [
-    { label: "Home", to: "/", active: route.path === "/" },
-    {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
-    { label: "Dashboard", to: "/dashboard", active: route.path.startsWith("/dashboard") },
-    {{/if}}
-])
-</script>
-
-<template>
-  <UHeader>
-    <template #left>
-      <UNavigationMenu :items="items" />
-    </template>
-
-    <template #right>
-      <UColorModeButton />
-      {{#if (eq auth "better-auth")}}
-      <ClientOnly>
-        <UserMenu />
-        <template #fallback>
-          <USkeleton class="h-9 w-24" />
-        </template>
-      </ClientOnly>
-      {{/if}}
-    </template>
-
-    <template #body>
-      <UNavigationMenu :items="items" orientation="vertical" class="-mx-2.5" />
-    </template>
-  </UHeader>
-</template>
-`],
-  ["frontend/nuxt/app/layouts/default.vue.hbs", `<script setup></script>
+  ["frontend/nuxt/apps/fullstack-web/app/layouts/default.vue.hbs", `<script setup></script>
 
 <template>
   <div>
@@ -9495,7 +9801,7 @@ const items = computed<NavigationMenuItem[]>(() => [
   </div>
 </template>
 `],
-  ["frontend/nuxt/app/pages/index.vue.hbs", `<script setup lang="ts">
+  ["frontend/nuxt/apps/fullstack-web/app/pages/index.vue.hbs", `<script setup lang="ts">
 {{#if (eq backend "convex")}}
 import { api } from "@{{ projectName }}/backend/convex/_generated/api";
 import { useConvexQuery } from "convex-vue";
@@ -9599,7 +9905,7 @@ onServerPrefetch(async () => {
   </UContainer>
 </template>
 `],
-  ["frontend/nuxt/nuxt.config.ts.hbs", `{{#if (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma")))}}
+  ["frontend/nuxt/apps/fullstack-web/nuxt.config.ts.hbs", `{{#if (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma")))}}
 import { createRequire } from "node:module";
 import { z } from "zod";
 
@@ -9739,14 +10045,14 @@ export default defineNuxtConfig({
   {{/if}}
 })
 `],
-  ["frontend/nuxt/package.json.hbs", `{
+  ["frontend/nuxt/apps/fullstack-web/package.json.hbs", `{
   "name": "web",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}nuxt build",
     "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}nuxt prepare && vue-tsc -b{{else}}nuxt typecheck{{/if}}",
-    "dev": "nuxt dev",
+    "dev": "nuxt dev{{#if application}} --port {{application.port}}{{/if}}",
     "generate": "nuxt generate",
     "preview": "{{#if (or (eq webDeploy "none") (eq webDeploy "docker"))}}node .output/server/index.mjs{{else}}nuxt preview{{/if}}",
     "postinstall": "nuxt prepare"
@@ -9764,15 +10070,11 @@ export default defineNuxtConfig({
   }
 }
 `],
-  ["frontend/nuxt/public/favicon.ico", `[Binary file]`],
-  ["frontend/nuxt/public/robots.txt", `User-Agent: *
-Disallow:
-`],
-  ["frontend/nuxt/server/tsconfig.json", `{
+  ["frontend/nuxt/apps/fullstack-web/server/tsconfig.json", `{
   "extends": "../.nuxt/tsconfig.server.json"
 }
 `],
-  ["frontend/nuxt/tsconfig.json.hbs", `{
+  ["frontend/nuxt/apps/fullstack-web/tsconfig.json.hbs", `{
   // https://nuxt.com/docs/guide/concepts/typescript
   "files": [],
   "references": [
@@ -9791,7 +10093,439 @@ Disallow:
   ]
 }
 `],
-  ["frontend/react/next/AGENTS.md.hbs", `<!-- BEGIN:nextjs-agent-rules -->
+  ["frontend/nuxt/apps/web-frontend/app/app.config.ts.hbs", `export default defineAppConfig({
+  ui: {
+    colors: {
+      primary: 'emerald',
+      neutral: 'neutral',
+    },
+  }
+})
+`],
+  ["frontend/nuxt/apps/web-frontend/app/app.vue.hbs", `<script setup lang="ts">
+{{#if (eq api "orpc")}}
+import { VueQueryDevtools } from '@tanstack/vue-query-devtools'
+{{/if}}
+</script>
+
+<template>
+    <NuxtAnnouncer />
+    <NuxtRouteAnnouncer />
+    <NuxtLoadingIndicator />
+    <UApp>
+        <NuxtLayout>
+            <NuxtPage />
+        </NuxtLayout>
+    </UApp>
+    {{#if (eq api "orpc")}}
+    <VueQueryDevtools />
+    {{/if}}
+</template>
+`],
+  ["frontend/nuxt/apps/web-frontend/app/layouts/default.vue.hbs", `<script setup></script>
+
+<template>
+  <div>
+    <Header />
+    <UMain>
+      <slot />
+    </UMain>
+  </div>
+</template>
+`],
+  ["frontend/nuxt/apps/web-frontend/app/pages/index.vue.hbs", `<script setup lang="ts">
+{{#if (eq backend "convex")}}
+import { api } from "@{{ projectName }}/backend/convex/_generated/api";
+import { useConvexQuery } from "convex-vue";
+{{else}}
+  {{#unless (eq api "none")}}
+const { $orpc } = useNuxtApp()
+import { useQuery } from '@tanstack/vue-query'
+  {{/unless}}
+{{/if}}
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+{{#if (eq backend "convex")}}
+const healthCheck = useConvexQuery(api.healthCheck.get, {});
+{{else}}
+  {{#unless (eq api "none")}}
+const healthCheck = useQuery($orpc.healthCheck.queryOptions())
+
+onServerPrefetch(async () => {
+  try {
+    await healthCheck.suspense()
+  } catch {}
+})
+  {{/unless}}
+{{/if}}
+</script>
+
+<template>
+  <UContainer class="py-8">
+    <pre class="overflow-x-auto font-mono text-sm whitespace-pre-wrap">\\{{ TITLE_TEXT }}</pre>
+
+    <div class="grid gap-6 mt-6">
+      <UCard>
+        <template #header>
+          <div class="font-medium">API Status</div>
+        </template>
+
+        {{#if (eq backend "convex")}}
+        <div class="flex items-center gap-2">
+          <UIcon
+            :name="healthCheck === undefined ? 'i-lucide-loader-2' : healthCheck.data.value === 'OK' ? 'i-lucide-check-circle' : 'i-lucide-x-circle'"
+            :class="[
+              healthCheck === undefined ? 'animate-spin text-muted' : '',
+              healthCheck?.data.value === 'OK' ? 'text-success' : 'text-error'
+            ]"
+          />
+          <span class="text-sm">
+            \\{{
+              healthCheck === undefined
+                ? "Checking..."
+                : healthCheck.data.value === "OK"
+                  ? "Connected"
+                  : "Error"
+            }}
+          </span>
+        </div>
+        {{else}}
+        {{#unless (eq api "none")}}
+        <div class="flex items-center gap-2">
+          <UIcon
+            :name="healthCheck.isLoading.value ? 'i-lucide-loader-2' : healthCheck.isSuccess.value ? 'i-lucide-check-circle' : 'i-lucide-x-circle'"
+            :class="[
+              healthCheck.isLoading.value ? 'animate-spin text-muted' : '',
+              healthCheck.isSuccess.value ? 'text-success' : '',
+              healthCheck.isError.value ? 'text-error' : ''
+            ]"
+          />
+          <span class="text-sm">
+            <template v-if="healthCheck.isLoading.value">
+              Checking...
+            </template>
+            <template v-else-if="healthCheck.isSuccess.value">
+              Connected (\\{{ healthCheck.data.value }})
+            </template>
+            <template v-else-if="healthCheck.isError.value">
+              Error: \\{{ healthCheck.error.value?.message || 'Failed to connect' }}
+            </template>
+            <template v-else>
+              Idle
+            </template>
+          </span>
+        </div>
+        {{/unless}}
+        {{/if}}
+      </UCard>
+    </div>
+  </UContainer>
+</template>
+`],
+  ["frontend/nuxt/apps/web-frontend/nuxt.config.ts.hbs", `{{#if (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma")))}}
+import { createRequire } from "node:module";
+import { z } from "zod";
+
+// libsql loads its platform binding by a computed name, which file tracing can't follow
+const libsqlRequire = createRequire(import.meta.resolve("libsql"));
+const libsqlPackage = z.object({
+  optionalDependencies: z.record(z.string(), z.string()),
+}).parse(libsqlRequire("./package.json"));
+const libsqlBindings = Object.keys(libsqlPackage.optionalDependencies).flatMap(
+  (name) => {
+    try {
+      return [libsqlRequire.resolve(name)];
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "MODULE_NOT_FOUND") return [];
+      throw error;
+    }
+  },
+);
+{{/if}}
+{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+import { fileURLToPath } from "node:url";
+
+const apiReference = { path: fileURLToPath(new URL("../../packages/api", import.meta.url)) };
+{{/if}}
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+import { defineNuxtModule } from "nuxt/kit";
+import { unwasm } from "unwasm/plugin";
+
+const prismaWasm = defineNuxtModule({
+  setup(_options, nuxt) {
+    nuxt.hook("vite:extendConfig", (viteConfig) => {
+      viteConfig.plugins?.unshift(unwasm({ esmImport: true }));
+    });
+  },
+});
+{{/if}}
+
+// https://nuxt.com/docs/api/configuration/nuxt-config
+export default defineNuxtConfig({
+  {{#if (hasNativeModules this)}}
+  alias: { '@': new URL('./src', import.meta.url).pathname },
+  {{/if}}
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  typescript: {
+    tsConfig: { references: [apiReference] },
+    nodeTsConfig: { references: [apiReference] },
+    sharedTsConfig: { references: [apiReference] },
+  },
+  {{/if}}
+  compatibilityDate: 'latest',
+  devtools: { enabled: true },
+  experimental: {
+    payloadExtraction: 'client',
+  },
+  modules: [
+    {{#unless (eq webDeploy "cloudflare")}}
+    "@varlock/nuxt-integration",
+    {{/unless}}
+    {{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+    prismaWasm,
+    {{/if}}
+    '@nuxt/ui'
+    {{#if (eq backend "convex")}},
+    'convex-nuxt'
+    {{/if}}
+  ],
+  {{#unless (eq webDeploy "cloudflare")}}
+  varlock: {
+    ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}",
+  },
+  {{/unless}}
+  css: ['~/assets/css/main.css'],
+  {{#if (and (eq webDeploy "vercel") (eq serverDeploy "vercel"))}}
+  icon: {
+    localApiEndpoint: "/_nuxt_icon",
+  },
+  {{/if}}
+{{#if (or (and (eq auth "better-auth") (ne backend "convex")) (and (eq api "orpc") (ne backend "convex") (ne backend "none")))}}
+  vite: {
+    optimizeDeps: {
+      include: [
+{{#if (and (eq auth "better-auth") (ne backend "convex"))}}
+        "better-auth/vue",
+{{/if}}
+{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+        "@orpc/client",
+        "@orpc/client/fetch",
+        "@orpc/tanstack-query",
+        "@tanstack/vue-query",
+        "@tanstack/vue-query-devtools",
+{{/if}}
+      ],
+    },
+  },
+{{/if}}
+  devServer: {
+    port: 3001
+  },
+  {{#if (or (and (eq api "orpc") (ne backend "convex") (ne backend "none")) (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma")) (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma"))))}}
+  nitro: {
+    {{#if (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma")))}}
+    externals: { traceInclude: libsqlBindings },
+    {{/if}}
+    {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+    typescript: {
+      tsConfig: { references: [apiReference] },
+    },
+    {{/if}}
+    {{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+    {{#if (eq database "postgres")}}
+    alias: {
+      // pg-native is optional and unavailable in Workers; pg uses its JavaScript driver.
+      'pg-native': 'unenv/mock/proxy'
+    },
+    {{/if}}
+    experimental: {
+      wasm: true
+    },
+    wasm: {
+      esmImport: true
+    }
+    {{/if}}
+  },
+  {{/if}}
+  {{#if (eq backend "convex")}}
+  convex: {
+    url: process.env.NUXT_PUBLIC_CONVEX_URL,
+  },
+  {{else if (and (ne backend "self") (ne backend "none"))}}
+  runtimeConfig: {
+    // server-side override for SSR fetches (NUXT_SERVER_URL); falls back to the public URL
+    serverUrl: "",
+    public: {
+      serverUrl: process.env.NUXT_PUBLIC_SERVER_URL ?? "",
+    }
+  },
+  {{/if}}
+})
+`],
+  ["frontend/nuxt/apps/web-frontend/package.json.hbs", `{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}nuxt build",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}nuxt prepare && vue-tsc -b{{else}}nuxt typecheck{{/if}}",
+    "dev": "nuxt dev{{#if application}} --port {{application.port}}{{/if}}",
+    "generate": "nuxt generate",
+    "preview": "{{#if (or (eq webDeploy "none") (eq webDeploy "docker"))}}node .output/server/index.mjs{{else}}nuxt preview{{/if}}",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.11.0",
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.42",
+    "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.3.3",
+    "@iconify-json/lucide": "^1.2.129",
+    "vue-tsc": "^3.3.11"
+  }
+}
+`],
+  ["frontend/nuxt/apps/web-frontend/server/tsconfig.json", `{
+  "extends": "../.nuxt/tsconfig.server.json"
+}
+`],
+  ["frontend/nuxt/apps/web-frontend/tsconfig.json.hbs", `{
+  // https://nuxt.com/docs/guide/concepts/typescript
+  "files": [],
+  "references": [
+    {
+      "path": "./.nuxt/tsconfig.app.json"
+    },
+    {
+      "path": "./.nuxt/tsconfig.server.json"
+    },
+    {
+      "path": "./.nuxt/tsconfig.shared.json"
+    },
+    {
+      "path": "./.nuxt/tsconfig.node.json"
+    }
+  ]
+}
+`],
+  ["frontend/nuxt/shared/_gitignore", `# Nuxt dev/build outputs
+.output
+.data
+.nuxt
+.nitro
+.cache
+dist
+.wrangler
+.alchemy
+
+# Node dependencies
+node_modules
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+.fleet
+.idea
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+`],
+  ["frontend/nuxt/shared/app/assets/css/main.css", `@import "tailwindcss";
+@import "@nuxt/ui";
+`],
+  ["frontend/nuxt/shared/app/components/Header.vue.hbs", `<script setup lang="ts">
+import type { NavigationMenuItem } from '@nuxt/ui'
+{{#if (eq auth "better-auth")}}
+import UserMenu from './UserMenu.vue'
+{{/if}}
+
+const route = useRoute()
+
+const items = computed<NavigationMenuItem[]>(() => [
+    { label: "Home", to: "/", active: route.path === "/" },
+    {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+    { label: "Dashboard", to: "/dashboard", active: route.path.startsWith("/dashboard") },
+    {{/if}}
+])
+</script>
+
+<template>
+  <UHeader>
+    <template #left>
+      <UNavigationMenu :items="items" />
+    </template>
+
+    <template #right>
+      <UColorModeButton />
+      {{#if (eq auth "better-auth")}}
+      <ClientOnly>
+        <UserMenu />
+        <template #fallback>
+          <USkeleton class="h-9 w-24" />
+        </template>
+      </ClientOnly>
+      {{/if}}
+    </template>
+
+    <template #body>
+      <UNavigationMenu :items="items" orientation="vertical" class="-mx-2.5" />
+    </template>
+  </UHeader>
+</template>
+`],
+  ["frontend/nuxt/shared/public/favicon.ico", `[Binary file]`],
+  ["frontend/nuxt/shared/public/robots.txt", `User-Agent: *
+Disallow:
+`],
+  ["frontend/react/next/adapter.json", `{
+  "id": "next",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": [
+          "next"
+        ],
+        "backend": "self",
+        "runtime": "none",
+        "api": "none"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": [
+          "next"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}
+`],
+  ["frontend/react/next/apps/fullstack-web/AGENTS.md.hbs", `<!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
 
@@ -9801,13 +10535,13 @@ This block is written and re-added by \`next dev\` — verify at \`node_modules/
 
 <!-- END:nextjs-agent-rules -->
 `],
-  ["frontend/react/next/next-env.d.ts.hbs", `/// <reference types="next" />
+  ["frontend/react/next/apps/fullstack-web/next-env.d.ts.hbs", `/// <reference types="next" />
 /// <reference types="next/image-types/global" />
 
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
 `],
-  ["frontend/react/next/next.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+  ["frontend/react/next/apps/fullstack-web/next.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
 import { varlockNextConfigPlugin } from "@varlock/nextjs-integration/plugin";
 
 const withVarlock = varlockNextConfigPlugin();
@@ -9836,12 +10570,12 @@ export default {{#if (eq webDeploy "cloudflare")}}nextConfig{{else}}withVarlock(
 initOpenNextCloudflareForDev();
 {{/if}}
 `],
-  ["frontend/react/next/package.json.hbs", `{
+  ["frontend/react/next/apps/fullstack-web/package.json.hbs", `{
   "name": "web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "next dev --port {{#if application}}{{application.port}}{{else}}3001{{/if}}",
     "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}next build",
     "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit",
     "start": "next start"
@@ -9866,14 +10600,13 @@ initOpenNextCloudflareForDev();
   }
 }
 `],
-  ["frontend/react/next/postcss.config.mjs.hbs", `const config = {
+  ["frontend/react/next/apps/fullstack-web/postcss.config.mjs.hbs", `const config = {
   plugins: ["@tailwindcss/postcss"],
 };
 
 export default config;
 `],
-  ["frontend/react/next/src/app/favicon.ico", `[Binary file]`],
-  ["frontend/react/next/src/app/layout.tsx.hbs", `import type { Metadata } from "next";
+  ["frontend/react/next/apps/fullstack-web/src/app/layout.tsx.hbs", `import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../index.css";
 {{#if (eq auth "clerk")}}import { ClerkProvider } from "@clerk/nextjs";
@@ -9950,7 +10683,7 @@ export default function RootLayout({
 }
 {{/if}}
 `],
-  ["frontend/react/next/src/app/page.tsx.hbs", `"use client"
+  ["frontend/react/next/apps/fullstack-web/src/app/page.tsx.hbs", `"use client"
 {{#if (eq backend "convex")}}
 import { useQuery } from "convex/react";
 import { api } from "@{{projectName}}/backend/convex/_generated/api";
@@ -10030,7 +10763,340 @@ export default function Home() {
   );
 }
 `],
-  ["frontend/react/next/src/components/mode-toggle.tsx.hbs", `"use client"
+  ["frontend/react/next/apps/fullstack-web/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@{{projectName}}/ui/*": ["../../packages/ui/src/*"]
+    }{{#if (or (eq serverDeploy "cloudflare") (eq webDeploy "cloudflare"))}},
+    "types": [
+      "@cloudflare/workers-types"
+    ]{{/if}}
+  },
+  "include": [
+    {{#if (eq serverDeploy "cloudflare")}}
+    "../server/env.d.ts",
+    {{/if}}
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "./node_modules"
+  ]
+}
+`],
+  ["frontend/react/next/apps/web-frontend/AGENTS.md.hbs", `<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in \`node_modules/next/dist/docs/\` (resolved from this file's directory; in monorepos the \`next\` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by \`next dev\` — verify at \`node_modules/next/dist/server/lib/generate-agent-files.js\`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
+`],
+  ["frontend/react/next/apps/web-frontend/next-env.d.ts.hbs", `/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+`],
+  ["frontend/react/next/apps/web-frontend/next.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockNextConfigPlugin } from "@varlock/nextjs-integration/plugin";
+
+const withVarlock = varlockNextConfigPlugin();
+{{/unless}}
+{{#if (eq webDeploy "cloudflare")}}
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+{{/if}}
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+	typedRoutes: true,
+	reactCompiler: true,
+	{{#if (or (includes addons "tauri") (and (includes addons "electrobun") (or (ne backend "convex") (ne auth "better-auth"))))}}
+	output: "export",
+	{{else if (or (eq webDeploy "docker") (eq webDeploy "prisma"))}}
+	output: "standalone",
+	{{/if}}
+	{{#if (and (eq backend "self") (eq dbSetup "turso"))}}
+	serverExternalPackages: ["libsql", "@libsql/client"],
+	{{/if}}
+};
+
+export default {{#if (eq webDeploy "cloudflare")}}nextConfig{{else}}withVarlock(nextConfig){{/if}};
+
+{{#if (eq webDeploy "cloudflare")}}
+initOpenNextCloudflareForDev();
+{{/if}}
+`],
+  ["frontend/react/next/apps/web-frontend/package.json.hbs", `{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port {{#if application}}{{application.port}}{{else}}3001{{/if}}",
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}next build",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@{{projectName}}/ui": "{{#if (eq packageManager "npm")}}*{{else}}workspace:*{{/if}}",
+    "@swc/helpers": "^0.5.23",
+    "lucide-react": "^1.41.0",
+    "next": "^16.3.4",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sonner": "^2.0.8",
+    "babel-plugin-react-compiler": "^1.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.3"
+  }
+}
+`],
+  ["frontend/react/next/apps/web-frontend/postcss.config.mjs.hbs", `const config = {
+  plugins: ["@tailwindcss/postcss"],
+};
+
+export default config;
+`],
+  ["frontend/react/next/apps/web-frontend/src/app/layout.tsx.hbs", `import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "../index.css";
+{{#if (eq auth "clerk")}}import { ClerkProvider } from "@clerk/nextjs";
+{{/if}}{{#if (and (eq backend "convex") (eq auth "better-auth"))}}
+import { getToken } from "@/lib/auth-server";
+{{/if}}
+import Providers from "@/components/providers";
+import Header from "@/components/header";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "{{projectName}}",
+  description: "{{projectName}}",
+};
+
+{{#if (and (eq backend "convex") (eq auth "better-auth"))}}
+export default async function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const token = await getToken();
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={\`\${geistSans.variable} \${geistMono.variable} antialiased\`}
+      >
+        <Providers initialToken={token}>
+          <div className="grid grid-rows-[auto_1fr] h-svh">
+            <Header />
+            {children}
+          </div>
+        </Providers>
+      </body>
+    </html>
+  );
+}
+{{else}}
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+	return (
+		<html lang="en" suppressHydrationWarning>
+			<body
+				className={\`\${geistSans.variable} \${geistMono.variable} antialiased\`}
+			>
+				{{#if (eq auth "clerk")}}<ClerkProvider>
+					<Providers>
+						<div className="grid grid-rows-[auto_1fr] h-svh">
+							<Header />
+							{children}
+						</div>
+					</Providers>
+				</ClerkProvider>{{else}}<Providers>
+					<div className="grid grid-rows-[auto_1fr] h-svh">
+						<Header />
+						{children}
+					</div>
+				</Providers>{{/if}}
+			</body>
+		</html>
+	);
+}
+{{/if}}
+`],
+  ["frontend/react/next/apps/web-frontend/src/app/page.tsx.hbs", `"use client"
+{{#if (eq backend "convex")}}
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+{{else if (or (eq api "orpc") (eq api "trpc"))}}
+import { useQuery } from "@tanstack/react-query";
+  {{#if (eq api "orpc")}}
+import { orpc } from "@/utils/orpc";
+  {{/if}}
+  {{#if (eq api "trpc")}}
+import { trpc } from "@/utils/trpc";
+  {{/if}}
+{{/if}}
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+export default function Home() {
+  {{#if (eq backend "convex")}}
+  const healthCheck = useQuery(api.healthCheck.get);
+  {{else if (eq api "orpc")}}
+  const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+  {{else if (eq api "trpc")}}
+  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+  {{/if}}
+
+  return (
+    <div className="container mx-auto max-w-3xl px-4 py-2">
+      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+      <div className="grid gap-6">
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">API Status</h2>
+          {{#if (eq backend "convex")}}
+          <div className="flex items-center gap-2">
+            <div
+              className={\`h-2 w-2 rounded-full \${healthCheck === "OK" ? "bg-green-500" : healthCheck === undefined ? "bg-orange-400" : "bg-red-500"}\`}
+            />
+            <span className="text-sm text-muted-foreground">
+              {healthCheck === undefined
+                ? "Checking..."
+                : healthCheck === "OK"
+                  ? "Connected"
+                  : "Error"}
+            </span>
+          </div>
+          {{else}}
+            {{#unless (eq api "none")}}
+            <div className="flex items-center gap-2">
+              <div
+                className={\`h-2 w-2 rounded-full \${healthCheck.data ? "bg-green-500" : "bg-red-500"}\`}
+              />
+              <span className="text-sm text-muted-foreground">
+                {healthCheck.isLoading
+                  ? "Checking..."
+                  : healthCheck.data
+                    ? "Connected"
+                    : "Disconnected"}
+              </span>
+            </div>
+            {{/unless}}
+          {{/if}}
+        </section>
+      </div>
+    </div>
+  );
+}
+`],
+  ["frontend/react/next/apps/web-frontend/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@{{projectName}}/ui/*": ["../../packages/ui/src/*"]
+    }{{#if (or (eq serverDeploy "cloudflare") (eq webDeploy "cloudflare"))}},
+    "types": [
+      "@cloudflare/workers-types"
+    ]{{/if}}
+  },
+  "include": [
+    {{#if (eq serverDeploy "cloudflare")}}
+    "../server/env.d.ts",
+    {{/if}}
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "./node_modules"
+  ]
+}
+`],
+  ["frontend/react/next/shared/src/app/favicon.ico", `[Binary file]`],
+  ["frontend/react/next/shared/src/components/mode-toggle.tsx.hbs", `"use client"
 
 import * as React from "react"
 import { Moon, Sun } from "lucide-react"
@@ -10068,7 +11134,7 @@ export function ModeToggle() {
   )
 }
 `],
-  ["frontend/react/next/src/components/providers.tsx.hbs", `"use client";
+  ["frontend/react/next/shared/src/components/providers.tsx.hbs", `"use client";
 
 {{#if (and (eq auth "clerk") (ne api "none"))}}
 import { useEffect } from "react";
@@ -10183,7 +11249,7 @@ export default function Providers({
   );
 }
 `],
-  ["frontend/react/next/src/components/theme-provider.tsx.hbs", `"use client"
+  ["frontend/react/next/shared/src/components/theme-provider.tsx.hbs", `"use client"
 
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider } from "next-themes"
@@ -10195,60 +11261,37 @@ export function ThemeProvider({
   return <NextThemesProvider {...props}>{children}</NextThemesProvider>
 }
 `],
-  ["frontend/react/next/tsconfig.json.hbs", `{
-  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
-  "references": [{ "path": "../../packages/api" }],
-  {{/if}}
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "jsx": "react-jsx",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
+  ["frontend/react/react-router/adapter.json", `{
+  "id": "react-router",
+  "apps": {
+    "web-frontend": {
+      "stack": {
+        "frontend": [
+          "react-router"
+        ],
+        "runtime": "none",
+        "api": "none"
       }
-    ],
-    "paths": {
-      "@/*": ["./src/*"],
-      "@{{projectName}}/ui/*": ["../../packages/ui/src/*"]
-    }{{#if (or (eq serverDeploy "cloudflare") (eq webDeploy "cloudflare"))}},
-    "types": [
-      "@cloudflare/workers-types"
-    ]{{/if}}
-  },
-  "include": [
-    {{#if (eq serverDeploy "cloudflare")}}
-    "../server/env.d.ts",
-    {{/if}}
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-  ],
-  "exclude": [
-    "./node_modules"
-  ]
+    },
+    "admin": {
+      "stack": {
+        "frontend": [
+          "react-router"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
 }
 `],
-  ["frontend/react/react-router/package.json.hbs", `{
+  ["frontend/react/react-router/apps/admin/package.json.hbs", `{
   "name": "web",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}react-router build",
-    "dev": "react-router dev",
+    "dev": "react-router dev{{#if application}} --port {{application.port}}{{/if}}",
     "start": "react-router-serve ./build/server/index.js",
     "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}react-router typegen && tsc --noEmit"
   },
@@ -10276,8 +11319,7 @@ export function ThemeProvider({
   }
 }
 `],
-  ["frontend/react/react-router/public/favicon.ico", `[Binary file]`],
-  ["frontend/react/react-router/react-router.config.ts.hbs", `import type { Config } from "@react-router/dev/config";
+  ["frontend/react/react-router/apps/admin/react-router.config.ts.hbs", `import type { Config } from "@react-router/dev/config";
 
 export default {
 {{#if (and (eq webDeploy "vercel") (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
@@ -10290,49 +11332,7 @@ export default {
   appDirectory: "src",
 } satisfies Config;
 `],
-  ["frontend/react/react-router/src/components/mode-toggle.tsx.hbs", `import { Moon, Sun } from "lucide-react";
-
-import { Button } from "@{{projectName}}/ui/components/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@{{projectName}}/ui/components/dropdown-menu";
-import { useTheme } from "@/components/theme-provider";
-
-export function ModeToggle() {
-  const { setTheme } = useTheme();
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
-        <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
-        <Moon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
-        <span className="sr-only">Toggle theme</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>Light</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-`],
-  ["frontend/react/react-router/src/components/theme-provider.tsx.hbs", `import * as React from "react";
-import { ThemeProvider as NextThemesProvider } from "next-themes";
-
-export function ThemeProvider({
-  children,
-  ...props
-}: React.ComponentProps<typeof NextThemesProvider>) {
-  return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
-}
-
-export { useTheme } from "next-themes";
-`],
-  ["frontend/react/react-router/src/root.tsx.hbs", `import {
+  ["frontend/react/react-router/apps/admin/src/root.tsx.hbs", `import {
   isRouteErrorResponse,
   Links,
   Meta,
@@ -10634,12 +11634,12 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   );
 }
 `],
-  ["frontend/react/react-router/src/routes.ts", `import { type RouteConfig } from "@react-router/dev/routes";
+  ["frontend/react/react-router/apps/admin/src/routes.ts", `import { type RouteConfig } from "@react-router/dev/routes";
 import { flatRoutes } from "@react-router/fs-routes";
 
 export default flatRoutes() satisfies RouteConfig;
 `],
-  ["frontend/react/react-router/src/routes/_index.tsx.hbs", `import type { Route } from "./+types/_index";
+  ["frontend/react/react-router/apps/admin/src/routes/_index.tsx.hbs", `import type { Route } from "./+types/_index";
 {{#if (eq backend "convex")}}
 import { useQuery } from "convex/react";
 import { api } from "@{{projectName}}/backend/convex/_generated/api";
@@ -10725,7 +11725,7 @@ export default function Home() {
   );
 }
 `],
-  ["frontend/react/react-router/tsconfig.json.hbs", `{
+  ["frontend/react/react-router/apps/admin/tsconfig.json.hbs", `{
   {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
   "references": [{ "path": "../../packages/api" }],
   {{/if}}
@@ -10756,7 +11756,7 @@ export default function Home() {
   }
 }
 `],
-  ["frontend/react/react-router/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+  ["frontend/react/react-router/apps/admin/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
 import { varlockVitePlugin } from "@varlock/vite-integration";
 {{/unless}}
 {{#if (and (eq webDeploy "cloudflare") (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
@@ -10811,56 +11811,534 @@ export default defineConfig({{#if (and (or (eq webDeploy "vercel") (eq webDeploy
 {{/if}}
 }{{#if (and (or (eq webDeploy "vercel") (eq webDeploy "prisma")) (not (or (includes addons "tauri") (includes addons "electrobun"))))}}){{/if}});
 `],
-  ["frontend/react/tanstack-router/index.html.hbs", `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{projectName}}</title>
-  </head>
-
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-`],
-  ["frontend/react/tanstack-router/package.json.hbs", `{
-	"name": "web",
-	"version": "0.0.0",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev": "vite dev",
-		"build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
-		"serve": "vite preview",
-		"start": "vite",
-		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build && tsc --noEmit"
-	},
-	"dependencies": {
-        "@{{projectName}}/ui": "{{#if (eq packageManager "npm")}}*{{else}}workspace:*{{/if}}",
-		"@tailwindcss/vite": "^4.3.3",
-		"@tanstack/react-router": "^1.170.44",
-		"lucide-react": "^1.56.0",
-        "next-themes": "^0.4.6",
-		"react": "^19.3.0",
-		"react-dom": "^19.3.0",
-        "sonner": "^2.0.8"
-	},
-	"devDependencies": {
-		"@tanstack/react-router-devtools": "^1.167.2",
-		"@tanstack/router-plugin": "^1.168.45",
-		"@types/node": "^26.6.5",
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0",
-		"@vitejs/plugin-react": "^6.1.2",
-		"postcss": "^8.5.30",
-		"tailwindcss": "^4.3.3",
-		"vite": "^8.3.4"
-	}
+  ["frontend/react/react-router/apps/web-frontend/package.json.hbs", `{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}react-router build",
+    "dev": "react-router dev{{#if application}} --port {{application.port}}{{/if}}",
+    "start": "react-router-serve ./build/server/index.js",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}react-router typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@{{projectName}}/ui": "{{#if (eq packageManager "npm")}}*{{else}}workspace:*{{/if}}",
+    "@react-router/fs-routes": "^8.3.1",
+    "@react-router/node": "^8.3.1",
+    "@react-router/serve": "^8.3.1",
+    "isbot": "^5.2.2",
+    "lucide-react": "^1.41.0",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router": "^8.3.1",
+    "sonner": "^2.0.8"
+  },
+  "devDependencies": {
+    "@react-router/dev": "^8.3.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.2.2"
+  }
 }
 `],
-  ["frontend/react/tanstack-router/src/components/mode-toggle.tsx.hbs", `import { Moon, Sun } from "lucide-react";
+  ["frontend/react/react-router/apps/web-frontend/react-router.config.ts.hbs", `import type { Config } from "@react-router/dev/config";
+
+export default {
+{{#if (and (eq webDeploy "vercel") (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
+  // Adopt vercelPreset() once @vercel/react-router supports RR8 (vercel/vercel#16730)
+{{/if}}
+{{#if (or (includes addons "tauri") (includes addons "electrobun"))}}
+  // Desktop addons package static web assets; SSR output cannot be bundled
+  ssr: false,
+{{/if}}
+  appDirectory: "src",
+} satisfies Config;
+`],
+  ["frontend/react/react-router/apps/web-frontend/src/root.tsx.hbs", `import {
+  isRouteErrorResponse,
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+} from "react-router";
+import type { Route } from "./+types/root";
+import "./index.css";
+import Header from "./components/header";
+import { ThemeProvider } from "./components/theme-provider";
+import { Toaster } from "@{{projectName}}/ui/components/sonner";
+{{#if (eq auth "clerk")}}
+import { ClerkProvider{{#if (or (eq backend "convex") (ne api "none"))}}, useAuth{{/if}} } from "@clerk/react-router";
+import { clerkMiddleware, rootAuthLoader } from "@clerk/react-router/server";
+{{/if}}
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+import { useEffect } from "react";
+import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
+{{/if}}
+
+{{#if (eq backend "convex")}}
+import { ConvexReactClient } from "convex/react";
+import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+  {{#if (eq auth "clerk")}}
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+  {{else if (eq auth "better-auth")}}
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { authClient } from "@/lib/auth-client";
+  {{else}}
+import { ConvexProvider } from "convex/react";
+  {{/if}}
+{{else}}
+  {{#unless (eq api "none")}}
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+    {{#if (eq api "orpc")}}
+import { queryClient } from "./utils/orpc";
+    {{/if}}
+    {{#if (eq api "trpc")}}
+import { queryClient } from "./utils/trpc";
+    {{/if}}
+  {{/unless}}
+{{/if}}
+
+{{#if (eq auth "clerk")}}
+export const middleware: Route.MiddlewareFunction[] = [clerkMiddleware()];
+
+export const loader = (args: Route.LoaderArgs) => rootAuthLoader(args);
+{{/if}}
+
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+function ClerkApiAuthBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setClerkAuthTokenGetter(getToken);
+
+    return () => {
+      setClerkAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  return null;
+}
+{{/if}}
+
+export const links: Route.LinksFunction = () => [
+  { rel: "preconnect", href: "https://fonts.googleapis.com" },
+  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+  {
+    rel: "stylesheet",
+    href:
+      "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+  },
+];
+
+export function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Meta />
+        <Links />
+      </head>
+      <body>
+        {children}
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+{{#if (eq backend "convex")}}
+{{#if (eq auth "clerk")}}
+export default function App({ loaderData }: Route.ComponentProps) {
+{{else if (eq auth "better-auth")}}
+export default function App() {
+{{else}}
+export default function App() {
+{{/if}}
+  const convex = new ConvexReactClient(ENV.VITE_CONVEX_URL);
+  {{#if (eq auth "clerk")}}
+  return (
+    <ClerkProvider loaderData={loaderData}>
+      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          disableTransitionOnChange
+          storageKey="vite-ui-theme"
+        >
+          <div className="grid grid-rows-[auto_1fr] h-svh">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+        </ThemeProvider>
+      </ConvexProviderWithClerk>
+    </ClerkProvider>
+  );
+  {{else if (eq auth "better-auth")}}
+  return (
+    <ConvexBetterAuthProvider client={convex} authClient={authClient}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+    </ConvexBetterAuthProvider>
+  );
+  {{else}}
+  return (
+    <ConvexProvider client={convex}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+    </ConvexProvider>
+  );
+  {{/if}}
+}
+{{else if (eq auth "clerk")}}
+export default function App({ loaderData }: Route.ComponentProps) {
+  return (
+    <ClerkProvider loaderData={loaderData}>
+      {{#unless (eq api "none")}}
+      <ClerkApiAuthBridge />
+      {{/unless}}
+      {{#if (eq api "orpc")}}
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          disableTransitionOnChange
+          storageKey="vite-ui-theme"
+        >
+          <div className="grid grid-rows-[auto_1fr] h-svh">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+        </ThemeProvider>
+        <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+      </QueryClientProvider>
+      {{else if (eq api "trpc")}}
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          disableTransitionOnChange
+          storageKey="vite-ui-theme"
+        >
+          <div className="grid grid-rows-[auto_1fr] h-svh">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+        </ThemeProvider>
+        <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+      </QueryClientProvider>
+      {{else}}
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+      {{/if}}
+    </ClerkProvider>
+  );
+}
+{{else if (eq api "orpc")}}
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+      <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+    </QueryClientProvider>
+  );
+}
+{{else if (eq api "trpc")}}
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        disableTransitionOnChange
+        storageKey="vite-ui-theme"
+      >
+        <div className="grid grid-rows-[auto_1fr] h-svh">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+      </ThemeProvider>
+      <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+    </QueryClientProvider>
+  );
+}
+{{else}}
+export default function App() {
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="dark"
+      disableTransitionOnChange
+      storageKey="vite-ui-theme"
+    >
+      <div className="grid grid-rows-[auto_1fr] h-svh">
+        <Header />
+        <Outlet />
+      </div>
+      <Toaster richColors />
+    </ThemeProvider>
+  );
+}
+{{/if}}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  let message = "Oops!";
+  let details = "An unexpected error occurred.";
+  let stack: string | undefined;
+  if (isRouteErrorResponse(error)) {
+    message = error.status === 404 ? "404" : "Error";
+    details =
+      error.status === 404
+        ? "The requested page could not be found."
+        : error.statusText || details;
+  } else if (import.meta.env.DEV && error && error instanceof Error) {
+    details = error.message;
+    stack = error.stack;
+  }
+  return (
+    <main className="pt-16 p-4 container mx-auto">
+      <h1>{message}</h1>
+      <p>{details}</p>
+      {stack && (
+        <pre className="w-full p-4 overflow-x-auto">
+          <code>{stack}</code>
+        </pre>
+      )}
+    </main>
+  );
+}
+`],
+  ["frontend/react/react-router/apps/web-frontend/src/routes.ts", `import { type RouteConfig } from "@react-router/dev/routes";
+import { flatRoutes } from "@react-router/fs-routes";
+
+export default flatRoutes() satisfies RouteConfig;
+`],
+  ["frontend/react/react-router/apps/web-frontend/src/routes/_index.tsx.hbs", `import type { Route } from "./+types/_index";
+{{#if (eq backend "convex")}}
+import { useQuery } from "convex/react";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+{{else if (or (eq api "orpc") (eq api "trpc"))}}
+import { useQuery } from "@tanstack/react-query";
+  {{#if (eq api "orpc")}}
+  import { orpc } from "@/utils/orpc";
+  {{/if}}
+  {{#if (eq api "trpc")}}
+  import { trpc } from "@/utils/trpc";
+  {{/if}}
+{{/if}}
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+export function meta({}: Route.MetaArgs) {
+  return [{ title: "{{projectName}}" }, { name: "description", content: "{{projectName}} is a web application" }];
+}
+
+export default function Home() {
+  {{#if (eq backend "convex")}}
+  const healthCheck = useQuery(api.healthCheck.get);
+  {{else if (eq api "orpc")}}
+  const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+  {{else if (eq api "trpc")}}
+  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+  {{/if}}
+
+  return (
+    <div className="container mx-auto max-w-3xl px-4 py-2">
+      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+      <div className="grid gap-6">
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">API Status</h2>
+          {{#if (eq backend "convex")}}
+          <div className="flex items-center gap-2">
+            <div
+              className={\`h-2 w-2 rounded-full \${healthCheck === "OK" ? "bg-green-500" : healthCheck === undefined ? "bg-orange-400" : "bg-red-500"}\`}
+            />
+            <span className="text-sm text-muted-foreground">
+              {healthCheck === undefined
+                ? "Checking..."
+                : healthCheck === "OK"
+                  ? "Connected"
+                  : "Error"}
+            </span>
+          </div>
+          {{else}}
+            {{#unless (eq api "none")}}
+            <div className="flex items-center gap-2">
+              <div
+                className={\`h-2 w-2 rounded-full \${
+                  healthCheck.data ? "bg-green-500" : "bg-red-500"
+                }\`}
+              />
+              <span className="text-sm text-muted-foreground">
+                {healthCheck.isLoading
+                  ? "Checking..."
+                  : healthCheck.data
+                  ? "Connected"
+                  : "Disconnected"}
+              </span>
+            </div>
+            {{/unless}}
+          {{/if}}
+        </section>
+      </div>
+    </div>
+  );
+}
+`],
+  ["frontend/react/react-router/apps/web-frontend/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "include": [
+    "**/*",
+    "**/.server/**/*",
+    "**/.client/**/*",
+    ".react-router/types/**/*"
+  ],
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "types": ["node", "vite/client"],
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "rootDirs": [".", "./.react-router/types"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@{{projectName}}/ui/*": ["../../packages/ui/src/*"]
+    },
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true
+  }
+}
+`],
+  ["frontend/react/react-router/apps/web-frontend/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockVitePlugin } from "@varlock/vite-integration";
+{{/unless}}
+{{#if (and (eq webDeploy "cloudflare") (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
+import { fileURLToPath } from "node:url";
+{{/if}}
+import { reactRouter } from "@react-router/dev/vite";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{else}}vite{{/if}}";
+
+export default defineConfig({{#if (and (or (eq webDeploy "vercel") (eq webDeploy "prisma")) (not (or (includes addons "tauri") (includes addons "electrobun"))))}}({ command }) => ({{/if}}{
+  resolve: {
+    tsconfigPaths: true,
+  },
+  optimizeDeps: {
+    entries: ["src/**/*.{ts,tsx}"],
+  },
+  plugins: [
+{{#unless (eq webDeploy "cloudflare")}}
+    varlockVitePlugin({ ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}" }),
+{{/unless}}
+    tailwindcss(),
+    reactRouter(),
+  ],
+{{#if (and (or (eq webDeploy "vercel") (eq webDeploy "prisma")) (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
+  ssr: {
+    // The deployment artifact has no node_modules; bundle all server dependencies.
+    noExternal: command === "build" ? true : undefined,
+  },
+{{/if}}
+{{#if (and (eq webDeploy "prisma") (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
+  environments: {
+    ssr: {
+      build: {
+        rollupOptions: {
+          input: "./prisma.server.ts",
+        },
+      },
+    },
+  },
+{{/if}}
+{{#if (and (eq webDeploy "cloudflare") (not (or (includes addons "tauri") (includes addons "electrobun"))))}}
+  environments: {
+    ssr: {
+      build: {
+        rollupOptions: {
+          // Worker entry wrapping the React Router request handler; must be absolute
+          input: fileURLToPath(new URL("./workers/app.ts", import.meta.url)),
+        },
+      },
+    },
+  },
+{{/if}}
+}{{#if (and (or (eq webDeploy "vercel") (eq webDeploy "prisma")) (not (or (includes addons "tauri") (includes addons "electrobun"))))}}){{/if}});
+`],
+  ["frontend/react/react-router/shared/public/favicon.ico", `[Binary file]`],
+  ["frontend/react/react-router/shared/src/components/mode-toggle.tsx.hbs", `import { Moon, Sun } from "lucide-react";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import {
@@ -10890,7 +12368,7 @@ export function ModeToggle() {
   );
 }
 `],
-  ["frontend/react/tanstack-router/src/components/theme-provider.tsx.hbs", `import * as React from "react";
+  ["frontend/react/react-router/shared/src/components/theme-provider.tsx.hbs", `import * as React from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 export function ThemeProvider({
@@ -10902,7 +12380,284 @@ export function ThemeProvider({
 
 export { useTheme } from "next-themes";
 `],
-  ["frontend/react/tanstack-router/src/main.tsx.hbs", `import { RouterProvider, createRouter } from "@tanstack/react-router";
+  ["frontend/react/shared/_gitignore", `# Dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Testing
+/coverage
+
+# Build outputs
+/.next/
+/out/
+/build/
+/dist/
+.vinxi
+.output
+.react-router/
+.tanstack/
+.nitro/
+
+# Deployment
+.vercel
+.netlify
+.wrangler
+.alchemy
+
+# Environment & local files
+.env*
+!.env.example
+.DS_Store
+*.pem
+*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Other
+dev-dist
+
+.wrangler
+.dev.vars*
+
+.open-next
+`],
+  ["frontend/react/shared/components.json.hbs", `{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-lyra",
+  "rsc": {{#if (includes frontend "next")}}true{{else}}false{{/if}},
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "../../packages/ui/src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@/components",
+    "utils": "@{{projectName}}/ui/lib/utils",
+    "ui": "@{{projectName}}/ui/components",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "menuColor": "default",
+  "menuAccent": "subtle",
+  "registries": {}
+}
+`],
+  ["frontend/react/shared/src/components/header.tsx.hbs", `{{#if (includes frontend "next")}}
+"use client";
+import Link from "next/link";
+{{else if (includes frontend "react-router")}}
+import { NavLink } from "react-router";
+{{else if (or (includes frontend "tanstack-router") (includes frontend "tanstack-start"))}}
+import { Link } from "@tanstack/react-router";
+{{/if}}
+{{#unless (includes frontend "tanstack-start")}}
+import { ModeToggle } from "./mode-toggle";
+{{/unless}}
+{{#if (and (eq auth "better-auth") (ne backend "convex"))}}
+import UserMenu from "./user-menu";
+{{/if}}
+
+export default function Header() {
+  const links = [
+    { to: "/", label: "Home" },
+    {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
+      { to: "/dashboard", label: "Dashboard" },
+    {{/if}}
+  ] as const;
+
+  return (
+    <div>
+      <div className="flex flex-row items-center justify-between px-2 py-1">
+        <nav className="flex gap-4 text-lg">
+          {links.map(({ to, label }) => {
+            {{#if (includes frontend "next")}}
+            return (
+              <Link key={to} href={to}>
+                {label}
+              </Link>
+            );
+            {{else if (includes frontend "react-router")}}
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) => isActive ? "font-bold" : ""}
+                end
+              >
+                {label}
+              </NavLink>
+            );
+            {{else if (or (includes frontend "tanstack-router") (includes frontend "tanstack-start"))}}
+            return (
+              <Link
+                key={to}
+                to={to}
+              >
+                {label}
+              </Link>
+            );
+            {{else}}
+            return null;
+            {{/if}}
+          })}
+        </nav>
+        <div className="flex items-center gap-2">
+          {{#unless (includes frontend "tanstack-start")}}
+          <ModeToggle />
+          {{/unless}}
+          {{#if (and (eq auth "better-auth") (ne backend "convex"))}}
+          <UserMenu />
+          {{/if}}
+        </div>
+      </div>
+      <hr />
+    </div>
+  );
+}
+`],
+  ["frontend/react/shared/src/components/loader.tsx.hbs", `import { Loader2 } from "lucide-react";
+
+export default function Loader() {
+  return (
+    <div className="flex h-full items-center justify-center pt-8">
+      <Loader2 className="animate-spin" />
+    </div>
+  );
+}
+`],
+  ["frontend/react/shared/src/index.css.hbs", `@import '@{{projectName}}/ui/globals.css';
+`],
+  ["frontend/react/tanstack-router/adapter.json", `{
+  "id": "tanstack-router",
+  "apps": {
+    "web-frontend": {
+      "stack": {
+        "frontend": [
+          "tanstack-router"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}
+`],
+  ["frontend/react/tanstack-router/apps/web-frontend/index.html.hbs", `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{projectName}}</title>
+  </head>
+
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+`],
+  ["frontend/react/tanstack-router/apps/web-frontend/package.json.hbs", `{
+	"name": "web",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+        "dev": "vite dev{{#if application}} --port {{application.port}}{{/if}}",
+		"build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
+		"serve": "vite preview",
+		"start": "vite",
+		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build && tsc --noEmit"
+	},
+	"dependencies": {
+        "@{{projectName}}/ui": "{{#if (eq packageManager "npm")}}*{{else}}workspace:*{{/if}}",
+		"@tailwindcss/vite": "^4.3.3",
+		"@tanstack/react-router": "^1.170.44",
+		"lucide-react": "^1.56.0",
+        "next-themes": "^0.4.6",
+		"react": "^19.3.0",
+		"react-dom": "^19.3.0",
+        "sonner": "^2.0.8"
+	},
+	"devDependencies": {
+		"@tanstack/react-router-devtools": "^1.167.2",
+		"@tanstack/router-plugin": "^1.168.45",
+		"@types/node": "^26.6.5",
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0",
+		"@vitejs/plugin-react": "^6.1.2",
+		"postcss": "^8.5.30",
+		"tailwindcss": "^4.3.3",
+		"vite": "^8.3.4"
+	}
+}
+`],
+  ["frontend/react/tanstack-router/apps/web-frontend/src/components/mode-toggle.tsx.hbs", `import { Moon, Sun } from "lucide-react";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@{{projectName}}/ui/components/dropdown-menu";
+import { useTheme } from "@/components/theme-provider";
+
+export function ModeToggle() {
+  const { setTheme } = useTheme();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
+        <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+        <Moon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+        <span className="sr-only">Toggle theme</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme("light")}>Light</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+`],
+  ["frontend/react/tanstack-router/apps/web-frontend/src/components/theme-provider.tsx.hbs", `import * as React from "react";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+
+export function ThemeProvider({
+  children,
+  ...props
+}: React.ComponentProps<typeof NextThemesProvider>) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
+}
+
+export { useTheme } from "next-themes";
+`],
+  ["frontend/react/tanstack-router/apps/web-frontend/src/main.tsx.hbs", `import { RouterProvider, createRouter } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
 {{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
 import { useEffect } from "react";
@@ -11041,7 +12796,7 @@ if (!rootElement.innerHTML) {
   root.render(<RouterProvider router={router} />);
 }
 `],
-  ["frontend/react/tanstack-router/src/routes/__root.tsx.hbs", `import Header from "@/components/header";
+  ["frontend/react/tanstack-router/apps/web-frontend/src/routes/__root.tsx.hbs", `import Header from "@/components/header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@{{projectName}}/ui/components/sonner";
 {{#if (eq api "orpc")}}
@@ -11145,7 +12900,7 @@ function RootComponent() {
   );
 }
 `],
-  ["frontend/react/tanstack-router/src/routes/index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["frontend/react/tanstack-router/apps/web-frontend/src/routes/index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 {{#if (eq api "orpc")}}
 import { orpc } from "@/utils/orpc";
 import { useQuery } from "@tanstack/react-query";
@@ -11231,7 +12986,7 @@ function HomeComponent() {
   );
 }
 `],
-  ["frontend/react/tanstack-router/tsconfig.json.hbs", `{
+  ["frontend/react/tanstack-router/apps/web-frontend/tsconfig.json.hbs", `{
   {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
   "references": [{ "path": "../../packages/api" }],
   {{/if}}
@@ -11252,7 +13007,7 @@ function HomeComponent() {
   }
 }
 `],
-  ["frontend/react/tanstack-router/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+  ["frontend/react/tanstack-router/apps/web-frontend/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
 import { varlockVitePlugin } from "@varlock/vite-integration";
 {{/unless}}
 import tailwindcss from "@tailwindcss/vite";
@@ -11280,14 +13035,39 @@ export default defineConfig({
   ],
 });
 `],
-  ["frontend/react/tanstack-start/package.json.hbs", `{
+  ["frontend/react/tanstack-start/adapter.json", `{
+  "id": "tanstack-start",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": [
+          "tanstack-start"
+        ],
+        "backend": "self",
+        "runtime": "none",
+        "api": "none"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": [
+          "tanstack-start"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}
+`],
+  ["frontend/react/tanstack-start/apps/fullstack-web/package.json.hbs", `{
   "name": "web",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
     "serve": "vite preview",
-    "dev": "vite dev",
+    "dev": "vite dev{{#if application}} --port {{application.port}}{{/if}}",
     "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build && tsc --noEmit"
   },
   "dependencies": {
@@ -11316,11 +13096,7 @@ export default defineConfig({
   }
 }
 `],
-  ["frontend/react/tanstack-start/public/robots.txt", `# https://www.robotstxt.org/robotstxt.html
-User-agent: *
-Disallow:
-`],
-  ["frontend/react/tanstack-start/src/router.tsx.hbs", `{{#if (eq backend "convex")}}
+  ["frontend/react/tanstack-start/apps/fullstack-web/src/router.tsx.hbs", `{{#if (eq backend "convex")}}
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
@@ -11490,7 +13266,7 @@ declare module "@tanstack/react-router" {
 	}
 }
 `],
-  ["frontend/react/tanstack-start/src/routes/__root.tsx.hbs", `import { Toaster } from "@{{projectName}}/ui/components/sonner";
+  ["frontend/react/tanstack-start/apps/fullstack-web/src/routes/__root.tsx.hbs", `import { Toaster } from "@{{projectName}}/ui/components/sonner";
 {{#unless (eq backend "convex")}} {{#unless (eq api "none")}}
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 {{/unless}} {{/unless}}
@@ -11746,7 +13522,7 @@ function RootDocument() {
   {{/if}}
 }
 `],
-  ["frontend/react/tanstack-start/src/routes/index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["frontend/react/tanstack-start/apps/fullstack-web/src/routes/index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 {{#if (eq backend "convex")}}
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -11832,7 +13608,7 @@ function HomeComponent() {
   );
 }
 `],
-  ["frontend/react/tanstack-start/tsconfig.json.hbs", `{
+  ["frontend/react/tanstack-start/apps/fullstack-web/tsconfig.json.hbs", `{
   {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
   "references": [{ "path": "../../packages/api" }],
   {{/if}}
@@ -11863,7 +13639,7 @@ function HomeComponent() {
   }
 }
 `],
-  ["frontend/react/tanstack-start/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+  ["frontend/react/tanstack-start/apps/fullstack-web/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
 import { varlockVitePlugin } from "@varlock/vite-integration";
 {{/unless}}
 import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{else}}vite{{/if}}";
@@ -11929,197 +13705,686 @@ export default defineConfig({
 {{/if}}
 });
 `],
-  ["frontend/react/web-base/_gitignore", `# Dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# Testing
-/coverage
-
-# Build outputs
-/.next/
-/out/
-/build/
-/dist/
-.vinxi
-.output
-.react-router/
-.tanstack/
-.nitro/
-
-# Deployment
-.vercel
-.netlify
-.wrangler
-.alchemy
-
-# Environment & local files
-.env*
-!.env.example
-.DS_Store
-*.pem
-*.local
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-*.log*
-
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
-
-# IDE
-.vscode/*
-!.vscode/extensions.json
-.idea
-
-# Other
-dev-dist
-
-.wrangler
-.dev.vars*
-
-.open-next
-`],
-  ["frontend/react/web-base/components.json.hbs", `{
-  "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "base-lyra",
-  "rsc": {{#if (includes frontend "next")}}true{{else}}false{{/if}},
-  "tsx": true,
-  "tailwind": {
-    "config": "",
-    "css": "../../packages/ui/src/styles/globals.css",
-    "baseColor": "neutral",
-    "cssVariables": true,
-    "prefix": ""
-  },
-  "iconLibrary": "lucide",
-  "aliases": {
-    "components": "@/components",
-    "utils": "@{{projectName}}/ui/lib/utils",
-    "ui": "@{{projectName}}/ui/components",
-    "lib": "@/lib",
-    "hooks": "@/hooks"
-  },
-  "menuColor": "default",
-  "menuAccent": "subtle",
-  "registries": {}
-}
-`],
-  ["frontend/react/web-base/src/components/header.tsx.hbs", `{{#if (includes frontend "next")}}
-"use client";
-import Link from "next/link";
-{{else if (includes frontend "react-router")}}
-import { NavLink } from "react-router";
-{{else if (or (includes frontend "tanstack-router") (includes frontend "tanstack-start"))}}
-import { Link } from "@tanstack/react-router";
-{{/if}}
-{{#unless (includes frontend "tanstack-start")}}
-import { ModeToggle } from "./mode-toggle";
-{{/unless}}
-{{#if (and (eq auth "better-auth") (ne backend "convex"))}}
-import UserMenu from "./user-menu";
-{{/if}}
-
-export default function Header() {
-  const links = [
-    { to: "/", label: "Home" },
-    {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
-      { to: "/dashboard", label: "Dashboard" },
-    {{/if}}
-  ] as const;
-
-  return (
-    <div>
-      <div className="flex flex-row items-center justify-between px-2 py-1">
-        <nav className="flex gap-4 text-lg">
-          {links.map(({ to, label }) => {
-            {{#if (includes frontend "next")}}
-            return (
-              <Link key={to} href={to}>
-                {label}
-              </Link>
-            );
-            {{else if (includes frontend "react-router")}}
-            return (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) => isActive ? "font-bold" : ""}
-                end
-              >
-                {label}
-              </NavLink>
-            );
-            {{else if (or (includes frontend "tanstack-router") (includes frontend "tanstack-start"))}}
-            return (
-              <Link
-                key={to}
-                to={to}
-              >
-                {label}
-              </Link>
-            );
-            {{else}}
-            return null;
-            {{/if}}
-          })}
-        </nav>
-        <div className="flex items-center gap-2">
-          {{#unless (includes frontend "tanstack-start")}}
-          <ModeToggle />
-          {{/unless}}
-          {{#if (and (eq auth "better-auth") (ne backend "convex"))}}
-          <UserMenu />
-          {{/if}}
-        </div>
-      </div>
-      <hr />
-    </div>
-  );
-}
-`],
-  ["frontend/react/web-base/src/components/loader.tsx.hbs", `import { Loader2 } from "lucide-react";
-
-export default function Loader() {
-  return (
-    <div className="flex h-full items-center justify-center pt-8">
-      <Loader2 className="animate-spin" />
-    </div>
-  );
-}
-`],
-  ["frontend/react/web-base/src/index.css.hbs", `@import '@{{projectName}}/ui/globals.css';
-`],
-  ["frontend/solid/_gitignore", `node_modules
-.DS_Store
-dist
-.output
-.vercel
-.netlify
-*.local
-.env
-.env.*
-
-.wrangler
-.alchemy
-.dev.vars*
-`],
-  ["frontend/solid/package.json.hbs", `{
+  ["frontend/react/tanstack-start/apps/web-frontend/package.json.hbs", `{
   "name": "web",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
+    "serve": "vite preview",
+    "dev": "vite dev{{#if application}} --port {{application.port}}{{/if}}",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build && tsc --noEmit"
+  },
+  "dependencies": {
+    "@{{projectName}}/ui": "{{#if (eq packageManager "npm")}}*{{else}}workspace:*{{/if}}",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-query": "^5.104.2",
+    "@tanstack/react-router": "^1.170.44",
+    "@tanstack/react-start": "^1.169.1",
+    "lucide-react": "^1.56.0",
+    "next-themes": "^0.4.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "sonner": "^2.0.8",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@tanstack/react-router-devtools": "^1.167.2",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^30.1.2",
+    "vite": "^8.3.4",
+    "web-vitals": "^6.2.3"
+  }
+}
+`],
+  ["frontend/react/tanstack-start/apps/web-frontend/src/router.tsx.hbs", `{{#if (eq backend "convex")}}
+import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import { QueryClient } from "@tanstack/react-query";
+import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
+import { ConvexQueryClient } from "@convex-dev/react-query";
+import { routeTree } from "./routeTree.gen";
+import Loader from "./components/loader";
+import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{else}}
+import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import Loader from "./components/loader";
+import { routeTree } from "./routeTree.gen";
+{{#if (eq api "trpc")}}
+import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
+import { toast } from "sonner";
+import type { AppRouter } from "@{{projectName}}/api/routers/index";
+import { TRPCProvider } from "./utils/trpc";
+{{#unless (eq backend "self")}}
+import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
+{{/unless}}
+{{#if (eq auth "clerk")}}
+import { getClerkAuthToken } from "@/utils/clerk-auth";
+{{/if}}
+{{else if (eq api "orpc")}}
+import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
+import { createQueryClient, orpc } from "./utils/orpc";
+{{/if}}
+{{/if}}
+
+{{#if (eq backend "convex")}}
+export function getRouter() {
+	const convexUrl = ENV.VITE_CONVEX_URL;
+	if (!convexUrl) {
+		throw new Error("VITE_CONVEX_URL is not set");
+	}
+
+	const convexQueryClient = new ConvexQueryClient(convexUrl);
+
+	const queryClient: QueryClient = new QueryClient({
+		defaultOptions: {
+			queries: {
+				queryKeyHashFn: convexQueryClient.hashFn(),
+				queryFn: convexQueryClient.queryFn(),
+			},
+		},
+	});
+	convexQueryClient.connect(queryClient);
+
+	const router = createTanStackRouter({
+		routeTree,
+		defaultPreload: "intent",
+		defaultPendingComponent: () => <Loader />,
+		defaultNotFoundComponent: () => <div>Not Found</div>,
+		context: { queryClient, convexQueryClient },
+	});
+
+	setupRouterSsrQueryIntegration({
+		router,
+		queryClient,
+	});
+
+	return router;
+}
+{{else}}
+{{#if (eq api "trpc")}}
+{{#unless (eq backend "self")}}
+{{> getServerUrl}}
+
+{{/unless}}
+function createQueryClient() {
+	return new QueryClient({
+		queryCache: new QueryCache({
+			onError: (error, query) => {
+				toast.error(error.message, {
+					action: {
+						label: "retry",
+						onClick: () => {
+							query.invalidate();
+						},
+					},
+				});
+			},
+		}),
+		defaultOptions: { queries: { staleTime: 60 * 1000 } },
+	});
+}
+
+const trpcClient = createTRPCClient<AppRouter>({
+	links: [
+		httpBatchLink({
+{{#if (eq backend "self")}}
+			url: "/api/trpc",
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+			url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/trpc\`,
+{{else}}
+			url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/trpc\`,
+{{/if}}
+{{#if (eq auth "clerk")}}
+			headers: async () => {
+				const token = await getClerkAuthToken();
+				return token ? { Authorization: \`Bearer \${token}\` } : {};
+			},
+{{/if}}
+{{#if (eq auth "better-auth")}}
+			fetch(url, options) {
+				return fetch(url, {
+					...options,
+					credentials: "include",
+				});
+			},
+{{/if}}
+		}),
+	],
+});
+{{else if (eq api "orpc")}}
+{{/if}}
+
+export const getRouter = () => {
+{{#if (eq api "trpc")}}
+	const queryClient = createQueryClient();
+	const trpc = createTRPCOptionsProxy({
+		client: trpcClient,
+		queryClient,
+	});
+{{else if (eq api "orpc")}}
+	const queryClient = createQueryClient();
+{{/if}}
+
+	const router = createTanStackRouter({
+		routeTree,
+		scrollRestoration: true,
+		defaultPreloadStaleTime: 0,
+{{#if (eq api "trpc")}}
+		context: { trpc, queryClient },
+{{else if (eq api "orpc")}}
+		context: { orpc, queryClient },
+{{else}}
+		context: {},
+{{/if}}
+		defaultPendingComponent: () => <Loader />,
+		defaultNotFoundComponent: () => <div>Not Found</div>,
+{{#if (eq api "trpc")}}
+		Wrap: ({ children }) => (
+			<TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+				{children}
+			</TRPCProvider>
+		),
+{{/if}}
+	});
+{{#if (or (eq api "trpc") (eq api "orpc"))}}
+
+	setupRouterSsrQueryIntegration({
+		router,
+		queryClient,
+	});
+{{/if}}
+
+	return router;
+};
+{{/if}}
+
+declare module "@tanstack/react-router" {
+	interface Register {
+		router: ReturnType<typeof getRouter>;
+	}
+}
+`],
+  ["frontend/react/tanstack-start/apps/web-frontend/src/routes/__root.tsx.hbs", `import { Toaster } from "@{{projectName}}/ui/components/sonner";
+{{#unless (eq backend "convex")}} {{#unless (eq api "none")}}
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+{{/unless}} {{/unless}}
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+{{#if (and (eq backend "convex") (or (eq auth "clerk") (eq auth "better-auth")))}}
+  useRouteContext,
+{{/if}}
+} from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import Header from "../components/header";
+import appCss from "../index.css?url";
+{{#if (eq backend "convex")}}
+import type { QueryClient } from "@tanstack/react-query";
+import type { ConvexQueryClient } from "@convex-dev/react-query";
+{{else}}
+{{#if (or (eq api "trpc") (eq api "orpc"))}}
+import type { QueryClient } from "@tanstack/react-query";
+{{/if}}
+{{/if}}
+
+{{#if (eq auth "clerk")}}
+import { ClerkProvider{{#if (or (eq backend "convex") (ne api "none"))}}, useAuth{{/if}} } from "@clerk/tanstack-react-start";
+{{/if}}
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+import { useEffect } from "react";
+import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
+{{/if}}
+{{#if (and (eq backend "convex") (eq auth "clerk"))}}
+import { auth } from "@clerk/tanstack-react-start/server";
+import { createServerFn } from "@tanstack/react-start";
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+
+const fetchClerkAuth = createServerFn({ method: "GET" }).handler(async () => {
+  const { userId, getToken } = await auth();
+  const token = await getToken();
+  return { userId, token };
+});
+{{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+import { createServerFn } from "@tanstack/react-start";
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { authClient } from "@/lib/auth-client";
+import { getToken } from "@/lib/auth-server";
+
+const getAuth = createServerFn({ method: "GET" }).handler(async () => {
+  return await getToken();
+});
+{{else if (eq backend "convex")}}
+import { ConvexProvider } from "convex/react";
+{{/if}}
+
+{{#if (and (eq auth "clerk") (ne backend "convex") (ne api "none"))}}
+function ClerkApiAuthBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setClerkAuthTokenGetter(getToken);
+
+    return () => {
+      setClerkAuthTokenGetter(null);
+    };
+  }, [getToken]);
+
+  return null;
+}
+{{/if}}
+
+{{#if (eq backend "convex")}}
+export interface RouterAppContext {
+  queryClient: QueryClient;
+  convexQueryClient: ConvexQueryClient;
+}
+{{else}}
+  {{#if (eq api "trpc")}}
+import type { TRPCOptionsProxy } from "@trpc/tanstack-react-query";
+import type { AppRouter } from "@{{projectName}}/api/routers/index";
+export interface RouterAppContext {
+  trpc: TRPCOptionsProxy<AppRouter>;
+  queryClient: QueryClient;
+}
+  {{else if (eq api "orpc")}}
+import type { orpc } from "@/utils/orpc";
+export interface RouterAppContext {
+  orpc: typeof orpc;
+  queryClient: QueryClient;
+}
+  {{else}}
+export interface RouterAppContext {
+}
+  {{/if}}
+{{/if}}
+
+export const Route = createRootRouteWithContext<RouterAppContext>()({
+  head: () => ({
+    meta: [
+      {
+        charSet: "utf-8",
+      },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1",
+      },
+      {
+        title: "My App",
+      },
+    ],
+    links: [
+      {
+        rel: "stylesheet",
+        href: appCss,
+      },
+    ],
+  }),
+
+  component: RootDocument,
+  {{#if (and (eq backend "convex") (eq auth "clerk"))}}
+  beforeLoad: async (ctx) => {
+    const { userId, token } = await fetchClerkAuth();
+    if (token) {
+      ctx.context.convexQueryClient.serverHttpClient?.setAuth(token);
+    }
+    return { userId, token };
+  },
+  {{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+  beforeLoad: async (ctx) => {
+    const token = await getAuth();
+    if (token) {
+      ctx.context.convexQueryClient.serverHttpClient?.setAuth(token);
+    }
+    return {
+      isAuthenticated: !!token,
+      token,
+    };
+  },
+  {{/if}}
+});
+
+function RootDocument() {
+  {{#if (and (eq backend "convex") (eq auth "clerk"))}}
+  const context = useRouteContext({ from: Route.id });
+  return (
+    <ClerkProvider>
+      <ConvexProviderWithClerk client={context.convexQueryClient.convexClient} useAuth={useAuth}>
+        <html lang="en" className="dark">
+          <head>
+            <HeadContent />
+          </head>
+          <body>
+            <div className="grid h-svh grid-rows-[auto_1fr]">
+              <Header />
+              <Outlet />
+            </div>
+            <Toaster richColors />
+            <TanStackRouterDevtools position="bottom-left" />
+            <Scripts />
+          </body>
+        </html>
+      </ConvexProviderWithClerk>
+    </ClerkProvider>
+  );
+  {{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+  const context = useRouteContext({ from: Route.id });
+  return (
+    <ConvexBetterAuthProvider
+      client={context.convexQueryClient.convexClient}
+      authClient={authClient}
+      initialToken={context.token}
+    >
+      <html lang="en" className="dark">
+        <head>
+          <HeadContent />
+        </head>
+        <body>
+          <div className="grid h-svh grid-rows-[auto_1fr]">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+          <TanStackRouterDevtools position="bottom-left" />
+          <Scripts />
+        </body>
+      </html>
+    </ConvexBetterAuthProvider>
+  );
+  {{else if (eq auth "clerk")}}
+  return (
+    <ClerkProvider>
+      {{#unless (eq api "none")}}
+      <ClerkApiAuthBridge />
+      {{/unless}}
+      <html lang="en" className="dark">
+        <head>
+          <HeadContent />
+        </head>
+        <body>
+          <div className="grid h-svh grid-rows-[auto_1fr]">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+          <TanStackRouterDevtools position="bottom-left" />
+          {{#unless (eq api "none")}}
+          <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+          {{/unless}}
+          <Scripts />
+        </body>
+      </html>
+    </ClerkProvider>
+  );
+  {{else if (eq backend "convex")}}
+  const { convexQueryClient } = Route.useRouteContext();
+  return (
+    <ConvexProvider client={convexQueryClient.convexClient}>
+      <html lang="en" className="dark">
+        <head>
+          <HeadContent />
+        </head>
+        <body>
+          <div className="grid h-svh grid-rows-[auto_1fr]">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
+          <TanStackRouterDevtools position="bottom-left" />
+          <Scripts />
+        </body>
+      </html>
+    </ConvexProvider>
+  );
+  {{else}}
+  return (
+    <html lang="en" className="dark">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <div className="grid h-svh grid-rows-[auto_1fr]">
+          <Header />
+          <Outlet />
+        </div>
+        <Toaster richColors />
+        <TanStackRouterDevtools position="bottom-left" />
+        {{#unless (eq api "none")}}
+        <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+        {{/unless}}
+        <Scripts />
+      </body>
+    </html>
+  );
+  {{/if}}
+}
+`],
+  ["frontend/react/tanstack-start/apps/web-frontend/src/routes/index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+{{#if (eq backend "convex")}}
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+{{else if (or (eq api "trpc") (eq api "orpc"))}}
+import { useQuery } from "@tanstack/react-query";
+  {{#if (eq api "trpc")}}
+import { useTRPC } from "@/utils/trpc";
+  {{/if}}
+  {{#if (eq api "orpc")}}
+import { orpc } from "@/utils/orpc";
+  {{/if}}
+{{/if}}
+
+export const Route = createFileRoute("/")({
+  component: HomeComponent,
+});
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+function HomeComponent() {
+  {{#if (eq backend "convex")}}
+  const healthCheck = useQuery(convexQuery(api.healthCheck.get, {}));
+  {{else if (eq api "trpc")}}
+  const trpc = useTRPC();
+  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+  {{else if (eq api "orpc")}}
+  const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+  {{/if}}
+
+  return (
+    <div className="container mx-auto max-w-3xl px-4 py-2">
+      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+      <div className="grid gap-6">
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-2 font-medium">API Status</h2>
+          {{#if (eq backend "convex")}}
+          <div className="flex items-center gap-2">
+            <div
+              className={\`h-2 w-2 rounded-full \${healthCheck.data === "OK" ? "bg-green-500" : healthCheck.isLoading ? "bg-orange-400" : "bg-red-500"}\`}
+            />
+            <span className="text-muted-foreground text-sm">
+              {healthCheck.isLoading
+                ? "Checking..."
+                : healthCheck.data === "OK"
+                  ? "Connected"
+                  : "Error"}
+            </span>
+          </div>
+          {{else}}
+            {{#unless (eq api "none")}}
+            <div className="flex items-center gap-2">
+              <div
+                className={\`h-2 w-2 rounded-full \${healthCheck.data ? "bg-green-500" : "bg-red-500"}\`}
+              />
+              <span className="text-muted-foreground text-sm">
+                {healthCheck.isLoading
+                  ? "Checking..."
+                  : healthCheck.data
+                    ? "Connected"
+                    : "Disconnected"}
+              </span>
+            </div>
+            {{/unless}}
+          {{/if}}
+        </section>
+      </div>
+    </div>
+  );
+}
+`],
+  ["frontend/react/tanstack-start/apps/web-frontend/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "include": ["**/*.ts", "**/*.tsx"],
+  "compilerOptions": {
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
+    /* Linting */
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@{{projectName}}/ui/*": ["../../packages/ui/src/*"]
+    }
+  }
+}
+`],
+  ["frontend/react/tanstack-start/apps/web-frontend/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockVitePlugin } from "@varlock/vite-integration";
+{{/unless}}
+import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{else}}vite{{/if}}";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+{{#if (or (eq webDeploy "docker") (eq webDeploy "vercel") (and (eq webDeploy "prisma") (ne backend "none")) (and (ne webDeploy "cloudflare") (not (and (eq webDeploy "prisma") (eq backend "none"))) (includes addons "axiom")))}}
+import { nitro } from "nitro/vite";
+{{/if}}
+import tailwindcss from "@tailwindcss/vite";
+import viteReact from "@vitejs/plugin-react";
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+import { unwasm } from "unwasm/plugin";
+
+const prismaWasm =
+  process.env.ALCHEMY_CLOUDFLARE_VITE_INJECTED === "1"
+    ? null
+    : unwasm({ esmImport: true });
+{{/if}}
+
+export default defineConfig({
+  server: {
+    port: 3001,
+  },
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self"))}}
+  build: {
+    rollupOptions: {
+      // resolved by workerd at runtime; node builds cannot bundle it
+      external: ["cloudflare:workers"],
+    },
+  },
+{{/if}}
+  resolve: {
+    tsconfigPaths: true,
+  },
+  plugins: [
+{{#unless (eq webDeploy "cloudflare")}}
+    varlockVitePlugin({ ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}" }),
+{{/unless}}
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+    prismaWasm,
+{{/if}}
+    tailwindcss(),
+    tanstackStart({{#if (or (includes addons "tauri") (and (includes addons "electrobun") (or (ne backend "convex") (ne auth "better-auth"))))}}
+      {
+        prerender: {
+          enabled: true,
+        },
+      },
+{{/if}}),
+{{#if (or (eq webDeploy "docker") (eq webDeploy "vercel") (and (eq webDeploy "prisma") (ne backend "none")) (and (ne webDeploy "cloudflare") (not (and (eq webDeploy "prisma") (eq backend "none"))) (includes addons "axiom")))}}
+    nitro({{#if (eq webDeploy "docker")}}{ preset: "{{#if (eq runtime "bun")}}bun{{else}}node-server{{/if}}" }{{/if}}),
+{{/if}}
+    viteReact(),
+  ],
+{{#if (or (eq webDeploy "vercel") (and (eq webDeploy "prisma") (ne backend "none")))}}
+  // These deployments run the standalone build artifact.
+  ssr: {
+    noExternal: true,
+  },
+{{else if (and (eq backend "convex") (eq auth "better-auth"))}}
+  ssr: {
+    noExternal: ["@convex-dev/better-auth"],
+  },
+{{/if}}
+});
+`],
+  ["frontend/react/tanstack-start/shared/public/robots.txt", `# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow:
+`],
+  ["frontend/solid/adapter.json", `{
+  "id": "solid",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": [
+          "solid"
+        ],
+        "backend": "self",
+        "runtime": "none",
+        "api": "orpc"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": [
+          "solid"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}
+`],
+  ["frontend/solid/apps/fullstack-web/package.json.hbs", `{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev{{#if application}} --port {{application.port}}{{/if}}",
     "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
     "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit",
     "start": "{{#if (eq webDeploy "cloudflare")}}vite preview{{else}}node .output/server/index.mjs{{/if}}",
@@ -12144,11 +14409,7 @@ dist
   }
 }
 `],
-  ["frontend/solid/public/robots.txt", `# https://www.robotstxt.org/robotstxt.html
-User-agent: *
-Disallow:
-`],
-  ["frontend/solid/src/App.tsx.hbs", `import { Title } from "@solidjs/meta";
+  ["frontend/solid/apps/fullstack-web/src/App.tsx.hbs", `import { Title } from "@solidjs/meta";
 import { Loading } from "solid-js";
 import Header from "~/components/header";
 import Loader from "~/components/loader";
@@ -12185,48 +14446,7 @@ export default function App() {
   );
 }
 `],
-  ["frontend/solid/src/components/header.tsx.hbs", `{{#if (eq auth "better-auth")}}
-import UserMenu from "./user-menu";
-{{/if}}
-import { For } from "solid-js";
-
-export default function Header() {
-  const links = [
-    { to: "/", label: "Home" },
-    {{#if (eq auth "better-auth")}}
-    { to: "/dashboard", label: "Dashboard" },
-    {{/if}}
-  ];
-
-  return (
-    <div>
-      <div class="flex flex-row items-center justify-between px-2 py-1">
-        <nav class="flex gap-4 text-lg">
-          <For each={links}>
-            {(link) => <a href={link.to}>{link.label}</a>}
-          </For>
-        </nav>
-        <div class="flex items-center gap-2">
-          {{#if (eq auth "better-auth")}}
-          <UserMenu />
-          {{/if}}
-        </div>
-      </div>
-      <hr />
-    </div>
-  );
-}
-`],
-  ["frontend/solid/src/components/loader.tsx", `export default function Loader() {
-  return (
-    <div class="flex h-full items-center justify-center pt-8" role="status">
-      <span class="h-5 w-5 animate-spin rounded-full border-2 border-current border-r-transparent" />
-      <span class="sr-only">Loading</span>
-    </div>
-  );
-}
-`],
-  ["frontend/solid/src/Document.tsx", `import { HydrationScript } from "@solidjs/web";
+  ["frontend/solid/apps/fullstack-web/src/Document.tsx", `import { HydrationScript } from "@solidjs/web";
 import type { ParentProps } from "solid-js";
 
 export default function Document(props: ParentProps) {
@@ -12242,7 +14462,7 @@ export default function Document(props: ParentProps) {
   );
 }
 `],
-  ["frontend/solid/src/middleware.ts", `import type { StartMiddleware } from "@solidjs/vite-plugin";
+  ["frontend/solid/apps/fullstack-web/src/middleware.ts", `import type { StartMiddleware } from "@solidjs/vite-plugin";
 import { createAPIHandler } from "filesystem-routing/api";
 import routes from "virtual:file-routes";
 
@@ -12250,13 +14470,13 @@ const handleAPI = createAPIHandler(routes);
 
 export default ((event, next) => handleAPI(event.request, next)) satisfies StartMiddleware;
 `],
-  ["frontend/solid/src/router.ts", `import { createRouter } from "@solidjs/router";
+  ["frontend/solid/apps/fullstack-web/src/router.ts", `import { createRouter } from "@solidjs/router";
 import { fileRoutes } from "@solidjs/router/fs";
 import { pageRoutes } from "virtual:file-routes";
 
 export const Router = createRouter({ routes: fileRoutes(pageRoutes) });
 `],
-  ["frontend/solid/src/routes/[...404].tsx", `import { Title } from "@solidjs/meta";
+  ["frontend/solid/apps/fullstack-web/src/routes/[...404].tsx", `import { Title } from "@solidjs/meta";
 import type { RouteDefinition } from "@solidjs/router";
 import { httpStatus } from "@solidjs/web";
 
@@ -12273,7 +14493,7 @@ export default function NotFound() {
   );
 }
 `],
-  ["frontend/solid/src/routes/index.tsx.hbs", `{{#if (eq api "orpc")}}
+  ["frontend/solid/apps/fullstack-web/src/routes/index.tsx.hbs", `{{#if (eq api "orpc")}}
 import { useQuery } from "@tanstack/solid-query";
 import { orpc } from "~/utils/orpc";
 {{/if}}
@@ -12329,16 +14549,10 @@ export default function Home() {
   );
 }
 `],
-  ["frontend/solid/src/styles.css", `@import "tailwindcss";
-
-body {
-  @apply bg-neutral-950 text-neutral-100;
-}
-`],
-  ["frontend/solid/src/vite-env.d.ts", `/// <reference types="vite/client" />
+  ["frontend/solid/apps/fullstack-web/src/vite-env.d.ts", `/// <reference types="vite/client" />
 /// <reference types="filesystem-routing/types" />
 `],
-  ["frontend/solid/tsconfig.json.hbs", `{
+  ["frontend/solid/apps/fullstack-web/tsconfig.json.hbs", `{
   {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
   "references": [{ "path": "../../packages/api" }],
   {{/if}}
@@ -12363,7 +14577,7 @@ body {
   "exclude": ["dist", ".output"]
 }
 `],
-  ["frontend/solid/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+  ["frontend/solid/apps/fullstack-web/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
 import { varlockVitePlugin } from "@varlock/vite-integration";
 {{/unless}}
 import tailwindcss from "@tailwindcss/vite";
@@ -12451,40 +14665,389 @@ export default defineConfig({
 });
 {{/if}}
 `],
-  ["frontend/svelte/_gitignore", `node_modules
+  ["frontend/solid/apps/web-frontend/package.json.hbs", `{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev{{#if application}} --port {{application.port}}{{/if}}",
+    "build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
+    "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit",
+    "start": "{{#if (eq webDeploy "cloudflare")}}vite preview{{else}}node .output/server/index.mjs{{/if}}",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@solidjs/meta": "1.0.0-next.2",
+    "@solidjs/router": "2.0.0-next.38",
+    "@solidjs/web": "2.0.0-rc.14",
+    "solid-js": "2.0.0-rc.14"
+  },
+  "devDependencies": {
+    "@solidjs/vite-plugin": "3.0.0-next.49",
+    "@tailwindcss/vite": "^4.3.3",
+    "filesystem-routing": "0.4.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.2.2"{{#unless (eq webDeploy "cloudflare")}},
+    "nitro": "3.0.260903-beta"{{/unless}}
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
+`],
+  ["frontend/solid/apps/web-frontend/src/App.tsx.hbs", `import { Title } from "@solidjs/meta";
+import { Loading } from "solid-js";
+import Header from "~/components/header";
+import Loader from "~/components/loader";
+import { Router } from "~/router";
+{{#if (eq api "orpc")}}
+import { QueryClientProvider } from "@tanstack/solid-query";
+import { createQueryClient } from "~/utils/orpc";
+{{/if}}
+import "./styles.css";
 
-# Output
+export default function App() {
+{{#if (eq api "orpc")}}
+  const queryClient = createQueryClient();
+{{/if}}
+
+  return (
+{{#if (eq api "orpc")}}
+    <QueryClientProvider client={queryClient}>
+{{/if}}
+      <Router>
+        {(props) => (
+          <>
+            <Title>{{projectName}}</Title>
+            <div class="grid h-svh grid-rows-[auto_1fr]">
+              <Header />
+              <Loading fallback={<Loader />}>{props.children}</Loading>
+            </div>
+          </>
+        )}
+      </Router>
+{{#if (eq api "orpc")}}
+    </QueryClientProvider>
+{{/if}}
+  );
+}
+`],
+  ["frontend/solid/apps/web-frontend/src/Document.tsx", `import { HydrationScript } from "@solidjs/web";
+import type { ParentProps } from "solid-js";
+
+export default function Document(props: ParentProps) {
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <HydrationScript />
+      </head>
+      <body>{props.children}</body>
+    </html>
+  );
+}
+`],
+  ["frontend/solid/apps/web-frontend/src/middleware.ts", `import type { StartMiddleware } from "@solidjs/vite-plugin";
+import { createAPIHandler } from "filesystem-routing/api";
+import routes from "virtual:file-routes";
+
+const handleAPI = createAPIHandler(routes);
+
+export default ((event, next) => handleAPI(event.request, next)) satisfies StartMiddleware;
+`],
+  ["frontend/solid/apps/web-frontend/src/router.ts", `import { createRouter } from "@solidjs/router";
+import { fileRoutes } from "@solidjs/router/fs";
+import { pageRoutes } from "virtual:file-routes";
+
+export const Router = createRouter({ routes: fileRoutes(pageRoutes) });
+`],
+  ["frontend/solid/apps/web-frontend/src/routes/[...404].tsx", `import { Title } from "@solidjs/meta";
+import type { RouteDefinition } from "@solidjs/router";
+import { httpStatus } from "@solidjs/web";
+
+export const route = {
+  preload: () => httpStatus(404),
+} satisfies RouteDefinition;
+
+export default function NotFound() {
+  return (
+    <main class="container mx-auto max-w-3xl px-4 py-10">
+      <Title>Not Found</Title>
+      <h1 class="text-3xl font-bold">Page not found</h1>
+    </main>
+  );
+}
+`],
+  ["frontend/solid/apps/web-frontend/src/routes/index.tsx.hbs", `{{#if (eq api "orpc")}}
+import { useQuery } from "@tanstack/solid-query";
+import { orpc } from "~/utils/orpc";
+{{/if}}
+
+const TITLE_TEXT = \`
+ ██████╗ ███████╗████████╗████████╗███████╗██████╗
+ ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+ ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+ ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+ ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+ ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+ ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+ ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+    ██║       ███████╗   ██║   ███████║██║     █████╔╝
+    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+ \`;
+
+export default function Home() {
+  {{#if (eq api "orpc")}}
+  const healthCheck = useQuery(() => ({
+    ...orpc.healthCheck.queryOptions(),
+    deferStream: true,
+  }));
+  const isConnected = () => healthCheck.data === "OK";
+  {{/if}}
+
+  return (
+    <div class="container mx-auto max-w-3xl px-4 py-2">
+      <pre class="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+      <div class="grid gap-6">
+        {{#if (eq api "orpc")}}
+        <section class="rounded-lg border p-4">
+          <h2 class="mb-2 font-medium">API Status</h2>
+          <div class="flex items-center gap-2">
+            <div
+              class={\`h-2 w-2 rounded-full \${healthCheck.isPending ? "bg-orange-400" : isConnected() ? "bg-green-500" : "bg-red-500"}\`}
+            />
+            <span class="text-sm text-muted-foreground">
+              {healthCheck.isPending
+                ? "Checking..."
+                : isConnected()
+                  ? "Connected"
+                  : "Disconnected"}
+            </span>
+          </div>
+        </section>
+        {{/if}}
+      </div>
+    </div>
+  );
+}
+`],
+  ["frontend/solid/apps/web-frontend/src/vite-env.d.ts", `/// <reference types="vite/client" />
+/// <reference types="filesystem-routing/types" />
+`],
+  ["frontend/solid/apps/web-frontend/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "preserve",
+    "jsxImportSource": "@solidjs/web",
+    "allowJs": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["vite/client"],
+    "isolatedModules": true,
+    "paths": {
+      "~/*": ["./src/*"]
+    }
+  },
+  "exclude": ["dist", ".output"]
+}
+`],
+  ["frontend/solid/apps/web-frontend/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockVitePlugin } from "@varlock/vite-integration";
+{{/unless}}
+import tailwindcss from "@tailwindcss/vite";
+import solid from "@solidjs/vite-plugin";
+import { fileRoutes } from "filesystem-routing/vite";
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+import { unwasm } from "unwasm/plugin";
+{{/if}}
+{{#if (eq webDeploy "cloudflare")}}
+import { fileURLToPath } from "node:url";
+{{/if}}
+{{#unless (eq webDeploy "cloudflare")}}
+import { nitro } from "nitro/vite";
+{{/unless}}
+import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{else}}vite{{/if}}";
+
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+const prismaWasm =
+  process.env.ALCHEMY_CLOUDFLARE_VITE_INJECTED === "1"
+    ? null
+    : unwasm({ esmImport: true });
+{{/if}}
+
+{{#if (eq webDeploy "cloudflare")}}
+export default defineConfig(({ command }) => {
+  const cloudflareWorkersAlias: Record<string, string> =
+    command === "serve" && process.env.ALCHEMY_CLOUDFLARE_VITE_INJECTED !== "1"
+      ? {
+          "cloudflare:workers": fileURLToPath(
+            new URL("./cloudflare-workers.dev.ts", import.meta.url),
+          ),
+        }
+      : {};
+
+  return {
+{{else}}
+export default defineConfig({
+{{/if}}
+  optimizeDeps: {
+    entries: ["src/**/*.tsx"],
+  },
+  plugins: [
+{{#unless (eq webDeploy "cloudflare")}}
+    varlockVitePlugin({ ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}" }),
+{{/unless}}
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+    prismaWasm,
+{{/if}}
+    solid({
+      start: { middleware: "./src/middleware.ts" },
+      ssr: true,
+      extensions: [".jsx", ".tsx"],
+    }),
+{{#unless (eq webDeploy "cloudflare")}}
+    nitro({ serverEntry: false }),
+{{/unless}}
+    fileRoutes({ httpMethods: true }),
+    tailwindcss(),
+  ],
+  server: {
+    port: 3001,
+  },
+{{#if (eq webDeploy "cloudflare")}}
+  build: {
+    rollupOptions: {
+      external: ["cloudflare:workers"],
+    },
+  },
+{{/if}}
+  ssr: {
+    noExternal: ["solid-js", /^@solidjs\\//, "@tanstack/solid-query"],
+  },
+  resolve: {
+    tsconfigPaths: true,
+{{#if (eq webDeploy "cloudflare")}}
+    alias: cloudflareWorkersAlias,
+{{/if}}
+  },
+{{#if (eq webDeploy "cloudflare")}}
+  };
+{{else}}
+});
+{{/if}}
+{{#if (eq webDeploy "cloudflare")}}
+});
+{{/if}}
+`],
+  ["frontend/solid/shared/_gitignore", `node_modules
+.DS_Store
+dist
 .output
 .vercel
 .netlify
-.wrangler
-.alchemy
-/.svelte-kit
-/build
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Env
+*.local
 .env
 .env.*
-!.env.example
-!.env.test
 
-# Vite
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
+.wrangler
+.alchemy
+.dev.vars*
 `],
-  ["frontend/svelte/_npmrc", `engine-strict=true
+  ["frontend/solid/shared/public/robots.txt", `# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow:
 `],
-  ["frontend/svelte/package.json.hbs", `{
+  ["frontend/solid/shared/src/components/header.tsx.hbs", `{{#if (eq auth "better-auth")}}
+import UserMenu from "./user-menu";
+{{/if}}
+import { For } from "solid-js";
+
+export default function Header() {
+  const links = [
+    { to: "/", label: "Home" },
+    {{#if (eq auth "better-auth")}}
+    { to: "/dashboard", label: "Dashboard" },
+    {{/if}}
+  ];
+
+  return (
+    <div>
+      <div class="flex flex-row items-center justify-between px-2 py-1">
+        <nav class="flex gap-4 text-lg">
+          <For each={links}>
+            {(link) => <a href={link.to}>{link.label}</a>}
+          </For>
+        </nav>
+        <div class="flex items-center gap-2">
+          {{#if (eq auth "better-auth")}}
+          <UserMenu />
+          {{/if}}
+        </div>
+      </div>
+      <hr />
+    </div>
+  );
+}
+`],
+  ["frontend/solid/shared/src/components/loader.tsx", `export default function Loader() {
+  return (
+    <div class="flex h-full items-center justify-center pt-8" role="status">
+      <span class="h-5 w-5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+      <span class="sr-only">Loading</span>
+    </div>
+  );
+}
+`],
+  ["frontend/solid/shared/src/styles.css", `@import "tailwindcss";
+
+body {
+  @apply bg-neutral-950 text-neutral-100;
+}
+`],
+  ["frontend/svelte/adapter.json", `{
+  "id": "svelte",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": [
+          "svelte"
+        ],
+        "backend": "self",
+        "runtime": "none",
+        "api": "orpc"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": [
+          "svelte"
+        ],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}
+`],
+  ["frontend/svelte/apps/fullstack-web/package.json.hbs", `{
 	"name": "web",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
+        "dev": "vite dev{{#if application}} --port {{application.port}}{{/if}}",
 		"build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
@@ -12511,13 +15074,7 @@ vite.config.ts.timestamp-*
 	"dependencies": {}
 }
 `],
-  ["frontend/svelte/src/app.css", `@import "tailwindcss";
-
-body {
-  @apply bg-neutral-950 text-neutral-100;
-}
-`],
-  ["frontend/svelte/src/app.d.ts.hbs", `{{#if (eq webDeploy "cloudflare")}}
+  ["frontend/svelte/apps/fullstack-web/src/app.d.ts.hbs", `{{#if (eq webDeploy "cloudflare")}}
 /// <reference path="../../../packages/env/env.d.ts" />
 {{/if}}
 {{#if (and (eq backend "self") (eq api "orpc"))}}
@@ -12551,7 +15108,7 @@ declare global {
 
 export {};
 `],
-  ["frontend/svelte/src/app.html", `<!doctype html>
+  ["frontend/svelte/apps/fullstack-web/src/app.html", `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -12564,35 +15121,7 @@ export {};
   </body>
 </html>
 `],
-  ["frontend/svelte/src/components/Header.svelte.hbs", `<script lang="ts">
-
-    {{#if (eq auth "better-auth")}}
-	import UserMenu from './UserMenu.svelte';
-    {{/if}}
-
-</script>
-
-<div>
-	<div class="flex flex-row items-center justify-between px-4 py-2 md:px-6">
-		<nav class="flex gap-4 text-lg">
-			<a href="/" class="hover:text-neutral-400 transition-colors">Home</a>
-		    {{#if (eq auth "better-auth")}}
-			<a href="/dashboard" class="hover:text-neutral-400 transition-colors">Dashboard</a>
-		    {{/if}}
-		</nav>
-		<div class="flex items-center gap-2">
-		    {{#if (eq auth "better-auth")}}
-            <UserMenu />
-             {{/if}}
-		</div>
-	</div>
-	<hr class="border-neutral-800" />
-</div>
-`],
-  ["frontend/svelte/src/lib/index.ts", `// place files you want to import through the \`$lib\` alias in this folder.
-export {};
-`],
-  ["frontend/svelte/src/routes/+layout.svelte.hbs", `{{#if (eq backend "convex")}}
+  ["frontend/svelte/apps/fullstack-web/src/routes/+layout.svelte.hbs", `{{#if (eq backend "convex")}}
 <script lang="ts">
 	import '../app.css';
     import Header from '../components/Header.svelte';
@@ -12647,7 +15176,7 @@ export {};
   {{/if}}
 {{/if}}
 `],
-  ["frontend/svelte/src/routes/+page.svelte.hbs", `{{#if (eq backend "convex")}}
+  ["frontend/svelte/apps/fullstack-web/src/routes/+page.svelte.hbs", `{{#if (eq backend "convex")}}
 <script lang="ts">
 import { useQuery } from 'convex-svelte';
 import { api } from "@{{projectName}}/backend/convex/_generated/api";
@@ -12740,8 +15269,7 @@ const TITLE_TEXT = \`
 </div>
 {{/if}}
 `],
-  ["frontend/svelte/static/favicon.png", `[Binary file]`],
-  ["frontend/svelte/svelte.config.js.hbs", `{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+  ["frontend/svelte/apps/fullstack-web/svelte.config.js.hbs", `{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
 import adapter from '@sveltejs/adapter-static';
 {{else if (eq webDeploy "cloudflare")}}
 import adapter from '@sveltejs/adapter-cloudflare';
@@ -12786,7 +15314,7 @@ const config = {
 
 export default config;
 `],
-  ["frontend/svelte/tsconfig.json.hbs", `{
+  ["frontend/svelte/apps/fullstack-web/tsconfig.json.hbs", `{
   {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
   "references": [{ "path": "../../packages/api" }],
   {{/if}}
@@ -12813,7 +15341,7 @@ export default config;
 	// from the referenced tsconfig.json - TypeScript does not merge them in
 }
 `],
-  ["frontend/svelte/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+  ["frontend/svelte/apps/fullstack-web/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
 import { varlockVitePlugin } from "@varlock/vite-integration";
 {{/unless}}
 import tailwindcss from "@tailwindcss/vite";
@@ -12843,6 +15371,398 @@ export default defineConfig({
 {{/if}}
 });
 `],
+  ["frontend/svelte/apps/web-frontend/package.json.hbs", `{
+	"name": "web",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+        "dev": "vite dev{{#if application}} --port {{application.port}}{{/if}}",
+		"build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+	},
+	"devDependencies": {
+		{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+		"@sveltejs/adapter-static": "^3.0.10",
+		{{else if (eq webDeploy "prisma")}}
+		"@sveltejs/adapter-node": "^5.5.7",
+		{{else}}
+		"@sveltejs/adapter-auto": "^7.0.1",
+		{{/if}}
+		"@sveltejs/kit": "^2.70.3",
+		"@sveltejs/vite-plugin-svelte": "^7.3.0",
+		"@tailwindcss/vite": "^4.3.3",
+		"svelte": "^5.57.0",
+		"svelte-check": "^4.7.6",
+		"tailwindcss": "^4.3.3",
+		"vite": "^8.2.2"
+	},
+	"dependencies": {}
+}
+`],
+  ["frontend/svelte/apps/web-frontend/src/app.d.ts.hbs", `{{#if (eq webDeploy "cloudflare")}}
+/// <reference path="../../../packages/env/env.d.ts" />
+{{/if}}
+{{#if (and (eq backend "self") (eq api "orpc"))}}
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+
+{{/if}}
+// See https://svelte.dev/docs/kit/types#app.d.ts
+// for information about these interfaces
+declare global {
+{{#if (and (eq backend "self") (eq api "orpc"))}}
+	var $client: AppRouterClient | undefined;
+
+{{/if}}
+	namespace App {
+		// interface Error {}
+		// interface Locals {}
+		// interface PageData {}
+		// interface PageState {}
+{{#if (eq webDeploy "cloudflare")}}
+		interface Platform {
+			env: Env;
+			ctx: ExecutionContext;
+			caches: CacheStorage;
+			cf: IncomingRequestCfProperties;
+		}
+{{else}}
+		// interface Platform {}
+{{/if}}
+	}
+}
+
+export {};
+`],
+  ["frontend/svelte/apps/web-frontend/src/app.html", `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
+`],
+  ["frontend/svelte/apps/web-frontend/src/routes/+layout.svelte.hbs", `{{#if (eq backend "convex")}}
+<script lang="ts">
+	import '../app.css';
+    import Header from '../components/Header.svelte';
+    import { PUBLIC_CONVEX_URL } from '$env/static/public';
+	import { setupConvex } from 'convex-svelte';
+
+	const { children } = $props();
+	setupConvex(PUBLIC_CONVEX_URL);
+</script>
+
+<div class="grid h-svh grid-rows-[auto_1fr]">
+	<Header />
+	<main class="overflow-y-auto">
+		{@render children()}
+	</main>
+</div>
+{{else}}
+  {{#if (eq api "orpc")}}
+<script lang="ts">
+    import { QueryClientProvider } from '@tanstack/svelte-query';
+    import { SvelteQueryDevtools } from '@tanstack/svelte-query-devtools'
+	import '../app.css';
+    import { queryClient } from '$lib/orpc';
+    import Header from '../components/Header.svelte';
+
+	const { children } = $props();
+</script>
+
+<QueryClientProvider client={queryClient}>
+    <div class="grid h-svh grid-rows-[auto_1fr]">
+		<Header />
+		<main class="overflow-y-auto">
+			{@render children()}
+		</main>
+    </div>
+    <SvelteQueryDevtools />
+</QueryClientProvider>
+  {{else}}
+<script lang="ts">
+	import '../app.css';
+    import Header from '../components/Header.svelte';
+
+	const { children } = $props();
+</script>
+
+<div class="grid h-svh grid-rows-[auto_1fr]">
+	<Header />
+	<main class="overflow-y-auto">
+		{@render children()}
+	</main>
+</div>
+  {{/if}}
+{{/if}}
+`],
+  ["frontend/svelte/apps/web-frontend/src/routes/+page.svelte.hbs", `{{#if (eq backend "convex")}}
+<script lang="ts">
+import { useQuery } from 'convex-svelte';
+import { api } from "@{{projectName}}/backend/convex/_generated/api";
+
+const healthCheck = useQuery(api.healthCheck.get, {});
+
+const TITLE_TEXT = \`
+   ██████╗ ███████╗████████╗████████╗███████╗██████╗
+   ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+   ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+   ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+   ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+   ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+   ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+   ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+      ██║       ███████╗   ██║   ███████║██║     █████╔╝
+      ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+      ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+      ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+   \`;
+</script>
+
+<div class="container mx-auto max-w-3xl px-4 py-2">
+	<pre class="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+	<div class="grid gap-6">
+		<section class="rounded-lg border p-4">
+			<h2 class="mb-2 font-medium">API Status</h2>
+			<div class="flex items-center gap-2">
+				<div
+					class={\`h-2 w-2 rounded-full \${healthCheck.data ? "bg-green-500" : "bg-red-500"}\`}
+				></div>
+				<span class="text-muted-foreground text-sm">
+					{healthCheck.isLoading
+						? "Checking..."
+						: healthCheck.data
+							? "Connected"
+							: "Disconnected"}
+				</span>
+			</div>
+		</section>
+	</div>
+</div>
+{{else}}
+<script lang="ts">
+{{#if (eq api "orpc")}}
+import { orpc } from "$lib/orpc";
+import { createQuery } from "@tanstack/svelte-query";
+const healthCheck = createQuery(() => orpc.healthCheck.queryOptions());
+{{/if}}
+
+const TITLE_TEXT = \`
+   ██████╗ ███████╗████████╗████████╗███████╗██████╗
+   ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
+   ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
+   ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
+   ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
+   ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
+
+   ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
+   ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
+      ██║       ███████╗   ██║   ███████║██║     █████╔╝
+      ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
+      ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
+      ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+   \`;
+</script>
+
+<div class="container mx-auto max-w-3xl px-4 py-2">
+	<pre class="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
+	<div class="grid gap-6">
+	    {{#if (eq api "orpc")}}
+		<section class="rounded-lg border p-4">
+			<h2 class="mb-2 font-medium">API Status</h2>
+			<div class="flex items-center gap-2">
+				<div
+					class={\`h-2 w-2 rounded-full \${healthCheck.data ? "bg-green-500" : "bg-red-500"}\`}
+				></div>
+				<span class="text-muted-foreground text-sm">
+					{healthCheck.isLoading
+						? "Checking..."
+						: healthCheck.data
+							? "Connected"
+							: "Disconnected"}
+				</span>
+			</div>
+		</section>
+	    {{/if}}
+	</div>
+</div>
+{{/if}}
+`],
+  ["frontend/svelte/apps/web-frontend/svelte.config.js.hbs", `{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+import adapter from '@sveltejs/adapter-static';
+{{else if (eq webDeploy "cloudflare")}}
+import adapter from '@sveltejs/adapter-cloudflare';
+{{else if (or (eq webDeploy "docker") (eq webDeploy "prisma"))}}
+import adapter from '@sveltejs/adapter-node';
+{{else if (eq webDeploy "vercel")}}
+import adapter from '@sveltejs/adapter-vercel';
+{{else}}
+import adapter from '@sveltejs/adapter-auto';
+{{/if}}
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+/** @type {import('@sveltejs/kit').Config} */
+const config = {
+	// Consult https://svelte.dev/docs/kit/integrations
+	// for more information about preprocessors
+	preprocess: vitePreprocess(),
+
+	kit: {
+{{#if (or (includes addons "electrobun") (includes addons "tauri"))}}
+		// adapter-static emits files Electrobun and Tauri can bundle directly.
+		adapter: adapter({
+			pages: 'build',
+			assets: 'build',
+			fallback: 'index.html'
+		})
+{{else if (eq webDeploy "cloudflare")}}
+		adapter: adapter()
+{{else if (or (eq webDeploy "docker") (eq webDeploy "prisma"))}}
+		// adapter-node builds a standalone Node server (run with \`node build/index.js\`).
+		adapter: adapter()
+{{else if (eq webDeploy "vercel")}}
+		adapter: adapter({ runtime: 'nodejs24.x' })
+{{else}}
+		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
+		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
+		// See https://svelte.dev/docs/kit/adapters for more information about adapters.
+		adapter: adapter()
+{{/if}}
+	}
+};
+
+export default config;
+`],
+  ["frontend/svelte/apps/web-frontend/tsconfig.json.hbs", `{
+  {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+  "references": [{ "path": "../../packages/api" }],
+  {{/if}}
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+    {{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}
+    "disableSourceOfProjectReferenceRedirect": true,
+    {{/if}}
+		"allowJs": true,
+		"checkJs": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"strict": true,
+		"moduleResolution": "bundler"{{#if (eq webDeploy "cloudflare")}},
+			"types": ["@cloudflare/workers-types"]{{/if}}
+	}
+	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
+	// except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
+	//
+	// If you want to overwrite includes/excludes, make sure to copy over the relevant includes/excludes
+	// from the referenced tsconfig.json - TypeScript does not merge them in
+}
+`],
+  ["frontend/svelte/apps/web-frontend/vite.config.ts.hbs", `{{#unless (eq webDeploy "cloudflare")}}
+import { varlockVitePlugin } from "@varlock/vite-integration";
+{{/unless}}
+import tailwindcss from "@tailwindcss/vite";
+import { sveltekit } from "@sveltejs/kit/vite";
+import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{else}}vite{{/if}}";
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+import { unwasm } from "unwasm/plugin";
+{{/if}}
+
+export default defineConfig({
+  plugins: [
+{{#unless (eq webDeploy "cloudflare")}}
+    varlockVitePlugin({ ssrInjectMode: "{{#if (or (eq webDeploy "vercel") (eq webDeploy "prisma"))}}resolved-env{{else}}auto-load{{/if}}" }),
+{{/unless}}
+{{#if (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma"))}}
+    unwasm({ esmImport: true }),
+{{/if}}
+    tailwindcss(),
+    sveltekit(),
+  ],
+{{#if (eq webDeploy "prisma")}}
+  // Prisma Compute uploads only the build artifact, so keep the official
+  // adapter-node output self-contained instead of requiring node_modules.
+  ssr: {
+    noExternal: true,
+  },
+{{/if}}
+});
+`],
+  ["frontend/svelte/shared/_gitignore", `node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+.alchemy
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+`],
+  ["frontend/svelte/shared/_npmrc", `engine-strict=true
+`],
+  ["frontend/svelte/shared/src/app.css", `@import "tailwindcss";
+
+body {
+  @apply bg-neutral-950 text-neutral-100;
+}
+`],
+  ["frontend/svelte/shared/src/components/Header.svelte.hbs", `<script lang="ts">
+
+    {{#if (eq auth "better-auth")}}
+	import UserMenu from './UserMenu.svelte';
+    {{/if}}
+
+</script>
+
+<div>
+	<div class="flex flex-row items-center justify-between px-4 py-2 md:px-6">
+		<nav class="flex gap-4 text-lg">
+			<a href="/" class="hover:text-neutral-400 transition-colors">Home</a>
+		    {{#if (eq auth "better-auth")}}
+			<a href="/dashboard" class="hover:text-neutral-400 transition-colors">Dashboard</a>
+		    {{/if}}
+		</nav>
+		<div class="flex items-center gap-2">
+		    {{#if (eq auth "better-auth")}}
+            <UserMenu />
+             {{/if}}
+		</div>
+	</div>
+	<hr class="border-neutral-800" />
+</div>
+`],
+  ["frontend/svelte/shared/src/lib/index.ts", `// place files you want to import through the \`$lib\` alias in this folder.
+export {};
+`],
+  ["frontend/svelte/shared/static/favicon.png", `[Binary file]`],
   ["modules/admin/files/docs/modules/admin.md.hbs", `# Admin console
 
 The admin area lives at \`/admin\` and is visible only to users with the \`admin\` role. Everyone else gets a 404.
@@ -12871,7 +15791,7 @@ ability.can("access", "Admin");
 Admins \`manage\` everything. Add roles or finer rules in \`defineAbilityFor\`, and register new subjects through declaration merging on \`SubjectMap\`.
 
 {{#if (includes frontend "next")}}
-Pages call \`requireAdmin(locale)\` from \`apps/web/src/lib/admin.ts\`.
+Pages call \`requireAdmin(locale)\` from \`{{appPath "fullstack-web"}}/src/lib/admin.ts\`.
 {{else}}
 Protected page loaders and API handlers check the authenticated session's admin role on the server. Hiding a navigation item is not authorization.
 {{/if}}
@@ -12879,13 +15799,13 @@ Protected page loaders and API handlers check the authenticated session's admin 
 ## Adding pages
 
 {{#if (includes frontend "next")}}
-Create \`apps/web/src/app/[lang]/admin/<page>/page.tsx\`.
+Create \`{{appPath "fullstack-web"}}/src/app/[lang]/admin/<page>/page.tsx\`.
 {{else if (includes frontend "tanstack-start")}}
-Add a locale-prefixed admin route under \`apps/web/src/routes/\` with a server-authorized loader.
+Add a locale-prefixed admin route under \`{{appPath "fullstack-web"}}/src/routes/\` with a server-authorized loader.
 {{else}}
-Add the page in \`apps/web/app/pages/\` and its protected data handler in \`apps/web/server/\`.
+Add the page in \`{{appPath "fullstack-web"}}/app/pages/\` and its protected data handler in \`{{appPath "fullstack-web"}}/server/\`.
 {{/if}}
-Add an entry to \`navigation.admin\` in \`apps/web/src/config/navigation.ts\`. Modules such as payment and credits add their pages this way.
+Add an entry to \`navigation.admin\` in \`{{appPath "fullstack-web"}}/src/config/navigation.ts\`. Modules such as payment and credits add their pages this way.
 `],
   ["modules/admin/files/packages/i18n/src/messages/en/admin.ts", `export default {
   nav: {
@@ -13005,7 +15925,7 @@ export function defineAbilityFor(actor: Actor | null | undefined): AppAbility {
   return build();
 }
 `],
-  ["modules/admin/frameworks/native/apps/web/src/lib/native/admin.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/admin/frameworks/native/apps/fullstack-web/src/lib/native/admin.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 import { z } from "zod";
 import { HttpError, json, pageOf, readJson, requireAdministrator, requireOrigin } from "../product-api";
 export async function handle(request: Request, path: string): Promise<Response | undefined> {
@@ -13031,7 +15951,7 @@ export async function handle(request: Request, path: string): Promise<Response |
   return json({ error: "method_not_allowed" }, 405);
 }
 `],
-  ["modules/admin/frameworks/next/apps/web/src/app/[lang]/admin/layout.tsx", `import SideNav from "@/components/side-nav";
+  ["modules/admin/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/layout.tsx", `import SideNav from "@/components/side-nav";
 import { requireAdmin } from "@/lib/admin";
 import { resolveLocale } from "@/lib/i18n/server";
 
@@ -13056,7 +15976,7 @@ export default async function AdminLayout({
   );
 }
 `],
-  ["modules/admin/frameworks/next/apps/web/src/app/[lang]/admin/page.tsx.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/admin/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/page.tsx.hbs", `import { auth } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 
@@ -13111,7 +16031,7 @@ export default async function AdminOverviewPage({ params }: Props) {
   );
 }
 `],
-  ["modules/admin/frameworks/next/apps/web/src/app/[lang]/admin/users/page.tsx.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/admin/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/users/page.tsx.hbs", `import { auth } from "@{{projectName}}/app-services";
 import { Button } from "@{{projectName}}/ui/components/button";
 import { Input } from "@{{projectName}}/ui/components/input";
 import type { Metadata } from "next";
@@ -13213,7 +16133,7 @@ export default async function AdminUsersPage({ params, searchParams }: Props) {
   );
 }
 `],
-  ["modules/admin/frameworks/next/apps/web/src/components/admin/pagination.tsx.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+  ["modules/admin/frameworks/next/apps/fullstack-web/src/components/admin/pagination.tsx.hbs", `import type { Locale } from "@{{projectName}}/i18n";
 
 import { getTranslator } from "@/lib/i18n/server";
 
@@ -13242,7 +16162,7 @@ export function Pagination({
   );
 }
 `],
-  ["modules/admin/frameworks/next/apps/web/src/components/admin/stat-card.tsx", `export function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
+  ["modules/admin/frameworks/next/apps/fullstack-web/src/components/admin/stat-card.tsx", `export function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1 border p-4">
       <span className="text-muted-foreground text-xs">{label}</span>
@@ -13251,7 +16171,7 @@ export function Pagination({
   );
 }
 `],
-  ["modules/admin/frameworks/next/apps/web/src/components/admin/user-actions.tsx.hbs", `"use client";
+  ["modules/admin/frameworks/next/apps/fullstack-web/src/components/admin/user-actions.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import { useRouter } from "next/navigation";
@@ -13313,7 +16233,7 @@ export function UserActions({
   );
 }
 `],
-  ["modules/admin/frameworks/next/apps/web/src/lib/admin.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+  ["modules/admin/frameworks/next/apps/fullstack-web/src/lib/admin.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
 import { defineAbilityFor } from "@{{projectName}}/permissions";
 import { notFound } from "next/navigation";
 
@@ -13327,7 +16247,7 @@ export async function requireAdmin(locale: Locale) {
   return { user, ability };
 }
 `],
-  ["modules/admin/frameworks/nuxt/apps/web/app/components/ProductAdmin.vue.hbs", `<script setup lang="ts">
+  ["modules/admin/frameworks/nuxt/apps/fullstack-web/app/components/ProductAdmin.vue.hbs", `<script setup lang="ts">
 import { navigation } from "@/config/navigation";
 const props = defineProps<{ section: string; id?: string }>();
 const { label, path, t } = useProductLocale();
@@ -13352,7 +16272,7 @@ if (!props.section) {
   </section></div>
 </template>
 `],
-  ["modules/admin/frameworks/nuxt/apps/web/app/components/ProductAdminUsers.vue.hbs", `<script setup lang="ts">
+  ["modules/admin/frameworks/nuxt/apps/fullstack-web/app/components/ProductAdminUsers.vue.hbs", `<script setup lang="ts">
 const { label } = useProductLocale();
 const { pending, error, notice, run } = useProductAction();
 const page = ref(1); const search = ref(""); const query = ref("");
@@ -13372,7 +16292,7 @@ async function change(user: User, action: "role" | "ban" | "unban") {
   <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\\{{ label('Previous', '上一页') }}</button><span>\\{{ page }} · \\{{ data?.total ?? 0 }} \\{{ label('users', '用户') }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\\{{ label('Next', '下一页') }}</button></nav>
 </template>
 `],
-  ["modules/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/admin/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
@@ -13380,11 +16300,11 @@ import { userSchema } from "@/lib/auth-data";
 export const Route = createFileRoute("/$lang/admin/")({ loader: ({ params }) => loadProduct("/api/product/admin", params.lang, z.object({ users: z.number(), admins: z.number(), recent: z.array(userSchema) })), component: Overview });
 function Overview() { const data = Route.useLoaderData(); const t = useT(); return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("admin.overview.title")}</h1><div className="grid gap-4 sm:grid-cols-2"><div className="border p-6"><p>{t("admin.overview.users")}</p><strong className="mt-3 block text-4xl">{data.users}</strong></div><div className="border p-6"><p>{t("admin.overview.admins")}</p><strong className="mt-3 block text-4xl">{data.admins}</strong></div></div><h2>{t("admin.overview.recent")}</h2><ul className="divide-y border">{data.recent.map((user) => <li key={user.id} className="flex justify-between p-4"><span>{user.name}</span><span>{user.email}</span></li>)}</ul></section>; }
 `],
-  ["modules/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.tsx.hbs", `import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
+  ["modules/admin/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.tsx.hbs", `import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 import { loadUser } from "@/lib/auth-data";
 export const Route = createFileRoute("/$lang/admin")({ beforeLoad: async ({ params }) => { const user = await loadUser(params.lang); if (!user.role?.split(",").includes("admin")) throw notFound(); return { user }; }, component: Outlet, head: () => ({ meta: [{ name: "robots", content: "noindex,nofollow" }] }) });
 `],
-  ["modules/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.users.tsx.hbs", `import { createFileRoute, useRouter } from "@tanstack/react-router";
+  ["modules/admin/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.users.tsx.hbs", `import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { useLocale, useT } from "@/components/i18n-provider";
@@ -13492,7 +16412,7 @@ export const affiliateCommission = sqliteTable(
   (table) => [index("affiliate_commission_referrer_idx").on(table.referrerId, table.createdAt)],
 );
 `],
-  ["modules/affiliate/files/apps/web/src/integrations/affiliate-payment.ts.hbs", `import type { Services } from "../services";
+  ["modules/affiliate/files/apps/fullstack-web/src/integrations/affiliate-payment.ts.hbs", `import type { Services } from "../services";
 
 /** Only verified payment events can earn credits; there is no client award endpoint. */
 export default function registerAffiliatePayment({ events, payment, affiliate, credits }: Services) {
@@ -13513,7 +16433,7 @@ export default function registerAffiliatePayment({ events, payment, affiliate, c
   });
 }
 `],
-  ["modules/affiliate/files/apps/web/src/integrations/affiliate-signup.ts.hbs", `import type { Services } from "../services";
+  ["modules/affiliate/files/apps/fullstack-web/src/integrations/affiliate-signup.ts.hbs", `import type { Services } from "../services";
 
 export default function registerAffiliateSignup({ events, affiliate }: Services) {
   events.on("auth.user_created", async ({ userId }) => {
@@ -13794,7 +16714,7 @@ export type Affiliate = ReturnType<typeof createAffiliate>;
   },
 } as const;
 `],
-  ["modules/affiliate/frameworks/native/apps/web/src/lib/native/affiliate.ts.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+  ["modules/affiliate/frameworks/native/apps/fullstack-web/src/lib/native/affiliate.ts.hbs", `import { affiliate } from "@{{projectName}}/app-services";
 import { referralCodeSchema, referralCookieFromHeader, referralCookieName, referralCookieSeconds } from "@{{projectName}}/affiliate";
 import { auth } from "@{{projectName}}/app-services";
 import { z } from "zod";
@@ -13829,7 +16749,7 @@ export async function handle(request: Request, path: string): Promise<Response |
   return new Response(null, { status: 303, headers: { Location: new URL(\`/\${input.data.lang}/signup\`, trusted.origin).href, "Cache-Control": "no-store", "Set-Cookie": \`\${referralCookieName}=\${value}; HttpOnly; SameSite=Lax; Path=/; Max-Age=\${referralCookieSeconds}\${trusted.protocol === "https:" ? "; Secure" : ""}\` } });
 }
 `],
-  ["modules/affiliate/frameworks/next/apps/web/src/app/[lang]/dashboard/affiliate/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+  ["modules/affiliate/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/affiliate/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
 
 import { ENV } from "@/env.server";
@@ -13890,7 +16810,7 @@ export default async function AffiliatePage({ params }: Props) {
   );
 }
 `],
-  ["modules/affiliate/frameworks/next/apps/web/src/app/[lang]/ref/[code]/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+  ["modules/affiliate/frameworks/next/apps/fullstack-web/src/app/[lang]/ref/[code]/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
 import { Button } from "@{{projectName}}/ui/components/button";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -13919,7 +16839,7 @@ export default async function ReferralPage({ params }: Props) {
   );
 }
 `],
-  ["modules/affiliate/frameworks/next/apps/web/src/app/api/affiliate/capture/route.ts.hbs", `import { referralCodeSchema, referralCookieFromHeader, referralCookieName, referralCookieSeconds } from "@{{projectName}}/affiliate";
+  ["modules/affiliate/frameworks/next/apps/fullstack-web/src/app/api/affiliate/capture/route.ts.hbs", `import { referralCodeSchema, referralCookieFromHeader, referralCookieName, referralCookieSeconds } from "@{{projectName}}/affiliate";
 import { affiliate } from "@{{projectName}}/app-services";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -13947,7 +16867,7 @@ export async function POST(request: Request) {
   return response;
 }
 `],
-  ["modules/affiliate/frameworks/next/apps/web/src/app/api/affiliate/route.ts.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+  ["modules/affiliate/frameworks/next/apps/fullstack-web/src/app/api/affiliate/route.ts.hbs", `import { affiliate } from "@{{projectName}}/app-services";
 
 import { getSession } from "@/lib/session";
 
@@ -13958,7 +16878,7 @@ export async function GET() {
   return Response.json({ code, commissionPercent: affiliate.commissionPercent, ...report }, { headers: { "Cache-Control": "no-store" } });
 }
 `],
-  ["modules/affiliate/frameworks/nuxt/apps/web/app/components/ProductAdminAffiliate.vue.hbs", `<script setup lang="ts">
+  ["modules/affiliate/frameworks/nuxt/apps/fullstack-web/app/components/ProductAdminAffiliate.vue.hbs", `<script setup lang="ts">
 const { label } = useProductLocale(); const page = ref(1);
 const { data, error } = await useFetch<{ rows: { orderId: string; userId: string; referrerId: string; credits: number; status: string; createdAt: string; grantedAt: string | null }[]; total: number }>("/api/product/referrals", { query: { page } });
 </script>
@@ -13968,7 +16888,7 @@ const { data, error } = await useFetch<{ rows: { orderId: string; userId: string
   <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\\{{ label('Previous', '上一页') }}</button><span>\\{{ page }} · \\{{ data?.total ?? 0 }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\\{{ label('Next', '下一页') }}</button></nav>
 </template>
 `],
-  ["modules/affiliate/frameworks/nuxt/apps/web/app/components/ProductAffiliate.vue.hbs", `<script setup lang="ts">
+  ["modules/affiliate/frameworks/nuxt/apps/fullstack-web/app/components/ProductAffiliate.vue.hbs", `<script setup lang="ts">
 const { label, locale } = useProductLocale();
 const { data, error } = await useFetch<{ code: string; origin: string; commissionPercent: number; referredSignups: number; convertedOrders: number; earnedCredits: number; pendingCredits: number; conversions: { orderId: string; credits: number; status: string; createdAt: string }[] }>("/api/product/affiliate");
 const link = computed(() => data.value ? \`\${data.value.origin}/\${locale.value}/ref/\${data.value.code}\` : "");
@@ -13982,7 +16902,7 @@ async function copy() { await run(async () => { await navigator.clipboard.writeT
   <div class="table-wrap"><table><thead><tr><th>\\{{ label('Order', '订单') }}</th><th>\\{{ label('Credits', '积分') }}</th><th>\\{{ label('Status', '状态') }}</th><th>\\{{ label('Date', '日期') }}</th></tr></thead><tbody><tr v-for="entry in data?.conversions ?? []" :key="entry.orderId"><td>\\{{ entry.orderId }}</td><td>\\{{ entry.credits }}</td><td>\\{{ entry.status }}</td><td>\\{{ entry.createdAt.slice(0, 10) }}</td></tr></tbody></table></div>
 </template>
 `],
-  ["modules/affiliate/frameworks/nuxt/apps/web/app/components/ProductReferral.vue.hbs", `<script setup lang="ts">
+  ["modules/affiliate/frameworks/nuxt/apps/fullstack-web/app/components/ProductReferral.vue.hbs", `<script setup lang="ts">
 const props = defineProps<{ code: string }>();
 const { label, locale, path } = useProductLocale();
 const { data, error } = await useFetch<{ commissionPercent: number }>(\`/api/product/referral/\${encodeURIComponent(props.code)}\`);
@@ -13992,7 +16912,7 @@ if (error.value || !data.value) throw createError({ statusCode: 404, statusMessa
   <section class="hero"><p class="eyebrow">{{projectName}}</p><h1>\\{{ label('You’re invited.', '你已受邀。') }}</h1><p>\\{{ label('Create your account using this invitation. Your inviter may earn credits when you make an eligible purchase.', '使用此邀请创建账户。当你进行符合条件的购买时，邀请人可能获得积分。') }}</p><form method="post" :action="\`/api/affiliate/capture?code=\${encodeURIComponent(code)}&lang=\${locale}\`"><button>\\{{ label('Accept invitation', '接受邀请') }}</button></form><p><NuxtLink :to="path('login')">\\{{ label('Already have an account? Sign in', '已有账户？登录') }}</NuxtLink></p></section>
 </template>
 `],
-  ["modules/affiliate/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.affiliate.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/affiliate/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.affiliate.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { useLocale, useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
@@ -14000,14 +16920,14 @@ const schema = z.object({ code: z.string(), origin: z.string(), commissionPercen
 export const Route = createFileRoute("/$lang/dashboard/affiliate")({ loader: ({ params }) => loadProduct("/api/product/affiliate", params.lang, schema), component: Affiliate });
 function Affiliate() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("affiliate.title")}</h1><p>{t("affiliate.policy", { percent: data.commissionPercent })}</p><label className="block space-y-2"><span>{t("affiliate.link")}</span><input readOnly className="w-full border bg-background p-3" value={\`\${data.origin}/\${locale}/ref/\${data.code}\`} /></label><dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">{([["signups", data.referredSignups], ["conversions", data.convertedOrders], ["earned", data.earnedCredits], ["pending", data.pendingCredits]] as const).map(([label, value]) => <div key={label} className="border p-5"><dt className="text-sm">{t(\`affiliate.stats.\${label}\`)}</dt><dd className="mt-3 text-3xl">{value}</dd></div>)}</dl><h2>{t("affiliate.history")}</h2>{data.conversions.length ? <ul className="divide-y border">{data.conversions.map((row) => <li key={row.orderId} className="flex justify-between gap-4 p-4"><span>{new Date(row.createdAt).toLocaleString(locale)}</span><span>{t(\`affiliate.status.\${row.status}\`)}</span><strong>{row.credits}</strong></li>)}</ul> : <p>{t("affiliate.empty")}</p>}<p className="text-xs text-muted-foreground">{t("affiliate.refundPolicy")}</p></section>; }
 `],
-  ["modules/affiliate/frameworks/tanstack-start/apps/web/src/routes/$lang.ref.$code.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/affiliate/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.ref.$code.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { useLocale, useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
 export const Route = createFileRoute("/$lang/ref/$code")({ loader: ({ params }) => loadProduct(\`/api/product/referral/\${encodeURIComponent(params.code)}\`, params.lang, z.object({ commissionPercent: z.number() })), head: () => ({ meta: [{ name: "robots", content: "noindex,nofollow" }] }), component: Referral });
 function Referral() { const { code } = Route.useParams(); const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="mx-auto max-w-xl space-y-8 px-6 py-24"><p className="text-xs uppercase tracking-widest">{t("affiliate.invite.eyebrow")}</p><h1 className="font-serif text-5xl">{t("affiliate.invite.title")}</h1><p>{t("affiliate.invite.description")}</p><form method="post" action={\`/api/affiliate/capture?\${new URLSearchParams({ code, lang: locale })}\`}><button className="bg-foreground px-5 py-3 text-background">{t("affiliate.invite.accept")}</button></form><p className="border-t pt-4 text-sm">{t("affiliate.policy", { percent: data.commissionPercent })}</p></section>; }
 `],
-  ["modules/affiliate/integrations/admin/frameworks/next/apps/web/src/app/[lang]/admin/affiliate/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+  ["modules/affiliate/integrations/admin/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/affiliate/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
 import { z } from "zod";
 
@@ -14057,7 +16977,7 @@ export default async function AdminAffiliatePage({ params, searchParams }: Props
   );
 }
 `],
-  ["modules/affiliate/integrations/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.affiliate.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/affiliate/integrations/admin/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.affiliate.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { useLocale, useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
@@ -14702,7 +17622,7 @@ export async function jsonRequest(
   },
 } as const;
 `],
-  ["modules/ai/frameworks/native/apps/web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
+  ["modules/ai/frameworks/native/apps/fullstack-web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
 import { z } from "zod";
 import { ENV } from "@/env.server";
 
@@ -14735,7 +17655,7 @@ export function aiErrorResponse(error: unknown) {
   return Response.json({ error: code }, { status, headers: privateHeaders });
 }
 `],
-  ["modules/ai/frameworks/native/apps/web/src/lib/native/ai.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
+  ["modules/ai/frameworks/native/apps/fullstack-web/src/lib/native/ai.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
 import { requestSchema } from "@{{projectName}}/ai";
 import { json, requireSession } from "../product-api";
 import { aiErrorResponse, privateHeaders, readAIRequest, requireAIOrigin } from "../ai-http";
@@ -14761,7 +17681,7 @@ export async function handle(request: Request, path: string): Promise<Response |
   } catch (error) { return aiErrorResponse(error); }
 }
 `],
-  ["modules/ai/frameworks/next/apps/web/src/app/[lang]/dashboard/ai/page.tsx.hbs", `import { ai } from "@{{projectName}}/app-services";
+  ["modules/ai/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/ai/page.tsx.hbs", `import { ai } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
 import { AIStudio } from "@/components/ai/studio";
 import { getTranslator, resolveLocale } from "@/lib/i18n/server";
@@ -14779,7 +17699,7 @@ export default async function AIPage({ params }: Props) {
   return <div className="space-y-8"><header className="space-y-2"><h1 className="font-serif text-4xl tracking-tight">{t("ai.title")}</h1><p className="text-muted-foreground">{t("ai.subtitle")}</p></header><AIStudio initialJobs={await ai.history(user.id)} capabilities={ai.capabilities()} /></div>;
 }
 `],
-  ["modules/ai/frameworks/next/apps/web/src/app/api/ai/[id]/media/route.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
+  ["modules/ai/frameworks/next/apps/fullstack-web/src/app/api/ai/[id]/media/route.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
 import { getSession } from "@/lib/session";
 import { aiErrorResponse, privateHeaders } from "@/lib/ai-http";
 
@@ -14792,7 +17712,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   } catch (error) { return aiErrorResponse(error); }
 }
 `],
-  ["modules/ai/frameworks/next/apps/web/src/app/api/ai/[id]/route.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
+  ["modules/ai/frameworks/next/apps/fullstack-web/src/app/api/ai/[id]/route.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
 import { getSession } from "@/lib/session";
 import { aiErrorResponse, privateHeaders, requireAIOrigin } from "@/lib/ai-http";
 
@@ -14815,7 +17735,7 @@ export async function DELETE(request: Request, { params }: Context) {
   } catch (error) { return aiErrorResponse(error); }
 }
 `],
-  ["modules/ai/frameworks/next/apps/web/src/app/api/ai/route.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
+  ["modules/ai/frameworks/next/apps/fullstack-web/src/app/api/ai/route.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
 import { requestSchema } from "@{{projectName}}/ai";
 import { getSession } from "@/lib/session";
 import { aiErrorResponse, privateHeaders, readAIRequest, requireAIOrigin } from "@/lib/ai-http";
@@ -14836,7 +17756,7 @@ export async function POST(request: Request) {
   } catch (error) { return aiErrorResponse(error); }
 }
 `],
-  ["modules/ai/frameworks/next/apps/web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
+  ["modules/ai/frameworks/next/apps/fullstack-web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
 import { z } from "zod";
 import { ENV } from "@/env.server";
 
@@ -14869,7 +17789,7 @@ export function aiErrorResponse(error: unknown) {
   return Response.json({ error: code }, { status, headers: privateHeaders });
 }
 `],
-  ["modules/ai/frameworks/nuxt/apps/web/app/components/ProductAI.vue.hbs", `<script setup lang="ts">
+  ["modules/ai/frameworks/nuxt/apps/fullstack-web/app/components/ProductAI.vue.hbs", `<script setup lang="ts">
 import { z } from "zod";
 const { label } = useProductLocale();
 const { pending, error, run } = useProductAction();
@@ -14929,7 +17849,7 @@ onBeforeUnmount(() => { disposed = true; if (timer) clearTimeout(timer); });
   <p v-if="!data?.jobs.length">\\{{ label('Your generations will appear here.', '生成结果将在这里显示。') }}</p>
 </template>
 `],
-  ["modules/ai/frameworks/react/apps/web/src/components/ai/studio.tsx.hbs", `"use client";
+  ["modules/ai/frameworks/react/apps/fullstack-web/src/components/ai/studio.tsx.hbs", `"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -15019,7 +17939,7 @@ export function AIStudio({ initialJobs, capabilities }: { initialJobs: Job[]; ca
   </div>;
 }
 `],
-  ["modules/ai/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.ai.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/ai/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.ai.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { AIStudio } from "@/components/ai/studio";
 import { useT } from "@/components/i18n-provider";
@@ -15028,7 +17948,7 @@ const schema = z.object({ jobs: z.array(z.object({ id: z.string(), requestId: z.
 export const Route = createFileRoute("/$lang/dashboard/ai")({ loader: ({ params }) => loadProduct("/api/product/ai", params.lang, schema), component: Studio });
 function Studio() { const data = Route.useLoaderData(); const t = useT(); return <section className="space-y-8"><header className="space-y-3"><h1 className="font-serif text-4xl">{t("ai.title")}</h1><p className="text-muted-foreground">{t("ai.subtitle")}</p></header><AIStudio initialJobs={data.jobs} capabilities={data.capabilities} /></section>; }
 `],
-  ["modules/ai/integrations/credits/apps/web/src/integrations/ai-credits.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
+  ["modules/ai/integrations/credits/apps/fullstack-web/src/integrations/ai-credits.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
 import { InsufficientCreditsError } from "@{{projectName}}/credits";
 import type { Services } from "../services";
 
@@ -15042,7 +17962,7 @@ export default function registerAICredits({ ai, credits }: Services) {
   });
 }
 `],
-  ["modules/ai/integrations/storage/apps/web/src/integrations/ai-storage.ts.hbs", `import type { Services } from "../services";
+  ["modules/ai/integrations/storage/apps/fullstack-web/src/integrations/ai-storage.ts.hbs", `import type { Services } from "../services";
 
 export default function registerAIStorage({ ai, storage }: Services) {
   ai.setStorage({
@@ -15517,7 +18437,7 @@ export const authRelations = defineRelationsPart({ user, session, account, verif
 `],
   ["modules/auth/files/docs/modules/auth.md.hbs", `# Authentication
 
-Built on [Better Auth](https://better-auth.com). The \`packages/auth\` package exports \`createAuth(env, db, events)\`; \`apps/web/src/services.ts\` creates the instance.
+Built on [Better Auth](https://better-auth.com). The \`packages/auth\` package exports \`createAuth(env, db, events)\`; \`{{appPath "fullstack-web"}}/src/services.ts\` creates the instance.
 
 The HTTP boundary is \`/api/auth/**\` on every framework. {{#if (includes frontend "next")}}Next.js uses the Better Auth \`nextCookies\` adapter.{{else if (includes frontend "tanstack-start")}}TanStack Start uses \`tanstackStartCookies\` as the last auth plugin so server API calls can propagate session cookies.{{else}}Nuxt forwards the H3 request to the Better Auth WHATWG handler and returns its response, including every session cookie.{{/if}} Never cache authenticated responses or expose the server service graph to client bundles.
 
@@ -15582,7 +18502,7 @@ No inline QR script or provider secret is sent to the browser. AppSecret and tok
 | \`auth.phone_verification_requested\` | A phone OTP should be sent; payload is \`{ phoneNumber, code }\` |
 {{/if}}
 
-Subscribe in \`apps/web/src/integrations/*.ts\`.
+Subscribe in \`{{appPath "fullstack-web"}}/src/integrations/*.ts\`.
 
 {{#if (includes module.integrations "sms")}}
 ## Phone sign-up and sign-in
@@ -15616,7 +18536,7 @@ Use the generated framework's protected page loader and preserve incoming reques
 
 ## Schema changes
 
-After adding Better Auth plugins, regenerate the schema with \`bun run auth:generate\` in \`apps/web\`, then \`bun run db:push\`.
+After adding Better Auth plugins, regenerate the schema with \`bun run auth:generate\` in \`{{appPath "fullstack-web"}}\`, then \`bun run db:push\`.
 {{#if (includes module.integrations "sms")}}
 
 The generated Drizzle auth schema already includes nullable, unique \`user.phoneNumber\`, \`phoneNumberVerified\`, \`phone_otp_challenge\`, and \`rate_limit\` for {{database}}. Preserve the custom challenge table when regenerating Better Auth's schema: it is managed by this integration rather than the upstream phone plugin. Apply the schema to the deployment database before accepting phone sign-ins.
@@ -16061,7 +18981,7 @@ export type Session = Auth["$Infer"]["Session"];
   },
 } as const;
 `],
-  ["modules/auth/frameworks/native/apps/web/src/lib/social-providers.server.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/auth/frameworks/native/apps/fullstack-web/src/lib/social-providers.server.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 
 import { isSocialProvider, type SocialProvider } from "./social-providers";
 
@@ -16070,7 +18990,7 @@ export function enabledSocialProviders(): SocialProvider[] {
   return Object.keys(auth.options.socialProviders).filter(isSocialProvider);
 }
 `],
-  ["modules/auth/frameworks/native/apps/web/src/lib/social-providers.ts.hbs", `export const socialProviderLabels = {
+  ["modules/auth/frameworks/native/apps/fullstack-web/src/lib/social-providers.ts.hbs", `export const socialProviderLabels = {
   google: "Google",
   github: "GitHub",
 {{#if (includes module.providers "wechat")}}
@@ -16084,7 +19004,7 @@ export function isSocialProvider(value: string): value is SocialProvider {
   return value in socialProviderLabels;
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/dashboard/layout.tsx", `import SideNav from "@/components/side-nav";
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/layout.tsx", `import SideNav from "@/components/side-nav";
 import { resolveLocale } from "@/lib/i18n/server";
 import { requireUser } from "@/lib/session";
 
@@ -16109,7 +19029,7 @@ export default async function DashboardLayout({
   );
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/dashboard/page.tsx", `import type { Metadata } from "next";
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/page.tsx", `import type { Metadata } from "next";
 
 import { getTranslator, resolveLocale } from "@/lib/i18n/server";
 import { requireUser } from "@/lib/session";
@@ -16134,7 +19054,7 @@ export default async function DashboardPage({ params }: Props) {
   );
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/dashboard/settings/page.tsx", `import type { Metadata } from "next";
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/settings/page.tsx", `import type { Metadata } from "next";
 
 import { PasswordForm, ProfileForm } from "@/components/auth/account-forms";
 import { getTranslator, resolveLocale } from "@/lib/i18n/server";
@@ -16167,12 +19087,12 @@ export default async function SettingsPage({ params }: Props) {
   );
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/login/layout.tsx", `export const metadata = { robots: { index: false, follow: false } };
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/app/[lang]/login/layout.tsx", `export const metadata = { robots: { index: false, follow: false } };
 export default function PrivateLayout({ children }: { children: React.ReactNode }) {
   return children;
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/login/page.tsx.hbs", `import type { Metadata } from "next";
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/app/[lang]/login/page.tsx.hbs", `import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard } from "@/components/auth/auth-card";
@@ -16231,12 +19151,12 @@ export default async function LoginPage({ params, searchParams }: Props) {
   );
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/signup/layout.tsx", `export const metadata = { robots: { index: false, follow: false } };
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/app/[lang]/signup/layout.tsx", `export const metadata = { robots: { index: false, follow: false } };
 export default function PrivateLayout({ children }: { children: React.ReactNode }) {
   return children;
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/app/[lang]/signup/page.tsx.hbs", `import type { Metadata } from "next";
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/app/[lang]/signup/page.tsx.hbs", `import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard } from "@/components/auth/auth-card";
@@ -16294,12 +19214,12 @@ export default async function SignUpPage({ params, searchParams }: Props) {
   );
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/app/api/auth/[...all]/route.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/app/api/auth/[...all]/route.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 import { toNextJsHandler } from "better-auth/next-js";
 
 export const { GET, POST } = toNextJsHandler(auth);
 `],
-  ["modules/auth/frameworks/next/apps/web/src/components/user-menu.tsx.hbs", `"use client";
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/components/user-menu.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import {
@@ -16368,12 +19288,12 @@ export default function UserMenu() {
   );
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/lib/auth-client.ts.hbs", `import { adminClient{{#if (includes module.integrations "sms")}}, phoneNumberClient{{/if}} } from "better-auth/client/plugins";
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/lib/auth-client.ts.hbs", `import { adminClient{{#if (includes module.integrations "sms")}}, phoneNumberClient{{/if}} } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({ plugins: [adminClient(){{#if (includes module.integrations "sms")}}, phoneNumberClient(){{/if}}] });
 `],
-  ["modules/auth/frameworks/next/apps/web/src/lib/session.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/lib/session.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 import type { Locale } from "@{{projectName}}/i18n";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -16398,7 +19318,7 @@ export function safeNext(value: string | undefined, fallback: string): string {
   return value?.startsWith("/") && !value.startsWith("//") ? value : fallback;
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/lib/social-providers.server.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/lib/social-providers.server.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 
 import { isSocialProvider, type SocialProvider } from "./social-providers";
 
@@ -16407,7 +19327,7 @@ export function enabledSocialProviders(): SocialProvider[] {
   return Object.keys(auth.options.socialProviders).filter(isSocialProvider);
 }
 `],
-  ["modules/auth/frameworks/next/apps/web/src/lib/social-providers.ts.hbs", `export const socialProviderLabels = {
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/lib/social-providers.ts.hbs", `export const socialProviderLabels = {
   google: "Google",
   github: "GitHub",
 {{#if (includes module.providers "wechat")}}
@@ -16421,7 +19341,7 @@ export function isSocialProvider(value: string): value is SocialProvider {
   return value in socialProviderLabels;
 }
 `],
-  ["modules/auth/frameworks/nuxt/apps/web/app/components/ProductAuth.vue.hbs", `<script setup lang="ts">
+  ["modules/auth/frameworks/nuxt/apps/fullstack-web/app/components/ProductAuth.vue.hbs", `<script setup lang="ts">
 import { z } from "zod";
 const props = defineProps<{ mode: string }>();
 const { path, label } = useProductLocale();
@@ -16516,7 +19436,7 @@ async function verifyPhone() {
 </template>
 <style scoped>.auth-panel{max-width:480px;margin:2rem auto}.auth-panel h1{font-size:2.3rem}</style>
 `],
-  ["modules/auth/frameworks/nuxt/apps/web/app/components/ProductSettings.vue.hbs", `<script setup lang="ts">
+  ["modules/auth/frameworks/nuxt/apps/fullstack-web/app/components/ProductSettings.vue.hbs", `<script setup lang="ts">
 const props = defineProps<{ user: { name: string; email: string; emailVerified: boolean } }>();
 const { label, path } = useProductLocale();
 const { pending, error, notice, run } = useProductAction();
@@ -16532,7 +19452,7 @@ async function changePassword() { await run(async () => { await productRequest("
   <form class="panel" @submit.prevent="changePassword"><h2>\\{{ label('Change password', '修改密码') }}</h2><label>\\{{ label('Current password', '当前密码') }}<input v-model="currentPassword" type="password" autocomplete="current-password" required /></label><label>\\{{ label('New password', '新密码') }}<input v-model="newPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required /></label><button :disabled="pending">\\{{ label('Update password', '更新密码') }}</button></form>
 </template>
 `],
-  ["modules/auth/frameworks/nuxt/apps/web/app/components/ProductWorkspace.vue.hbs", `<script setup lang="ts">
+  ["modules/auth/frameworks/nuxt/apps/fullstack-web/app/components/ProductWorkspace.vue.hbs", `<script setup lang="ts">
 import { navigation } from "@/config/navigation";
 const props = defineProps<{ section: string; user: { id: string; name: string; email: string; emailVerified: boolean } }>();
 const { path, label, t } = useProductLocale();
@@ -16555,7 +19475,7 @@ const titles: Record<string, string> = { "": label("Overview", "概览"), settin
   </div>
 </template>
 `],
-  ["modules/auth/frameworks/react/apps/web/src/components/auth/account-forms.tsx.hbs", `"use client";
+  ["modules/auth/frameworks/react/apps/fullstack-web/src/components/auth/account-forms.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import { useProductNavigation } from "@/lib/product-navigation";
@@ -16645,7 +19565,7 @@ export function PasswordForm() {
   );
 }
 `],
-  ["modules/auth/frameworks/react/apps/web/src/components/auth/auth-card.tsx.hbs", `import {
+  ["modules/auth/frameworks/react/apps/fullstack-web/src/components/auth/auth-card.tsx.hbs", `import {
   Card,
   CardContent,
   CardDescription,
@@ -16681,7 +19601,7 @@ export function AuthCard({
   );
 }
 `],
-  ["modules/auth/frameworks/react/apps/web/src/components/auth/field.tsx.hbs", `import { Input } from "@{{projectName}}/ui/components/input";
+  ["modules/auth/frameworks/react/apps/fullstack-web/src/components/auth/field.tsx.hbs", `import { Input } from "@{{projectName}}/ui/components/input";
 import { Label } from "@{{projectName}}/ui/components/label";
 
 export function Field({
@@ -16702,7 +19622,7 @@ export function formValue(form: FormData, name: string): string {
   return value instanceof File ? "" : (value ?? "");
 }
 `],
-  ["modules/auth/frameworks/react/apps/web/src/components/auth/sign-in-form.tsx.hbs", `"use client";
+  ["modules/auth/frameworks/react/apps/fullstack-web/src/components/auth/sign-in-form.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import { useState } from "react";
@@ -16786,7 +19706,7 @@ export default function SignInForm({
   );
 }
 `],
-  ["modules/auth/frameworks/react/apps/web/src/components/auth/sign-up-form.tsx.hbs", `"use client";
+  ["modules/auth/frameworks/react/apps/fullstack-web/src/components/auth/sign-up-form.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import { useState } from "react";
@@ -16870,7 +19790,7 @@ export default function SignUpForm({
   );
 }
 `],
-  ["modules/auth/frameworks/react/apps/web/src/components/auth/social-buttons.tsx.hbs", `"use client";
+  ["modules/auth/frameworks/react/apps/fullstack-web/src/components/auth/social-buttons.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import { useState } from "react";
@@ -16930,12 +19850,12 @@ export function SocialButtons({
   );
 }
 `],
-  ["modules/auth/frameworks/react/apps/web/src/lib/auth-client.ts.hbs", `import { adminClient{{#if (includes module.integrations "sms")}}, phoneNumberClient{{/if}} } from "better-auth/client/plugins";
+  ["modules/auth/frameworks/react/apps/fullstack-web/src/lib/auth-client.ts.hbs", `import { adminClient{{#if (includes module.integrations "sms")}}, phoneNumberClient{{/if}} } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({ plugins: [adminClient(){{#if (includes module.integrations "sms")}}, phoneNumberClient(){{/if}}] });
 `],
-  ["modules/auth/frameworks/tanstack-start/apps/web/src/lib/auth-data.ts.hbs", `import { z } from "zod";
+  ["modules/auth/frameworks/tanstack-start/apps/fullstack-web/src/lib/auth-data.ts.hbs", `import { z } from "zod";
 import { redirect } from "@tanstack/react-router";
 import { loadProduct } from "./product-data";
 export const userSchema = z.object({ id: z.string(), name: z.string(), email: z.string(), role: z.string().nullish(), emailVerified: z.boolean() });
@@ -16951,22 +19871,22 @@ export function safeNext(value: string | undefined, fallback: string): string {
   return value;
 }
 `],
-  ["modules/auth/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/auth/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { useT } from "@/components/i18n-provider";
 export const Route = createFileRoute("/$lang/dashboard/")({ component: Dashboard });
 function Dashboard() { const { user } = Route.useRouteContext(); const t = useT(); return <section className="space-y-6"><p className="text-xs uppercase tracking-[0.2em]">{{projectName}}</p><h1 className="font-serif text-4xl">{t("auth.dashboard.title")}</h1><p>{user.name}</p><p className="text-muted-foreground">{user.email}</p></section>; }
 `],
-  ["modules/auth/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.settings.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/auth/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.settings.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { ProfileForm, PasswordForm } from "@/components/auth/account-forms";
 import { useT } from "@/components/i18n-provider";
 export const Route = createFileRoute("/$lang/dashboard/settings")({ component: Settings });
 function Settings() { const { user } = Route.useRouteContext(); const t = useT(); return <div className="max-w-xl space-y-10"><h1 className="font-serif text-4xl">{t("auth.settings.title")}</h1><ProfileForm name={user.name} email={user.email} /><PasswordForm /></div>; }
 `],
-  ["modules/auth/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.tsx.hbs", `import { createFileRoute, Outlet } from "@tanstack/react-router";
+  ["modules/auth/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.tsx.hbs", `import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { loadUser } from "@/lib/auth-data";
 export const Route = createFileRoute("/$lang/dashboard")({ beforeLoad: async ({ params }) => ({ user: await loadUser(params.lang) }), component: Outlet });
 `],
-  ["modules/auth/frameworks/tanstack-start/apps/web/src/routes/$lang.login.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/auth/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.login.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import SignInForm from "@/components/auth/sign-in-form";
 import { AuthCard } from "@/components/auth/auth-card";
@@ -16976,7 +19896,7 @@ import { authConfigSchema, safeNext } from "@/lib/auth-data";
 export const Route = createFileRoute("/$lang/login")({ validateSearch: z.object({ next: z.string().optional() }), loader: ({ params }) => loadProduct("/api/product/config", params.lang, authConfigSchema), component: AuthPage });
 function AuthPage() { const config = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const next = safeNext(Route.useSearch().next, \`/\${locale}/dashboard\`); return <AuthCard title={t("auth.signIn.title")} footer={<a href={\`/\${locale}/signup\`} className="underline">{t("auth.signUp.title")}</a>}><SignInForm next={next} providers={config.socialProviders} canResetPassword={config.canResetPassword} />{{#if (includes product.features "sms")}}<a className="text-sm underline" href={\`/\${locale}/login/phone\`}>{t("auth.phone.title")}</a>{{/if}}</AuthCard>; }
 `],
-  ["modules/auth/frameworks/tanstack-start/apps/web/src/routes/$lang.signup.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/auth/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.signup.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import SignUpForm from "@/components/auth/sign-up-form";
 import { AuthCard } from "@/components/auth/auth-card";
@@ -16986,7 +19906,7 @@ import { authConfigSchema, safeNext } from "@/lib/auth-data";
 export const Route = createFileRoute("/$lang/signup")({ validateSearch: z.object({ next: z.string().optional() }), loader: ({ params }) => loadProduct("/api/product/config", params.lang, authConfigSchema), component: AuthPage });
 function AuthPage() { const config = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const next = safeNext(Route.useSearch().next, \`/\${locale}/dashboard\`); return <AuthCard title={t("auth.signUp.title")} footer={<a href={\`/\${locale}/login\`} className="underline">{t("auth.signIn.title")}</a>}><SignUpForm next={next} providers={config.socialProviders} verifyEmail={config.verifyEmail} />{{#if (includes product.features "sms")}}<a className="text-sm underline" href={\`/\${locale}/login/phone\`}>{t("auth.phone.title")}</a>{{/if}}</AuthCard>; }
 `],
-  ["modules/auth/integrations/email/frameworks/next/apps/web/src/app/[lang]/forgot-password/page.tsx", `import type { Metadata } from "next";
+  ["modules/auth/integrations/email/frameworks/next/apps/fullstack-web/src/app/[lang]/forgot-password/page.tsx", `import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard } from "@/components/auth/auth-card";
@@ -17020,7 +19940,7 @@ export default async function ForgotPasswordPage({ params }: Props) {
   );
 }
 `],
-  ["modules/auth/integrations/email/frameworks/next/apps/web/src/app/[lang]/reset-password/page.tsx", `import type { Metadata } from "next";
+  ["modules/auth/integrations/email/frameworks/next/apps/fullstack-web/src/app/[lang]/reset-password/page.tsx", `import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard } from "@/components/auth/auth-card";
@@ -17059,7 +19979,7 @@ export default async function ResetPasswordPage({ params, searchParams }: Props)
   );
 }
 `],
-  ["modules/auth/integrations/email/frameworks/react/apps/web/src/components/auth/password-reset-forms.tsx.hbs", `"use client";
+  ["modules/auth/integrations/email/frameworks/react/apps/fullstack-web/src/components/auth/password-reset-forms.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import { useState } from "react";
@@ -17163,7 +20083,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   );
 }
 `],
-  ["modules/auth/integrations/email/frameworks/tanstack-start/apps/web/src/routes/$lang.forgot-password.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/auth/integrations/email/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.forgot-password.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { ForgotPasswordForm } from "@/components/auth/password-reset-forms";
 import { AuthCard } from "@/components/auth/auth-card";
@@ -17171,7 +20091,7 @@ import { useT } from "@/components/i18n-provider";
 export const Route = createFileRoute("/$lang/forgot-password")({ validateSearch: z.object({ token: z.string().optional() }), component: PasswordPage });
 function PasswordPage() { const t = useT();  return <AuthCard title={t("auth.forgot.title")}><ForgotPasswordForm /></AuthCard>; }
 `],
-  ["modules/auth/integrations/email/frameworks/tanstack-start/apps/web/src/routes/$lang.reset-password.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/auth/integrations/email/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.reset-password.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { ResetPasswordForm } from "@/components/auth/password-reset-forms";
 import { AuthCard } from "@/components/auth/auth-card";
@@ -17179,7 +20099,7 @@ import { useT } from "@/components/i18n-provider";
 export const Route = createFileRoute("/$lang/reset-password")({ validateSearch: z.object({ token: z.string().optional() }), component: PasswordPage });
 function PasswordPage() { const t = useT(); const { token } = Route.useSearch(); return <AuthCard title={t("auth.reset.title")}><ResetPasswordForm token={token ?? ""} /></AuthCard>; }
 `],
-  ["modules/auth/integrations/sms/frameworks/next/apps/web/src/app/[lang]/login/phone/page.tsx", `import type { Metadata } from "next";
+  ["modules/auth/integrations/sms/frameworks/next/apps/fullstack-web/src/app/[lang]/login/phone/page.tsx", `import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard } from "@/components/auth/auth-card";
@@ -17221,7 +20141,7 @@ export default async function PhoneLoginPage({ params, searchParams }: Props) {
   );
 }
 `],
-  ["modules/auth/integrations/sms/frameworks/react/apps/web/src/components/auth/phone-sign-in-form.tsx.hbs", `"use client";
+  ["modules/auth/integrations/sms/frameworks/react/apps/fullstack-web/src/components/auth/phone-sign-in-form.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
 import { useEffect, useState } from "react";
@@ -17406,7 +20326,7 @@ export default function PhoneSignInForm({ next }: { next: string }) {
   );
 }
 `],
-  ["modules/auth/integrations/sms/frameworks/tanstack-start/apps/web/src/routes/$lang.login_.phone.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/auth/integrations/sms/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.login_.phone.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import PhoneSignInForm from "@/components/auth/phone-sign-in-form";
 import { AuthCard } from "@/components/auth/auth-card";
@@ -28570,7 +31490,7 @@ export type Blog = ReturnType<typeof createBlog>;
   },
 } as const;
 `],
-  ["modules/blog/frameworks/native/apps/web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/native/apps/fullstack-web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 import { BlogError, type BlogActor } from "@{{projectName}}/blog";
 import { defineAbilityFor } from "@{{projectName}}/permissions";
 import { z } from "zod";
@@ -28619,7 +31539,7 @@ export function blogFailure(error: unknown) {
   return blogResponse({ error: "server_error" }, 500);
 }
 `],
-  ["modules/blog/frameworks/native/apps/web/src/lib/native/blog.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/native/apps/fullstack-web/src/lib/native/blog.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
 import { revisionInput } from "@{{projectName}}/blog";
 import { isLocale, defaultLocale } from "@{{projectName}}/i18n";
 import { z } from "zod";
@@ -28657,7 +31577,7 @@ export async function handle(request: Request, path: string): Promise<Response |
   } catch (error) { return blogFailure(error); }
 }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/app/[lang]/admin/blog/[id]/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/blog/[id]/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
 import { BlogError } from "@{{projectName}}/blog";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -28675,7 +31595,7 @@ export default async function EditBlogPost({ params }: { params: Promise<{ lang:
   return <section><h1 className="mb-8 text-2xl font-semibold">{t("blog.editor.edit")}</h1><BlogEditor key={\`\${post.id}:\${post.revision}\`} locale={locale} post={ { id: post.id, locale: post.locale, slug: post.slug, title: post.title, excerpt: post.excerpt, body: post.body, translationKey: post.translationKey, status: post.status, revision: post.revision } } /><details className="mt-12 border-t pt-6"><summary className="mb-8 cursor-pointer font-medium">{t("blog.editor.preview")}</summary><Markdown>{post.body}</Markdown></details></section>;
 }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/app/[lang]/admin/blog/new/page.tsx.hbs", `import BlogEditor from "@/components/blog/editor";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/blog/new/page.tsx.hbs", `import BlogEditor from "@/components/blog/editor";
 import { requireAdmin } from "@/lib/admin";
 import { getTranslator, resolveLocale } from "@/lib/i18n/server";
 export default async function NewBlogPost({ params }: { params: Promise<{ lang: string }> }) {
@@ -28684,7 +31604,7 @@ export default async function NewBlogPost({ params }: { params: Promise<{ lang: 
   return <section><h1 className="mb-8 text-2xl font-semibold">{getTranslator(locale)("blog.editor.create")}</h1><BlogEditor locale={locale} /></section>;
 }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/app/[lang]/admin/blog/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/blog/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin";
 import { blogPage } from "@/lib/blog-page";
@@ -28703,7 +31623,7 @@ export default async function BlogAdmin({ params, searchParams }: { params: Prom
   </section>;
 }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/app/[lang]/blog/[slug]/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/app/[lang]/blog/[slug]/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Markdown from "@/components/blog/markdown";
@@ -28734,7 +31654,7 @@ export default async function BlogPostPage({ params }: Props) {
   </article>;
 }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/app/[lang]/blog/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/app/[lang]/blog/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { blogMetadata } from "@/lib/blog-metadata";
@@ -28768,7 +31688,7 @@ export default async function BlogPage({ params, searchParams }: Props) {
   </div>;
 }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/app/api/blog/[id]/route.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/app/api/blog/[id]/route.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
 import { revisionInput } from "@{{projectName}}/blog";
 import { z } from "zod";
 import { blogActor, blogFailure, blogResponse, readBlogJson } from "@/lib/blog-http";
@@ -28794,7 +31714,7 @@ export async function DELETE(request: Request, { params }: Context) {
   } catch (error) { return blogFailure(error); }
 }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/app/api/blog/route.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/app/api/blog/route.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
 import { z } from "zod";
 import { blogActor, blogFailure, blogResponse, readBlogJson } from "@/lib/blog-http";
 
@@ -28812,7 +31732,7 @@ export async function POST(request: Request) {
   } catch (error) { return blogFailure(error); }
 }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 import { BlogError, type BlogActor } from "@{{projectName}}/blog";
 import { defineAbilityFor } from "@{{projectName}}/permissions";
 import { z } from "zod";
@@ -28861,7 +31781,7 @@ export function blogFailure(error: unknown) {
   return blogResponse({ error: "server_error" }, 500);
 }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/lib/blog-metadata.ts.hbs", `import type { BlogPost } from "@{{projectName}}/blog";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/lib/blog-metadata.ts.hbs", `import type { BlogPost } from "@{{projectName}}/blog";
 import { defaultLocale } from "@{{projectName}}/i18n";
 import type { Metadata } from "next";
 import { blogOrigin } from "./blog-origin";
@@ -28880,10 +31800,10 @@ export function blogPosting(post: BlogPost) {
 }
 export function safeJsonLd(value: unknown) { return JSON.stringify(value).replace(/</g, "\\\\u003c").replace(/>/g, "\\\\u003e").replace(/&/g, "\\\\u0026"); }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/lib/blog-origin.ts.hbs", `import { ENV } from "@/env.server";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/lib/blog-origin.ts.hbs", `import { ENV } from "@/env.server";
 export function blogOrigin() { return new URL(ENV.BETTER_AUTH_URL).origin; }
 `],
-  ["modules/blog/frameworks/next/apps/web/src/lib/blog-page.ts", `import { notFound } from "next/navigation";
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/lib/blog-page.ts", `import { notFound } from "next/navigation";
 import { z } from "zod";
 export function blogPage(value: string | string[] | undefined) {
   const result = z.coerce
@@ -28896,7 +31816,7 @@ export function blogPage(value: string | string[] | undefined) {
   return result.data;
 }
 `],
-  ["modules/blog/frameworks/nuxt/apps/web/app/components/ProductBlog.vue.hbs", `<script setup lang="ts">
+  ["modules/blog/frameworks/nuxt/apps/fullstack-web/app/components/ProductBlog.vue.hbs", `<script setup lang="ts">
 import MarkdownIt from "markdown-it";
 import { defaultLocale } from "@{{projectName}}/i18n";
 const props = defineProps<{ slug?: string }>();
@@ -28938,7 +31858,7 @@ useHead(() => ({ script: !article.value || !config.value?.siteUrl ? [] : [{ type
   <section v-else class="stack"><h1>\\{{ label('Journal', '博客') }}</h1><div class="grid"><article v-for="post in listing?.posts ?? []" :key="post.id" class="panel"><small>\\{{ post.publishedAt?.slice(0, 10) }}</small><h2><NuxtLink :to="path(\`blog/\${post.slug}\`)">\\{{ post.title }}</NuxtLink></h2><p>\\{{ post.excerpt }}</p><small>\\{{ post.authorName }}</small></article></div><p v-if="!listing?.posts.length">\\{{ label('No published posts yet.', '暂无已发布文章。') }}</p><nav class="actions" :aria-label="label('Pagination', '分页')"><NuxtLink v-if="page > 1" :to="\`\${path('blog')}?page=\${page - 1}\`">\\{{ label('Previous', '上一页') }}</NuxtLink><NuxtLink v-if="listing && page * listing.limit < listing.total" :to="\`\${path('blog')}?page=\${page + 1}\`">\\{{ label('Next', '下一页') }}</NuxtLink></nav></section>
 </template>
 `],
-  ["modules/blog/frameworks/nuxt/apps/web/app/components/ProductBlogEditor.vue.hbs", `<script setup lang="ts">
+  ["modules/blog/frameworks/nuxt/apps/fullstack-web/app/components/ProductBlogEditor.vue.hbs", `<script setup lang="ts">
 import { z } from "zod";
 import MarkdownIt from "markdown-it";
 const props = defineProps<{ id?: string }>();
@@ -28986,7 +31906,7 @@ async function remove(post: Post) {
 </template>
 <style scoped>.body-editor{min-height:24rem;font-family:ui-monospace,monospace}</style>
 `],
-  ["modules/blog/frameworks/react/apps/web/src/components/blog/editor.tsx.hbs", `"use client";
+  ["modules/blog/frameworks/react/apps/fullstack-web/src/components/blog/editor.tsx.hbs", `"use client";
 
 import { locales } from "@{{projectName}}/i18n";
 import type { Locale } from "@{{projectName}}/i18n";
@@ -29039,7 +31959,7 @@ export default function BlogEditor({ locale, post }: { locale: Locale; post?: Ed
   </form>;
 }
 `],
-  ["modules/blog/frameworks/react/apps/web/src/components/blog/markdown.tsx", `import ReactMarkdown from "react-markdown";
+  ["modules/blog/frameworks/react/apps/fullstack-web/src/components/blog/markdown.tsx", `import ReactMarkdown from "react-markdown";
 
 /** Raw HTML is never interpreted. react-markdown also rejects unsafe URL schemes. */
 export default function Markdown({ children }: { children: string }) {
@@ -29055,7 +31975,7 @@ export default function Markdown({ children }: { children: string }) {
   );
 }
 `],
-  ["modules/blog/frameworks/tanstack-start/apps/web/src/lib/blog-data.ts", `import { z } from "zod";
+  ["modules/blog/frameworks/tanstack-start/apps/fullstack-web/src/lib/blog-data.ts", `import { z } from "zod";
 export const postSchema = z.object({
   id: z.string(),
   locale: z.string(),
@@ -29082,7 +32002,7 @@ export function blogSearch(search: z.input<typeof blogSearchSchema>) {
   return { page: result.success ? result.data.page : null };
 }
 `],
-  ["modules/blog/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.blog.$id.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/blog/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.blog.$id.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import BlogEditor from "@/components/blog/editor";
 import Markdown from "@/components/blog/markdown";
 import { useLocale, useT } from "@/components/i18n-provider";
@@ -29091,20 +32011,20 @@ import { postSchema } from "@/lib/blog-data";
 export const Route = createFileRoute("/$lang/admin/blog/$id")({ loader: ({ params }) => loadProduct(\`/api/blog/\${encodeURIComponent(params.id)}\`, params.lang, postSchema), component: EditPost });
 function EditPost() { const post = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section><h1 className="mb-8 font-serif text-4xl">{t("blog.editor.edit")}</h1><BlogEditor key={\`\${post.id}:\${post.revision}\`} locale={locale} post={post} /><details className="mt-12 border-t pt-6"><summary className="mb-8 cursor-pointer">{t("blog.editor.preview")}</summary><Markdown>{post.body}</Markdown></details></section>; }
 `],
-  ["modules/blog/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.blog.index.tsx.hbs", `import { createFileRoute, notFound } from "@tanstack/react-router";
+  ["modules/blog/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.blog.index.tsx.hbs", `import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useLocale, useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
 import { blogSearch, postListSchema } from "@/lib/blog-data";
 export const Route = createFileRoute("/$lang/admin/blog/")({ validateSearch: blogSearch, loaderDeps: ({ search }) => search, loader: ({ params, deps }) => { if (deps.page === null) throw notFound(); return loadProduct(\`/api/blog?page=\${deps.page}\`, params.lang, postListSchema); }, component: BlogAdmin });
 function BlogAdmin() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="space-y-8"><header className="flex items-center justify-between"><h1 className="font-serif text-4xl">{t("blog.manage")}</h1><a href={\`/\${locale}/admin/blog/new\`} className="border px-4 py-2">{t("blog.editor.create")}</a></header>{!data.posts.length && <p>{t("blog.adminEmpty")}</p>}<ul className="divide-y border">{data.posts.map((post) => <li key={post.id} className="flex justify-between gap-4 p-5"><div><a className="font-medium underline" href={\`/\${locale}/admin/blog/\${post.id}\`}>{post.title}</a><p className="mt-1 text-sm text-muted-foreground">{post.locale} / {post.slug}</p></div><span>{t(post.status === "published" ? "blog.published" : "blog.draft")}</span></li>)}</ul><nav className="flex justify-between" aria-label={t("blog.pagination")}>{data.page > 1 ? <a href={\`?page=\${data.page - 1}\`}>{t("blog.previous")}</a> : <span />}{data.page * data.limit < data.total && <a href={\`?page=\${data.page + 1}\`}>{t("blog.next")}</a>}</nav></section>; }
 `],
-  ["modules/blog/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.blog.new.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/blog/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.blog.new.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import BlogEditor from "@/components/blog/editor";
 import { useLocale, useT } from "@/components/i18n-provider";
 export const Route = createFileRoute("/$lang/admin/blog/new")({ component: NewPost });
 function NewPost() { const locale = useLocale(); const t = useT(); return <section><h1 className="mb-8 font-serif text-4xl">{t("blog.editor.create")}</h1><BlogEditor locale={locale} /></section>; }
 `],
-  ["modules/blog/frameworks/tanstack-start/apps/web/src/routes/$lang.blog.$slug.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/blog/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.blog.$slug.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { defaultLocale } from "@{{projectName}}/i18n";
 import { z } from "zod";
 import Markdown from "@/components/blog/markdown";
@@ -29128,7 +32048,7 @@ function Article() {
   return <article className="mx-auto max-w-3xl px-6 py-20"><a className="text-sm underline" href={\`/\${locale}/blog\`}>{t("blog.back")}</a><header className="my-10 border-b pb-10"><h1 className="font-serif text-5xl leading-tight">{post.title}</h1><p className="mt-6 text-lg text-muted-foreground">{post.excerpt}</p><p className="mt-6 text-sm">{post.authorName} · {post.publishedAt && new Date(post.publishedAt).toLocaleDateString(locale)}</p></header><Markdown>{post.body}</Markdown><script type="application/ld+json" dangerouslySetInnerHTML={ { __html: JSON.stringify(structured).replace(/</g, "\\\\u003c").replace(/>/g, "\\\\u003e").replace(/&/g, "\\\\u0026") } } /></article>;
 }
 `],
-  ["modules/blog/frameworks/tanstack-start/apps/web/src/routes/$lang.blog.index.tsx.hbs", `import { createFileRoute, notFound } from "@tanstack/react-router";
+  ["modules/blog/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.blog.index.tsx.hbs", `import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createTranslator, getMessages, isLocale } from "@{{projectName}}/i18n";
 import { z } from "zod";
 import { productHead } from "@/lib/product-head";
@@ -29143,7 +32063,7 @@ export const Route = createFileRoute("/$lang/blog/")({
 });
 function Journal() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="mx-auto max-w-5xl px-6 py-20"><header className="mb-12 border-b pb-10"><p className="mb-4 text-xs uppercase tracking-widest">{t("blog.journal")}</p><h1 className="font-serif text-5xl">{t("blog.title")}</h1><p className="mt-5 text-muted-foreground">{t("blog.description")}</p></header>{!data.posts.length && <p>{t("blog.empty")}</p>}<div className="divide-y">{data.posts.map((post) => <article key={post.id} className="grid gap-5 py-8 md:grid-cols-[10rem_1fr]"><div className="text-sm text-muted-foreground"><time>{post.publishedAt && new Date(post.publishedAt).toLocaleDateString(locale)}</time><p>{post.authorName}</p></div><div><h2 className="font-serif text-3xl"><a href={\`/\${locale}/blog/\${post.slug}\`}>{post.title}</a></h2><p className="mt-4 text-muted-foreground">{post.excerpt}</p></div></article>)}</div><nav className="mt-8 flex justify-between border-t pt-6" aria-label={t("blog.pagination")}>{data.page > 1 ? <a href={\`?page=\${data.page - 1}\`}>{t("blog.previous")}</a> : <span />}{data.page * data.limit < data.total && <a href={\`?page=\${data.page + 1}\`}>{t("blog.next")}</a>}</nav></section>; }
 `],
-  ["modules/blog/integrations/seo/apps/web/src/integrations/blog-seo.ts.hbs", `import type { Services } from "../services";
+  ["modules/blog/integrations/seo/apps/fullstack-web/src/integrations/blog-seo.ts.hbs", `import type { Services } from "../services";
 
 export default function registerBlogSeo({ blog, seo }: Services) {
   seo.registerSitemap("blog", async () => {
@@ -29161,7 +32081,7 @@ export default function registerBlogSeo({ blog, seo }: Services) {
   });
 }
 `],
-  ["modules/blog/integrations/seo/apps/web/src/lib/blog-origin.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+  ["modules/blog/integrations/seo/apps/fullstack-web/src/lib/blog-origin.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 export function blogOrigin() { return seo.origin; }
 `],
   ["modules/captcha/files/docs/modules/captcha.md.hbs", `# Bot protection / 人机验证
@@ -29326,14 +32246,14 @@ export function createCaptchaBeforeHook(env: CaptchaConfig) {
   retry: "重新验证",
 };
 `],
-  ["modules/captcha/frameworks/native/apps/web/src/lib/native/captcha.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
+  ["modules/captcha/frameworks/native/apps/fullstack-web/src/lib/native/captcha.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
 import { ENV } from "@/env.server";
 import { json } from "../product-api";
 export async function handle(request: Request, path: string): Promise<Response | undefined> {
   if (path === "/api/captcha/config" && request.method === "GET") return json(captchaPublicConfig(ENV));
 }
 `],
-  ["modules/captcha/frameworks/next/apps/web/src/app/api/captcha/config/route.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
+  ["modules/captcha/frameworks/next/apps/fullstack-web/src/app/api/captcha/config/route.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
 import { ENV } from "@/env.server";
 
 export const dynamic = "force-dynamic";
@@ -29342,7 +32262,7 @@ export function GET() {
   return Response.json(captchaPublicConfig(ENV), { headers: { "Cache-Control": "no-store" } });
 }
 `],
-  ["modules/captcha/frameworks/nuxt/apps/web/app/components/ProductCaptcha.vue.hbs", `<script setup lang="ts">
+  ["modules/captcha/frameworks/nuxt/apps/fullstack-web/app/components/ProductCaptcha.vue.hbs", `<script setup lang="ts">
 import { z } from "zod";
 const props = defineProps<{ action: string }>();
 const token = defineModel<string>({ required: true });
@@ -29388,7 +32308,7 @@ onBeforeUnmount(() => { disposed = true; abort.abort(); token.value = ""; if (wi
   </div>
 </template>
 `],
-  ["modules/captcha/frameworks/react/apps/web/src/components/auth/captcha.tsx.hbs", `"use client";
+  ["modules/captcha/frameworks/react/apps/fullstack-web/src/components/auth/captcha.tsx.hbs", `"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -29509,7 +32429,7 @@ export function Captcha({ action, challenge }: {
   );
 }
 `],
-  ["modules/core/files/apps/web/src/config/site.ts.hbs", `export const site = {
+  ["modules/core/files/apps/fullstack-web/src/config/site.ts.hbs", `export const site = {
   name: "{{projectName}}",
 };
 `],
@@ -29520,14 +32440,14 @@ The shell every feature module plugs into.
 ## Layout
 
 {{#if (includes frontend "next")}}
-- Product pages live in \`apps/web/src/app/[lang]/\`.
+- Product pages live in \`{{appPath "fullstack-web"}}/src/app/[lang]/\`.
 {{else if (includes frontend "tanstack-start")}}
-- Product routes live in \`apps/web/src/routes/\`, with locale-prefixed URLs and server loaders for protected pages.
+- Product routes live in \`{{appPath "fullstack-web"}}/src/routes/\`, with locale-prefixed URLs and server loaders for protected pages.
 {{else}}
-- Product pages live in \`apps/web/app/pages/\`; server adapters live in \`apps/web/server/\`. Nuxt's \`~/\` alias points to the app and \`@/\` points to the shared \`src/\` directory.
+- Product pages live in \`{{appPath "fullstack-web"}}/app/pages/\`; server adapters live in \`{{appPath "fullstack-web"}}/server/\`. Nuxt's \`~/\` alias points to the app and \`@/\` points to the shared \`src/\` directory.
 {{/if}}
-- \`apps/web/src/config/navigation.ts\` is generated from the modules you picked. Edit it freely; it is plain data.
-- \`apps/web/src/services.ts\` is the composition root: every package exports a factory, and this file wires them with environment variables and each other.
+- \`{{appPath "fullstack-web"}}/src/config/navigation.ts\` is generated from the modules you picked. Edit it freely; it is plain data.
+- \`{{appPath "fullstack-web"}}/src/services.ts\` is the composition root: every package exports a factory, and this file wires them with environment variables and each other.
 
 {{#if (includes frontend "tanstack-start")}}
 ## TanStack Start workflow
@@ -29536,11 +32456,11 @@ From the repository root, install dependencies with \`{{packageManager}} install
 
 Use \`{{packageManager}} run build\` for the workspace production build and \`{{packageManager}} run check-types\` for generated package type checks. Start uses Vite and its native server-route handlers, not Next.js request adapters.
 
-- Every module contributes explicit locale-prefixed file routes under \`apps/web/src/routes/\`.
-- \`apps/web/src/lib/product-data.ts\` defines GET-only server functions that forward the caller's request headers to the shared native service dispatcher. Private loaders and API handlers independently enforce authentication and authorization.
-- \`apps/web/src/routes/api.$.ts\` forwards original WHATWG requests to \`apps/web/src/lib/product-api.ts\`. Module handlers live under \`apps/web/src/lib/native/\`; mutations validate the configured Origin, while payment webhooks delegate signature verification to the provider.
+- Every module contributes explicit locale-prefixed file routes under \`{{appPath "fullstack-web"}}/src/routes/\`.
+- \`{{appPath "fullstack-web"}}/src/lib/product-data.ts\` defines GET-only server functions that forward the caller's request headers to the shared native service dispatcher. Private loaders and API handlers independently enforce authentication and authorization.
+- \`{{appPath "fullstack-web"}}/src/routes/api.$.ts\` forwards original WHATWG requests to \`{{appPath "fullstack-web"}}/src/lib/product-api.ts\`. Module handlers live under \`{{appPath "fullstack-web"}}/src/lib/native/\`; mutations validate the configured Origin, while payment webhooks delegate signature verification to the provider.
 - \`/api/product/*\` supplies typed page data and protected administration operations. Auth, storage, AI, blog, affiliate and payment retain their documented \`/api/<module>/*\` URLs.
-- Auth forms, captcha, file manager, AI studio, Markdown and blog editor use the same React source templates as Next.js. Only navigation effects are supplied by \`apps/web/src/lib/product-navigation.ts\`.
+- Auth forms, captcha, file manager, AI studio, Markdown and blog editor use the same React source templates as Next.js. Only navigation effects are supplied by \`{{appPath "fullstack-web"}}/src/lib/product-navigation.ts\`.
 {{/if}}
 
 ## Domain events
@@ -29558,7 +32478,7 @@ Use \`{{packageManager}} run build\` for the workspace production build and \`{{
    \`\`\`
 
 2. It emits them: \`await events.emit("order.paid", { orderId, userId })\`.
-3. Code that connects two modules lives in \`apps/web/src/integrations/*.ts\` and subscribes with \`events.on(...)\`.
+3. Code that connects two modules lives in \`{{appPath "fullstack-web"}}/src/integrations/*.ts\` and subscribes with \`events.on(...)\`.
 
 Handlers run in order and an error rejects \`emit\`, so a failed side effect surfaces to the caller. Replace \`createEventBus\` with a queue-backed implementation if you need retries; the interface stays the same.
 
@@ -29677,7 +32597,7 @@ export function createEventBus(): EventBus {
   },
 };
 `],
-  ["modules/core/frameworks/native/apps/web/src/lib/product-api.ts.hbs", `import { z } from "zod";
+  ["modules/core/frameworks/native/apps/fullstack-web/src/lib/product-api.ts.hbs", `import { z } from "zod";
 {{#if (includes product.features "auth")}}
 import { auth } from "@{{projectName}}/app-services";
 import { enabledSocialProviders } from "./social-providers.server";
@@ -29748,7 +32668,7 @@ export async function handleProductRequest(request: Request): Promise<Response> 
   }
 }
 `],
-  ["modules/core/frameworks/next/apps/web/src/app/[lang]/layout.tsx.hbs", `import { getMessages, locales } from "@{{projectName}}/i18n";
+  ["modules/core/frameworks/next/apps/fullstack-web/src/app/[lang]/layout.tsx.hbs", `import { getMessages, locales } from "@{{projectName}}/i18n";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
@@ -29807,7 +32727,7 @@ export default async function LocaleLayout({ children, params }: Props) {
   );
 }
 `],
-  ["modules/core/frameworks/next/apps/web/src/app/[lang]/page.tsx.hbs", `{{#if (includes product.features "auth")}}
+  ["modules/core/frameworks/next/apps/fullstack-web/src/app/[lang]/page.tsx.hbs", `{{#if (includes product.features "auth")}}
 import { buttonVariants } from "@{{projectName}}/ui/components/button";
 import Link from "next/link";
 
@@ -29870,7 +32790,7 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
   );
 }
 `],
-  ["modules/core/frameworks/next/apps/web/src/components/side-nav.tsx", `"use client";
+  ["modules/core/frameworks/next/apps/fullstack-web/src/components/side-nav.tsx", `"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -29904,7 +32824,7 @@ export default function SideNav({ area }: { area: Exclude<NavArea, "main" | "foo
   );
 }
 `],
-  ["modules/core/frameworks/next/apps/web/src/components/site-footer.tsx", `"use client";
+  ["modules/core/frameworks/next/apps/fullstack-web/src/components/site-footer.tsx", `"use client";
 
 import Link from "next/link";
 
@@ -29940,7 +32860,7 @@ export default function SiteFooter() {
   );
 }
 `],
-  ["modules/core/frameworks/next/apps/web/src/components/site-header.tsx.hbs", `"use client";
+  ["modules/core/frameworks/next/apps/fullstack-web/src/components/site-header.tsx.hbs", `"use client";
 
 import Link from "next/link";
 
@@ -29999,14 +32919,14 @@ export default function SiteHeader() {
   );
 }
 `],
-  ["modules/core/frameworks/next/apps/web/src/lib/page-metadata.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+  ["modules/core/frameworks/next/apps/fullstack-web/src/lib/page-metadata.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
 import type { Metadata } from "next";
 
 export function pageMetadata(input: { locale: Locale; path: \`/\${string}\`; title: string; description: string }): Metadata {
   return { title: input.title, description: input.description };
 }
 `],
-  ["modules/core/frameworks/next/apps/web/src/lib/product-navigation.ts", `"use client";
+  ["modules/core/frameworks/next/apps/fullstack-web/src/lib/product-navigation.ts", `"use client";
 
 import { useRouter } from "next/navigation";
 
@@ -30019,13 +32939,13 @@ export function useProductNavigation() {
   };
 }
 `],
-  ["modules/core/frameworks/nuxt/apps/web/app/app.vue.hbs", `<template>
+  ["modules/core/frameworks/nuxt/apps/fullstack-web/app/app.vue.hbs", `<template>
   <NuxtRouteAnnouncer />
   <NuxtLoadingIndicator />
   <NuxtLayout><NuxtPage :key="$route.path" /></NuxtLayout>
 </template>
 `],
-  ["modules/core/frameworks/nuxt/apps/web/app/composables/useProductAction.ts.hbs", `import { z } from "zod";
+  ["modules/core/frameworks/nuxt/apps/fullstack-web/app/composables/useProductAction.ts.hbs", `import { z } from "zod";
 
 export function useProductAction() {
   const pending = ref(false);
@@ -30059,7 +32979,7 @@ export function productJson<T>(body: T): RequestInit {
   return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
 }
 `],
-  ["modules/core/frameworks/nuxt/apps/web/app/composables/useProductLocale.ts.hbs", `import { createTranslator, defaultLocale, getMessages, isLocale, localeNames, locales, type Locale } from "@{{projectName}}/i18n";
+  ["modules/core/frameworks/nuxt/apps/fullstack-web/app/composables/useProductLocale.ts.hbs", `import { createTranslator, defaultLocale, getMessages, isLocale, localeNames, locales, type Locale } from "@{{projectName}}/i18n";
 
 export function useProductLocale() {
   const route = useRoute();
@@ -30070,7 +32990,7 @@ export function useProductLocale() {
   return { locale, locales, localeNames, t: (key: Parameters<typeof t.value>[0], params?: Parameters<typeof t.value>[1]) => t.value(key, params), path, label };
 }
 `],
-  ["modules/core/frameworks/nuxt/apps/web/app/layouts/default.vue.hbs", `<script setup lang="ts">
+  ["modules/core/frameworks/nuxt/apps/fullstack-web/app/layouts/default.vue.hbs", `<script setup lang="ts">
 import { LOCALE_COOKIE } from "@{{projectName}}/i18n";
 import { canSee, navigation } from "@/config/navigation";
 const { locale, locales, localeNames, path, label, t } = useProductLocale();
@@ -30116,7 +33036,7 @@ const mainNavigation = computed(() => navigation.main.filter((item) => canSee(it
 :root{font-family:Georgia,'Noto Serif',serif;color:#202b29;background:#f6f5ef;font-synthesis:none;--paper:#fffefa;--line:#ccd2c9;--ink:#202b29;--muted:#57675f;--accent:#176047}html.dark{color:#e9eee6;background:#14221d;--paper:#1b2d25;--line:#3d5548;--ink:#e9eee6;--muted:#aebfb2;--accent:#8bdaaa}*{box-sizing:border-box}body{margin:0}a{color:inherit;text-underline-offset:4px}button,input,textarea,select{font:inherit}button,.button{cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--paper);padding:.65rem 1rem;border-radius:4px;text-decoration:none;display:inline-block}button:disabled{opacity:.5;cursor:not-allowed}.text-button{background:transparent;color:var(--ink);border-color:var(--line)}input,textarea,select{background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:.65rem;border-radius:3px;max-width:100%}label{display:grid;gap:.4rem}form{display:grid;gap:1rem}textarea{min-height:8rem}h1,h2,h3{font-weight:500;letter-spacing:-.025em}h1{font-size:clamp(2rem,5vw,4rem);line-height:1.05}h2{font-size:1.65rem}p{line-height:1.65}pre{white-space:pre-wrap;overflow-wrap:anywhere}small,.muted{color:var(--muted)}.site-header,.site-footer{display:flex;align-items:center;justify-content:space-between;gap:2rem;max-width:1280px;margin:auto;padding:1.5rem 2rem}.site-header{border-bottom:1px solid var(--line)}.site-header nav{display:flex;align-items:center;flex-wrap:wrap;gap:1.1rem;font-size:.9rem}.wordmark{font-size:1.4rem;font-weight:700;text-decoration:none}main{max-width:1200px;margin:auto;padding:3rem 2rem;min-height:70vh}.site-footer{border-top:1px solid var(--line);font-size:.85rem}.site-footer span{color:var(--muted)}.skip-link{position:fixed;top:-80px;left:1rem;background:var(--paper);padding:1rem;z-index:100}.skip-link:focus{top:1rem}.panel{background:var(--paper);border:1px solid var(--line);padding:1.5rem;border-radius:5px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:1.5rem}.stack{display:grid;gap:1.5rem}.actions{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}.error{color:#b83d37;border-left:3px solid currentColor;padding:.6rem}.notice{color:var(--accent)}.workspace{display:grid;grid-template-columns:185px minmax(0,1fr);gap:2rem}.workspace-nav{display:flex;flex-direction:column;gap:.8rem}.workspace-nav a{padding:.5rem;text-decoration:none}.workspace-nav .router-link-exact-active{border-left:3px solid var(--accent);background:var(--paper)}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{text-align:left;border-bottom:1px solid var(--line);padding:.8rem;vertical-align:top}.prose{max-width:760px;margin:auto;overflow-wrap:anywhere}.prose img,.media{max-width:100%;height:auto}.hero{padding:4rem 0;max-width:850px}.hero p{font-size:1.3rem;max-width:650px}.eyebrow{text-transform:uppercase;letter-spacing:.18em;font: .75rem ui-monospace,monospace;color:var(--muted)}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}@media(max-width:700px){.site-header{align-items:flex-start;flex-direction:column;gap:1rem}.site-header,main,.site-footer{padding:1.3rem}.workspace{grid-template-columns:1fr}.workspace-nav{flex-direction:row;flex-wrap:wrap}.site-footer{align-items:flex-start;flex-direction:column;gap:.5rem}}
 </style>
 `],
-  ["modules/core/frameworks/nuxt/apps/web/app/pages/[locale]/[...path].vue.hbs", `<script setup lang="ts">
+  ["modules/core/frameworks/nuxt/apps/fullstack-web/app/pages/[locale]/[...path].vue.hbs", `<script setup lang="ts">
 import { {{#if (includes product.features "seo")}}defaultLocale, {{/if}}isLocale } from "@{{projectName}}/i18n";
 definePageMeta({ key: (route) => route.fullPath });
 const route = useRoute();
@@ -30169,7 +33089,7 @@ useHead(() => ({ link: privatePage || !config.value?.siteUrl || section === "blo
   {{#if (includes product.features "affiliate")}}<ProductReferral v-else-if="section === 'ref'" :code="segments[1] ?? ''" />{{/if}}
 </template>
 `],
-  ["modules/core/frameworks/nuxt/apps/web/app/pages/index.vue.hbs", `<script setup lang="ts">
+  ["modules/core/frameworks/nuxt/apps/fullstack-web/app/pages/index.vue.hbs", `<script setup lang="ts">
 import { defaultLocale, isLocale, LOCALE_COOKIE, matchLocale } from "@{{projectName}}/i18n";
 const cookie = useCookie(LOCALE_COOKIE);
 const headers = useRequestHeaders(["accept-language"]);
@@ -30177,12 +33097,12 @@ await navigateTo(\`/\${isLocale(cookie.value ?? undefined) ? cookie.value : matc
 </script>
 <template><span /></template>
 `],
-  ["modules/core/frameworks/nuxt/apps/web/server/api/[...path].ts.hbs", `import { defineEventHandler, toWebRequest } from "h3";
+  ["modules/core/frameworks/nuxt/apps/fullstack-web/server/api/[...path].ts.hbs", `import { defineEventHandler, toWebRequest } from "h3";
 import { handleProductRequest } from "@/lib/product-api";
 
 export default defineEventHandler((event) => handleProductRequest(toWebRequest(event)));
 `],
-  ["modules/core/frameworks/nuxt/apps/web/server/middleware/product-private.ts.hbs", `import { defineEventHandler, getRequestURL, setHeader } from "h3";
+  ["modules/core/frameworks/nuxt/apps/fullstack-web/server/middleware/product-private.ts.hbs", `import { defineEventHandler, getRequestURL, setHeader } from "h3";
 
 export default defineEventHandler((event) => {
   if (/^\\/[^/]+\\/(?:dashboard|admin|payment|login|signup|forgot-password|reset-password|verify-email|ref)(?:\\/|$)/.test(getRequestURL(event).pathname)) {
@@ -30191,7 +33111,7 @@ export default defineEventHandler((event) => {
   }
 });
 `],
-  ["modules/core/frameworks/tanstack-start/apps/web/src/components/product-shell.tsx.hbs", `import { useEffect, useState } from "react";
+  ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/components/product-shell.tsx.hbs", `import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useLocation } from "@tanstack/react-router";
 import { locales } from "@{{projectName}}/i18n";
@@ -30214,7 +33134,7 @@ export function ProductShell({ children{{#if (includes product.features "auth")}
   return <div className="min-h-screen bg-background text-foreground"><a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4">Skip to content</a><header className="border-b"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-6 px-6 py-5"><a href={\`/\${locale}\`} className="mr-auto font-serif text-2xl font-semibold tracking-tight">{{projectName}}</a><nav aria-label="Main" className="flex gap-5 text-sm">{navigation.main.filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={\`/\${locale}\${item.href === "/" ? "" : item.href}\`} aria-current={location.pathname === \`/\${locale}\${item.href}\` ? "page" : undefined}>{t(item.labelKey)}</a>)}</nav><label className="sr-only" htmlFor="locale">Language</label><select id="locale" aria-label="Language" value={locale} className="border bg-background p-2 text-xs" onChange={(event) => window.location.assign(\`/\${event.target.value}\${location.pathname.slice(locale.length + 1)}\${location.searchStr}\`)}>{locales.map((lang) => <option key={lang} value={lang}>{lang === "en" ? "English" : "简体中文"}</option>)}</select><button type="button" className="border px-3 py-2 text-xs" aria-label="Toggle color theme" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>{mounted && resolvedTheme === "dark" ? "Light" : "Dark"}</button>{{#if (includes product.features "auth")}}{user ? <button className="text-sm underline" onClick={() => void authClient.signOut().then(() => window.location.assign(\`/\${locale}\`))}>{t("auth.user.signOut")}</button> : <a href={\`/\${locale}/login\`} className="text-sm underline">{t("auth.user.signIn")}</a>}{{/if}}</div></header><div className={area ? "mx-auto grid max-w-7xl gap-10 px-6 py-12 md:grid-cols-[180px_1fr]" : ""}>{area && <aside><nav aria-label={area} className="flex flex-wrap gap-4 md:flex-col">{navigation[area].filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={\`/\${locale}\${item.href}\`} className={\`border-l-2 py-2 pl-4 text-sm \${location.pathname === \`/\${locale}\${item.href}\` ? "border-foreground font-semibold" : "border-transparent text-muted-foreground"}\`}>{t(item.labelKey)}</a>)}</nav></aside>}<main id="main-content" className="min-w-0">{children}</main></div><footer className="mx-auto mt-16 max-w-7xl border-t px-6 py-8 text-xs text-muted-foreground">{t("core.footer.rights", { year: new Date().getFullYear(), name: "{{projectName}}" })}</footer></div>;
 }
 `],
-  ["modules/core/frameworks/tanstack-start/apps/web/src/lib/product-data.ts.hbs", `import { createServerFn } from "@tanstack/react-start";
+  ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/lib/product-data.ts.hbs", `import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { notFound, redirect } from "@tanstack/react-router";
 import { z } from "zod";
@@ -30245,7 +33165,7 @@ export async function mutateProduct(path: string, input: object) {
   return response;
 }
 `],
-  ["modules/core/frameworks/tanstack-start/apps/web/src/lib/product-head.ts.hbs", `import { defaultLocale, locales } from "@{{projectName}}/i18n";
+  ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/lib/product-head.ts.hbs", `import { defaultLocale, locales } from "@{{projectName}}/i18n";
 /** Translate the shared public URL policy into TanStack Router head entries. */
 export function productHead(input: { siteUrl: string; locale: string; path: string; title: string; description: string; page?: number }) {
   const suffix = input.path === "/" ? "" : input.path;
@@ -30257,7 +33177,7 @@ export function productHead(input: { siteUrl: string; locale: string; path: stri
   };
 }
 `],
-  ["modules/core/frameworks/tanstack-start/apps/web/src/lib/product-navigation.ts", `import { useRouter } from "@tanstack/react-router";
+  ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/lib/product-navigation.ts", `import { useRouter } from "@tanstack/react-router";
 /** Navigation effects shared UI delegates to the hosting framework. */
 export function useProductNavigation() {
   const router = useRouter();
@@ -30271,7 +33191,7 @@ export function useProductNavigation() {
   };
 }
 `],
-  ["modules/core/frameworks/tanstack-start/apps/web/src/routes/__root.tsx.hbs", `import { HeadContent, Outlet, Scripts, createRootRoute, useLocation } from "@tanstack/react-router";
+  ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/routes/__root.tsx.hbs", `import { HeadContent, Outlet, Scripts, createRootRoute, useLocation } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@{{projectName}}/ui/components/sonner";
 import { defaultLocale, isLocale } from "@{{projectName}}/i18n";
@@ -30279,7 +33199,7 @@ import appCss from "../index.css?url";
 export const Route = createRootRoute({ head: () => ({ meta: [{ charSet: "utf-8" }, { name: "viewport", content: "width=device-width, initial-scale=1" }, { title: "{{projectName}}" }], links: [{ rel: "stylesheet", href: appCss }] }), component: RootDocument, notFoundComponent: () => <main className="mx-auto max-w-3xl px-6 py-24"><h1 className="font-serif text-4xl">Not found</h1><a href="/" className="mt-6 inline-block underline">Home</a></main> });
 function RootDocument() { const segment = useLocation().pathname.split("/")[1] ?? ""; const locale = isLocale(segment) ? segment : defaultLocale; return <html lang={locale} suppressHydrationWarning><head><HeadContent /></head><body><ThemeProvider attribute="class" defaultTheme="system" enableSystem><Outlet /><Toaster richColors /></ThemeProvider><Scripts /></body></html>; }
 `],
-  ["modules/core/frameworks/tanstack-start/apps/web/src/routes/$lang.index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.index.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { createTranslator, getMessages, isLocale } from "@{{projectName}}/i18n";
 import { z } from "zod";
 import { {{#if (includes product.features "auth")}}useLocale, {{/if}}useT } from "@/components/i18n-provider";
@@ -30295,7 +33215,7 @@ export const Route = createFileRoute("/$lang/")({
 });
 function Home() { {{#if (includes product.features "auth")}}const locale = useLocale(); {{/if}}const t = useT(); return <section className="mx-auto max-w-5xl px-6 py-24"><p className="mb-8 text-xs uppercase tracking-[0.3em]">{{projectName}}</p><h1 className="max-w-3xl font-serif text-6xl leading-tight tracking-tight">{t("core.landing.title")}</h1><p className="mt-8 max-w-xl text-lg leading-relaxed text-muted-foreground">{t("core.landing.subtitle")}</p>{{#if (includes product.features "auth")}}<a href={\`/\${locale}/dashboard\`} className="mt-10 inline-block border bg-foreground px-6 py-3 text-background">{t("core.landing.cta")}</a>{{else}}<p className="mt-10 border-t pt-8">{t("core.landing.features.modular.body")}</p>{{/if}}</section>; }
 `],
-  ["modules/core/frameworks/tanstack-start/apps/web/src/routes/$lang.tsx.hbs", `import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
+  ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.tsx.hbs", `import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 import { getMessages, isLocale } from "@{{projectName}}/i18n";
 import { I18nProvider } from "@/components/i18n-provider";
 import { ProductShell } from "@/components/product-shell";
@@ -30318,7 +33238,7 @@ function LocaleLayout() {
   return <I18nProvider locale={locale} messages={getMessages(locale)}><ProductShell{{#if (includes product.features "auth")}} initialUser={session?.user ?? null}{{/if}}><Outlet /></ProductShell></I18nProvider>;
 }
 `],
-  ["modules/core/frameworks/tanstack-start/apps/web/src/routes/api.$.ts", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/routes/api.$.ts", `import { createFileRoute } from "@tanstack/react-router";
 
 import { handleProductRequest } from "@/lib/product-api";
 
@@ -30336,7 +33256,7 @@ export const Route = createFileRoute("/api/$")({
   },
 });
 `],
-  ["modules/core/frameworks/tanstack-start/apps/web/src/routes/index.tsx.hbs", `import { createFileRoute, redirect } from "@tanstack/react-router";
+  ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/routes/index.tsx.hbs", `import { createFileRoute, redirect } from "@tanstack/react-router";
 import { defaultLocale } from "@{{projectName}}/i18n";
 export const Route = createFileRoute("/")({ beforeLoad: () => { throw redirect({ href: \`/\${defaultLocale}\` }); } });
 `],
@@ -30428,7 +33348,7 @@ export const creditTransaction = sqliteTable(
   (table) => [index("credit_transaction_user_idx").on(table.userId, table.createdAt)],
 );
 `],
-  ["modules/credits/files/apps/web/src/integrations/credits-signup.ts.hbs", `import type { Services } from "../services";
+  ["modules/credits/files/apps/fullstack-web/src/integrations/credits-signup.ts.hbs", `import type { Services } from "../services";
 
 {{#if module.options.signupBonus}}
 const SIGNUP_BONUS = {{module.options.signupBonus}};
@@ -30471,9 +33391,9 @@ await credits.adjust(userId, -20, "manual correction");
 ## Sources
 
 {{#if module.options.signupBonus}}
-- **Sign-up bonus:** {{module.options.signupBonus}} credits for each new account (\`apps/web/src/integrations/credits-signup.ts\`).
+- **Sign-up bonus:** {{module.options.signupBonus}} credits for each new account (\`{{appPath "fullstack-web"}}/src/integrations/credits-signup.ts\`).
 {{else}}
-- **Sign-up bonus:** disabled. Set the credits \`signupBonus\` option, or edit \`apps/web/src/integrations/credits-signup.ts\`.
+- **Sign-up bonus:** disabled. Set the credits \`signupBonus\` option, or edit \`{{appPath "fullstack-web"}}/src/integrations/credits-signup.ts\`.
 {{/if}}
 {{#if (includes module.integrations "payment")}}
 - **Purchases:** each paid order grants its plan's \`credits\` (\`packages/payment/src/plans.ts\`), keyed by \`order:<orderId>\`. Subscription renewals grant them again every period.
@@ -30782,7 +33702,7 @@ export type Credits = ReturnType<typeof createCredits>;
   },
 } as const;
 `],
-  ["modules/credits/frameworks/native/apps/web/src/lib/native/credits.ts.hbs", `import { credits } from "@{{projectName}}/app-services";
+  ["modules/credits/frameworks/native/apps/fullstack-web/src/lib/native/credits.ts.hbs", `import { credits } from "@{{projectName}}/app-services";
 import { json, requireSession } from "../product-api";
 {{#if (includes product.features "admin")}}
 import { auth } from "@{{projectName}}/app-services";
@@ -30812,7 +33732,7 @@ export async function handle(request: Request, path: string): Promise<Response |
 {{/if}}
 }
 `],
-  ["modules/credits/frameworks/next/apps/web/src/app/[lang]/dashboard/credits/page.tsx.hbs", `import { credits } from "@{{projectName}}/app-services";
+  ["modules/credits/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/credits/page.tsx.hbs", `import { credits } from "@{{projectName}}/app-services";
 {{#if (includes product.features "payment")}}
 import { buttonVariants } from "@{{projectName}}/ui/components/button";
 {{/if}}
@@ -30884,7 +33804,7 @@ export default async function CreditsPage({ params }: Props) {
   );
 }
 `],
-  ["modules/credits/frameworks/nuxt/apps/web/app/components/ProductAdminCredits.vue.hbs", `<script setup lang="ts">
+  ["modules/credits/frameworks/nuxt/apps/fullstack-web/app/components/ProductAdminCredits.vue.hbs", `<script setup lang="ts">
 const { label } = useProductLocale();
 const { pending, error, notice, run } = useProductAction();
 const page = ref(1); const email = ref(""); const amount = ref(0); const reason = ref("");
@@ -30905,7 +33825,7 @@ async function adjust() {
   <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\\{{ label('Previous', '上一页') }}</button><span>\\{{ page }} · \\{{ data?.total ?? 0 }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\\{{ label('Next', '下一页') }}</button></nav>
 </template>
 `],
-  ["modules/credits/frameworks/nuxt/apps/web/app/components/ProductCredits.vue.hbs", `<script setup lang="ts">
+  ["modules/credits/frameworks/nuxt/apps/fullstack-web/app/components/ProductCredits.vue.hbs", `<script setup lang="ts">
 const { label, path } = useProductLocale();
 type Transaction = { id: string; amount: number; balanceAfter: number; type: string; reason: string | null; createdAt: string };
 const { data, error, refresh } = await useFetch<{ balance: number; transactions: Transaction[] }>("/api/product/credits");
@@ -30916,7 +33836,7 @@ const { data, error, refresh } = await useFetch<{ balance: number; transactions:
   <div class="table-wrap"><table><thead><tr><th>\\{{ label('Date', '日期') }}</th><th>\\{{ label('Type', '类型') }}</th><th>\\{{ label('Amount', '金额') }}</th><th>\\{{ label('Balance', '余额') }}</th><th>\\{{ label('Reason', '原因') }}</th></tr></thead><tbody><tr v-for="entry in data?.transactions ?? []" :key="entry.id"><td>\\{{ entry.createdAt.slice(0, 10) }}</td><td>\\{{ entry.type }}</td><td>\\{{ entry.amount > 0 ? '+' : '' }}\\{{ entry.amount }}</td><td>\\{{ entry.balanceAfter }}</td><td>\\{{ entry.reason }}</td></tr></tbody></table><p v-if="!data?.transactions.length">\\{{ label('No transactions yet.', '暂无交易。') }}</p></div>
 </template>
 `],
-  ["modules/credits/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.credits.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/credits/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.credits.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { useLocale, useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
@@ -30924,7 +33844,7 @@ const schema = z.object({ balance: z.number(), transactions: z.array(z.object({ 
 export const Route = createFileRoute("/$lang/dashboard/credits")({ loader: ({ params }) => loadProduct("/api/product/credits", params.lang, schema), component: Credits });
 function Credits() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("credits.page.title")}</h1><div className="border p-6"><p className="text-sm text-muted-foreground">{t("credits.page.balance")}</p><p className="my-4 text-5xl font-semibold tabular-nums">{data.balance}</p>{{#if (includes product.features "payment")}}<a href={\`/\${locale}/pricing\`} className="underline">{t("credits.page.buyMore")}</a>{{/if}}</div><h2 className="text-lg font-medium">{t("credits.page.history")}</h2>{data.transactions.length ? <ul className="divide-y border">{data.transactions.map((row) => <li key={row.id} className="flex justify-between gap-4 p-4"><div><p>{row.type}</p><p className="text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString(locale)} · {row.reason}</p></div><span className="tabular-nums">{new Intl.NumberFormat(locale, { signDisplay: "exceptZero" }).format(row.amount)}</span></li>)}</ul> : <p>{t("credits.page.empty")}</p>}</section>; }
 `],
-  ["modules/credits/integrations/admin/frameworks/next/apps/web/src/app/[lang]/admin/credits/actions.ts.hbs", `"use server";
+  ["modules/credits/integrations/admin/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/credits/actions.ts.hbs", `"use server";
 
 import { auth, credits } from "@{{projectName}}/app-services";
 import { InsufficientCreditsError } from "@{{projectName}}/credits";
@@ -30961,7 +33881,7 @@ export async function adjustCredits(formData: FormData) {
   redirect(\`\${back}?done=1\`);
 }
 `],
-  ["modules/credits/integrations/admin/frameworks/next/apps/web/src/app/[lang]/admin/credits/page.tsx.hbs", `import { credits } from "@{{projectName}}/app-services";
+  ["modules/credits/integrations/admin/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/credits/page.tsx.hbs", `import { credits } from "@{{projectName}}/app-services";
 import { Button } from "@{{projectName}}/ui/components/button";
 import { Input } from "@{{projectName}}/ui/components/input";
 import type { Metadata } from "next";
@@ -31070,7 +33990,7 @@ export default async function AdminCreditsPage({ params, searchParams }: Props) 
   );
 }
 `],
-  ["modules/credits/integrations/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.credits.tsx.hbs", `import { createFileRoute, useRouter } from "@tanstack/react-router";
+  ["modules/credits/integrations/admin/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.credits.tsx.hbs", `import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { useLocale, useT } from "@/components/i18n-provider";
@@ -31081,7 +34001,7 @@ function CreditsAdmin() { const data = Route.useLoaderData(); const { page } = R
   async function adjust(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = event.currentTarget; const input = new FormData(form); setBusy(true); setMessage(""); try { await mutateProduct("/api/product/credit-transactions", { email: String(input.get("email")), amount: Number(input.get("amount")), reason: String(input.get("reason") ?? "") }); form.reset(); await router.invalidate(); setMessage(t("credits.admin.done")); } catch { setMessage(t("credits.admin.errors.invalid")); } finally { setBusy(false); } }
   return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("credits.admin.title")}</h1><form onSubmit={adjust} className="space-y-4 border p-6"><h2 className="font-medium">{t("credits.admin.adjust")}</h2><fieldset disabled={busy} className="grid gap-4 md:grid-cols-3"><label>{t("credits.admin.email")}<input name="email" type="email" required className="mt-2 w-full border bg-background p-2" /></label><label>{t("credits.admin.amount")}<input name="amount" type="number" step={1} required className="mt-2 w-full border bg-background p-2" /></label><label>{t("credits.admin.reason")}<input name="reason" maxLength={1000} className="mt-2 w-full border bg-background p-2" /></label></fieldset><p className="text-xs text-muted-foreground">{t("credits.admin.amountHint")}</p><button disabled={busy} className="bg-foreground px-4 py-2 text-background">{t("credits.admin.submit")}</button><p role="status">{message}</p></form><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["date", "user", "type", "reason", "amount", "balance"].map((label) => <th className="border-b p-3" key={label}>{label}</th>)}</tr></thead><tbody>{data.rows.map(({ transaction: row, email }) => <tr key={row.id}><td className="border-b p-3">{new Date(row.createdAt).toLocaleString(locale)}</td><td className="border-b p-3">{email}</td><td className="border-b p-3">{row.type}</td><td className="border-b p-3">{row.reason}</td><td className="border-b p-3">{row.amount}</td><td className="border-b p-3">{row.balanceAfter}</td></tr>)}</tbody></table></div>{!data.rows.length && <p>{t("credits.admin.empty")}</p>}<nav className="flex justify-between" aria-label="Pagination">{page > 1 ? <a href={\`?page=\${page - 1}\`}>Previous</a> : <span />}{page * 20 < data.total && <a href={\`?page=\${page + 1}\`}>Next</a>}</nav></section>; }
 `],
-  ["modules/credits/integrations/payment/apps/web/src/integrations/payment-credits.ts.hbs", `import type { Services } from "../services";
+  ["modules/credits/integrations/payment/apps/fullstack-web/src/integrations/payment-credits.ts.hbs", `import type { Services } from "../services";
 
 /** Grants each paid order's plan credits; keyed by order id so webhook retries are safe. */
 export default function registerPaymentCredits({ events, credits }: Services) {
@@ -31134,7 +34054,7 @@ A provider is one file implementing \`createTransport(env): Transport | undefine
 
 ## Auth emails
 
-\`apps/web/src/integrations/auth-email.ts\` subscribes to \`auth.verification_requested\` and \`auth.password_reset_requested\` and sends localized emails. The copy lives in \`packages/i18n/src/messages/*/auth.ts\` under \`emails\`.
+\`{{appPath "fullstack-web"}}/src/integrations/auth-email.ts\` subscribes to \`auth.verification_requested\` and \`auth.password_reset_requested\` and sends localized emails. The copy lives in \`packages/i18n/src/messages/*/auth.ts\` under \`emails\`.
 {{/if}}
 `],
   ["modules/email/files/packages/email/src/index.ts.hbs", `import { createTransport, type ProviderConfig } from "./providers/{{module.providers.[0]}}";
@@ -31229,7 +34149,7 @@ export type Transport = {
   send(message: EmailMessage & { from: string }): Promise<void>;
 };
 `],
-  ["modules/email/integrations/auth/apps/web/src/integrations/auth-email.ts.hbs", `import { renderEmail } from "@{{projectName}}/email";
+  ["modules/email/integrations/auth/apps/fullstack-web/src/integrations/auth-email.ts.hbs", `import { renderEmail } from "@{{projectName}}/email";
 import { createTranslator, getMessages, type Locale } from "@{{projectName}}/i18n";
 
 import { site } from "@/config/site";
@@ -31429,7 +34349,7 @@ export type MessageKey = Leaves<Messages>;
 
 export type MessageParams = Record<string, string | number>;
 `],
-  ["modules/i18n/frameworks/next/apps/web/src/components/locale-switcher.tsx.hbs", `"use client";
+  ["modules/i18n/frameworks/next/apps/fullstack-web/src/components/locale-switcher.tsx.hbs", `"use client";
 
 import { LOCALE_COOKIE, localeNames, locales } from "@{{projectName}}/i18n";
 import { Button } from "@{{projectName}}/ui/components/button";
@@ -31479,7 +34399,7 @@ export default function LocaleSwitcher() {
   );
 }
 `],
-  ["modules/i18n/frameworks/next/apps/web/src/lib/i18n/paths.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+  ["modules/i18n/frameworks/next/apps/fullstack-web/src/lib/i18n/paths.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
 import type { Route } from "next";
 
 /** Prefixes an app path with the locale segment. */
@@ -31487,7 +34407,7 @@ export function localePath(locale: Locale, href: \`/\${string}\`): Route {
   return \`/\${locale}\${href === "/" ? "" : href}\` as Route;
 }
 `],
-  ["modules/i18n/frameworks/next/apps/web/src/lib/i18n/proxy.ts.hbs", `import { isLocale, LOCALE_COOKIE, matchLocale } from "@{{projectName}}/i18n";
+  ["modules/i18n/frameworks/next/apps/fullstack-web/src/lib/i18n/proxy.ts.hbs", `import { isLocale, LOCALE_COOKIE, matchLocale } from "@{{projectName}}/i18n";
 import { NextResponse } from "next/server";
 
 import type { ProxyStep } from "../proxy";
@@ -31504,7 +34424,7 @@ export const localeStep: ProxyStep = (request) => {
   return NextResponse.redirect(url);
 };
 `],
-  ["modules/i18n/frameworks/next/apps/web/src/lib/i18n/server.ts.hbs", `import { createTranslator, getMessages, isLocale, type Locale } from "@{{projectName}}/i18n";
+  ["modules/i18n/frameworks/next/apps/fullstack-web/src/lib/i18n/server.ts.hbs", `import { createTranslator, getMessages, isLocale, type Locale } from "@{{projectName}}/i18n";
 import { notFound } from "next/navigation";
 
 /** Validates the \`[lang]\` route segment. */
@@ -31517,7 +34437,7 @@ export function getTranslator(locale: Locale) {
   return createTranslator(getMessages(locale));
 }
 `],
-  ["modules/i18n/frameworks/react/apps/web/src/components/i18n-provider.tsx.hbs", `"use client";
+  ["modules/i18n/frameworks/react/apps/fullstack-web/src/components/i18n-provider.tsx.hbs", `"use client";
 
 import {
   createTranslator,
@@ -31556,7 +34476,7 @@ export function useT(): Translator {
   return useI18n().t;
 }
 `],
-  ["modules/i18n/frameworks/tanstack-start/apps/web/src/lib/i18n/paths.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+  ["modules/i18n/frameworks/tanstack-start/apps/fullstack-web/src/lib/i18n/paths.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
 export function localePath(locale: Locale, href: \`/\${string}\`): string { return \`/\${locale}\${href === "/" ? "" : href}\`; }
 `],
   ["modules/payment/dialects/postgres/packages/db/src/schema/payment.ts", `import {
@@ -32458,7 +35378,7 @@ export interface PaymentProvider {
   createPortalUrl?(customerRef: string, returnUrl: string): Promise<string>;
 }
 `],
-  ["modules/payment/frameworks/native/apps/web/src/lib/native/payment.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/frameworks/native/apps/fullstack-web/src/lib/native/payment.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
 import { PaymentError, plans } from "@{{projectName}}/payment";
 import { isLocale{{#if (includes module.providers "mock")}}, defaultLocale{{/if}} } from "@{{projectName}}/i18n";
 import { z } from "zod";
@@ -32522,7 +35442,7 @@ export async function handle(request: Request, path: string): Promise<Response |
   } catch (error) { if (error instanceof PaymentError) return json({ error: error.code }, 400); throw error; }
 }
 `],
-  ["modules/payment/frameworks/next/apps/web/src/app/[lang]/dashboard/billing/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/billing/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
 import { getPlan } from "@{{projectName}}/payment";
 import { Button, buttonVariants } from "@{{projectName}}/ui/components/button";
 import type { Metadata } from "next";
@@ -32625,7 +35545,7 @@ export default async function BillingPage({ params, searchParams }: Props) {
   );
 }
 `],
-  ["modules/payment/frameworks/next/apps/web/src/app/[lang]/payment/[orderId]/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/frameworks/next/apps/fullstack-web/src/app/[lang]/payment/[orderId]/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
 import { buttonVariants } from "@{{projectName}}/ui/components/button";
 import type { Metadata } from "next";
 {{#if (includes module.providers "wechat")}}
@@ -32711,7 +35631,7 @@ export default async function PaymentPage({ params }: Props) {
   );
 }
 `],
-  ["modules/payment/frameworks/next/apps/web/src/app/[lang]/pricing/actions.ts.hbs", `"use server";
+  ["modules/payment/frameworks/next/apps/fullstack-web/src/app/[lang]/pricing/actions.ts.hbs", `"use server";
 
 import { payment } from "@{{projectName}}/app-services";
 import { PaymentError } from "@{{projectName}}/payment";
@@ -32749,7 +35669,7 @@ export async function openBillingPortal(formData: FormData) {
   redirect((await payment.portalUrl(user.id, localePath(locale, "/dashboard/billing"))) as Route);
 }
 `],
-  ["modules/payment/frameworks/next/apps/web/src/app/[lang]/pricing/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/frameworks/next/apps/fullstack-web/src/app/[lang]/pricing/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
 import { plans, type Plan } from "@{{projectName}}/payment";
 import { Button } from "@{{projectName}}/ui/components/button";
 import type { Metadata } from "next";
@@ -32855,7 +35775,7 @@ export default async function PricingPage({ params, searchParams }: Props) {
   );
 }
 `],
-  ["modules/payment/frameworks/next/apps/web/src/app/api/payment/webhook/[provider]/route.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/frameworks/next/apps/fullstack-web/src/app/api/payment/webhook/[provider]/route.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
 
 /** Point your provider's webhook at \`/api/payment/webhook/<provider>\`, e.g. \`/api/payment/webhook/stripe\`. */
 export async function POST(
@@ -32875,7 +35795,7 @@ export async function POST(
   }
 }
 `],
-  ["modules/payment/frameworks/next/apps/web/src/lib/format.ts", `/** Formats an amount in the currency's minor unit, e.g. \`1900\` USD as \`$19.00\`. */
+  ["modules/payment/frameworks/next/apps/fullstack-web/src/lib/format.ts", `/** Formats an amount in the currency's minor unit, e.g. \`1900\` USD as \`$19.00\`. */
 export function formatMoney(amount: number, currency: string, locale: string): string {
   const format = new Intl.NumberFormat(locale, {
     style: "currency",
@@ -32885,7 +35805,7 @@ export function formatMoney(amount: number, currency: string, locale: string): s
   return format.format(amount / 10 ** digits);
 }
 `],
-  ["modules/payment/frameworks/nuxt/apps/web/app/components/ProductAdminOrders.vue.hbs", `<script setup lang="ts">
+  ["modules/payment/frameworks/nuxt/apps/fullstack-web/app/components/ProductAdminOrders.vue.hbs", `<script setup lang="ts">
 const { label, locale } = useProductLocale();
 const page = ref(1);
 type Order = { id: string; planId: string; provider: string; amount: number; currency: string; status: string; createdAt: string };
@@ -32898,7 +35818,7 @@ const money = (row: Order) => new Intl.NumberFormat(locale.value, { style: "curr
   <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\\{{ label('Previous', '上一页') }}</button><span>\\{{ page }} · \\{{ data?.total ?? 0 }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\\{{ label('Next', '下一页') }}</button></nav>
 </template>
 `],
-  ["modules/payment/frameworks/nuxt/apps/web/app/components/ProductBilling.vue.hbs", `<script setup lang="ts">
+  ["modules/payment/frameworks/nuxt/apps/fullstack-web/app/components/ProductBilling.vue.hbs", `<script setup lang="ts">
 import { z } from "zod";
 const { label, locale, path } = useProductLocale();
 const { pending, error, run } = useProductAction();
@@ -32913,7 +35833,7 @@ const money = (row: Order) => new Intl.NumberFormat(locale.value, { style: "curr
   <div class="table-wrap"><table><thead><tr><th>\\{{ label('Date', '日期') }}</th><th>\\{{ label('Plan', '方案') }}</th><th>\\{{ label('Provider', '支付方式') }}</th><th>\\{{ label('Amount', '金额') }}</th><th>\\{{ label('Status', '状态') }}</th></tr></thead><tbody><tr v-for="order in data?.orders ?? []" :key="order.id"><td>\\{{ order.createdAt.slice(0, 10) }}</td><td><NuxtLink :to="path(\`payment/\${order.id}\`)">\\{{ order.planId }}</NuxtLink></td><td>\\{{ order.provider }}</td><td>\\{{ money(order) }}</td><td>\\{{ order.status }}</td></tr></tbody></table><p v-if="!data?.orders.length">\\{{ label('No orders yet.', '暂无订单。') }}</p></div>
 </template>
 `],
-  ["modules/payment/frameworks/nuxt/apps/web/app/components/ProductPayment.vue.hbs", `<script setup lang="ts">
+  ["modules/payment/frameworks/nuxt/apps/fullstack-web/app/components/ProductPayment.vue.hbs", `<script setup lang="ts">
 import { z } from "zod";
 const props = defineProps<{ orderId?: string }>();
 const { label, path, locale, t } = useProductLocale();
@@ -32956,7 +35876,7 @@ onBeforeUnmount(() => { disposed = true; if (timer) clearTimeout(timer); });
 </template>
 <style scoped>.price{font-size:2rem}.price small{font-size:1rem}</style>
 `],
-  ["modules/payment/frameworks/tanstack-start/apps/web/src/lib/payment-data.ts", `import { z } from "zod";
+  ["modules/payment/frameworks/tanstack-start/apps/fullstack-web/src/lib/payment-data.ts", `import { z } from "zod";
 export const orderSchema = z.object({
   id: z.string(),
   planId: z.string(),
@@ -33000,7 +35920,7 @@ export function formatMoney(amount: number, currency: string, locale: string) {
   return format.format(amount / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2));
 }
 `],
-  ["modules/payment/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.billing.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/payment/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.billing.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { useLocale, useT } from "@/components/i18n-provider";
@@ -33011,7 +35931,7 @@ function Billing() { const data = Route.useLoaderData(); const locale = useLocal
   async function portal() { setBusy(true); setError(false); try { const response = await mutateProduct("/api/payment/portal", { locale }); window.location.assign(z.object({ url: z.string() }).parse(await response.json()).url); } catch { setError(true); } finally { setBusy(false); } }
   return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("payment.billing.title")}</h1><div className="space-y-4 border p-6"><h2 className="font-medium">{t("payment.billing.subscription")}</h2>{data.subscription ? <><p>{data.subscription.planId} · {data.subscription.status}</p>{data.subscription.currentPeriodEnd && <p>{t(data.subscription.cancelAtPeriodEnd ? "payment.billing.endsOn" : "payment.billing.renewsOn", { date: new Date(data.subscription.currentPeriodEnd).toLocaleDateString(locale) })}</p>}{data.subscription.customerRef && <button disabled={busy} className="border px-4 py-2" onClick={() => void portal()}>{t("payment.billing.manage")}</button>}</> : <p>{t("payment.billing.none")}</p>}<a className="inline-block underline" href={\`/\${locale}/pricing\`}>{t("payment.billing.viewPlans")}</a>{error && <p role="alert">{t("payment.errors.checkout")}</p>}</div><h2 className="font-medium">{t("payment.billing.history")}</h2>{data.orders.length ? <ul className="divide-y border">{data.orders.map((order) => <li key={order.id} className="flex justify-between gap-4 p-4"><a className="underline" href={\`/\${locale}/payment/\${order.id}\`}>{order.planId}</a><span>{order.status}</span><span>{new Date(order.createdAt).toLocaleDateString(locale)}</span><strong>{formatMoney(order.amount, order.currency, locale)}</strong></li>)}</ul> : <p>{t("payment.billing.noOrders")}</p>}</section>; }
 `],
-  ["modules/payment/frameworks/tanstack-start/apps/web/src/routes/$lang.payment.$orderId.tsx.hbs", `import { createFileRoute, useRouter } from "@tanstack/react-router";
+  ["modules/payment/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.payment.$orderId.tsx.hbs", `import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { z } from "zod";
 import { useLocale, useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
@@ -33019,7 +35939,7 @@ import { orderSchema, formatMoney } from "@/lib/payment-data";
 export const Route = createFileRoute("/$lang/payment/$orderId")({ loader: ({ params }) => loadProduct(\`/api/product/order/\${encodeURIComponent(params.orderId)}\`, params.lang, z.object({ order: orderSchema, qrImage: z.string().nullable() })), component: Checkout });
 function Checkout() { const { order, qrImage } = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const router = useRouter(); return <section className="mx-auto max-w-lg space-y-8 px-6 py-20"><h1 className="font-serif text-4xl">{t("payment.checkout.title")}</h1><div className="space-y-6 border p-8 text-center"><p className="text-4xl font-semibold">{formatMoney(order.amount, order.currency, locale)}</p><p role="status">{order.status}</p>{qrImage && <img src={qrImage} alt={t("payment.checkout.qrAlt")} width={256} height={256} className="mx-auto" />}<button className="border px-4 py-2" onClick={() => void router.invalidate()}>{t("payment.checkout.refresh")}</button><a className="block underline" href={\`/\${locale}/dashboard/billing\`}>{t("payment.checkout.billing")}</a></div></section>; }
 `],
-  ["modules/payment/frameworks/tanstack-start/apps/web/src/routes/$lang.pricing.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/payment/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.pricing.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { createTranslator, getMessages, isLocale } from "@{{projectName}}/i18n";
 import { useState } from "react";
 import { z } from "zod";
@@ -33038,7 +35958,7 @@ function Pricing() {
   return <section className="mx-auto max-w-5xl px-6 py-20"><header className="mb-12"><h1 className="font-serif text-5xl">{t("payment.pricing.title")}</h1><p className="mt-5 text-muted-foreground">{t("payment.pricing.subtitle")}</p></header>{error && <p role="alert" className="mb-6 text-destructive">{error} <a href={\`/\${locale}/login\`} className="underline">{t("auth.user.signIn")}</a></p>}<div className="grid gap-6 md:grid-cols-2">{plans.map((plan) => <article key={plan.id} className="flex flex-col gap-6 border p-8"><h2 className="text-xl font-medium">{planMessages.get(plan.id)?.name ?? plan.id}</h2>{planMessages.get(plan.id)?.description && <p className="text-muted-foreground">{planMessages.get(plan.id)?.description}</p>}<p className="text-4xl font-semibold">{formatMoney(plan.amount, plan.currency, locale)}<span className="text-sm font-normal text-muted-foreground"> {plan.interval ?? t("payment.pricing.oneTime")}</span></p>{plan.credits !== undefined && <p>{t("payment.pricing.credits", { credits: plan.credits })}</p>}{plan.providers.length ? plan.providers.map((provider) => <button key={provider} disabled={busy} className="border bg-foreground p-3 text-background disabled:opacity-50" onClick={() => void checkout(plan.id, provider)}>{t(plan.mode === "payment" ? "payment.pricing.buyWith" : "payment.pricing.subscribeWith", { provider })}</button>) : <p>{t("payment.pricing.noProviders")}</p>}</article>)}</div></section>;
 }
 `],
-  ["modules/payment/integrations/admin/frameworks/next/apps/web/src/app/[lang]/admin/orders/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/integrations/admin/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/orders/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
 
 import { Pagination } from "@/components/admin/pagination";
@@ -33116,7 +36036,7 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
   );
 }
 `],
-  ["modules/payment/integrations/admin/frameworks/tanstack-start/apps/web/src/routes/$lang.admin.orders.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/payment/integrations/admin/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.orders.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { useLocale, useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
@@ -33301,7 +36221,7 @@ export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>
   };
 }
 `],
-  ["modules/payment/providers/mock/frameworks/next/apps/web/src/app/api/payment/mock/route.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/providers/mock/frameworks/next/apps/fullstack-web/src/app/api/payment/mock/route.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
 
 function notFound() {
   return new Response("Not found", { status: 404 });
@@ -34019,7 +36939,7 @@ export function createSeo(config: {
 }
 export type Seo = ReturnType<typeof createSeo>;
 `],
-  ["modules/seo/frameworks/native/apps/web/src/lib/native/seo.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+  ["modules/seo/frameworks/native/apps/fullstack-web/src/lib/native/seo.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 import { locales } from "@{{projectName}}/i18n";
 const escape = (value: string) => value.replace(/[<>&"']/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[char]!);
 export async function handle(request: Request, path: string): Promise<Response | undefined> {
@@ -34035,7 +36955,7 @@ export async function handle(request: Request, path: string): Promise<Response |
   }
 }
 `],
-  ["modules/seo/frameworks/next/apps/web/src/app/robots.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+  ["modules/seo/frameworks/next/apps/fullstack-web/src/app/robots.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 import { locales } from "@{{projectName}}/i18n";
 import type { MetadataRoute } from "next";
 
@@ -34044,7 +36964,7 @@ export default function robots(): MetadataRoute.Robots {
   return { rules: { userAgent: "*", allow: "/", disallow: [...privatePaths, ...locales.flatMap((locale) => privatePaths.map((path) => \`/\${locale}\${path}\`))] }, sitemap: seo.url("/sitemap.xml") };
 }
 `],
-  ["modules/seo/frameworks/next/apps/web/src/app/sitemap.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+  ["modules/seo/frameworks/next/apps/fullstack-web/src/app/sitemap.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 import type { MetadataRoute } from "next";
 
 export const dynamic = "force-dynamic";
@@ -34052,23 +36972,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return seo.sitemap();
 }
 `],
-  ["modules/seo/frameworks/nuxt/apps/web/server/routes/robots.txt.ts.hbs", `import { defineEventHandler, toWebRequest } from "h3";
+  ["modules/seo/frameworks/nuxt/apps/fullstack-web/server/routes/robots.txt.ts.hbs", `import { defineEventHandler, toWebRequest } from "h3";
 import { handleProductRequest } from "@/lib/product-api";
 export default defineEventHandler((event) => handleProductRequest(toWebRequest(event)));
 `],
-  ["modules/seo/frameworks/nuxt/apps/web/server/routes/sitemap.xml.ts.hbs", `import { defineEventHandler, toWebRequest } from "h3";
+  ["modules/seo/frameworks/nuxt/apps/fullstack-web/server/routes/sitemap.xml.ts.hbs", `import { defineEventHandler, toWebRequest } from "h3";
 import { handleProductRequest } from "@/lib/product-api";
 export default defineEventHandler((event) => handleProductRequest(toWebRequest(event)));
 `],
-  ["modules/seo/frameworks/tanstack-start/apps/web/src/routes/robots[.]txt.ts.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/seo/frameworks/tanstack-start/apps/fullstack-web/src/routes/robots[.]txt.ts.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { handleProductRequest } from "@/lib/product-api";
 export const Route = createFileRoute("/robots.txt")({ server: { handlers: { GET: ({ request }) => handleProductRequest(request) } } });
 `],
-  ["modules/seo/frameworks/tanstack-start/apps/web/src/routes/sitemap[.]xml.ts.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/seo/frameworks/tanstack-start/apps/fullstack-web/src/routes/sitemap[.]xml.ts.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { handleProductRequest } from "@/lib/product-api";
 export const Route = createFileRoute("/sitemap.xml")({ server: { handlers: { GET: ({ request }) => handleProductRequest(request) } } });
 `],
-  ["modules/seo/integrations/core/frameworks/next/apps/web/src/lib/page-metadata.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
+  ["modules/seo/integrations/core/frameworks/next/apps/fullstack-web/src/lib/page-metadata.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 import type { Locale } from "@{{projectName}}/i18n";
 import type { Metadata } from "next";
 
@@ -34076,7 +36996,7 @@ export function pageMetadata(input: { locale: Locale; path: \`/\${string}\`; tit
   return seo.metadata(input);
 }
 `],
-  ["modules/seo/integrations/payment/apps/web/src/integrations/seo-payment.ts.hbs", `import { defaultLocale, locales } from "@{{projectName}}/i18n";
+  ["modules/seo/integrations/payment/apps/fullstack-web/src/integrations/seo-payment.ts.hbs", `import { defaultLocale, locales } from "@{{projectName}}/i18n";
 import type { Services } from "../services";
 
 export default function registerSeoPayment({ seo }: Services) {
@@ -34185,7 +37105,7 @@ No adapter automatically retries OTP sends: after a timeout, the provider may al
 
 ## Phone authentication integration
 
-\`apps/web/src/integrations/auth-sms.ts\` subscribes to \`auth.phone_verification_requested\` and awaits \`sms.sendOtp({ phoneNumber, code })\`. Authentication owns code generation and verification; SMS owns sending. Auth does not import the SMS package. The phone-login flow uses six-digit codes with a five-minute expiry.
+\`{{appPath "fullstack-web"}}/src/integrations/auth-sms.ts\` subscribes to \`auth.phone_verification_requested\` and awaits \`sms.sendOtp({ phoneNumber, code })\`. Authentication owns code generation and verification; SMS owns sending. Auth does not import the SMS package. The phone-login flow uses six-digit codes with a five-minute expiry.
 {{/if}}
 `],
   ["modules/sms/files/packages/sms/src/index.ts.hbs", `import { createTransport, type ProviderConfig } from "./providers/{{module.providers.[0]}}";
@@ -34254,7 +37174,7 @@ export type Sms = {
   sendOtp(message: OtpMessage): Promise<void>;
 };
 `],
-  ["modules/sms/integrations/auth/apps/web/src/integrations/auth-sms.ts.hbs", `import type { Services } from "../services";
+  ["modules/sms/integrations/auth/apps/fullstack-web/src/integrations/auth-sms.ts.hbs", `import type { Services } from "../services";
 
 /** Await provider acceptance so a failed request cannot appear to have sent an OTP. */
 export default function registerAuthSms({ events, sms }: Services) {
@@ -34527,7 +37447,7 @@ The generated OpenNext adapter obtains \`STORAGE_BUCKET\` from \`getCloudflareCo
 The generated package uses the official \`ali-oss\` SDK and \`@types/ali-oss\` development types.
 
 1. Create an OSS bucket in your selected region. Set its ACL to **private** and enable the account/bucket block-public-access controls. Do not add anonymous read policies.
-2. Set \`OSS_REGION\` (for example \`oss-cn-hangzhou\`), \`OSS_BUCKET\`, \`OSS_ACCESS_KEY_ID\` and \`OSS_ACCESS_KEY_SECRET\` in \`apps/web/.env\` or your server's secret manager. \`OSS_SECURITY_TOKEN\` is optional for temporary credentials; rotate all temporary credentials before expiration.
+2. Set \`OSS_REGION\` (for example \`oss-cn-hangzhou\`), \`OSS_BUCKET\`, \`OSS_ACCESS_KEY_ID\` and \`OSS_ACCESS_KEY_SECRET\` in \`{{appPath "fullstack-web"}}/.env\` or your server's secret manager. \`OSS_SECURITY_TOKEN\` is optional for temporary credentials; rotate all temporary credentials before expiration.
 3. Use a dedicated RAM identity. Grant only \`oss:PutObject\`, \`oss:GetObject\` and \`oss:DeleteObject\` on this bucket's application objects (\`acs:oss:*:*:<bucket>/*\`, narrowed to the generated application object prefix when deploying). Do not grant bucket administration, ACL administration, public access or wildcard-account permissions. Bucket enumeration is not needed: the application lists its own database rows.
 
 See [OSS Node.js SDK documentation](https://www.alibabacloud.com/help/en/oss/developer-reference/node-js) and [RAM policies for OSS](https://www.alibabacloud.com/help/en/oss/user-guide/overview-10).
@@ -34536,7 +37456,7 @@ See [OSS Node.js SDK documentation](https://www.alibabacloud.com/help/en/oss/dev
 The generated package uses the official \`cos-nodejs-sdk-v5\` SDK, which includes its TypeScript declarations.
 
 1. Create a COS bucket and choose **private read/write**. Keep public access disabled and do not add anonymous read policies.
-2. Set \`COS_REGION\` (for example \`ap-guangzhou\`), \`COS_BUCKET\` (including the APPID suffix), \`COS_SECRET_ID\` and \`COS_SECRET_KEY\` in \`apps/web/.env\` or your server's secret manager. \`COS_SECURITY_TOKEN\` is optional for temporary credentials; rotate all temporary credentials before expiration.
+2. Set \`COS_REGION\` (for example \`ap-guangzhou\`), \`COS_BUCKET\` (including the APPID suffix), \`COS_SECRET_ID\` and \`COS_SECRET_KEY\` in \`{{appPath "fullstack-web"}}/.env\` or your server's secret manager. \`COS_SECURITY_TOKEN\` is optional for temporary credentials; rotate all temporary credentials before expiration.
 3. Use a dedicated CAM identity. Grant only \`name/cos:PutObject\`, \`name/cos:GetObject\` and \`name/cos:DeleteObject\` on this bucket's application objects (\`qcs::cos:<region>:uid/<APPID>:<bucket>/*\`, narrowed to the generated application object prefix when deploying). Do not grant bucket administration, ACL administration, public access or wildcard-account permissions. Bucket enumeration is not needed: the application lists its own database rows.
 
 See [COS Node.js SDK documentation](https://www.tencentcloud.com/document/product/436/8629) and [COS access management](https://www.tencentcloud.com/document/product/436/10313).
@@ -35108,7 +38028,7 @@ export function createProvider({{#if (includes module.providers "r2-binding")}}_
 {{/if}}
 }
 `],
-  ["modules/storage/frameworks/native/apps/web/src/lib/native/storage.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
+  ["modules/storage/frameworks/native/apps/fullstack-web/src/lib/native/storage.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
 import { z } from "zod";
 import { json, requireSession } from "../product-api";
 import { readStorageFile, requireStorageOrigin, storageErrorResponse, StorageRequestError } from "../storage-http";
@@ -35132,7 +38052,7 @@ export async function handle(request: Request, path: string): Promise<Response |
   } catch (error) { return storageErrorResponse(error); }
 }
 `],
-  ["modules/storage/frameworks/native/apps/web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
+  ["modules/storage/frameworks/native/apps/fullstack-web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
 import { z } from "zod";
 
 import { ENV } from "@/env.server";
@@ -35226,7 +38146,7 @@ export async function readStorageFile(request: Request): Promise<File> {
   return parsed.data;
 }
 `],
-  ["modules/storage/frameworks/next/apps/web/src/app/[lang]/dashboard/files/page.tsx.hbs", `import { storage } from "@{{projectName}}/app-services";
+  ["modules/storage/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/files/page.tsx.hbs", `import { storage } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
 
 import { FileManager, type StorageLabels } from "@/components/storage/file-manager";
@@ -35299,7 +38219,7 @@ export default async function FilesPage({ params }: Props) {
   );
 }
 `],
-  ["modules/storage/frameworks/next/apps/web/src/app/api/storage/[id]/route.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
+  ["modules/storage/frameworks/next/apps/fullstack-web/src/app/api/storage/[id]/route.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
 import { z } from "zod";
 
 import { getSession } from "@/lib/session";
@@ -35355,7 +38275,7 @@ export async function DELETE(request: Request, context: Context) {
   }
 }
 `],
-  ["modules/storage/frameworks/next/apps/web/src/app/api/storage/route.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
+  ["modules/storage/frameworks/next/apps/fullstack-web/src/app/api/storage/route.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
 
 import { getSession } from "@/lib/session";
 import { readStorageFile, requireStorageOrigin, storageErrorResponse } from "@/lib/storage-http";
@@ -35378,7 +38298,7 @@ export async function POST(request: Request) {
   }
 }
 `],
-  ["modules/storage/frameworks/next/apps/web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
+  ["modules/storage/frameworks/next/apps/fullstack-web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
 import { z } from "zod";
 
 import { ENV } from "@/env.server";
@@ -35472,7 +38392,7 @@ export async function readStorageFile(request: Request): Promise<File> {
   return parsed.data;
 }
 `],
-  ["modules/storage/frameworks/nuxt/apps/web/app/components/ProductFiles.vue.hbs", `<script setup lang="ts">
+  ["modules/storage/frameworks/nuxt/apps/fullstack-web/app/components/ProductFiles.vue.hbs", `<script setup lang="ts">
 const { label } = useProductLocale();
 const { pending, error, notice, run } = useProductAction();
 const selected = ref<File>(); const input = ref<HTMLInputElement>();
@@ -35496,7 +38416,7 @@ async function remove(id: string) { if (!window.confirm(label("Delete this file 
   <div class="table-wrap"><table><thead><tr><th>\\{{ label('Name', '名称') }}</th><th>\\{{ label('Size', '大小') }}</th><th>\\{{ label('Created', '创建时间') }}</th><th>\\{{ label('Actions', '操作') }}</th></tr></thead><tbody><tr v-for="file in data?.files ?? []" :key="file.id"><td>\\{{ file.name }}</td><td>\\{{ (file.size / 1024).toFixed(1) }} KiB</td><td>\\{{ file.createdAt.slice(0, 10) }}</td><td class="actions"><a :href="\`/api/storage/\${encodeURIComponent(file.id)}\`" rel="noreferrer">\\{{ label('Download', '下载') }}</a><button class="text-button" :disabled="pending" @click="remove(file.id)">\\{{ label('Delete', '删除') }}</button></td></tr></tbody></table><p v-if="!data?.files.length">\\{{ label('No files yet.', '暂无文件。') }}</p></div>
 </template>
 `],
-  ["modules/storage/frameworks/react/apps/web/src/components/storage/file-manager.tsx.hbs", `"use client";
+  ["modules/storage/frameworks/react/apps/fullstack-web/src/components/storage/file-manager.tsx.hbs", `"use client";
 
 import { Button, buttonVariants } from "@{{projectName}}/ui/components/button";
 import { useProductNavigation } from "@/lib/product-navigation";
@@ -35686,7 +38606,7 @@ export function FileManager({
   );
 }
 `],
-  ["modules/storage/frameworks/tanstack-start/apps/web/src/routes/$lang.dashboard.files.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/storage/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.files.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { FileManager, type StorageLabels } from "@/components/storage/file-manager";
 import { useLocale, useT } from "@/components/i18n-provider";
@@ -37535,4 +40455,4 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 `]
 ]);
 
-export const TEMPLATE_COUNT = 760;
+export const TEMPLATE_COUNT = 835;

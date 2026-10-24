@@ -90,7 +90,9 @@ export async function processStackModules(
 }
 
 /** The plan restricted to natively rendered modules; `undefined` when there are none. */
-function requirePlan(config: ProjectConfig): ResolvedPlan | undefined {
+function requirePlan(
+  config: ProjectConfig & Pick<RenderConfig, "application">,
+): ResolvedPlan | undefined {
   const plan = getModulePlan(config);
   if (hasErrors(plan)) {
     throw new GeneratorError({
@@ -102,6 +104,12 @@ function requirePlan(config: ProjectConfig): ResolvedPlan | undefined {
     });
   }
   const modules = plan.modules.filter((m) => m.variant === "native");
+  if (modules.length && config.application && config.application.type !== "fullstack-web") {
+    throw new GeneratorError({
+      phase: "modules",
+      message: `Application type "${config.application.type}" has no business module adapters; these modules currently require a fullstack-web application`,
+    });
+  }
   return modules.length ? { ...plan, modules } : undefined;
 }
 
@@ -109,7 +117,11 @@ function workspaceVersion(config: ProjectConfig): string {
   return config.packageManager === "npm" ? "*" : "workspace:*";
 }
 
-function templateContext(config: ProjectConfig, plan: ResolvedPlan, module: ResolvedModule) {
+function templateContext(
+  config: ProjectConfig & Pick<RenderConfig, "application">,
+  plan: ResolvedPlan,
+  module: ResolvedModule,
+) {
   return {
     ...config,
     product: {
@@ -141,7 +153,12 @@ function renderPrefix(
     const relativePath = templatePath.slice(normalized.length);
     // Framework overlays are selected explicitly, never emitted as output directories.
     if (relativePath.startsWith("frameworks/")) continue;
-    const destPath = transformFilename(relativePath);
+    const contributionType = relativePath.startsWith("apps/")
+      ? relativePath.split("/")[1]
+      : undefined;
+    const selectedType = context.application?.type ?? "fullstack-web";
+    if (contributionType && contributionType !== selectedType) continue;
+    const destPath = vfs.resolvePath(transformFilename(relativePath));
     if (stackFiles.has(destPath)) {
       throw new GeneratorError({
         message: `Module "${context.module.id}" overwrites ${destPath} from the stack templates; declare it in "replaces"`,
@@ -310,18 +327,21 @@ export function finalizeModules(vfs: VirtualFileSystem, config: ProjectConfig): 
 }
 
 /** README section describing the feature modules and their first-run steps. */
-export function moduleReadmeSection(config: ProjectConfig): string {
+export function moduleReadmeSection(
+  config: ProjectConfig & Pick<RenderConfig, "application">,
+): string {
   const plan = requirePlan(config);
   if (!plan) return "";
   const ids = new Set(plan.modules.map((m) => m.manifest.id));
   const run = `${config.packageManager} run`;
+  const webRoot = config.application?.paths["apps/web"] ?? "apps/web";
 
   const modules = plan.modules.map(
     (m) =>
       `- **${m.manifest.name.en}** ([docs](docs/modules/${m.manifest.id}.md)): ${m.manifest.description.en}`,
   );
   const steps = [
-    "Fill in `apps/web/.env`; `apps/web/.env.schema` documents every variable and which ones are optional.",
+    `Fill in \`${webRoot}/.env\`; \`${webRoot}/.env.schema\` documents every variable and which ones are optional.`,
     ids.has("admin")
       ? "Add your email to `ADMIN_EMAILS` before signing up so your account gets the admin role."
       : "",
@@ -333,7 +353,7 @@ export function moduleReadmeSection(config: ProjectConfig): string {
       ? "Without an email provider key, development emails (verification, password reset) are printed to the server console."
       : "",
     ids.has("sms")
-      ? "Configure the selected SMS provider in `apps/web/.env`. For local development only, explicitly set `SMS_DELIVERY_MODE=console` to print verification codes instead of sending SMS; production requires provider credentials."
+      ? `Configure the selected SMS provider in \`${webRoot}/.env\`. For local development only, explicitly set \`SMS_DELIVERY_MODE=console\` to print verification codes instead of sending SMS; production requires provider credentials.`
       : "",
     plan.modules.some((m) => m.providers.includes("mock"))
       ? "Checkout falls back to the `mock` payment provider in development until real provider keys are set."

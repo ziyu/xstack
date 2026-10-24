@@ -1,0 +1,20 @@
+{
+  "id": "svelte",
+  "apps": {
+    "fullstack-web": {
+      "stack": {
+        "frontend": ["svelte"],
+        "backend": "self",
+        "runtime": "none",
+        "api": "orpc"
+      }
+    },
+    "web-frontend": {
+      "stack": {
+        "frontend": ["svelte"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}

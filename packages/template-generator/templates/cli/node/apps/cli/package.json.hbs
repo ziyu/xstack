@@ -1,0 +1,12 @@
+{
+  "name": "cli",
+  "private": true,
+  "type": "module",
+  "bin": { "{{application.id}}": "./src/index.js" },
+  "scripts": {
+    "dev": "node src/index.js --help",
+    "start": "node src/index.js",
+    "build": "node --check src/index.js",
+    "check-types": "node --check src/index.js"
+  }
+}

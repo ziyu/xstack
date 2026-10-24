@@ -12,13 +12,16 @@ export async function processApiTemplates(
 
   processTemplatesFromPrefix(vfs, templates, `api/${config.api}/server`, "packages/api", config);
 
-  processSingleTemplate(
-    vfs,
-    templates,
-    `api/${config.api}/context.ts`,
-    config.backend === "self" ? "apps/web/src/context.ts" : "apps/server/src/context.ts",
-    config,
-  );
+  const server = config.backend === "self" ? "apps/web" : "apps/server";
+  if (vfs.exists(`${server}/package.json`)) {
+    processSingleTemplate(
+      vfs,
+      templates,
+      `api/${config.api}/context.ts`,
+      `${server}/src/context.ts`,
+      config,
+    );
+  }
 
   const hasReactWeb = config.frontend.some((f) =>
     ["tanstack-router", "react-router", "tanstack-start", "next"].includes(f),

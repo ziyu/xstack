@@ -1,0 +1,12 @@
+{
+  "id": "hono",
+  "apps": {
+    "backend": {
+      "stack": {
+        "backend": "hono",
+        "runtime": "bun",
+        "api": "orpc"
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@ import { analyzeStackCompatibility } from "@/lib/stack-validation";
 
 import type { StackState } from "./constant";
 import { sanitizeStackState } from "./sanitize-stack-addons";
+import { applicationIssues } from "./stack-applications";
 
 const MAX_COMPATIBILITY_PASSES = 10;
 
@@ -14,6 +15,15 @@ export type ResolvedStackCompatibility = CompatibilityAnalysis & {
 
 export function resolveStackCompatibility(stack: StackState): ResolvedStackCompatibility {
   let currentStack = sanitizeStackState(stack);
+  if (currentStack.apps !== undefined) {
+    const issues = applicationIssues(currentStack);
+    return {
+      stack: currentStack,
+      adjustedStack: null,
+      notes: { apps: { notes: issues, hasIssue: issues.length > 0 } },
+      changes: [],
+    };
+  }
   let wasAdjusted = false;
   const changes: CompatibilityAnalysis["changes"] = [];
 

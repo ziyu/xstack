@@ -13,6 +13,8 @@ import {
   type AddInput,
   type Addons,
   AddonsSchema,
+  type ApplicationSelection,
+  ApplicationSelectionSchema,
   type AddonOptions,
   type DbSetupOptions,
   DbSetupOptionsSchema,
@@ -136,6 +138,7 @@ export const router = os.router({
         ProjectNameSchema.optional(),
         z.object({
           template: TemplateSchema.optional().describe("Use a predefined template"),
+          apps: z.string().optional().describe("Application selections as a JSON array"),
           yes: z.boolean().optional().default(false).describe("Use default configuration"),
           yolo: z
             .boolean()
@@ -194,13 +197,25 @@ export const router = os.router({
       ]),
     )
     .handler(async ({ input }) => {
-      const [projectName, { features, providers, moduleOptions, ...options }] = input;
+      const [projectName, { apps, features, providers, moduleOptions, ...options }] = input;
       const product = productFromFlags({ features, providers, moduleOptions });
       if (product.isErr()) throw product.error;
+      let applications: ApplicationSelection[] | undefined;
+      if (apps !== undefined) {
+        try {
+          applications = z.array(ApplicationSelectionSchema).parse(JSON.parse(apps));
+        } catch (cause) {
+          throw new CLIError({
+            message: `Invalid --apps JSON: ${cause instanceof Error ? cause.message : String(cause)}`,
+            cause,
+          });
+        }
+      }
       const combinedInput = {
         projectName,
         ...options,
         product: product.value,
+        apps: applications,
       };
       const result = await createProjectHandler(combinedInput);
 
@@ -463,6 +478,7 @@ export {
 import {
   generate,
   GeneratorError,
+  resolveApplicationConfig,
   type VirtualFileTree,
   EMBEDDED_TEMPLATES,
 } from "@xstack/template-generator";
@@ -471,6 +487,8 @@ import {
  * Programmatic API to generate a project in-memory (virtual filesystem).
  * Returns a Result with a VirtualFileTree without writing to disk.
  * Useful for web previews and testing.
+ * Supply `apps` to select application templates; their manifests determine the app stack.
+ * With `apps`, omitted `product` selects no feature modules.
  *
  * @example
  * ```typescript
@@ -505,7 +523,7 @@ export async function createVirtual(
   }
 
   const virtualOptions = parsedInput.data;
-  const config: ProjectConfig = {
+  let config: ProjectConfig = {
     projectName: virtualOptions.projectName || "my-project",
     projectDir: "/virtual",
     relativePath: "./virtual",
@@ -517,7 +535,9 @@ export async function createVirtual(
     runtime: virtualOptions.runtime || (virtualOptions.serverDeploy === "vercel" ? "node" : "bun"),
     frontend: virtualOptions.frontend || ["tanstack-router"],
     addons: virtualOptions.addons || [],
-    product: virtualOptions.product,
+    product:
+      virtualOptions.product ?? (virtualOptions.apps !== undefined ? { features: [] } : undefined),
+    apps: virtualOptions.apps,
     git: virtualOptions.git ?? false,
     packageManager: virtualOptions.packageManager || "bun",
     install: false,
@@ -526,6 +546,22 @@ export async function createVirtual(
     webDeploy: virtualOptions.webDeploy || "none",
     serverDeploy: virtualOptions.serverDeploy || "none",
   };
+
+  if (config.apps !== undefined) {
+    try {
+      config = resolveApplicationConfig(config);
+    } catch (cause) {
+      return Result.err(
+        GeneratorError.is(cause)
+          ? cause
+          : new GeneratorError({
+              message: cause instanceof Error ? cause.message : String(cause),
+              phase: "validation",
+              cause,
+            }),
+      );
+    }
+  }
 
   const validationResult = validateResolvedConfigCompatibility(config);
   if (validationResult.isErr()) {
@@ -546,6 +582,7 @@ export async function createVirtual(
 
 export type {
   CreateInput,
+  ApplicationSelection,
   InitResult,
   ProjectConfig,
   XStackConfig,

@@ -56,12 +56,14 @@ export function processCatalogs(vfs: VirtualFileSystem, config: ProjectConfig): 
   if (config.packageManager === "npm") return;
 
   const packagesInfo: PackageInfo[] = [];
-  const featurePackages = vfs
-    .listDir("packages")
-    .map((dir) => `packages/${dir}`)
-    .filter((dir) => !PACKAGE_PATHS.includes(dir));
+  const workspacePackages = ["apps", "packages"].flatMap((root) =>
+    vfs
+      .listDir(root)
+      .map((dir) => `${root}/${dir}`)
+      .filter((dir) => !PACKAGE_PATHS.includes(dir)),
+  );
 
-  for (const pkgPath of [...PACKAGE_PATHS, ...featurePackages]) {
+  for (const pkgPath of [...PACKAGE_PATHS, ...workspacePackages]) {
     const jsonPath = pkgPath === "." ? "package.json" : `${pkgPath}/package.json`;
     const pkgJson = vfs.readJson<PackageJson>(jsonPath);
 

@@ -22,6 +22,7 @@ import {
 import { type StackState, TECH_OPTIONS, isStackOption } from "@/lib/constant";
 import { CATEGORY_ORDER } from "@/lib/stack-utils";
 
+import { applicationIssues } from "./stack-applications";
 import { featureIssue, productPlan, resolvableFeatures, stackAuth } from "./stack-features";
 import {
   getStackBackend,
@@ -77,6 +78,14 @@ interface CompatibilityResult {
 }
 
 export const analyzeStackCompatibility = (stack: StackState): CompatibilityResult => {
+  if (stack.apps !== undefined) {
+    const issues = applicationIssues(stack);
+    return {
+      adjustedStack: null,
+      notes: { apps: { notes: issues, hasIssue: issues.length > 0 } },
+      changes: [],
+    };
+  }
   if (stack.yolo === "true") {
     return {
       adjustedStack: null,

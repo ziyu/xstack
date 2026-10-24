@@ -101,7 +101,9 @@ export function selfCloudflareWebEnvEntries(
   }
 
   entries.push(...commonRuntimeEntries(plan, false));
-  const nativeModules = getModulePlan(plan.config).modules.filter((entry) => entry.variant === "native");
+  const nativeModules = getModulePlan(plan.config).modules.filter(
+    (entry) => entry.variant === "native",
+  );
   if (nativeModules.length) entries.push('NODE_ENV: "production",');
   for (const module of nativeModules) {
     if (module.manifest.id === "storage" && module.providers.includes("r2-binding")) {
@@ -109,15 +111,41 @@ export function selfCloudflareWebEnvEntries(
     }
     const specs = [
       ...(module.manifest.env ?? []),
-      ...module.providers.flatMap((provider) => module.manifest.providers?.options[provider]?.env ?? []),
+      ...module.providers.flatMap(
+        (provider) => module.manifest.providers?.options[provider]?.env ?? [],
+      ),
     ];
     for (const spec of specs) {
       if (entries.some((entry) => entry.startsWith(`${spec.key}:`))) continue;
-      const method = spec.type === "number" ? "Number" : spec.type === "boolean" ? "Boolean" : spec.sensitive === false || spec.public ? "String" : "Redacted";
+      const method =
+        spec.type === "number"
+          ? "Number"
+          : spec.type === "boolean"
+            ? "Boolean"
+            : spec.sensitive === false || spec.public
+              ? "String"
+              : "Redacted";
       const value = `Config.${method}(${JSON.stringify(spec.key)})`;
-      const rawDefault = spec.default ?? (spec.required === false ? method === "Number" ? "0" : method === "Boolean" ? "false" : "" : undefined);
-      const fallback = rawDefault === undefined ? undefined : method === "Redacted" ? `Redacted.make(${JSON.stringify(rawDefault)})` : method === "Number" || method === "Boolean" ? rawDefault : JSON.stringify(rawDefault);
-      entries.push(`${spec.key}: ${fallback === undefined ? value : `${value}.pipe(Config.withDefault(${fallback}))`},`);
+      const rawDefault =
+        spec.default ??
+        (spec.required === false
+          ? method === "Number"
+            ? "0"
+            : method === "Boolean"
+              ? "false"
+              : ""
+          : undefined);
+      const fallback =
+        rawDefault === undefined
+          ? undefined
+          : method === "Redacted"
+            ? `Redacted.make(${JSON.stringify(rawDefault)})`
+            : method === "Number" || method === "Boolean"
+              ? rawDefault
+              : JSON.stringify(rawDefault);
+      entries.push(
+        `${spec.key}: ${fallback === undefined ? value : `${value}.pipe(Config.withDefault(${fallback}))`},`,
+      );
     }
   }
   if (plan.hasAxiomWebRuntime) {

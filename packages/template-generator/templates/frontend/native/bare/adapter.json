@@ -1,0 +1,12 @@
+{
+  "id": "native-bare",
+  "apps": {
+    "native": {
+      "stack": {
+        "frontend": ["native-bare"],
+        "runtime": "none",
+        "api": "none"
+      }
+    }
+  }
+}
