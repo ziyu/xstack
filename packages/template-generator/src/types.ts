@@ -11,6 +11,8 @@ export type ApplicationRenderContext = {
   port: number;
   clientOrigins: string[];
   paths: Record<string, string>;
+  /** Bound backend owner, or this app's root when it owns the backend role. */
+  backendRoot?: string;
   workspaceRuntime: ProjectConfig["runtime"];
   ownsPath: (path: string) => boolean;
   inheritedFiles?: ReadonlyMap<string, string>;
@@ -35,11 +37,28 @@ export interface VirtualDirectory {
 
 export type VirtualNode = VirtualFile | VirtualDirectory;
 
+/** Origin metadata only; traces never include generated content or secrets. */
+export interface GenerationSource {
+  kind: "template" | "processor";
+  name: string;
+  app?: string;
+  owner?: string;
+}
+
+export interface GenerationWrite {
+  path: string;
+  operation: "create" | "update" | "delete";
+  source: GenerationSource;
+  previousSource?: GenerationSource;
+}
+
 export interface VirtualFileTree {
   root: VirtualDirectory;
   fileCount: number;
   directoryCount: number;
   config: ProjectConfig;
+  /** Ordered file operations, present only when tracing was requested. */
+  provenance?: GenerationWrite[];
 }
 
 export interface GeneratorOptions {
@@ -48,6 +67,8 @@ export interface GeneratorOptions {
   templates?: Map<string, string>;
   /** CLI version string for xstack.jsonc */
   version?: string;
+  /** Capture file origins and replacements without recording generated contents. */
+  trace?: boolean;
 }
 
 /**
@@ -57,4 +78,5 @@ export class GeneratorError extends TaggedError("GeneratorError")<{
   message: string;
   phase?: string;
   cause?: unknown;
+  source?: GenerationSource;
 }> {}

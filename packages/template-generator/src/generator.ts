@@ -120,45 +120,57 @@ async function generateApplication(
       "apps/backend": "apps/server",
     },
     context ? { ownsPath: context.ownsPath, inheritedFiles: context.inheritedFiles } : undefined,
+    {
+      trace: options.trace,
+      source: { kind: "processor", name: "application", app: context?.id, owner: context?.id },
+    },
   );
-  await processBaseTemplate(vfs, templates, config);
+  const stage = <T>(name: string, run: () => T): T =>
+    vfs.withSource({ kind: "processor", name }, run);
+  const asyncStage = <T>(name: string, run: () => Promise<T>): Promise<T> =>
+    vfs.withSourceAsync({ kind: "processor", name }, run);
+  await asyncStage("base", () => processBaseTemplate(vfs, templates, config));
   if (app) {
-    renderApplicationLayers(vfs, templates, config, app.adapter);
+    stage("application-layers", () => renderApplicationLayers(vfs, templates, config, app.adapter));
   } else {
-    await processFrontendTemplates(vfs, templates, config);
-    await processBackendTemplates(vfs, templates, config);
+    await asyncStage("frontend", () => processFrontendTemplates(vfs, templates, config));
+    await asyncStage("backend", () => processBackendTemplates(vfs, templates, config));
   }
-  await processDbTemplates(vfs, templates, config);
-  await processApiTemplates(vfs, templates, config);
-  await processConfigPackage(vfs, templates, config);
-  await processUiPackage(vfs, templates, config);
-  await processStackModules(vfs, templates, config);
-  await processAddonTemplates(vfs, templates, config);
-  await processExtrasTemplates(vfs, templates, config);
-  await processDeployTemplates(vfs, templates, config);
-  processModuleTemplates(vfs, templates, config);
-  processPackageConfigs(vfs, config);
-  processDependencies(vfs, config);
-  finalizeAlchemyDevScripts(vfs, config);
-  processEnvVariables(vfs, config);
-  processModuleEnv(vfs, config);
-  processAuthPlugins(vfs, config);
-  processAlchemyPlugins(vfs, config);
-  processPwaPlugins(vfs, config);
-  processVarlock(vfs, templates, config);
-  finalizeModules(vfs, config);
-  if (!app) processCatalogs(vfs, config);
-  processVercelConfig(vfs, config);
+  await asyncStage("database", () => processDbTemplates(vfs, templates, config));
+  await asyncStage("api", () => processApiTemplates(vfs, templates, config));
+  await asyncStage("config-package", () => processConfigPackage(vfs, templates, config));
+  await asyncStage("ui-package", () => processUiPackage(vfs, templates, config));
+  await asyncStage("stack-modules", () => processStackModules(vfs, templates, config));
+  await asyncStage("addons", () => processAddonTemplates(vfs, templates, config));
+  await asyncStage("extras", () => processExtrasTemplates(vfs, templates, config));
+  await asyncStage("deploy", () => processDeployTemplates(vfs, templates, config));
+  stage("module-templates", () => processModuleTemplates(vfs, templates, config));
+  stage("package-configs", () => processPackageConfigs(vfs, config));
+  stage("dependencies", () => processDependencies(vfs, config));
+  stage("alchemy-dev-scripts", () => finalizeAlchemyDevScripts(vfs, config));
+  stage("environment", () => processEnvVariables(vfs, config));
+  stage("module-environment", () => processModuleEnv(vfs, config));
+  stage("auth-plugins", () => processAuthPlugins(vfs, config));
+  stage("alchemy-plugins", () => processAlchemyPlugins(vfs, config));
+  stage("pwa-plugins", () => processPwaPlugins(vfs, config));
+  stage("varlock", () => processVarlock(vfs, templates, config));
+  stage("module-finalization", () => finalizeModules(vfs, config));
+  if (!app) stage("catalogs", () => processCatalogs(vfs, config));
+  stage("vercel-config", () => processVercelConfig(vfs, config));
   if (vfs.ownsPath("package.json")) {
-    processReadme(vfs, config);
+    stage("readme", () => processReadme(vfs, config));
     if (options.version)
-      writeXStackConfigToVfs(vfs, config, options.version, generateReproducibleCommand(config));
-    processAgentGuidance(vfs, config);
+      stage("saved-config", () =>
+        writeXStackConfigToVfs(vfs, config, options.version!, generateReproducibleCommand(config)),
+      );
+    stage("agent-guidance", () => processAgentGuidance(vfs, config));
   }
-  return {
+  const tree: VirtualFileTree = {
     root: vfs.toTree(config.projectName),
     fileCount: vfs.getFileCount(),
     directoryCount: vfs.getDirectoryCount(),
     config,
   };
+  if (options.trace) tree.provenance = vfs.getProvenance();
+  return tree;
 }

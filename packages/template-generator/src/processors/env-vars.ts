@@ -1,5 +1,6 @@
 import type { ProjectConfig } from "@xstack/types";
 
+import { appOutputPath } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { RenderConfig } from "../types";
 import { isDatabaseConsumedByDocker } from "../utils/docker-database";
@@ -495,7 +496,7 @@ export function processEnvVariables(vfs: VirtualFileSystem, config: RenderConfig
 
   // --- Client App .env ---
   if (hasWebFrontend) {
-    const clientDir = "apps/web";
+    const clientDir = appOutputPath(config, "web");
     if (vfs.directoryExists(clientDir)) {
       const envPath = `${clientDir}/.env`;
       // Matches the /api base the Vercel build uses when web and server deploy together
@@ -507,7 +508,7 @@ export function processEnvVariables(vfs: VirtualFileSystem, config: RenderConfig
 
   // --- Root .env for docker compose build args ---
   // compose ${VAR} interpolation only reads the root .env, not the per-app env_file,
-  // so mirror the same variable names users fill in apps/web/.env
+  // so mirror the same variable names users fill in the web application's .env
   if (webDeploy === "docker" && hasWebFrontend) {
     const hasClerkBuildArgFrontend =
       hasNextJs || hasReactRouter || hasTanStackRouter || hasTanStackStart;
@@ -544,7 +545,7 @@ export function processEnvVariables(vfs: VirtualFileSystem, config: RenderConfig
     frontend.includes("native-uniwind") ||
     frontend.includes("native-unistyles")
   ) {
-    const nativeDir = "apps/native";
+    const nativeDir = appOutputPath(config, "native");
     if (vfs.directoryExists(nativeDir)) {
       const envPath = `${nativeDir}/.env`;
       const nativeVars = buildNativeVars(frontend, backend, auth);
@@ -598,14 +599,8 @@ export function processEnvVariables(vfs: VirtualFileSystem, config: RenderConfig
     serverDeploy,
   );
 
-  if (backend === "self") {
-    const webDir = "apps/web";
-    if (vfs.directoryExists(webDir)) {
-      const envPath = `${webDir}/.env`;
-      writeEnvFile(vfs, envPath, serverVars);
-    }
-  } else if (vfs.directoryExists("apps/server")) {
-    const envPath = "apps/server/.env";
-    writeEnvFile(vfs, envPath, serverVars);
+  const serverDir = appOutputPath(config, "server");
+  if (vfs.ownsPath(serverDir) && vfs.directoryExists(serverDir)) {
+    writeEnvFile(vfs, `${serverDir}/.env`, serverVars);
   }
 }

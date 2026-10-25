@@ -47,7 +47,12 @@ export async function generateApplications(
     });
   const plan = buildWorkspacePlan(options.config, templates);
   const { config } = plan;
-  const vfs = new VirtualFileSystem();
+  const vfs = new VirtualFileSystem({}, undefined, {
+    trace: options.trace,
+    source: { kind: "processor", name: "workspace", owner: plan.rootOwner },
+  });
+  const stage = <T>(name: string, run: () => T): T =>
+    vfs.withSource({ kind: "processor", name }, run);
   for (const entry of plan.applications) {
     const { app, context } = entry;
     // Only manifests of already-generated shared packages are inherited. App files
@@ -77,8 +82,9 @@ export async function generateApplications(
           phase: "ownership",
           message: `Shared file ${file.path} was rendered more than once`,
         });
-      vfs.writeFile(file.path, file.content, file.sourcePath);
+      vfs.withoutTracing(() => vfs.writeFile(file.path, file.content, file.sourcePath));
     }
+    if (tree.provenance) vfs.importProvenance(tree.provenance);
     const packagePath = `apps/${app.selection.id}/package.json`;
     const pkg = vfs.readJson<PackageJson>(packagePath);
     if (!pkg)
@@ -87,32 +93,72 @@ export async function generateApplications(
         message: `Application ${app.selection.id} does not provide package.json`,
       });
     pkg.name = app.selection.id;
-    vfs.writeJson(packagePath, pkg);
+    vfs.withSource(
+      {
+        kind: "processor",
+        name: "application-package-name",
+        app: app.selection.id,
+        owner: app.selection.id,
+      },
+      () => vfs.writeJson(packagePath, pkg),
+    );
   }
 
   // Root dependencies are contributions from every app, not the root owner's stack.
   // Reuse dependency processors in an explicitly root-owned view; shared packages
   // have already been rendered and must not be processed again under another stack.
   for (const entry of plan.applications) {
-    const rootView = new VirtualFileSystem(entry.context.paths, {
-      ownsPath: (path) => !path.startsWith("apps/") && !path.startsWith("packages/"),
-      inheritedFiles: new Map(
-        vfs
-          .getAllFiles()
-          .filter((path) => path.endsWith("/package.json"))
-          .map((path) => [path, vfs.readFile(path)!]),
-      ),
-    });
+    const rootView = new VirtualFileSystem(
+      entry.context.paths,
+      {
+        ownsPath: (path) => !path.startsWith("apps/") && !path.startsWith("packages/"),
+        inheritedFiles: new Map(
+          vfs
+            .getAllFiles()
+            .filter((path) => path.endsWith("/package.json"))
+            .map((path) => [path, vfs.readFile(path)!]),
+        ),
+      },
+      {
+        trace: options.trace,
+        source: {
+          kind: "processor",
+          name: "workspace-dependencies",
+          app: entry.app.selection.id,
+          owner: plan.rootOwner,
+        },
+      },
+    );
     for (const path of ["package.json", "pnpm-workspace.yaml"]) {
       const content = vfs.readFile(path);
-      if (content !== undefined) rootView.writeFile(path, content);
+      if (content !== undefined) rootView.withoutTracing(() => rootView.writeFile(path, content));
     }
     const renderConfig = toRenderConfig(entry.config);
-    processWorkspaceDeps(rootView, renderConfig);
-    processEnvDeps(rootView, renderConfig);
-    processAddonsDeps(rootView, renderConfig);
-    processNpmScriptApprovals(rootView, renderConfig);
-    for (const path of rootView.getAllFiles()) vfs.writeFile(path, rootView.readFile(path)!);
+    renderConfig.application = entry.context;
+    if (options.trace)
+      rootView.importProvenance(
+        vfs
+          .getProvenance()
+          .filter(
+            (record) => record.path === "package.json" || record.path === "pnpm-workspace.yaml",
+          ),
+      );
+    const inheritedTraceLength = rootView.getProvenance().length;
+    rootView.withSource({ kind: "processor", name: "workspace-dependencies" }, () =>
+      processWorkspaceDeps(rootView, renderConfig),
+    );
+    rootView.withSource({ kind: "processor", name: "workspace-environment-dependencies" }, () =>
+      processEnvDeps(rootView, renderConfig),
+    );
+    rootView.withSource({ kind: "processor", name: "workspace-addon-dependencies" }, () =>
+      processAddonsDeps(rootView, renderConfig),
+    );
+    rootView.withSource({ kind: "processor", name: "workspace-script-approvals" }, () =>
+      processNpmScriptApprovals(rootView, renderConfig),
+    );
+    for (const path of rootView.getAllFiles())
+      vfs.withoutTracing(() => vfs.writeFile(path, rootView.readFile(path)!));
+    if (options.trace) vfs.importProvenance(rootView.getProvenance().slice(inheritedTraceLength));
   }
   const aggregateConfig: ProjectConfig = {
     ...config,
@@ -124,8 +170,8 @@ export async function generateApplications(
   rootConfig.application = plan.applications.find(
     (entry) => entry.app.selection.id === plan.rootOwner,
   )!.context;
-  updateRootPackageJson(vfs, rootConfig);
-  processTurboConfig(vfs, aggregateConfig);
+  stage("workspace-package-config", () => updateRootPackageJson(vfs, rootConfig));
+  stage("workspace-turbo", () => processTurboConfig(vfs, aggregateConfig));
   const root = vfs.readJson<PackageJson>("package.json");
   if (!root)
     throw new GeneratorError({ phase: "applications", message: "Missing workspace package.json" });
@@ -153,30 +199,38 @@ export async function generateApplications(
       .filter((command) => command && !command.startsWith("varlock codegen --path "));
     root.scripts.postinstall = [...existing, ...envCommands].join(" && ");
   }
-  vfs.writeJson("package.json", root);
-  processCatalogs(vfs, config);
-  vfs.writeJson(
-    "applications.json",
-    plan.applications.map(({ app }) => ({
-      id: app.selection.id,
-      type: app.selection.type,
-      stack: app.selection.stack,
-      roles: app.manifest.roles,
-      product: app.product ?? null,
-      bindings: app.bindings,
-    })),
+  stage("workspace-commands", () => vfs.writeJson("package.json", root));
+  stage("workspace-catalogs", () => processCatalogs(vfs, config));
+  stage("application-inventory", () =>
+    vfs.writeJson(
+      "applications.json",
+      plan.applications.map(({ app }) => ({
+        id: app.selection.id,
+        type: app.selection.type,
+        stack: app.selection.stack,
+        roles: app.manifest.roles,
+        product: app.product ?? null,
+        bindings: app.bindings,
+      })),
+    ),
   );
   if (options.version)
-    writeXStackConfigToVfs(vfs, config, options.version, generateReproducibleCommand(config));
-  vfs.writeFile(
-    "README.md",
-    `# ${config.projectName}\n\n## Applications\n\n${plan.applications.map(({ app }) => `- \`apps/${app.selection.id}\`: ${app.manifest.name} (${app.manifest.roles.join(", ") || "independent"}). Run \`${config.packageManager} run dev:${app.selection.id}\`.`).join("\n")}\n\nApplication ownership and resolved connections: \`applications.json\`.\n`,
+    stage("workspace-saved-config", () =>
+      writeXStackConfigToVfs(vfs, config, options.version!, generateReproducibleCommand(config)),
+    );
+  stage("workspace-readme", () =>
+    vfs.writeFile(
+      "README.md",
+      `# ${config.projectName}\n\n## Applications\n\n${plan.applications.map(({ app }) => `- \`apps/${app.selection.id}\`: ${app.manifest.name} (${app.manifest.roles.join(", ") || "independent"}). Run \`${config.packageManager} run dev:${app.selection.id}\`.`).join("\n")}\n\nApplication ownership and resolved connections: \`applications.json\`.\n`,
+    ),
   );
-  processAgentGuidance(vfs, config);
-  return {
+  stage("workspace-agent-guidance", () => processAgentGuidance(vfs, config));
+  const tree: VirtualFileTree = {
     root: vfs.toTree(config.projectName),
     fileCount: vfs.getFileCount(),
     directoryCount: vfs.getDirectoryCount(),
     config,
   };
+  if (options.trace) tree.provenance = vfs.getProvenance();
+  return tree;
 }

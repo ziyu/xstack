@@ -217,12 +217,12 @@ describe("module seams", () => {
   it("refuses to replace stack files that no longer exist", () => {
     const vfs = new VirtualFileSystem();
     vfs.writeFile("apps/web/src/app/page.tsx", "");
-    expect(replaceStackFiles(vfs, "core", ["apps/web/src/app/page.tsx"])).toEqual([
-      "apps/web/src/app/page.tsx",
-    ]);
-    expect(() => replaceStackFiles(vfs, "core", ["apps/web/src/app/page.tsx"])).toThrow(
-      "no longer generate",
-    );
+    expect(
+      replaceStackFiles(vfs, "core", ["apps/web/src/app/page.tsx"], config(undefined)),
+    ).toEqual(["apps/web/src/app/page.tsx"]);
+    expect(() =>
+      replaceStackFiles(vfs, "core", ["apps/web/src/app/page.tsx"], config(undefined)),
+    ).toThrow("no longer generate");
   });
 
   it("refuses module templates that overwrite undeclared stack files", async () => {

@@ -6,6 +6,7 @@ import { resolveApplications } from "../apps/plan";
 import { MODULE_CATALOG } from "../modules/catalog";
 import { resolveModules, toSelection } from "../modules/resolver";
 import type { ResolvedPlan } from "../modules/types";
+import { resolveApplicationContext } from "./context";
 
 export interface ModuleCapability {
   app: string;
@@ -40,25 +41,7 @@ export function resolveWorkspaceCapabilities(
           id: app.selection.id,
           type: app.selection.type,
           independent,
-          config: {
-            ...config,
-            ...app.adapter.stack,
-            frontend: app.adapter.stack.frontend ?? [],
-            backend: independent
-              ? (app.adapter.stack.backend ?? "none")
-              : (app.adapter.stack.backend ?? config.backend),
-            runtime: independent
-              ? (app.adapter.stack.runtime ?? "none")
-              : (app.adapter.stack.runtime ?? config.runtime),
-            api: independent
-              ? (app.adapter.stack.api ?? "none")
-              : app.manifest.roles.includes("backend")
-                ? (app.adapter.stack.api ?? config.api)
-                : config.api,
-            database: independent ? "none" : config.database,
-            orm: independent ? "none" : config.orm,
-            product: independent ? { features: [] } : config.product,
-          } satisfies ProjectConfig,
+          config: resolveApplicationContext(config, app),
         };
       })
     : [{ id: "web", type: "fullstack-web", independent: false, config }];

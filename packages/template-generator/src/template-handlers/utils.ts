@@ -28,18 +28,20 @@ export function processSingleTemplate(
 
   if (!content) return;
 
-  let processedContent: string;
-  if (isBinaryFile(templateKey)) {
-    processedContent = "[Binary file]";
-  } else if (templateKey.endsWith(".hbs")) {
-    processedContent = processTemplateString(content, config);
-  } else {
-    processedContent = content;
-  }
+  vfs.withSource({ kind: "template", name: templateKey }, () => {
+    let processedContent: string;
+    if (isBinaryFile(templateKey)) {
+      processedContent = "[Binary file]";
+    } else if (templateKey.endsWith(".hbs")) {
+      processedContent = processTemplateString(content, config);
+    } else {
+      processedContent = content;
+    }
 
-  // Pass original template path for binary files
-  const sourcePath = isBinaryFile(templateKey) ? templateKey : undefined;
-  vfs.writeFile(destPath, processedContent, sourcePath);
+    // Binary source paths are separate from text-template provenance.
+    const sourcePath = isBinaryFile(templateKey) ? templateKey : undefined;
+    vfs.writeFile(destPath, processedContent, sourcePath);
+  });
 }
 
 export function processTemplatesFromPrefix(
@@ -60,17 +62,19 @@ export function processTemplatesFromPrefix(
     const destPath = destPrefix ? `${destPrefix}/${outputPath}` : outputPath;
     if (!vfs.ownsPath(destPath)) continue;
 
-    let processedContent: string;
-    if (isBinaryFile(templatePath)) {
-      processedContent = "[Binary file]";
-    } else if (templatePath.endsWith(".hbs")) {
-      processedContent = processTemplateString(content, config);
-    } else {
-      processedContent = content;
-    }
+    vfs.withSource({ kind: "template", name: templatePath }, () => {
+      let processedContent: string;
+      if (isBinaryFile(templatePath)) {
+        processedContent = "[Binary file]";
+      } else if (templatePath.endsWith(".hbs")) {
+        processedContent = processTemplateString(content, config);
+      } else {
+        processedContent = content;
+      }
 
-    // Pass original template path for binary files
-    const sourcePath = isBinaryFile(templatePath) ? templatePath : undefined;
-    vfs.writeFile(destPath, processedContent, sourcePath);
+      // Binary source paths are separate from text-template provenance.
+      const sourcePath = isBinaryFile(templatePath) ? templatePath : undefined;
+      vfs.writeFile(destPath, processedContent, sourcePath);
+    });
   }
 }

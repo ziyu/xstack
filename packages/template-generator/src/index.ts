@@ -51,3 +51,4 @@ export type { StackContribution } from "./contributions/stack";
 export { requiredModuleContributions } from "./contributions/requirements";
 export { buildWorkspacePlan } from "./contributions/workspace";
 export type { WorkspacePlan } from "./contributions/workspace";
+export { resolveApplicationContext, appOutputPath } from "./contributions/context";

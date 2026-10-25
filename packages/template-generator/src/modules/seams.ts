@@ -1,6 +1,7 @@
-import type { ProjectConfig } from "@xstack/types";
 import { Node, Project, SyntaxKind } from "ts-morph";
 
+import { appOutputPath } from "../contributions/context";
+import type { ApplicationConfig } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { GeneratorError } from "../types";
 import { addPackageDependency } from "../utils/add-deps";
@@ -12,15 +13,7 @@ import type { EnvSpec, ServiceSpec } from "./types";
  * fails generation instead of being skipped silently.
  */
 
-const WEB = "apps/web";
-
-export const SEAM_FILES = {
-  appPackage: `${WEB}/package.json`,
-  env: `${WEB}/.env`,
-  envSchema: `${WEB}/.env.schema`,
-  services: `${WEB}/src/services.ts`,
-  dbSchemaIndex: "packages/db/src/schema/index.ts",
-} as const;
+const DB_SCHEMA_INDEX = "packages/db/src/schema/index.ts";
 
 function stackFile(vfs: VirtualFileSystem, path: string, seam: string): string {
   const content = vfs.readFile(path);
@@ -42,11 +35,21 @@ export function replaceStackFiles(
   vfs: VirtualFileSystem,
   module: string,
   paths: string[],
+  config: ApplicationConfig,
 ): string[] {
   const files = vfs.getAllFiles();
   const deleted: string[] = [];
   for (const logicalPath of paths) {
-    const path = vfs.resolvePath(logicalPath).replace(/\/$/, "");
+    const match = /^apps\/(web|server|native|fullstack-web)\/(.*)$/.exec(logicalPath);
+    const path = (
+      match
+        ? appOutputPath(
+            config,
+            match[1] === "fullstack-web" ? "web" : (match[1] as "web" | "server" | "native"),
+            match[2],
+          )
+        : logicalPath
+    ).replace(/\/$/, "");
     const targets = logicalPath.endsWith("/")
       ? files.filter((file) => file.startsWith(`${path}/`))
       : [path];
@@ -62,11 +65,16 @@ export function replaceStackFiles(
   return deleted;
 }
 
-export function addAppDependencies(vfs: VirtualFileSystem, dependencies: Record<string, string>) {
-  stackFile(vfs, SEAM_FILES.appPackage, "app dependencies");
+export function addAppDependencies(
+  vfs: VirtualFileSystem,
+  dependencies: Record<string, string>,
+  config: ApplicationConfig,
+) {
+  const path = appOutputPath(config, "web", "package.json");
+  stackFile(vfs, path, "app dependencies");
   addPackageDependency({
     vfs,
-    packagePath: SEAM_FILES.appPackage,
+    packagePath: path,
     customDependencies: dependencies,
   });
 }
@@ -75,12 +83,16 @@ export function addAppDependencies(vfs: VirtualFileSystem, dependencies: Record<
 export function addServerExternalPackages(
   vfs: VirtualFileSystem,
   packages: string[],
-  config: ProjectConfig,
+  config: ApplicationConfig,
 ) {
   if (!packages.length) return;
   const next = config.frontend.includes("next");
   const nuxt = config.frontend.includes("nuxt");
-  const path = `${WEB}/${next ? "next.config.ts" : nuxt ? "nuxt.config.ts" : "vite.config.ts"}`;
+  const path = appOutputPath(
+    config,
+    "web",
+    next ? "next.config.ts" : nuxt ? "nuxt.config.ts" : "vite.config.ts",
+  );
   const project = new Project({ useInMemoryFileSystem: true });
   const source = project.createSourceFile(path, stackFile(vfs, path, "server external packages"));
   const exported = source.getExportAssignment((assignment) => !assignment.isExportEquals());
@@ -156,8 +168,13 @@ export function addServerExternalPackages(
 export type ModuleEnvEntry = { module: string; spec: EnvSpec };
 
 /** Appends module variables to the server `.env`, grouped by module. */
-export function appendEnv(vfs: VirtualFileSystem, entries: ModuleEnvEntry[]) {
-  let content = stackFile(vfs, SEAM_FILES.env, "env");
+export function appendEnv(
+  vfs: VirtualFileSystem,
+  entries: ModuleEnvEntry[],
+  config: ApplicationConfig,
+) {
+  const path = appOutputPath(config, "server", ".env");
+  let content = stackFile(vfs, path, "env");
   let lastModule = "";
   for (const { module, spec } of entries) {
     if (new RegExp(`^\\s*#?\\s*${spec.key}=`, "m").test(content)) continue;
@@ -169,7 +186,7 @@ export function appendEnv(vfs: VirtualFileSystem, entries: ModuleEnvEntry[]) {
     const value = spec.example ?? spec.default ?? "";
     content += spec.required === false && !value ? `# ${spec.key}=\n` : `${spec.key}=${value}\n`;
   }
-  vfs.writeFile(SEAM_FILES.env, content);
+  vfs.writeFile(path, content);
 }
 
 function schemaType(spec: EnvSpec): string {
@@ -190,8 +207,13 @@ function schemaType(spec: EnvSpec): string {
 }
 
 /** Declares module variables in `.env.schema`, replacing stack declarations of the same key. */
-export function declareEnvSchema(vfs: VirtualFileSystem, entries: ModuleEnvEntry[]) {
-  let schema = stackFile(vfs, SEAM_FILES.envSchema, "env schema");
+export function declareEnvSchema(
+  vfs: VirtualFileSystem,
+  entries: ModuleEnvEntry[],
+  config: ApplicationConfig,
+) {
+  const path = appOutputPath(config, "server", ".env.schema");
+  let schema = stackFile(vfs, path, "env schema");
   for (const { spec } of entries) {
     const decorators = [
       spec.public ? "@public" : "",
@@ -205,7 +227,7 @@ export function declareEnvSchema(vfs: VirtualFileSystem, entries: ModuleEnvEntry
       ? schema.replace(pattern, block)
       : `${schema.trimEnd()}\n\n${block}\n`;
   }
-  vfs.writeFile(SEAM_FILES.envSchema, schema);
+  vfs.writeFile(path, schema);
 }
 
 /**
@@ -215,10 +237,10 @@ export function declareEnvSchema(vfs: VirtualFileSystem, entries: ModuleEnvEntry
  */
 export function wireServices(
   vfs: VirtualFileSystem,
-  config: ProjectConfig,
+  config: ApplicationConfig,
   services: ServiceSpec[],
 ) {
-  const existing = stackFile(vfs, SEAM_FILES.services, "services");
+  const existing = stackFile(vfs, appOutputPath(config, "server", "src/services.ts"), "services");
   const scope = `@${config.projectName}/`;
   const replaced = new Set(services.map((service) => service.name));
   if (
@@ -259,7 +281,7 @@ export function wireServices(
   const names = [...existingNames, ...services.map((service) => service.name)];
 
   const integrations = vfs
-    .listDir(`${WEB}/src/integrations`)
+    .listDir(appOutputPath(config, "server", "src/integrations"))
     .filter((file) => file.endsWith(".ts"))
     .map((file) => file.replace(/\.ts$/, ""));
 
@@ -286,7 +308,7 @@ export function wireServices(
     ...integrations.map((name) => `${camel(`register-${name}`)}(services);`),
   ];
   vfs.writeFile(
-    SEAM_FILES.services,
+    appOutputPath(config, "server", "src/services.ts"),
     `${lines
       .join("\n")
       .replace(/\n{3,}/g, "\n\n")
@@ -296,7 +318,7 @@ export function wireServices(
 /** Lazily builds one integrated graph per service property access; never captures request bindings at import time. */
 function wireCloudflareServices(
   vfs: VirtualFileSystem,
-  config: ProjectConfig,
+  config: ApplicationConfig,
   services: ServiceSpec[],
 ) {
   const scope = `@${config.projectName}/`;
@@ -325,12 +347,12 @@ function wireCloudflareServices(
     }
   }
   const integrations = vfs
-    .listDir(`${WEB}/src/integrations`)
+    .listDir(appOutputPath(config, "server", "src/integrations"))
     .filter((file) => file.endsWith(".ts"))
     .map((file) => file.slice(0, -3));
   const names = ["db", ...services.map((service) => service.name)];
   vfs.writeFile(
-    SEAM_FILES.services,
+    appOutputPath(config, "server", "src/services.ts"),
     [
       `import { createDb, type Database } from "${scope}db";`,
       'import { ENV } from "./env.server";',
@@ -388,14 +410,14 @@ function wireCloudflareServices(
 
 /** Re-exports every schema file, including those modules added, from the db package. */
 export function indexDbSchema(vfs: VirtualFileSystem) {
-  stackFile(vfs, SEAM_FILES.dbSchemaIndex, "db schema");
+  stackFile(vfs, DB_SCHEMA_INDEX, "db schema");
   const dir = "packages/db/src/schema";
   const files = vfs
     .listDir(dir)
     .filter((file) => file.endsWith(".ts") && file !== "index.ts")
     .map((file) => file.replace(/\.ts$/, ""));
   vfs.writeFile(
-    SEAM_FILES.dbSchemaIndex,
+    DB_SCHEMA_INDEX,
     `${files.map((file) => `export * from "./${file}";`).join("\n")}\nexport {};\n`,
   );
 }

@@ -10,3 +10,4 @@ export type {
 export { resolveApplicationConfig } from "./config";
 export { resolveWorkspaceCapabilities } from "../contributions/capabilities";
 export type { WorkspaceCapabilities, ModuleCapability } from "../contributions/capabilities";
+export { resolveApplicationContext, appOutputPath } from "../contributions/context";

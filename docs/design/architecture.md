@@ -677,3 +677,11 @@ WorkspacePlan 在 app 渲染前确定 root/package/file owner、依赖顺序和�
 resolveWorkspaceCapabilities 共用到生成入口、CLI 和 Builder；区分 native/stack/missing/not-applicable，移除 Builder 的 blanket split 禁用。旧 stack auth 明确标注缺少原生业务集成与管理员后台；真实后端服务初始化接收计划中的客户端 Origin，授权边界不使用通配符。
 
 验证：全栈 Next auth+credits+CLI 与拆分 React Router frontend/console+Hono auth+CLI 实际安装、全部 workspace 类型检查和构建、SQLite schema 应用通过。全栈注册/会话/积分页通过；拆分两个声明 Origin 的真实注册/会话通过，第三方 Origin 403。命名 portal 项目追加 credits 保留用户 README 和独立 CLI。浏览器验证 Builder 显示 stack auth 限制且真实预览成功。选择顺序反转的产物比较排除 createdAt 时间元数据，其余一致；未知贡献、缺失 provider、共享冲突与越权写入已有回归覆盖。
+
+### 27.4 C1 上下文与文件来源追踪
+
+前批已提交 1602811。本批将 workspace/preflight/capabilities 中重复的 app 配置投影收敛到浏览器可用 resolveApplicationContext；appOutputPath 区分当前客户端根目录与 backendRoot，环境生成、Varlock 数据库导入和服务初始化、模块 seams/navigation/proxy 使用实际路径。命名全栈及拆分路径测试无需 VFS canonical alias 即可通过；外围依赖/部署 processor 尚有兼容别名，不能据此宣称全仓固定路径清零。
+
+generate({trace:true}) 返回 provenance：按顺序记录物理路径、create/update/delete、template/processor 来源、app/owner 和 previousSource。所有生成顶层阶段有命名 scope，文本及二进制模板均保留源码路径，模块替换显式归因 module:<id>:replaces；合并复制不伪造新来源，后续根包处理承接原来源。trace 默认关闭，不收集内容、密钥或内容 hash；追踪异常保留原阶段并附来源。诊断脚本 trace:contributions 接收完整 ProjectConfig JSON，可按输出路径过滤，不落盘生成项目。
+
+验收：121 项测试通过，生成器/Web/CLI 类型检查与本批定向 lint 通过。原始模板→后处理→删除→重新创建来源链、嵌套同步/异步 scope 恢复、只读 owner、独立应用隔离和默认无 trace 已覆盖。实际生成 portal 全栈（auth+credits+CLI）及 public-ui/ops-ui/service-api 拆分 auth，安装/类型检查/构建/SQLite schema 通过；两套真实注册、会话及全栈积分页访问通过。source trace 命令显示 portal 页面由 Next 模板创建、随后由 core 声明替换，未含正文。业务 C2–C6 未扩充；本批只推进 C1 正确性和可诊断性。

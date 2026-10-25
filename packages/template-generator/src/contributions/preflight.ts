@@ -6,6 +6,7 @@ import { toRenderConfig, getModulePlan } from "../modules/pipeline";
 import { planAuthContributions } from "../modules/stack/auth";
 import { planApiContributions } from "../template-handlers/api";
 import { GeneratorError, type RenderConfig } from "../types";
+import { resolveApplicationContext } from "./context";
 import { assertContributionInventory } from "./inventory";
 import { requiredModuleContributions } from "./requirements";
 import type { StackContribution } from "./stack";
@@ -24,20 +25,7 @@ export function planStackContributions(
   const contexts: { app?: string; config: RenderConfig; root?: string }[] = [];
   if (!apps.length) contexts.push({ config: toRenderConfig(config) });
   for (const app of apps) {
-    const independent = app.manifest.scope === "independent";
-    const local = toRenderConfig({
-      ...config,
-      ...app.adapter.stack,
-      apps: undefined,
-      frontend: app.adapter.stack.frontend ?? [],
-      api: independent
-        ? (app.adapter.stack.api ?? "none")
-        : app.manifest.roles.includes("backend")
-          ? (app.adapter.stack.api ?? config.api)
-          : config.api,
-      backend: independent ? "none" : (app.adapter.stack.backend ?? config.backend),
-      product: independent ? { features: [] } : config.product,
-    });
+    const local = toRenderConfig(resolveApplicationContext(config, app));
     local.application = {
       id: app.selection.id,
       type: app.selection.type,
@@ -45,6 +33,11 @@ export function planStackContributions(
       clientOrigins: [],
       paths: {},
       workspaceRuntime: config.runtime,
+      backendRoot: app.manifest.roles.includes("backend")
+        ? `apps/${app.selection.id}`
+        : app.bindings.backend
+          ? `apps/${app.bindings.backend}`
+          : undefined,
       ownsPath: () => true,
     };
     contexts.push({ app: app.selection.id, config: local, root: `apps/${app.selection.id}` });

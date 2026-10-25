@@ -1,5 +1,6 @@
 import { dirname, relative } from "pathe";
 
+import { appOutputPath } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { processSingleTemplate, type TemplateData } from "../template-handlers/utils";
 import type { RenderConfig } from "../types";
@@ -20,20 +21,21 @@ function schemaKeys(vfs: VirtualFileSystem, app: string, config: RenderConfig): 
   const keys = new Set<string>();
   for (const match of (vfs.readFile(`${app}/.env`) ?? "").matchAll(/^\s*#?\s*([A-Z][A-Z0-9_]*)=/gm))
     keys.add(match[1]!);
-  if (app === "apps/web" && config.backend === "none") {
+  if (app === appOutputPath(config, "web") && config.backend === "none") {
     for (const key of keys) if (key.endsWith("SERVER_URL")) keys.delete(key);
   }
   if (
     config.addons.includes("axiom") &&
-    ((app === "apps/server" && ["hono", "express", "fastify", "elysia"].includes(config.backend)) ||
-      (app === "apps/web" &&
+    ((app === appOutputPath(config, "server") &&
+      ["hono", "express", "fastify", "elysia"].includes(config.backend)) ||
+      (app === appOutputPath(config, "web") &&
         config.frontend.some((f) =>
           ["next", "tanstack-start", "nuxt", "svelte", "astro"].includes(f),
         )))
   ) {
     for (const key of ["AXIOM_API_KEY", "AXIOM_DATASET", "AXIOM_EDGE_URL"]) keys.add(key);
   }
-  const server = app === (config.backend === "self" ? "apps/web" : "apps/server");
+  const server = app === appOutputPath(config, "server");
   if (server) {
     if (config.database !== "none" && config.dbSetup !== "d1") {
       if (
@@ -52,8 +54,10 @@ function schemaKeys(vfs: VirtualFileSystem, app: string, config: RenderConfig): 
 
 function schema(keys: Set<string>, config: RenderConfig, envFile: string, app: string): string {
   const readOnlyRuntime =
-    (app === "apps/web" && config.webDeploy === "vercel") ||
-    (app === "apps/server" && config.serverDeploy === "vercel");
+    (app === appOutputPath(config, "web") && config.webDeploy === "vercel") ||
+    (config.backend !== "self" &&
+      app === appOutputPath(config, "server") &&
+      config.serverDeploy === "vercel");
   const lines = [
     "# @defaultRequired=true",
     "# @defaultSensitive=true",
@@ -134,12 +138,12 @@ function processAlchemySchema(vfs: VirtualFileSystem, config: RenderConfig): voi
     ...Array.from(source.matchAll(/Config\.(?:String|Redacted)\("([A-Z_]+)"\)/g), (m) => m[1]!),
   ]);
   const imports: string[] = [];
-  for (const app of ["apps/server", "apps/web"]) {
+  for (const app of new Set([appOutputPath(config, "server"), appOutputPath(config, "web")])) {
     if (!vfs.exists(`${app}/.env.schema`)) continue;
     const keys = new Set(["NODE_ENV", ...schemaKeys(vfs, app, config)]);
     const pick = [...inputs].filter((key) => keys.has(key));
     if (!pick.length) continue;
-    imports.push(`# @import(../../${vfs.resolvePath(app)}/, pick=[${pick.join(", ")}])`);
+    imports.push(`# @import(../../${app}/, pick=[${pick.join(", ")}])`);
     for (const key of pick) inputs.delete(key);
   }
   vfs.writeFile(
@@ -163,14 +167,16 @@ function processCloudflarePublicEnv(vfs: VirtualFileSystem, config: RenderConfig
       .getAllFiles()
       .some(
         (file) =>
-          file.startsWith(`${vfs.resolvePath("apps/web")}/`) &&
+          file.startsWith(`${appOutputPath(config, "web")}/`) &&
           vfs
             .readFile(file)
-            ?.includes(`from "${importPath(file, vfs.resolvePath("apps/web/src/env.public"))}"`),
+            ?.includes(
+              `from "${importPath(file, appOutputPath(config, "web", "src/env.public"))}"`,
+            ),
       )
   )
     return;
-  const keys = [...schemaKeys(vfs, "apps/web", config)].filter((key) =>
+  const keys = [...schemaKeys(vfs, appOutputPath(config, "web"), config)].filter((key) =>
     /^(VITE_|NEXT_PUBLIC_|NUXT_PUBLIC_|PUBLIC_)/.test(key),
   );
   const svelte = config.frontend.includes("svelte");
@@ -200,7 +206,7 @@ function processCloudflarePublicEnv(vfs: VirtualFileSystem, config: RenderConfig
     `} satisfies Pick<PublicCoercedEnvSchema, ${keys.map((key) => JSON.stringify(key)).join(" | ") || "never"}>;`,
     "",
   );
-  vfs.writeFile("apps/web/src/env.public.ts", lines.join("\n"));
+  vfs.writeFile(appOutputPath(config, "web", "src/env.public.ts"), lines.join("\n"));
 }
 
 /** App-owned schemas, loading, and composition of configured shared services. */
@@ -209,7 +215,7 @@ export function processVarlock(
   templates: TemplateData,
   config: RenderConfig,
 ): void {
-  const server = vfs.resolvePath(config.backend === "self" ? "apps/web" : "apps/server");
+  const server = appOutputPath(config, "server");
   const commands: string[] = [];
   const allKeys = new Set([
     "NODE_ENV",
@@ -220,18 +226,23 @@ export function processVarlock(
     "VERCEL_PROJECT_PRODUCTION_URL",
     "_VARLOCK_ENV_KEY",
   ]);
-  for (const app of ["apps/web", "apps/server", "apps/native"]) {
-    if (!vfs.exists(`${app}/package.json`)) continue;
+  const appRoots = new Set(
+    (["web", "server", "native"] as const).map((kind) => appOutputPath(config, kind)),
+  );
+  for (const app of appRoots) {
+    if (!vfs.ownsPath(app) || !vfs.exists(`${app}/package.json`)) continue;
     const keys = schemaKeys(vfs, app, config);
     for (const key of keys) allKeys.add(key);
     const envFile =
-      app === "apps/web" && config.frontend.includes("svelte") ? "env.generated.ts" : "env.ts";
+      app === appOutputPath(config, "web") && config.frontend.includes("svelte")
+        ? "env.generated.ts"
+        : "env.ts";
     vfs.writeFile(`${app}/.env.schema`, schema(keys, config, envFile, app));
     vfs.writeFile(`${app}/bunfig.toml`, `env = false\n${vfs.readFile(`${app}/bunfig.toml`) ?? ""}`);
     const pkg = vfs.readJson<Package>(`${app}/package.json`)!;
     pkg.scripts = { ...pkg.scripts, "env:generate": "varlock codegen" };
     vfs.writeJson(`${app}/package.json`, pkg);
-    commands.push(`varlock codegen --path ./${vfs.resolvePath(app)}/`);
+    commands.push(`varlock codegen --path ./${app}/`);
     const ignore = `${app}/.gitignore`;
     vfs.writeFile(ignore, `${vfs.readFile(ignore) ?? ""}\n!.env.schema\n/src/${envFile}\n`);
   }
@@ -269,6 +280,7 @@ export function processVarlock(
     config.runtime !== "workers" &&
     config.serverDeploy !== "cloudflare" &&
     !(config.backend === "self" && config.webDeploy === "cloudflare") &&
+    vfs.ownsPath(server) &&
     vfs.exists(`${server}/package.json`)
   ) {
     const execute =
@@ -286,7 +298,11 @@ export function processVarlock(
     root.scripts["auth:generate"] = `cd ${server} && ${config.packageManager} run auth:generate`;
   }
   if (vfs.ownsPath("package.json")) vfs.writeJson("package.json", root);
-  if (["express", "fastify"].includes(config.backend) && config.auth === "better-auth") {
+  if (
+    vfs.ownsPath(server) &&
+    ["express", "fastify"].includes(config.backend) &&
+    config.auth === "better-auth"
+  ) {
     addPackageDependency({
       vfs,
       packagePath: `${server}/package.json`,
@@ -296,6 +312,7 @@ export function processVarlock(
   if (
     config.backend !== "none" &&
     config.backend !== "convex" &&
+    vfs.ownsPath(server) &&
     vfs.exists(`${server}/package.json`)
   ) {
     processSingleTemplate(
@@ -318,10 +335,10 @@ export function processVarlock(
       `@${config.projectName}/app-services`,
       importPath(file, `${server}/src/services`),
     );
-    if (file !== vfs.resolvePath("apps/web/src/client.ts")) {
+    if (file !== appOutputPath(config, "web", "src/client.ts")) {
       content = content.replaceAll(
         `@${config.projectName}/auth/client`,
-        importPath(file, vfs.resolvePath("apps/web/src/client")),
+        importPath(file, appOutputPath(config, "web", "src/client")),
       );
     }
     if (app === server) {

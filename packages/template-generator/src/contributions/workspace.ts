@@ -5,6 +5,7 @@ import type { ResolvedApplication } from "../apps/plan";
 import { processTemplateString, transformFilename } from "../core/template-processor";
 import { getModulePlan, toRenderConfig } from "../modules/pipeline";
 import { GeneratorError, type ApplicationRenderContext } from "../types";
+import { resolveApplicationContext } from "./context";
 
 export interface WorkspaceApplication {
   app: ResolvedApplication;
@@ -99,25 +100,7 @@ export function buildWorkspacePlan(
     return rootFileOwners.get(path) ?? rootOwner;
   };
   const applications = ordered.map((app): WorkspaceApplication => {
-    const independent = app.manifest.scope === "independent";
-    const appConfig: ProjectConfig = {
-      ...config,
-      apps: undefined,
-      ...app.adapter.stack,
-      frontend: app.adapter.stack.frontend ?? ["none"],
-      api:
-        !independent && !app.manifest.roles.includes("backend")
-          ? config.api
-          : (app.adapter.stack.api ?? config.api),
-    };
-    if (independent) {
-      appConfig.backend = app.adapter.stack.backend ?? "none";
-      appConfig.runtime = app.adapter.stack.runtime ?? "none";
-      appConfig.api = app.adapter.stack.api ?? "none";
-      appConfig.database = "none";
-      appConfig.orm = "none";
-      appConfig.product = { features: [] };
-    }
+    const appConfig = resolveApplicationContext(config, app);
     const targetRoot = `apps/${app.selection.id}`;
     const paths: ApplicationRenderContext["paths"] = { [`apps/${app.selection.type}`]: targetRoot };
     if (
@@ -134,6 +117,11 @@ export function buildWorkspacePlan(
       port: ports.get(app.selection.id) ?? 3000,
       clientOrigins,
       workspaceRuntime: config.runtime,
+      backendRoot: app.manifest.roles.includes("backend")
+        ? targetRoot
+        : app.bindings.backend
+          ? `apps/${app.bindings.backend}`
+          : undefined,
       ownsPath: (path) => ownerOf(path) === app.selection.id,
     };
     return { app, config: appConfig, context };

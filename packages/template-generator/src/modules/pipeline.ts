@@ -1,5 +1,6 @@
 import { AuthSchema, type ProjectConfig } from "@xstack/types";
 
+import { appOutputPath } from "../contributions/context";
 import { Handlebars, isBinaryFile, transformFilename } from "../core/template-processor";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { TemplateData } from "../template-handlers/utils";
@@ -21,8 +22,6 @@ import {
 } from "./seams";
 import { processAuthTemplates } from "./stack/auth";
 import type { NavArea, ResolvedModule, ResolvedPlan, WorkspacePackageSpec } from "./types";
-
-const WEB = "apps/web";
 
 type PackageJson = {
   name?: string;
@@ -166,13 +165,15 @@ function renderPrefix(
         phase: "modules",
       });
     }
-    if (isBinaryFile(templatePath)) {
-      vfs.writeFile(destPath, "[Binary file]", templatePath);
-    } else if (templatePath.endsWith(".hbs")) {
-      vfs.writeFile(destPath, Handlebars.compile(content)(context));
-    } else {
-      vfs.writeFile(destPath, content);
-    }
+    vfs.withSource({ kind: "template", name: templatePath }, () => {
+      if (isBinaryFile(templatePath)) {
+        vfs.writeFile(destPath, "[Binary file]", templatePath);
+      } else if (templatePath.endsWith(".hbs")) {
+        vfs.writeFile(destPath, Handlebars.compile(content)(context));
+      } else {
+        vfs.writeFile(destPath, content);
+      }
+    });
   }
 }
 
@@ -230,9 +231,11 @@ export function processModuleTemplates(
       ...config.frontend.flatMap((framework) => manifest.frameworkReplaces?.[framework] ?? []),
     ];
     if (replacements.length) {
-      for (const file of replaceStackFiles(vfs, manifest.id, replacements)) {
-        stackFiles.delete(file);
-      }
+      vfs.withSource({ kind: "processor", name: `module:${manifest.id}:replaces` }, () => {
+        for (const file of replaceStackFiles(vfs, manifest.id, replacements, config)) {
+          stackFiles.delete(file);
+        }
+      });
     }
 
     const prefixes = [
@@ -275,16 +278,20 @@ export function processModuleTemplates(
           ...own.map((p) => p.devDependencies),
         ),
       });
-      addAppDependencies(vfs, { [`@${config.projectName}/${spec.dir}`]: workspaceVersion(config) });
+      addAppDependencies(
+        vfs,
+        { [`@${config.projectName}/${spec.dir}`]: workspaceVersion(config) },
+        config,
+      );
     }
 
-    if (manifest.appDependencies) addAppDependencies(vfs, manifest.appDependencies);
+    if (manifest.appDependencies) addAppDependencies(vfs, manifest.appDependencies, config);
     for (const framework of config.frontend) {
       const dependencies = manifest.frameworkAppDependencies?.[framework];
-      if (dependencies) addAppDependencies(vfs, dependencies);
+      if (dependencies) addAppDependencies(vfs, dependencies, config);
     }
     for (const spec of providerSpecs) {
-      if (spec.appDependencies) addAppDependencies(vfs, spec.appDependencies);
+      if (spec.appDependencies) addAppDependencies(vfs, spec.appDependencies, config);
       if (spec.serverExternalPackages)
         addServerExternalPackages(vfs, spec.serverExternalPackages, config);
     }
@@ -293,7 +300,7 @@ export function processModuleTemplates(
   if (vfs.ownsPath("packages/i18n")) aggregateMessages(vfs, plan);
   if (vfs.ownsPath("packages/db")) indexDbSchema(vfs);
   writeNavigation(vfs, config, plan);
-  if (config.frontend.includes("next")) writeProxy(vfs, plan);
+  if (config.frontend.includes("next")) writeProxy(vfs, plan, config);
   if (vfs.ownsPath("docs")) writeModuleDocsIndex(vfs, plan);
 }
 
@@ -312,14 +319,14 @@ function moduleEnv(plan: ResolvedPlan): ModuleEnvEntry[] {
 /** Phase 2 (after stack env files exist): add module variables to the server `.env`. */
 export function processModuleEnv(vfs: VirtualFileSystem, config: ProjectConfig): void {
   const plan = requirePlan(config);
-  if (plan) appendEnv(vfs, moduleEnv(plan));
+  if (plan) appendEnv(vfs, moduleEnv(plan), config);
 }
 
 /** Phase 3 (after the stack wrote `.env.schema` and `services.ts`): module-aware wiring. */
 export function finalizeModules(vfs: VirtualFileSystem, config: ProjectConfig): void {
   const plan = requirePlan(config);
   if (!plan) return;
-  declareEnvSchema(vfs, moduleEnv(plan));
+  declareEnvSchema(vfs, moduleEnv(plan), config);
   wireServices(
     vfs,
     config,
@@ -336,7 +343,7 @@ export function moduleReadmeSection(
   if (!plan) return "";
   const ids = new Set(plan.modules.map((m) => m.manifest.id));
   const run = `${config.packageManager} run`;
-  const webRoot = config.application?.paths["apps/web"] ?? "apps/web";
+  const webRoot = appOutputPath(config, "web");
 
   const modules = plan.modules.map(
     (m) =>
@@ -483,17 +490,17 @@ function writeNavigation(vfs: VirtualFileSystem, config: ProjectConfig, plan: Re
     "};",
     "",
   ];
-  vfs.writeFile(`${WEB}/src/config/navigation.ts`, lines.join("\n"));
+  vfs.writeFile(appOutputPath(config, "web", "src/config/navigation.ts"), lines.join("\n"));
 }
 
-function writeProxy(vfs: VirtualFileSystem, plan: ResolvedPlan) {
+function writeProxy(vfs: VirtualFileSystem, plan: ResolvedPlan, config: ProjectConfig) {
   const steps = plan.modules
     .flatMap((m) => m.manifest.proxy ?? [])
     .sort((a, b) => a.order - b.order);
   if (!steps.length) return;
 
   vfs.writeFile(
-    `${WEB}/src/lib/proxy.ts`,
+    appOutputPath(config, "web", "src/lib/proxy.ts"),
     [
       'import type { NextRequest, NextResponse } from "next/server";',
       "",
@@ -526,7 +533,7 @@ function writeProxy(vfs: VirtualFileSystem, plan: ResolvedPlan) {
     "};",
     "",
   ];
-  vfs.writeFile(`${WEB}/src/proxy.ts`, lines.join("\n"));
+  vfs.writeFile(appOutputPath(config, "web", "src/proxy.ts"), lines.join("\n"));
 }
 
 function writeModuleDocsIndex(vfs: VirtualFileSystem, plan: ResolvedPlan) {
