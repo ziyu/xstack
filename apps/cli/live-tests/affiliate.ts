@@ -6,6 +6,8 @@ import { pathToFileURL } from "node:url";
 
 import { z } from "zod";
 
+import { productBackendDirectory } from "./product-backend";
+
 // Local protocol fixture: real generated auth/DB/Stripe verifier/credit ledger.
 // No Stripe purchase, external Siteverify request, or live provider evidence.
 const project = resolve(process.argv[2] ?? "");
@@ -13,15 +15,16 @@ if (!project.startsWith(resolve(import.meta.dir, "../.smoke") + sep)) {
   throw new Error("Expected a disposable generated SQLite project under apps/cli/.smoke");
 }
 const load = (path: string) => import(pathToFileURL(`${project}/${path}`).href);
+const backend = await productBackendDirectory(project);
 const { createDb } = await load("packages/db/src/index.ts");
 const { createEventBus } = await load("packages/events/src/index.ts");
 const { createAuth } = await load("packages/auth/src/index.ts");
 const { createAffiliate } = await load("packages/affiliate/src/index.ts");
 const { createCredits } = await load("packages/credits/src/index.ts");
 const { createPayment, plans } = await load("packages/payment/src/index.ts");
-const { default: registerSignup } = await load("apps/web/src/integrations/affiliate-signup.ts");
-const { default: registerAffiliate } = await load("apps/web/src/integrations/affiliate-payment.ts");
-const { default: registerCredits } = await load("apps/web/src/integrations/payment-credits.ts");
+const { default: registerSignup } = await load(`${backend}/src/integrations/affiliate-signup.ts`);
+const { default: registerAffiliate } = await load(`${backend}/src/integrations/affiliate-payment.ts`);
+const { default: registerCredits } = await load(`${backend}/src/integrations/payment-credits.ts`);
 const db = createDb({ DATABASE_URL: `file:${project}/local.db` });
 const sqlite = new Database(`${project}/local.db`, { create: false, readwrite: true });
 const origin = "http://localhost:39841";

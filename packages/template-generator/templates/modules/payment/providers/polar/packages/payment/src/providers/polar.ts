@@ -105,6 +105,8 @@ export function createProvider({ env }: ProviderOptions<ProviderConfig>): Paymen
               type: "checkout.completed",
               orderId,
               providerRef: order.checkout_id ?? order.id,
+              amount: order.total_amount,
+              currency: order.currency,
               customerRef: order.customer_id,
               subscriptionRef: order.subscription_id ?? undefined,
             },

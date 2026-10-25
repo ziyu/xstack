@@ -79,7 +79,7 @@ export default defineModule({
     {
       name: "auth",
       imports: [{ from: "@app/auth", names: ["createAuth"] }],
-      init: "createAuth(ENV, db, events)",
+      init: "createAuth(ENV, db, events, {{{clientOrigins}}})",
     },
   ],
   proxy: [{ id: "auth-session", from: "./lib/auth-proxy", name: "authSessionStep", order: 90 }],

@@ -32,12 +32,25 @@ export type PaymentOptions = {
   env: ProvidersConfig;
   db: Database;
   events: EventBus;
-  /** Public app URL used to build absolute redirect URLs. */
+  /** Canonical backend URL used by providers for signed callback endpoints. */
   baseUrl: string;
+  /** Explicit browser origins allowed to receive checkout and portal returns. */
+  clientOrigins?: readonly string[];
 };
 
-export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
+export function createPayment({ env, db, events, baseUrl, clientOrigins = [] }: PaymentOptions) {
   const providers = createProviders(env, baseUrl);
+  const trustedReturnOrigins = new Set([new URL(baseUrl).origin, ...clientOrigins.map((origin) => new URL(origin).origin)]);
+
+  function returnUrl(path: string, returnOrigin?: string): string {
+    const origin = returnOrigin ?? new URL(baseUrl).origin;
+    if (!trustedReturnOrigins.has(origin)) {
+      throw new PaymentError("provider_error", "Untrusted payment return origin");
+    }
+    const url = new URL(path, origin);
+    if (url.origin !== origin) throw new PaymentError("provider_error", "Payment return path must stay on the trusted origin");
+    return url.href;
+  }
 
   function provider(id: string): PaymentProvider {
     const found = providers.find((p) => p.id === id);
@@ -207,6 +220,8 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
       successPath: string;
       cancelPath: string;
       checkoutPath?: string;
+      /** Supplied only by the trusted request boundary, never by checkout JSON. */
+      returnOrigin?: string;
     }): Promise<string> {
       const plan = getPlan(input.planId);
       if (!plan) throw new PaymentError("unknown_plan", `Unknown plan "${input.planId}"`);
@@ -222,6 +237,9 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
       if (plan.mode !== "payment" && current) {
         throw new PaymentError("already_subscribed", "You already have an active subscription");
       }
+      const successUrl = returnUrl(input.successPath, input.returnOrigin);
+      const cancelUrl = returnUrl(input.cancelPath, input.returnOrigin);
+      const checkoutUrl = returnUrl(input.checkoutPath ?? "/en/payment", input.returnOrigin);
 
       const orderId = crypto.randomUUID().replaceAll("-", "");
       await db.insert(paymentOrder).values({
@@ -242,8 +260,8 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
             email: input.user.email,
             providerRef: current?.provider === gateway.id ? (current.customerRef ?? undefined) : undefined,
           },
-          successUrl: new URL(input.successPath, baseUrl).toString(),
-          cancelUrl: new URL(input.cancelPath, baseUrl).toString(),
+          successUrl,
+          cancelUrl,
         })
         .catch((cause: unknown) => {
           console.error(`[payment] ${gateway.id} checkout failed`, cause);
@@ -254,7 +272,7 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
         .set({ providerRef: session.providerRef, qrCodeUrl: session.qrCodeUrl ?? null })
         .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "pending")));
       return session.qrCodeUrl
-        ? new URL(`${input.checkoutPath ?? "/en/payment"}/${orderId}`, baseUrl).toString()
+        ? `${checkoutUrl.replace(/\/$/, "")}/${orderId}`
         : session.url;
     },
 
@@ -267,7 +285,7 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
 
     getSubscription: activeSubscription,
 
-    async portalUrl(userId: string, returnPath: string): Promise<string> {
+    async portalUrl(userId: string, returnPath: string, returnOrigin?: string): Promise<string> {
       const subscription = await activeSubscription(userId);
       const gateway = subscription && provider(subscription.provider);
       if (!subscription?.customerRef || !gateway?.createPortalUrl) {
@@ -275,7 +293,7 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
       }
       return gateway.createPortalUrl(
         subscription.customerRef,
-        new URL(returnPath, baseUrl).toString(),
+        returnUrl(returnPath, returnOrigin),
       );
     },
 

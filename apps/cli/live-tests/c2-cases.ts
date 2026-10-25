@@ -39,13 +39,23 @@ export const c2Cases = [
     independentCli: "operations-c2",
   },
 ] as const;
-export type C2Case = (typeof c2Cases)[number];
+export type C2Case = {
+  id: string;
+  framework: "next" | "tanstack-start" | "nuxt" | "react-router";
+  database: "sqlite" | "postgres";
+  email: "resend" | "smtp";
+  sms: "twilio" | "aliyun" | "tencent";
+  appIds?: { backend: string; admin: string; public: string; fullstack: string };
+  independentCli?: string;
+};
 
 export function c2Input(test: C2Case, projectName: string): CreateInput {
-  const ids =
-    "appIds" in test
-      ? test.appIds
-      : { backend: "api", admin: "console", public: "portal", fullstack: "product" };
+  const ids = test.appIds ?? {
+    backend: "api",
+    admin: "console",
+    public: "portal",
+    fullstack: "product",
+  };
   const apps: NonNullable<CreateInput["apps"]> =
     test.framework === "react-router"
       ? [
@@ -68,7 +78,7 @@ export function c2Input(test: C2Case, projectName: string): CreateInput {
           },
         ]
       : [{ id: ids.fullstack, type: "fullstack-web", stack: { framework: test.framework } }];
-  if ("independentCli" in test)
+  if (test.independentCli)
     apps.push({ id: test.independentCli, type: "cli", stack: { framework: "node" } });
   return {
     projectName,

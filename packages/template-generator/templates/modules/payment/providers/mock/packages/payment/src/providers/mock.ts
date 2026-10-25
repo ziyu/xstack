@@ -10,7 +10,7 @@ const PERIOD_DAYS = { month: 30, year: 365 } as const;
  * Simulates checkout locally: the "checkout page" is `/api/payment/mock`, which posts
  * back a fake webhook. Refuses to run in production.
  */
-export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>): PaymentProvider {
+export function createProvider({ env }: ProviderOptions<ProviderConfig>): PaymentProvider {
   const guard = () => {
     if (env.NODE_ENV === "production") {
       throw new Error("The mock payment provider is disabled in production");
@@ -23,7 +23,7 @@ export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>
 
     async createCheckout({ orderId, plan, customer, successUrl, cancelUrl }) {
       guard();
-      const url = new URL("/api/payment/mock", baseUrl);
+      const url = new URL("/api/payment/mock", successUrl);
       url.search = new URLSearchParams({
         orderId,
         userId: customer.id,

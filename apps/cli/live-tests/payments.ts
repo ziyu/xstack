@@ -4,17 +4,20 @@ import { createCipheriv, generateKeyPairSync, randomBytes, sign, verify } from "
 import { resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { productBackendDirectory } from "./product-backend";
+
 // Local signed-provider fixture, never evidence of a real payment or merchant approval.
 const project = resolve(process.argv[2] ?? "");
 if (!project.startsWith(resolve(import.meta.dir, "../.smoke") + sep)) {
   throw new Error("Expected a disposable generated project inside apps/cli/.smoke");
 }
 const load = (path: string) => import(pathToFileURL(`${project}/${path}`).href);
+const backend = await productBackendDirectory(project);
 const { createDb } = await load("packages/db/src/index.ts");
 const { createPayment, plans } = await load("packages/payment/src/index.ts");
 const { createCredits } = await load("packages/credits/src/index.ts");
 const { createEventBus } = await load("packages/events/src/index.ts");
-const { default: registerCredits } = await load("apps/web/src/integrations/payment-credits.ts");
+const { default: registerCredits } = await load(`${backend}/src/integrations/payment-credits.ts`);
 const { createProvider: wechatProvider } = await load("packages/payment/src/providers/wechat.ts");
 const { createProvider: alipayProvider } = await load("packages/payment/src/providers/alipay.ts");
 const db = createDb({ DATABASE_URL: `file:${project}/local.db` });
@@ -25,6 +28,7 @@ registerCredits({ events, credits });
 const merchant = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const platform = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const env = {
+  NODE_ENV: "production",
   WECHAT_PAY_APP_ID: "wxpaymentfixture",
   WECHAT_PAY_MCH_ID: "1900000001",
   WECHAT_PAY_SERIAL_NO: "AABB0011",

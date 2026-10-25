@@ -1,0 +1,10 @@
+import { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import { AdminPagination } from "@/components/product-pagination";
+import { commissionSchema } from "@/lib/affiliate-contract";
+
+export const adminAffiliateSchema = z.object({ rows: z.array(commissionSchema), total: z.number() });
+export function AdminAffiliate({ data, page }: { data: z.infer<typeof adminAffiliateSchema>; page: number }) {
+  const t = useT();
+  return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("affiliate.admin.title")}</h1><p className="text-muted-foreground">{t("affiliate.admin.total", { total: data.total })}</p><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("affiliate.admin.title")}</caption><thead><tr>{(["order", "referrer", "customer", "credits", "status", "date"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(`affiliate.admin.${key}`)}</th>)}</tr></thead><tbody>{data.rows.map((entry) => <tr key={entry.orderId}><td className="border-b p-3">{entry.orderId}</td><td className="border-b p-3">{entry.referrerId}</td><td className="border-b p-3">{entry.userId}</td><td className="border-b p-3">{entry.credits}</td><td className="border-b p-3">{t(`affiliate.status.${entry.status}`)}</td><td className="border-b p-3">{entry.createdAt.slice(0, 10)}</td></tr>)}{!data.rows.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{t("affiliate.admin.empty")}</td></tr>}</tbody></table></div><AdminPagination page={page} total={data.total} path="affiliate" /></section>;
+}

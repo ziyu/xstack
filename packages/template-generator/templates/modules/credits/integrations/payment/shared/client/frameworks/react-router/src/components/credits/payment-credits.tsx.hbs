@@ -1,0 +1,10 @@
+import { useLocale, useT } from "@/components/i18n-provider";
+
+export function PlanCredits({ credits }: { credits: number | undefined }) {
+  const t = useT();
+  return credits ? <p className="text-sm">{t("payment.pricing.credits", { credits })}</p> : null;
+}
+export function BuyCredits() {
+  const t = useT(); const locale = useLocale();
+  return <a className="inline-block underline" href={`/${locale}/pricing`}>{t("credits.page.buyMore")}</a>;
+}

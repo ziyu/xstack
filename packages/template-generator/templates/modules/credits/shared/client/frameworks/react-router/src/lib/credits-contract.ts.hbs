@@ -1,0 +1,7 @@
+import { z } from "zod";
+
+export const creditTransactionSchema = z.object({
+  id: z.string(), amount: z.number(), balanceAfter: z.number(), reason: z.string().nullable(), createdAt: z.string(),
+  type: z.enum(["purchase", "subscription", "signup", "grant", "consume", "refund", "adjust", "affiliate"]),
+});
+export const creditsSchema = z.object({ balance: z.number(), transactions: z.array(creditTransactionSchema) });

@@ -7,7 +7,7 @@
       "productContribution": {
         "mode": "client",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -18,8 +18,8 @@
         "frameworks": [{ "id": "react-router", "modules": ["core"] }],
         "client": {
           "framework": "react-router",
-          "modules": ["core", "i18n", "auth", "admin", "captcha"],
-          "integrations": ["email", "sms"]
+          "modules": ["core", "i18n", "auth", "admin", "captcha", "payment", "credits", "affiliate"],
+          "integrations": ["email", "sms", "admin", "payment"]
         }
       },
       "stack": {
@@ -34,7 +34,7 @@
       "productContribution": {
         "mode": "client",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -45,8 +45,8 @@
         "frameworks": [{ "id": "react-router", "modules": ["core"] }],
         "client": {
           "framework": "react-router",
-          "modules": ["core", "i18n", "auth", "admin", "captcha"],
-          "integrations": ["email", "sms"]
+          "modules": ["core", "i18n", "auth", "admin", "captcha", "payment", "credits", "affiliate"],
+          "integrations": ["email", "sms", "admin", "payment"]
         }
       },
       "stack": {

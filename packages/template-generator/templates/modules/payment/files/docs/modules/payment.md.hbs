@@ -19,6 +19,14 @@ Selecting `wechat` or `alipay` generates CNY one-time credit packs, including wh
 Orders change state at most once. `payment.order_paid` is delivered at least once: if a handler throws, the webhook fails, the provider retries and the event is emitted again. Make handlers idempotent on `orderId`, as the credits integration does.
 
 Domestic settlement checks the signed merchant/app identity, stored order provider, amount and currency before fulfillment. Browser return URLs never grant purchases or prove payment. QR pages read the signed-in user's order only; refresh after paying to see the webhook-confirmed state.
+
+{{#if application.nativeSplit}}
+## Split application boundaries
+
+`{{appPath "backend"}}` is the sole payment service and webhook owner. Provider notification URLs use the backend's public `BETTER_AUTH_URL`; configure each provider once, never duplicate webhook endpoints in frontend/admin applications. Browser checkout, portal and QR return URLs use the validated requesting client's origin through its same-origin BFF. The service accepts only backend/declared client origins; body-supplied origin overrides are rejected. Provider credentials and ledger integrations remain server-only. Set actual public origins in the backend allowlist when deploying, and keep the client `VITE_SERVER_URL` pointed at that backend.
+
+The frontend owns pricing and billing/QR pages; the admin application owns order management. Both consume the same server payment domain. A browser success URL is navigation only and never settles an order.
+{{/if}}
 {{#if (includes module.providers "wechat")}}
 
 ## WeChat Native Pay
@@ -96,7 +104,7 @@ Webhook endpoint: `<BETTER_AUTH_URL>/api/payment/webhook/polar`, format "Raw", w
 
 ## Mock provider
 
-`mock` completes checkouts locally through `/api/payment/mock` without any account and appears as an explicit development payment choice. It is disabled in production; remove it from `packages/payment/src/providers/index.ts` before launch.
+`mock` completes authenticated, owned checkouts locally through `/api/payment/mock` without a provider account and appears as an explicit development payment choice. It is disabled in production; remove it from `packages/payment/src/providers/index.ts` before launch. The public `/api/payment/webhook/mock` route is rejected; mock settlement must pass the signed-in checkout and Origin checks. It is never evidence of a real payment.
 {{/if}}
 
 ## Adding a provider

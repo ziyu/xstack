@@ -1,0 +1,30 @@
+import { z } from "zod";
+import type { Translator } from "@{{projectName}}/i18n";
+import { productRequest } from "@/lib/product-contract";
+
+export const planSchema = z.object({
+  id: z.string(), mode: z.enum(["payment", "subscription"]), amount: z.number(), currency: z.string(),
+  interval: z.enum(["month", "year"]).optional(), credits: z.number().optional(), highlighted: z.boolean().optional(), providers: z.array(z.string()),
+});
+export const pricingSchema = z.object({ plans: z.array(planSchema) });
+export const orderSchema = z.object({
+  id: z.string(), planId: z.string(), provider: z.string(), amount: z.number(), currency: z.string(),
+  status: z.enum(["pending", "paid", "failed", "refunded"]), createdAt: z.string(),
+});
+export const billingSchema = z.object({
+  subscription: z.object({ planId: z.string(), provider: z.string(), status: z.enum(["active", "trialing", "past_due", "canceled", "incomplete", "unpaid"]), currentPeriodEnd: z.string().nullable(), cancelAtPeriodEnd: z.boolean() }).nullish(),
+  orders: z.array(orderSchema),
+});
+export const paymentOrderSchema = z.object({ order: orderSchema, qrImage: z.string().nullable() });
+const destinationSchema = z.object({ url: z.string().refine((value) => {
+  try { const url = new URL(value, "https://client.invalid"); return (url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password; } catch { return false; }
+}) });
+export function checkout(input: { planId: string; provider: string; locale: string }) { return productRequest("/api/payment/checkout", input, destinationSchema); }
+export function billingPortal(locale: string) { return productRequest("/api/payment/portal", { locale }, destinationSchema); }
+export function formatMoney(amount: number, currency: string, locale: string) { return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount / 100); }
+export function planLabel(t: Translator, id: string, field: "name" | "description" = "name") {
+  return id === "starter" || id === "pro" ? t(`payment.plans.${id}.${field}`) : field === "name" ? id : "";
+}
+export function providerLabel(t: Translator, id: string) {
+  return id === "stripe" || id === "polar" || id === "wechat" || id === "alipay" || id === "mock" ? t(`payment.providers.${id}`) : id;
+}

@@ -13,6 +13,7 @@ export default defineModule({
   requires: ["payment", "credits", "auth"],
   enhances: ["admin"],
   supports: NATIVE_SHELL_DB,
+  nativeSplit: true,
   options: {
     commissionPercent: {
       type: "number",

@@ -3418,7 +3418,7 @@ fastify.listen({ port: 3000{{#if (or (eq serverDeploy "docker") (eq serverDeploy
       "productContribution": {
         "mode": "server",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -3427,7 +3427,7 @@ fastify.listen({ port: 3000{{#if (or (eq serverDeploy "docker") (eq serverDeploy
           "webDeploy": ["none"]
         },
         "frameworks": [
-          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha"] },
+          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] },
           { "id": "hono", "modules": ["core"] }
         ]
       },
@@ -11293,7 +11293,7 @@ export function ThemeProvider({
       "productContribution": {
         "mode": "client",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -11304,8 +11304,8 @@ export function ThemeProvider({
         "frameworks": [{ "id": "react-router", "modules": ["core"] }],
         "client": {
           "framework": "react-router",
-          "modules": ["core", "i18n", "auth", "admin", "captcha"],
-          "integrations": ["email", "sms"]
+          "modules": ["core", "i18n", "auth", "admin", "captcha", "payment", "credits", "affiliate"],
+          "integrations": ["email", "sms", "admin", "payment"]
         }
       },
       "stack": {
@@ -11320,7 +11320,7 @@ export function ThemeProvider({
       "productContribution": {
         "mode": "client",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -11331,8 +11331,8 @@ export function ThemeProvider({
         "frameworks": [{ "id": "react-router", "modules": ["core"] }],
         "client": {
           "framework": "react-router",
-          "modules": ["core", "i18n", "auth", "admin", "captcha"],
-          "integrations": ["email", "sms"]
+          "modules": ["core", "i18n", "auth", "admin", "captcha", "payment", "credits", "affiliate"],
+          "integrations": ["email", "sms", "admin", "payment"]
         }
       },
       "stack": {
@@ -16529,40 +16529,13 @@ export const affiliateCommission = sqliteTable(
   (table) => [index("affiliate_commission_referrer_idx").on(table.referrerId, table.createdAt)],
 );
 `],
-  ["modules/affiliate/files/apps/fullstack-web/src/integrations/affiliate-payment.ts.hbs", `import type { Services } from "../services";
-
-/** Only verified payment events can earn credits; there is no client award endpoint. */
-export default function registerAffiliatePayment({ events, payment, affiliate, credits }: Services) {
-  events.on("payment.order_paid", async ({ orderId, userId, plan, amount, renewal }) => {
-    if (renewal) return;
-    const order = await payment.getOrder(userId, orderId);
-    if (!order || order.status !== "paid" || order.amount !== amount || order.planId !== plan.id) {
-      throw new Error("Affiliate settlement requires the persisted paid order");
-    }
-    const commission = await affiliate.prepareCommission({ orderId, userId, planCredits: plan.credits ?? 0, amount, renewal });
-    if (!commission || commission.status === "granted") return;
-    // The immutable intent survives a process failure. Replaying the webhook resumes it;
-    // the unique credit reference handles a failure after grant but before markGranted.
-    await credits.grant(commission.referrerId, commission.credits, {
-      type: "affiliate", reason: \`Referral purchase \${orderId}\`, referenceId: \`affiliate:\${orderId}\`,
-    });
-    await affiliate.markGranted(orderId);
-  });
-}
+  ["modules/affiliate/files/apps/backend/src/integrations/affiliate-payment.ts.hbs", `{{> affiliate/affiliate-payment}}
 `],
-  ["modules/affiliate/files/apps/fullstack-web/src/integrations/affiliate-signup.ts.hbs", `import type { Services } from "../services";
-
-export default function registerAffiliateSignup({ events, affiliate }: Services) {
-  events.on("auth.user_created", async ({ userId }) => {
-    try {
-      await affiliate.bindSignup(userId);
-    } catch {
-      // Account creation already committed. Payment fulfillment can recover from
-      // the immutable private signup token; don't report the signup as failed.
-      console.error("[affiliate] Signup attribution deferred until settlement");
-    }
-  });
-}
+  ["modules/affiliate/files/apps/backend/src/integrations/affiliate-signup.ts.hbs", `{{> affiliate/affiliate-signup}}
+`],
+  ["modules/affiliate/files/apps/fullstack-web/src/integrations/affiliate-payment.ts.hbs", `{{> affiliate/affiliate-payment}}
+`],
+  ["modules/affiliate/files/apps/fullstack-web/src/integrations/affiliate-signup.ts.hbs", `{{> affiliate/affiliate-signup}}
 `],
   ["modules/affiliate/files/docs/modules/affiliate.md.hbs", `# Referral credit rewards
 
@@ -16587,6 +16560,10 @@ The policy is configured at generation with \`affiliate.commissionPercent\` (0�
 ## Reports and access
 
 \`GET /api/affiliate\` returns the authenticated account's code, referral count, conversion count, granted/pending credit totals, and latest 50 conversions. It never uses a requested user ID. \`/<locale>/admin/affiliate\` is generated only with \`admin\` and authorizes administrators before querying all commission intents. No invitee email is exposed in the owned report. Both English and Simplified Chinese pages label rewards as credits.
+
+{{#if application.nativeSplit}}
+In split applications, referral links, capture cookies and signup return to the validated client host through its BFF. \`{{appPath "backend"}}/src/integrations/affiliate-signup.ts\` and \`affiliate-payment.ts\` alone bind attribution and grant purchase rewards. No client copy of signing secrets, payment subscriptions or award handlers is generated. Admin reports remain protected on the backend even when requested directly.
+{{/if}}
 
 ## Refunds and chargebacks
 
@@ -16831,40 +16808,9 @@ export type Affiliate = ReturnType<typeof createAffiliate>;
   },
 } as const;
 `],
-  ["modules/affiliate/frameworks/http-server/apps/fullstack-web/src/lib/native/affiliate.ts.hbs", `import { affiliate } from "@{{projectName}}/app-services";
-import { referralCodeSchema, referralCookieFromHeader, referralCookieName, referralCookieSeconds } from "@{{projectName}}/affiliate";
-import { auth } from "@{{projectName}}/app-services";
-import { z } from "zod";
-import { ENV } from "@/env.server";
-import { json, requireOrigin, requireSession } from "../product-api";
-{{#if (includes product.features "admin")}}
-import { pageOf, requireAdministrator } from "../product-api";
-{{/if}}
-export async function handle(request: Request, path: string): Promise<Response | undefined> {
-{{#if (includes product.features "admin")}}
-  if (path === "/api/product/referrals" && request.method === "GET") {
-    await requireAdministrator(request);
-    return json(await affiliate.listAll({ limit: 20, offset: (pageOf(request) - 1) * 20 }));
-  }
-{{/if}}
-  if ((path === "/api/affiliate" || path === "/api/product/affiliate") && request.method === "GET") {
-    const { user } = await requireSession(request);
-    const [code, report] = await Promise.all([affiliate.getCode(user.id), affiliate.report(user.id)]);
-    return json({ code, origin: new URL(ENV.BETTER_AUTH_URL).origin, commissionPercent: affiliate.commissionPercent, ...report });
-  }
-  if (path.startsWith("/api/product/referral/") && request.method === "GET") {
-    return await affiliate.findInviter(path.slice("/api/product/referral/".length)) ? json({ commissionPercent: affiliate.commissionPercent }) : json({ error: "not_found" }, 404);
-  }
-  if (path !== "/api/affiliate/capture" || request.method !== "POST") return;
-  requireOrigin(request);
-  const input = z.object({ code: referralCodeSchema, lang: z.enum(["en", "zh-CN"]) }).strict().safeParse(Object.fromEntries(new URL(request.url).searchParams));
-  if (!input.success) return json({ error: "invalid_referral" }, 400);
-  if (await auth.api.getSession({ headers: request.headers })) return json({ error: "existing_account" }, 409);
-  const value = await affiliate.capture(input.data.code, referralCookieFromHeader(request.headers.get("cookie") ?? undefined));
-  if (!value) return json({ error: "unknown_referrer" }, 404);
-  const trusted = new URL(ENV.BETTER_AUTH_URL);
-  return new Response(null, { status: 303, headers: { Location: new URL(\`/\${input.data.lang}/signup\`, trusted.origin).href, "Cache-Control": "no-store", "Set-Cookie": \`\${referralCookieName}=\${value}; HttpOnly; SameSite=Lax; Path=/; Max-Age=\${referralCookieSeconds}\${trusted.protocol === "https:" ? "; Secure" : ""}\` } });
-}
+  ["modules/affiliate/frameworks/http-server/apps/backend/src/lib/native/affiliate.ts.hbs", `{{> affiliate/affiliate}}
+`],
+  ["modules/affiliate/frameworks/http-server/apps/fullstack-web/src/lib/native/affiliate.ts.hbs", `{{> affiliate/affiliate}}
 `],
   ["modules/affiliate/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/affiliate/page.tsx.hbs", `import { affiliate } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
@@ -17100,6 +17046,111 @@ import { useLocale, useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
 export const Route = createFileRoute("/$lang/admin/affiliate")({ validateSearch: z.object({ page: z.coerce.number().int().min(1).catch(1) }), loaderDeps: ({ search }) => search, loader: ({ params, deps }) => loadProduct(\`/api/product/referrals?page=\${deps.page}\`, params.lang, z.object({ rows: z.array(z.object({ orderId: z.string(), userId: z.string(), referrerId: z.string(), credits: z.number(), status: z.string(), createdAt: z.string() })), total: z.number() })), component: Referrals });
 function Referrals() { const data = Route.useLoaderData(); const { page } = Route.useSearch(); const locale = useLocale(); const t = useT(); return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("affiliate.title")}</h1><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["Date", "Order", "Customer", "Referrer", "Credits", "Status"].map((label) => <th className="border-b p-3" key={label}>{label}</th>)}</tr></thead><tbody>{data.rows.map((row) => <tr key={row.orderId}><td className="border-b p-3">{new Date(row.createdAt).toLocaleString(locale)}</td><td className="border-b p-3 font-mono text-xs">{row.orderId}</td><td className="border-b p-3 font-mono text-xs">{row.userId}</td><td className="border-b p-3 font-mono text-xs">{row.referrerId}</td><td className="border-b p-3">{row.credits}</td><td className="border-b p-3">{row.status}</td></tr>)}</tbody></table></div>{!data.rows.length && <p>{t("affiliate.empty")}</p>}<nav className="flex justify-between" aria-label="Pagination">{page > 1 ? <a href={\`?page=\${page - 1}\`}>Previous</a> : <span />}{page * 20 < data.total && <a href={\`?page=\${page + 1}\`}>Next</a>}</nav></section>; }
+`],
+  ["modules/affiliate/integrations/admin/shared/client/frameworks/react-router/src/components/admin/admin-affiliate.tsx.hbs", `import { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import { AdminPagination } from "@/components/product-pagination";
+import { commissionSchema } from "@/lib/affiliate-contract";
+
+export const adminAffiliateSchema = z.object({ rows: z.array(commissionSchema), total: z.number() });
+export function AdminAffiliate({ data, page }: { data: z.infer<typeof adminAffiliateSchema>; page: number }) {
+  const t = useT();
+  return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("affiliate.admin.title")}</h1><p className="text-muted-foreground">{t("affiliate.admin.total", { total: data.total })}</p><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("affiliate.admin.title")}</caption><thead><tr>{(["order", "referrer", "customer", "credits", "status", "date"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(\`affiliate.admin.\${key}\`)}</th>)}</tr></thead><tbody>{data.rows.map((entry) => <tr key={entry.orderId}><td className="border-b p-3">{entry.orderId}</td><td className="border-b p-3">{entry.referrerId}</td><td className="border-b p-3">{entry.userId}</td><td className="border-b p-3">{entry.credits}</td><td className="border-b p-3">{t(\`affiliate.status.\${entry.status}\`)}</td><td className="border-b p-3">{entry.createdAt.slice(0, 10)}</td></tr>)}{!data.rows.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{t("affiliate.admin.empty")}</td></tr>}</tbody></table></div><AdminPagination page={page} total={data.total} path="affiliate" /></section>;
+}
+`],
+  ["modules/affiliate/shared/client/frameworks/react-router/src/components/affiliate/affiliate-pages.tsx.hbs", `import type { z } from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useLocale, useT } from "@/components/i18n-provider";
+import type { affiliateSchema } from "@/lib/affiliate-contract";
+
+export function AffiliatePage({ data }: { data: z.infer<typeof affiliateSchema> }) {
+  const t = useT(); const locale = useLocale(); const link = \`\${data.origin}/\${locale}/ref/\${encodeURIComponent(data.code)}\`;
+  const stats = [{ key: "signups", value: data.referredSignups }, { key: "conversions", value: data.convertedOrders }, { key: "earned", value: data.earnedCredits }, { key: "pending", value: data.pendingCredits }] as const;
+  return <section className="space-y-8"><header className="max-w-3xl space-y-4"><h1 className="font-serif text-4xl">{t("affiliate.title")}</h1><p className="text-muted-foreground">{t("affiliate.policy", { percent: data.commissionPercent })}</p></header><section className="space-y-3 rounded-lg border p-6"><label className="grid gap-2">{t("affiliate.link")}<input value={link} readOnly onFocus={(event) => event.currentTarget.select()} className="w-full rounded-md border bg-background p-3 text-sm" /></label><p className="text-sm text-muted-foreground">{t("affiliate.linkHint")}</p></section><dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{stats.map((stat) => <div key={stat.key} className="space-y-2 rounded-lg border p-6"><dt className="text-sm text-muted-foreground">{t(\`affiliate.stats.\${stat.key}\`)}</dt><dd className="font-serif text-4xl">{stat.value}</dd></div>)}</dl><section className="space-y-4"><h2 className="text-xl font-semibold">{t("affiliate.history")}</h2><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("affiliate.history")}</caption><thead><tr>{(["order", "credits", "status", "date"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(\`affiliate.admin.\${key}\`)}</th>)}</tr></thead><tbody>{data.conversions.map((entry) => <tr key={entry.orderId}><td className="border-b p-3">{entry.orderId}</td><td className="border-b p-3">{entry.credits}</td><td className="border-b p-3">{t(\`affiliate.status.\${entry.status}\`)}</td><td className="border-b p-3">{entry.createdAt.slice(0, 10)}</td></tr>)}{!data.conversions.length && <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">{t("affiliate.empty")}</td></tr>}</tbody></table></div></section><p className="max-w-3xl text-sm text-muted-foreground">{t("affiliate.refundPolicy")}</p></section>;
+}
+
+export function ReferralPage({ code, signedIn }: { code: string; signedIn: boolean }) {
+  const t = useT(); const locale = useLocale();
+  return <section className="mx-auto max-w-xl space-y-6 rounded-lg border p-8"><p className="text-sm uppercase tracking-widest text-muted-foreground">{t("affiliate.invite.eyebrow")}</p><h1 className="font-serif text-4xl">{t("affiliate.invite.title")}</h1><p>{t("affiliate.invite.description")}</p>{signedIn ? <a className="underline" href={\`/\${locale}/dashboard/affiliate\`}>{t("affiliate.nav.affiliate")}</a> : <form method="post" action={\`/api/affiliate/capture?\${new URLSearchParams({ code, lang: locale })}\`}><Button type="submit">{t("affiliate.invite.accept")}</Button></form>}</section>;
+}
+`],
+  ["modules/affiliate/shared/client/frameworks/react-router/src/lib/affiliate-contract.ts.hbs", `import { z } from "zod";
+
+export const commissionSchema = z.object({ orderId: z.string(), userId: z.string(), referrerId: z.string(), credits: z.number(), status: z.enum(["pending", "granted"]), createdAt: z.string(), grantedAt: z.string().nullable() });
+export const affiliateSchema = z.object({ code: z.string(), origin: z.string().url(), commissionPercent: z.number(), referredSignups: z.number(), convertedOrders: z.number(), earnedCredits: z.number(), pendingCredits: z.number(), conversions: z.array(commissionSchema) });
+export const referralSchema = z.object({ commissionPercent: z.number() });
+`],
+  ["modules/affiliate/shared/partials/affiliate-payment.hbs", `import type { Services } from "../services";
+
+/** Only verified payment events can earn credits; there is no client award endpoint. */
+export default function registerAffiliatePayment({ events, payment, affiliate, credits }: Services) {
+  events.on("payment.order_paid", async ({ orderId, userId, plan, amount, renewal }) => {
+    if (renewal) return;
+    const order = await payment.getOrder(userId, orderId);
+    if (!order || order.status !== "paid" || order.amount !== amount || order.planId !== plan.id) {
+      throw new Error("Affiliate settlement requires the persisted paid order");
+    }
+    const commission = await affiliate.prepareCommission({ orderId, userId, planCredits: plan.credits ?? 0, amount, renewal });
+    if (!commission || commission.status === "granted") return;
+    // The immutable intent survives a process failure. Replaying the webhook resumes it;
+    // the unique credit reference handles a failure after grant but before markGranted.
+    await credits.grant(commission.referrerId, commission.credits, {
+      type: "affiliate", reason: \`Referral purchase \${orderId}\`, referenceId: \`affiliate:\${orderId}\`,
+    });
+    await affiliate.markGranted(orderId);
+  });
+}
+`],
+  ["modules/affiliate/shared/partials/affiliate-signup.hbs", `import type { Services } from "../services";
+
+export default function registerAffiliateSignup({ events, affiliate }: Services) {
+  events.on("auth.user_created", async ({ userId }) => {
+    try {
+      await affiliate.bindSignup(userId);
+    } catch {
+      // Account creation already committed. Payment fulfillment can recover from
+      // the immutable private signup token; don't report the signup as failed.
+      console.error("[affiliate] Signup attribution deferred until settlement");
+    }
+  });
+}
+`],
+  ["modules/affiliate/shared/partials/affiliate.hbs", `import { affiliate } from "@{{projectName}}/app-services";
+import { referralCodeSchema, referralCookieFromHeader, referralCookieName, referralCookieSeconds } from "@{{projectName}}/affiliate";
+import { auth } from "@{{projectName}}/app-services";
+import { z } from "zod";
+{{#unless application.nativeSplit}}
+import { ENV } from "@/env.server";
+{{/unless}}
+import { json, requireOrigin, requireSession } from "../product-api";
+{{#if (includes product.features "admin")}}
+import { pageOf, requireAdministrator } from "../product-api";
+{{/if}}
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  const trusted = new URL({{#if application.nativeSplit}}request.url{{else}}ENV.BETTER_AUTH_URL{{/if}});
+{{#if (includes product.features "admin")}}
+  if (path === "/api/product/referrals" && request.method === "GET") {
+    await requireAdministrator(request);
+    return json(await affiliate.listAll({ limit: 20, offset: (pageOf(request) - 1) * 20 }));
+  }
+{{/if}}
+  if ((path === "/api/affiliate" || path === "/api/product/affiliate") && request.method === "GET") {
+    const { user } = await requireSession(request);
+    const [code, report] = await Promise.all([affiliate.getCode(user.id), affiliate.report(user.id)]);
+    return json({ code, origin: trusted.origin, commissionPercent: affiliate.commissionPercent, ...report });
+  }
+  if (path.startsWith("/api/product/referral/") && request.method === "GET") {
+    return await affiliate.findInviter(path.slice("/api/product/referral/".length)) ? json({ commissionPercent: affiliate.commissionPercent }) : json({ error: "not_found" }, 404);
+  }
+  if (path !== "/api/affiliate/capture" || request.method !== "POST") return;
+  requireOrigin(request);
+  const input = z.object({ code: referralCodeSchema, lang: z.enum(["en", "zh-CN"]) }).strict().safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if (!input.success) return json({ error: "invalid_referral" }, 400);
+  if (await auth.api.getSession({ headers: request.headers })) return json({ error: "existing_account" }, 409);
+  const value = await affiliate.capture(input.data.code, referralCookieFromHeader(request.headers.get("cookie") ?? undefined));
+  if (!value) return json({ error: "unknown_referrer" }, 404);
+  return new Response(null, { status: 303, headers: { Location: new URL(\`/\${input.data.lang}/signup\`, trusted.origin).href, "Cache-Control": "no-store", "Set-Cookie": \`\${referralCookieName}=\${value}; HttpOnly; SameSite=Lax; Path=/; Max-Age=\${referralCookieSeconds}\${trusted.protocol === "https:" ? "; Secure" : ""}\` } });
+}
 `],
   ["modules/ai/dialects/postgres/packages/db/src/schema/ai.ts", `import { bigint, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
@@ -34402,6 +34453,13 @@ import { localeFromHeaders } from "@{{projectName}}/i18n";
 const preferredLocale = createServerFn({ method: "GET" }).handler(() => localeFromHeaders(getRequest().headers));
 export const Route = createFileRoute("/")({ beforeLoad: async () => { throw redirect({ href: \`/\${await preferredLocale()}\` }); } });
 `],
+  ["modules/core/shared/client/frameworks/react-router/src/components/product-pagination.tsx.hbs", `import { useLocale, useT } from "@/components/i18n-provider";
+
+export function AdminPagination({ page, total, path }: { page: number; total: number; path: string }) {
+  const t = useT(); const locale = useLocale(); const pages = Math.max(1, Math.ceil(total / 20));
+  return <nav aria-label="Pagination" className="flex items-center justify-between gap-4"><span>{t("admin.pagination.page", { page, pages })}</span><div className="flex gap-4">{page > 1 && <a className="underline" href={\`/\${locale}/admin/\${path}?page=\${page - 1}\`}>{t("admin.pagination.previous")}</a>}{page < pages && <a className="underline" href={\`/\${locale}/admin/\${path}?page=\${page + 1}\`}>{t("admin.pagination.next")}</a>}</div></nav>;
+}
+`],
   ["modules/core/shared/client/frameworks/react-router/src/components/product-shell.tsx.hbs", `import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
 import { useTheme } from "next-themes";
@@ -34543,6 +34601,21 @@ export async function mutateUser(input: UserMutation): Promise<void> {
   if (!response.ok) throw new Error(\`Account update failed (\${response.status})\`);
   z.object({ success: z.literal(true) }).parse(await response.json());
 }
+
+export class ProductRequestError extends Error {
+  constructor(readonly code: string, readonly status: number) { super(code); }
+}
+export async function productRequest<T>(path: string, input: unknown, schema: z.ZodType<T>): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST", credentials: "same-origin", cache: "no-store",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const result = z.object({ error: z.string() }).safeParse(await response.json().catch(() => null));
+    throw new ProductRequestError(result.success ? result.data.error : "request_failed", response.status);
+  }
+  return schema.parse(await response.json());
+}
 `],
   ["modules/core/shared/client/frameworks/react-router/src/lib/product-navigation.ts.hbs", `import { useNavigate, useRevalidator } from "react-router";
 export function useProductNavigation() {
@@ -34618,6 +34691,27 @@ import PhoneSignInForm from "@/components/auth/phone-sign-in-form";
 {{#if (includes product.features "admin")}}
 import { AdminOverview, AdminUsers } from "@/components/admin/admin-pages";
 {{/if}}
+{{#if (includes product.features "payment")}}
+import { Pricing, Billing, PaymentOrder } from "@/components/payment/payment-pages";
+import { pricingSchema, billingSchema, paymentOrderSchema } from "@/lib/payment-contract";
+{{/if}}
+{{#if (includes product.features "credits")}}
+import { CreditsPage } from "@/components/credits/credits-page";
+import { creditsSchema } from "@/lib/credits-contract";
+{{/if}}
+{{#if (includes product.features "affiliate")}}
+import { AffiliatePage, ReferralPage } from "@/components/affiliate/affiliate-pages";
+import { affiliateSchema, referralSchema } from "@/lib/affiliate-contract";
+{{/if}}
+{{#if (and (includes product.features "payment") (includes product.features "admin"))}}
+import { AdminOrders, ordersSchema } from "@/components/admin/admin-orders";
+{{/if}}
+{{#if (and (includes product.features "credits") (includes product.features "admin"))}}
+import { AdminCredits, adminCreditsSchema } from "@/components/admin/admin-credits";
+{{/if}}
+{{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}
+import { AdminAffiliate, adminAffiliateSchema } from "@/components/admin/admin-affiliate";
+{{/if}}
 
 export const headers: HeadersFunction = ({ loaderHeaders, errorHeaders }) => {
   const output = new Headers(privateHeaders);
@@ -34636,16 +34730,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const locale = segments[0];
   if (!isLocale(locale)) throw new Response("Not found", { status: 404, headers });
   const page = segments.slice(1).join("/");
-  const publicPages: string[] = ["", {{#if (includes product.features "auth")}}"login", "signup",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "email"))}} "forgot-password", "reset-password", "verify-email",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "sms"))}} "login/phone",{{/if}}];
-  const accountPages: string[] = [{{#if (includes product.features "auth")}}"dashboard", "dashboard/settings"{{/if}}];
-  const adminPages: string[] = [{{#if (includes product.features "admin")}}"admin", "admin/users"{{/if}}];
-  if (!publicPages.includes(page) && !accountPages.includes(page) && !(isAdminClient && adminPages.includes(page))) throw new Response("Not found", { status: 404, headers });
+  const orderId = {{#if (includes product.features "payment")}}/^payment\\/[^/]+$/.test(page) ? page.slice("payment/".length) : {{/if}}null;
+  const referralCode = {{#if (includes product.features "affiliate")}}/^ref\\/[a-zA-Z0-9_-]+$/.test(page) ? page.slice("ref/".length) : {{/if}}null;
+  const publicPages: string[] = ["", {{#if (includes product.features "auth")}}"login", "signup",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "email"))}} "forgot-password", "reset-password", "verify-email",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "sms"))}} "login/phone",{{/if}}{{#if (includes product.features "payment")}} "pricing",{{/if}}];
+  const accountPages: string[] = [{{#if (includes product.features "auth")}}"dashboard", "dashboard/settings",{{/if}}{{#if (includes product.features "payment")}} "dashboard/billing",{{/if}}{{#if (includes product.features "credits")}} "dashboard/credits",{{/if}}{{#if (includes product.features "affiliate")}} "dashboard/affiliate",{{/if}}];
+  const adminPages: string[] = [{{#if (includes product.features "admin")}}"admin", "admin/users",{{#if (includes product.features "payment")}} "admin/orders",{{/if}}{{#if (includes product.features "credits")}} "admin/credits",{{/if}}{{#if (includes product.features "affiliate")}} "admin/affiliate",{{/if}}{{/if}}];
+  if (!publicPages.includes(page) && !accountPages.includes(page) && !orderId && !referralCode && !(isAdminClient && adminPages.includes(page))) throw new Response("Not found", { status: 404, headers });
   let user: ProductUser | null = null;
   let config: ReturnType<typeof configSchema.parse> = { socialProviders: [], verifyEmail: false, canResetPassword: false };
 {{#if (includes product.features "auth")}}
   const session = await readBackend(request, "/api/product/session", sessionSchema, headers);
   user = session?.user ?? null;
-  const privatePage = accountPages.includes(page) || adminPages.includes(page);
+  const privatePage = accountPages.includes(page) || adminPages.includes(page) || !!orderId;
   if (privatePage && !user) throw redirect(\`/\${locale}/login?next=\${encodeURIComponent(\`/\${segments.join("/")}\${url.search}\`)}\`, { headers });
   if (privatePage && ({{#if (includes product.features "admin")}}isAdminClient || {{/if}}adminPages.includes(page)) && !isAdministrator(user)) throw new Response("Forbidden", { status: 403, headers });
   if (publicPages.includes(page)) config = await readBackend(request, "/api/product/config", configSchema, headers);
@@ -34657,7 +34753,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const search = { q: url.searchParams.get("q") ?? "", page: Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1)) };
   const overview = {{#if (includes product.features "admin")}}page === "admin" ? await readBackend(request, "/api/product/admin", overviewSchema, headers) : {{/if}}null;
   const users = {{#if (includes product.features "admin")}}page === "admin/users" ? await readBackend(request, \`/api/product/users?\${new URLSearchParams({ q: search.q, page: String(search.page) })}\`, usersSchema, headers) : {{/if}}null;
-  return data({ locale, page, user, config, next, nextPath, search, overview, users, token: url.searchParams.get("token") ?? "", error: url.searchParams.get("error") }, { headers });
+  const pricing = {{#if (includes product.features "payment")}}page === "pricing" ? await readBackend(request, "/api/product/pricing", pricingSchema, headers) : {{/if}}null;
+  const billing = {{#if (includes product.features "payment")}}page === "dashboard/billing" ? await readBackend(request, "/api/product/billing", billingSchema, headers) : {{/if}}null;
+  const paymentOrder = {{#if (includes product.features "payment")}}orderId ? await readBackend(request, \`/api/product/order/\${encodeURIComponent(orderId)}\`, paymentOrderSchema, headers) : {{/if}}null;
+  const credits = {{#if (includes product.features "credits")}}page === "dashboard/credits" ? await readBackend(request, "/api/product/credits", creditsSchema, headers) : {{/if}}null;
+  const affiliate = {{#if (includes product.features "affiliate")}}page === "dashboard/affiliate" ? await readBackend(request, "/api/product/affiliate", affiliateSchema, headers) : {{/if}}null;
+{{#if (includes product.features "affiliate")}}
+  if (referralCode) await readBackend(request, \`/api/product/referral/\${encodeURIComponent(referralCode)}\`, referralSchema, headers);
+{{/if}}
+  const orders = {{#if (and (includes product.features "payment") (includes product.features "admin"))}}page === "admin/orders" ? await readBackend(request, \`/api/product/orders?page=\${search.page}\`, ordersSchema, headers) : {{/if}}null;
+  const adminCredits = {{#if (and (includes product.features "credits") (includes product.features "admin"))}}page === "admin/credits" ? await readBackend(request, \`/api/product/credit-transactions?page=\${search.page}\`, adminCreditsSchema, headers) : {{/if}}null;
+  const adminAffiliate = {{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}page === "admin/affiliate" ? await readBackend(request, \`/api/product/referrals?page=\${search.page}\`, adminAffiliateSchema, headers) : {{/if}}null;
+  return data({ locale, page, user, config, next, nextPath, search, overview, users, pricing, billing, paymentOrder, credits, affiliate, referralCode, orders, adminCredits, adminAffiliate, returned: url.searchParams.get("status") === "success", token: url.searchParams.get("token") ?? "", error: url.searchParams.get("error") }, { headers });
 }
 
 export default function ProductPage() {
@@ -34691,6 +34798,27 @@ function Content({ result }: { result: ReturnType<typeof useLoaderData<typeof lo
 {{#if (includes product.features "admin")}}
   if (page === "admin" && result.overview) return <AdminOverview data={result.overview} locale={locale} />;
   if (page === "admin/users" && result.users && user) return <AdminUsers data={result.users} search={result.search} locale={locale} currentUser={user} />;
+{{/if}}
+{{#if (includes product.features "payment")}}
+  if (page === "pricing" && result.pricing) return <Pricing data={result.pricing} signedIn={!!user} />;
+  if (page === "dashboard/billing" && result.billing) return <Billing data={result.billing} returned={result.returned} />;
+  if (result.paymentOrder) return <PaymentOrder data={result.paymentOrder} />;
+{{/if}}
+{{#if (includes product.features "credits")}}
+  if (page === "dashboard/credits" && result.credits) return <CreditsPage data={result.credits} />;
+{{/if}}
+{{#if (includes product.features "affiliate")}}
+  if (page === "dashboard/affiliate" && result.affiliate) return <AffiliatePage data={result.affiliate} />;
+  if (result.referralCode) return <ReferralPage code={result.referralCode} signedIn={!!user} />;
+{{/if}}
+{{#if (and (includes product.features "payment") (includes product.features "admin"))}}
+  if (page === "admin/orders" && result.orders) return <AdminOrders data={result.orders} page={result.search.page} />;
+{{/if}}
+{{#if (and (includes product.features "credits") (includes product.features "admin"))}}
+  if (page === "admin/credits" && result.adminCredits) return <AdminCredits data={result.adminCredits} page={result.search.page} />;
+{{/if}}
+{{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}
+  if (page === "admin/affiliate" && result.adminAffiliate) return <AdminAffiliate data={result.adminAffiliate} page={result.search.page} />;
 {{/if}}
   return <section className="space-y-10 py-12"><div className="max-w-3xl space-y-6"><p className="text-sm uppercase tracking-widest">{{projectName}}</p><h1 className="font-serif text-5xl">{t("core.landing.title")}</h1><p className="text-lg text-muted-foreground">{t("core.landing.subtitle")}</p>{{#if (includes product.features "auth")}}<a href={\`/\${locale}/\${user ? isAdminClient && {{#if (includes product.features "admin")}}true{{else}}false{{/if}} ? "admin" : "dashboard" : "signup"}\`} className="inline-block border bg-foreground px-6 py-3 text-background">{t("core.landing.cta")}</a>{{/if}}</div><section className="space-y-6"><h2 className="text-2xl">{t("core.landing.features.title")}</h2><div className="grid gap-6 md:grid-cols-3">{(["modular", "portable", "deploy"] as const).map((feature) => <article key={feature} className="space-y-3 border p-6"><h3 className="font-semibold">{t(\`core.landing.features.\${feature}.title\`)}</h3><p className="text-muted-foreground">{t(\`core.landing.features.\${feature}.body\`)}</p></article>)}</div></section></section>;
 }
@@ -34873,24 +35001,9 @@ export const creditTransaction = sqliteTable(
   (table) => [index("credit_transaction_user_idx").on(table.userId, table.createdAt)],
 );
 `],
-  ["modules/credits/files/apps/fullstack-web/src/integrations/credits-signup.ts.hbs", `import type { Services } from "../services";
-
-{{#if module.options.signupBonus}}
-const SIGNUP_BONUS = {{module.options.signupBonus}};
-
-/** Grants the sign-up bonus once per account. */
-export default function registerCreditsSignup({ events, credits }: Services) {
-  events.on("auth.user_created", async ({ userId }) => {
-    await credits.grant(userId, SIGNUP_BONUS, {
-      type: "signup",
-      referenceId: \`signup:\${userId}\`,
-    });
-  });
-}
-{{else}}
-/** Sign-up bonus is disabled; set the credits \`signupBonus\` option to enable it. */
-export default function registerCreditsSignup(_services: Services) {}
-{{/if}}
+  ["modules/credits/files/apps/backend/src/integrations/credits-signup.ts.hbs", `{{> credits/credits-signup}}
+`],
+  ["modules/credits/files/apps/fullstack-web/src/integrations/credits-signup.ts.hbs", `{{> credits/credits-signup}}
 `],
   ["modules/credits/files/docs/modules/credits.md.hbs", `# Credits
 
@@ -34916,15 +35029,19 @@ await credits.adjust(userId, -20, "manual correction");
 ## Sources
 
 {{#if module.options.signupBonus}}
-- **Sign-up bonus:** {{module.options.signupBonus}} credits for each new account (\`{{appPath "fullstack-web"}}/src/integrations/credits-signup.ts\`).
+- **Sign-up bonus:** {{module.options.signupBonus}} credits for each new account (\`{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/integrations/credits-signup.ts\`).
 {{else}}
-- **Sign-up bonus:** disabled. Set the credits \`signupBonus\` option, or edit \`{{appPath "fullstack-web"}}/src/integrations/credits-signup.ts\`.
+- **Sign-up bonus:** disabled. Set the credits \`signupBonus\` option, or edit \`{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/integrations/credits-signup.ts\`.
 {{/if}}
 {{#if (includes module.integrations "payment")}}
 - **Purchases:** each paid order grants its plan's \`credits\` (\`packages/payment/src/plans.ts\`), keyed by \`order:<orderId>\`. Subscription renewals grant them again every period.
 {{/if}}
 {{#if (includes module.integrations "admin")}}
 - **Admin:** \`/admin/credits\` lists all transactions and lets admins adjust a user's balance by email.
+{{/if}}
+
+{{#if application.nativeSplit}}
+The backend owns balance/schema/ledger and subscribes to signup/payment events once. Clients do not import \`app-services\` or \`credits\`; signed-in pages use \`/api/product/credits\`, while \`/api/product/credit-transactions\` independently requires administrator authorization. Never grant credits from a browser checkout-return handler.
 {{/if}}
 `],
   ["modules/credits/files/packages/credits/src/events.ts.hbs", `import type { creditTransactionTypes } from "@{{projectName}}/db/schema/credits";
@@ -35227,35 +35344,9 @@ export type Credits = ReturnType<typeof createCredits>;
   },
 } as const;
 `],
-  ["modules/credits/frameworks/http-server/apps/fullstack-web/src/lib/native/credits.ts.hbs", `import { credits } from "@{{projectName}}/app-services";
-import { json, requireSession } from "../product-api";
-{{#if (includes product.features "admin")}}
-import { auth } from "@{{projectName}}/app-services";
-import { InsufficientCreditsError } from "@{{projectName}}/credits";
-import { z } from "zod";
-import { HttpError, pageOf, readJson, requireAdministrator, requireOrigin } from "../product-api";
-{{/if}}
-export async function handle(request: Request, path: string): Promise<Response | undefined> {
-  if (path === "/api/product/credits" && request.method === "GET") {
-    const { user } = await requireSession(request);
-    return json({ balance: await credits.getBalance(user.id), transactions: await credits.listTransactions(user.id) });
-  }
-{{#if (includes product.features "admin")}}
-  if (path !== "/api/product/credit-transactions") return;
-  const { user } = await requireAdministrator(request);
-  if (request.method === "GET") return json(await credits.listAllTransactions({ limit: 20, offset: (pageOf(request) - 1) * 20 }));
-  if (request.method === "POST") {
-    requireOrigin(request);
-    const data = z.object({ email: z.string().email().transform((value) => value.trim().toLowerCase()), amount: z.number().int().safe().refine((value) => value !== 0), reason: z.string().max(1000).default("") }).strict().parse(await readJson(request));
-    const { users } = await auth.api.listUsers({ headers: request.headers, query: { filterField: "email", filterValue: data.email, filterOperator: "eq", limit: 1 } });
-    if (!users[0]) throw new HttpError(404, "user_not_found");
-    try { await credits.adjust(users[0].id, data.amount, data.reason ? \`\${data.reason} (\${user.email})\` : user.email); }
-    catch (error) { if (error instanceof InsufficientCreditsError) throw new HttpError(409, "insufficient_credits"); throw error; }
-    return json({ success: true });
-  }
-  return json({ error: "method_not_allowed" }, 405);
-{{/if}}
-}
+  ["modules/credits/frameworks/http-server/apps/backend/src/lib/native/credits.ts.hbs", `{{> credits/credits}}
+`],
+  ["modules/credits/frameworks/http-server/apps/fullstack-web/src/lib/native/credits.ts.hbs", `{{> credits/credits}}
 `],
   ["modules/credits/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/credits/page.tsx.hbs", `import { credits } from "@{{projectName}}/app-services";
 {{#if (includes product.features "payment")}}
@@ -35526,7 +35617,124 @@ function CreditsAdmin() { const data = Route.useLoaderData(); const { page } = R
   async function adjust(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = event.currentTarget; const input = new FormData(form); setBusy(true); setMessage(""); try { await mutateProduct("/api/product/credit-transactions", { email: String(input.get("email")), amount: Number(input.get("amount")), reason: String(input.get("reason") ?? "") }); form.reset(); await router.invalidate(); setMessage(t("credits.admin.done")); } catch { setMessage(t("credits.admin.errors.invalid")); } finally { setBusy(false); } }
   return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("credits.admin.title")}</h1><form onSubmit={adjust} className="space-y-4 border p-6"><h2 className="font-medium">{t("credits.admin.adjust")}</h2><fieldset disabled={busy} className="grid gap-4 md:grid-cols-3"><label>{t("credits.admin.email")}<input name="email" type="email" required className="mt-2 w-full border bg-background p-2" /></label><label>{t("credits.admin.amount")}<input name="amount" type="number" step={1} required className="mt-2 w-full border bg-background p-2" /></label><label>{t("credits.admin.reason")}<input name="reason" maxLength={1000} className="mt-2 w-full border bg-background p-2" /></label></fieldset><p className="text-xs text-muted-foreground">{t("credits.admin.amountHint")}</p><button disabled={busy} className="bg-foreground px-4 py-2 text-background">{t("credits.admin.submit")}</button><p role="status">{message}</p></form><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["date", "user", "type", "reason", "amount", "balance"].map((label) => <th className="border-b p-3" key={label}>{label}</th>)}</tr></thead><tbody>{data.rows.map(({ transaction: row, email }) => <tr key={row.id}><td className="border-b p-3">{new Date(row.createdAt).toLocaleString(locale)}</td><td className="border-b p-3">{email}</td><td className="border-b p-3">{row.type}</td><td className="border-b p-3">{row.reason}</td><td className="border-b p-3">{row.amount}</td><td className="border-b p-3">{row.balanceAfter}</td></tr>)}</tbody></table></div>{!data.rows.length && <p>{t("credits.admin.empty")}</p>}<nav className="flex justify-between" aria-label="Pagination">{page > 1 ? <a href={\`?page=\${page - 1}\`}>Previous</a> : <span />}{page * 20 < data.total && <a href={\`?page=\${page + 1}\`}>Next</a>}</nav></section>; }
 `],
-  ["modules/credits/integrations/payment/apps/fullstack-web/src/integrations/payment-credits.ts.hbs", `import type { Services } from "../services";
+  ["modules/credits/integrations/admin/shared/client/frameworks/react-router/src/components/admin/admin-credits.tsx.hbs", `import { useState, type FormEvent } from "react";
+import { useRevalidator } from "react-router";
+import { z } from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useT } from "@/components/i18n-provider";
+import { AdminPagination } from "@/components/product-pagination";
+import { creditTransactionSchema } from "@/lib/credits-contract";
+import { ProductRequestError, productRequest } from "@/lib/product-contract";
+
+export const adminCreditsSchema = z.object({ rows: z.array(z.object({ transaction: creditTransactionSchema, email: z.string() })), total: z.number() });
+export function AdminCredits({ data, page }: { data: z.infer<typeof adminCreditsSchema>; page: number }) {
+  const t = useT(); const revalidator = useRevalidator();
+  const [pending, setPending] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
+  async function adjust(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (pending) return;
+    const form = event.currentTarget; const values = new FormData(form);
+    const email = String(values.get("email") ?? "").trim(); const amount = Number(values.get("amount")); const reason = String(values.get("reason") ?? "").trim();
+    setError(""); setNotice("");
+    if (!email || !Number.isSafeInteger(amount) || amount === 0 || Math.abs(amount) > 2147483647) { setError(t("credits.admin.errors.invalid")); return; }
+    setPending(true);
+    try {
+      await productRequest("/api/product/credit-transactions", { email, amount, reason }, z.object({ success: z.literal(true) }));
+      form.reset(); await revalidator.revalidate(); setNotice(t("credits.admin.done"));
+    } catch (error) { setError(t(error instanceof ProductRequestError && error.code === "user_not_found" ? "credits.admin.errors.user" : error instanceof ProductRequestError && error.code === "insufficient_credits" ? "credits.admin.errors.balance" : "auth.errors.generic")); }
+    finally { setPending(false); }
+  }
+  return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("credits.admin.title")}</h1><form onSubmit={(event) => void adjust(event)} className="max-w-xl space-y-4 rounded-lg border p-6"><h2 className="text-xl font-semibold">{t("credits.admin.adjust")}</h2><label className="grid gap-2">{t("credits.admin.email")}<input name="email" type="email" autoComplete="off" required className="rounded-md border bg-background p-2" disabled={pending} /></label><label className="grid gap-2">{t("credits.admin.amount")}<input name="amount" type="number" step="1" min={-2147483647} max={2147483647} required aria-describedby="credit-amount-hint" className="rounded-md border bg-background p-2" disabled={pending} /></label><p id="credit-amount-hint" className="text-sm text-muted-foreground">{t("credits.admin.amountHint")}</p><label className="grid gap-2">{t("credits.admin.reason")}<input name="reason" maxLength={1000} className="rounded-md border bg-background p-2" disabled={pending} /></label><Button type="submit" disabled={pending}>{t("credits.admin.submit")}</Button>{error && <p role="alert" className="text-destructive">{error}</p>}{notice && <p role="status">{notice}</p>}</form><div className="overflow-x-auto"><table className="w-full text-left text-sm" aria-busy={pending}><caption className="sr-only">{t("credits.page.history")}</caption><thead><tr>{(["date", "user", "type", "reason", "amount", "balance"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(\`credits.admin.columns.\${key}\`)}</th>)}</tr></thead><tbody>{data.rows.map(({ transaction: entry, email }) => <tr key={entry.id}><td className="border-b p-3">{entry.createdAt.slice(0, 10)}</td><td className="border-b p-3">{email}</td><td className="border-b p-3">{t(\`credits.types.\${entry.type}\`)}</td><td className="border-b p-3">{entry.reason ?? "—"}</td><td className="border-b p-3 tabular-nums">{entry.amount > 0 ? "+" : ""}{entry.amount}</td><td className="border-b p-3 tabular-nums">{entry.balanceAfter}</td></tr>)}{!data.rows.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{t("credits.admin.empty")}</td></tr>}</tbody></table></div><AdminPagination page={page} total={data.total} path="credits" /></section>;
+}
+`],
+  ["modules/credits/integrations/payment/apps/backend/src/integrations/payment-credits.ts.hbs", `{{> credits/payment-credits}}
+`],
+  ["modules/credits/integrations/payment/apps/fullstack-web/src/integrations/payment-credits.ts.hbs", `{{> credits/payment-credits}}
+`],
+  ["modules/credits/integrations/payment/shared/client/frameworks/react-router/src/components/credits/payment-credits.tsx.hbs", `import { useLocale, useT } from "@/components/i18n-provider";
+
+export function PlanCredits({ credits }: { credits: number | undefined }) {
+  const t = useT();
+  return credits ? <p className="text-sm">{t("payment.pricing.credits", { credits })}</p> : null;
+}
+export function BuyCredits() {
+  const t = useT(); const locale = useLocale();
+  return <a className="inline-block underline" href={\`/\${locale}/pricing\`}>{t("credits.page.buyMore")}</a>;
+}
+`],
+  ["modules/credits/shared/client/frameworks/react-router/src/components/credits/credits-page.tsx.hbs", `import type { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import type { creditsSchema } from "@/lib/credits-contract";
+{{#if (includes product.features "payment")}}
+import { BuyCredits } from "@/components/credits/payment-credits";
+{{/if}}
+
+export function CreditsPage({ data }: { data: z.infer<typeof creditsSchema> }) {
+  const t = useT();
+  return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("credits.page.title")}</h1><section className="space-y-4 rounded-lg border p-6"><h2 className="text-sm text-muted-foreground">{t("credits.page.balance")}</h2><p className="font-serif text-5xl">{data.balance}</p>
+{{#if (includes product.features "payment")}}
+    <BuyCredits />
+{{/if}}
+    </section><section className="space-y-4"><h2 className="text-xl font-semibold">{t("credits.page.history")}</h2><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("credits.page.history")}</caption><thead><tr>{(["date", "type", "reason", "amount", "balance"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(\`credits.admin.columns.\${key}\`)}</th>)}</tr></thead><tbody>{data.transactions.map((entry) => <tr key={entry.id}><td className="border-b p-3">{entry.createdAt.slice(0, 10)}</td><td className="border-b p-3">{t(\`credits.types.\${entry.type}\`)}</td><td className="border-b p-3">{entry.reason ?? "—"}</td><td className="border-b p-3 tabular-nums">{entry.amount > 0 ? "+" : ""}{entry.amount}</td><td className="border-b p-3 tabular-nums">{entry.balanceAfter}</td></tr>)}{!data.transactions.length && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">{t("credits.page.empty")}</td></tr>}</tbody></table></div></section></section>;
+}
+`],
+  ["modules/credits/shared/client/frameworks/react-router/src/lib/credits-contract.ts.hbs", `import { z } from "zod";
+
+export const creditTransactionSchema = z.object({
+  id: z.string(), amount: z.number(), balanceAfter: z.number(), reason: z.string().nullable(), createdAt: z.string(),
+  type: z.enum(["purchase", "subscription", "signup", "grant", "consume", "refund", "adjust", "affiliate"]),
+});
+export const creditsSchema = z.object({ balance: z.number(), transactions: z.array(creditTransactionSchema) });
+`],
+  ["modules/credits/shared/partials/credits-signup.hbs", `import type { Services } from "../services";
+
+{{#if module.options.signupBonus}}
+const SIGNUP_BONUS = {{module.options.signupBonus}};
+
+/** Grants the sign-up bonus once per account. */
+export default function registerCreditsSignup({ events, credits }: Services) {
+  events.on("auth.user_created", async ({ userId }) => {
+    await credits.grant(userId, SIGNUP_BONUS, {
+      type: "signup",
+      referenceId: \`signup:\${userId}\`,
+    });
+  });
+}
+{{else}}
+/** Sign-up bonus is disabled; set the credits \`signupBonus\` option to enable it. */
+export default function registerCreditsSignup(_services: Services) {}
+{{/if}}
+`],
+  ["modules/credits/shared/partials/credits.hbs", `import { credits } from "@{{projectName}}/app-services";
+import { json, requireSession } from "../product-api";
+{{#if (includes product.features "admin")}}
+import { auth } from "@{{projectName}}/app-services";
+import { InsufficientCreditsError } from "@{{projectName}}/credits";
+import { z } from "zod";
+import { HttpError, pageOf, readJson, requireAdministrator, requireOrigin } from "../product-api";
+{{/if}}
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path === "/api/product/credits" && request.method === "GET") {
+    const { user } = await requireSession(request);
+    return json({ balance: await credits.getBalance(user.id), transactions: await credits.listTransactions(user.id) });
+  }
+{{#if (includes product.features "admin")}}
+  if (path !== "/api/product/credit-transactions") return;
+  const { user } = await requireAdministrator(request);
+  if (request.method === "GET") return json(await credits.listAllTransactions({ limit: 20, offset: (pageOf(request) - 1) * 20 }));
+  if (request.method === "POST") {
+    requireOrigin(request);
+    const data = z.object({ email: z.string().email().transform((value) => value.trim().toLowerCase()), amount: z.number().int().safe().refine((value) => value !== 0), reason: z.string().max(1000).default("") }).strict().parse(await readJson(request));
+    const { users } = await auth.api.listUsers({ headers: request.headers, query: { filterField: "email", filterValue: data.email, filterOperator: "eq", limit: 1 } });
+    if (!users[0]) throw new HttpError(404, "user_not_found");
+    try { await credits.adjust(users[0].id, data.amount, data.reason ? \`\${data.reason} (\${user.email})\` : user.email); }
+    catch (error) { if (error instanceof InsufficientCreditsError) throw new HttpError(409, "insufficient_credits"); throw error; }
+    return json({ success: true });
+  }
+  return json({ error: "method_not_allowed" }, 405);
+{{/if}}
+}
+`],
+  ["modules/credits/shared/partials/payment-credits.hbs", `import type { Services } from "../services";
 
 /** Grants each paid order's plan credits; keyed by order id so webhook retries are safe. */
 export default function registerPaymentCredits({ events, credits }: Services) {
@@ -36200,6 +36408,14 @@ Selecting \`wechat\` or \`alipay\` generates CNY one-time credit packs, includin
 Orders change state at most once. \`payment.order_paid\` is delivered at least once: if a handler throws, the webhook fails, the provider retries and the event is emitted again. Make handlers idempotent on \`orderId\`, as the credits integration does.
 
 Domestic settlement checks the signed merchant/app identity, stored order provider, amount and currency before fulfillment. Browser return URLs never grant purchases or prove payment. QR pages read the signed-in user's order only; refresh after paying to see the webhook-confirmed state.
+
+{{#if application.nativeSplit}}
+## Split application boundaries
+
+\`{{appPath "backend"}}\` is the sole payment service and webhook owner. Provider notification URLs use the backend's public \`BETTER_AUTH_URL\`; configure each provider once, never duplicate webhook endpoints in frontend/admin applications. Browser checkout, portal and QR return URLs use the validated requesting client's origin through its same-origin BFF. The service accepts only backend/declared client origins; body-supplied origin overrides are rejected. Provider credentials and ledger integrations remain server-only. Set actual public origins in the backend allowlist when deploying, and keep the client \`VITE_SERVER_URL\` pointed at that backend.
+
+The frontend owns pricing and billing/QR pages; the admin application owns order management. Both consume the same server payment domain. A browser success URL is navigation only and never settles an order.
+{{/if}}
 {{#if (includes module.providers "wechat")}}
 
 ## WeChat Native Pay
@@ -36277,7 +36493,7 @@ Webhook endpoint: \`<BETTER_AUTH_URL>/api/payment/webhook/polar\`, format "Raw",
 
 ## Mock provider
 
-\`mock\` completes checkouts locally through \`/api/payment/mock\` without any account and appears as an explicit development payment choice. It is disabled in production; remove it from \`packages/payment/src/providers/index.ts\` before launch.
+\`mock\` completes authenticated, owned checkouts locally through \`/api/payment/mock\` without a provider account and appears as an explicit development payment choice. It is disabled in production; remove it from \`packages/payment/src/providers/index.ts\` before launch. The public \`/api/payment/webhook/mock\` route is rejected; mock settlement must pass the signed-in checkout and Origin checks. It is never evidence of a real payment.
 {{/if}}
 
 ## Adding a provider
@@ -36535,12 +36751,25 @@ export type PaymentOptions = {
   env: ProvidersConfig;
   db: Database;
   events: EventBus;
-  /** Public app URL used to build absolute redirect URLs. */
+  /** Canonical backend URL used by providers for signed callback endpoints. */
   baseUrl: string;
+  /** Explicit browser origins allowed to receive checkout and portal returns. */
+  clientOrigins?: readonly string[];
 };
 
-export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
+export function createPayment({ env, db, events, baseUrl, clientOrigins = [] }: PaymentOptions) {
   const providers = createProviders(env, baseUrl);
+  const trustedReturnOrigins = new Set([new URL(baseUrl).origin, ...clientOrigins.map((origin) => new URL(origin).origin)]);
+
+  function returnUrl(path: string, returnOrigin?: string): string {
+    const origin = returnOrigin ?? new URL(baseUrl).origin;
+    if (!trustedReturnOrigins.has(origin)) {
+      throw new PaymentError("provider_error", "Untrusted payment return origin");
+    }
+    const url = new URL(path, origin);
+    if (url.origin !== origin) throw new PaymentError("provider_error", "Payment return path must stay on the trusted origin");
+    return url.href;
+  }
 
   function provider(id: string): PaymentProvider {
     const found = providers.find((p) => p.id === id);
@@ -36710,6 +36939,8 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
       successPath: string;
       cancelPath: string;
       checkoutPath?: string;
+      /** Supplied only by the trusted request boundary, never by checkout JSON. */
+      returnOrigin?: string;
     }): Promise<string> {
       const plan = getPlan(input.planId);
       if (!plan) throw new PaymentError("unknown_plan", \`Unknown plan "\${input.planId}"\`);
@@ -36725,6 +36956,9 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
       if (plan.mode !== "payment" && current) {
         throw new PaymentError("already_subscribed", "You already have an active subscription");
       }
+      const successUrl = returnUrl(input.successPath, input.returnOrigin);
+      const cancelUrl = returnUrl(input.cancelPath, input.returnOrigin);
+      const checkoutUrl = returnUrl(input.checkoutPath ?? "/en/payment", input.returnOrigin);
 
       const orderId = crypto.randomUUID().replaceAll("-", "");
       await db.insert(paymentOrder).values({
@@ -36745,8 +36979,8 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
             email: input.user.email,
             providerRef: current?.provider === gateway.id ? (current.customerRef ?? undefined) : undefined,
           },
-          successUrl: new URL(input.successPath, baseUrl).toString(),
-          cancelUrl: new URL(input.cancelPath, baseUrl).toString(),
+          successUrl,
+          cancelUrl,
         })
         .catch((cause: unknown) => {
           console.error(\`[payment] \${gateway.id} checkout failed\`, cause);
@@ -36757,7 +36991,7 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
         .set({ providerRef: session.providerRef, qrCodeUrl: session.qrCodeUrl ?? null })
         .where(and(eq(paymentOrder.id, orderId), eq(paymentOrder.status, "pending")));
       return session.qrCodeUrl
-        ? new URL(\`\${input.checkoutPath ?? "/en/payment"}/\${orderId}\`, baseUrl).toString()
+        ? \`\${checkoutUrl.replace(/\\/$/, "")}/\${orderId}\`
         : session.url;
     },
 
@@ -36770,7 +37004,7 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
 
     getSubscription: activeSubscription,
 
-    async portalUrl(userId: string, returnPath: string): Promise<string> {
+    async portalUrl(userId: string, returnPath: string, returnOrigin?: string): Promise<string> {
       const subscription = await activeSubscription(userId);
       const gateway = subscription && provider(subscription.provider);
       if (!subscription?.customerRef || !gateway?.createPortalUrl) {
@@ -36778,7 +37012,7 @@ export function createPayment({ env, db, events, baseUrl }: PaymentOptions) {
       }
       return gateway.createPortalUrl(
         subscription.customerRef,
-        new URL(returnPath, baseUrl).toString(),
+        returnUrl(returnPath, returnOrigin),
       );
     },
 
@@ -36946,69 +37180,9 @@ export interface PaymentProvider {
   createPortalUrl?(customerRef: string, returnUrl: string): Promise<string>;
 }
 `],
-  ["modules/payment/frameworks/http-server/apps/fullstack-web/src/lib/native/payment.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
-import { PaymentError, plans } from "@{{projectName}}/payment";
-import { isLocale{{#if (includes module.providers "mock")}}, defaultLocale{{/if}} } from "@{{projectName}}/i18n";
-import { z } from "zod";
-{{#if (includes module.providers "mock")}}
-import { ENV } from "@/env.server";
-{{/if}}
-import { HttpError, json, pageOf, readJson, requireAdministrator, requireOrigin, requireSession } from "../product-api";
-{{#if (includes module.providers "wechat")}}
-import QRCode from "qrcode";
-{{/if}}
-const input = z.object({ planId: z.string().min(1), provider: z.string().min(1), locale: z.string() }).strict();
-{{#if (includes module.providers "mock")}}
-const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
-{{/if}}
-export async function handle(request: Request, path: string): Promise<Response | undefined> {
-  if (path === "/api/product/pricing" && request.method === "GET") return json({ plans: plans.map((plan) => ({ ...plan, providers: payment.availableProviders(plan.id) })) });
-  if (path.startsWith("/api/payment/webhook/") && request.method === "POST") {
-    const provider = path.slice("/api/payment/webhook/".length);
-    try { await payment.handleWebhook(provider, request); return provider === "alipay" ? new Response("success") : provider === "wechat" ? new Response(null, { status: 204 }) : json({ received: true }); }
-    catch { console.error("Payment webhook failed"); return provider === "alipay" ? new Response("failure", { status: 400 }) : json({ error: "Webhook handling failed" }, 400); }
-  }
-  if (!["/api/product/billing", "/api/product/orders", "/api/payment/checkout", "/api/payment/portal", "/api/payment/mock"].includes(path) && !path.startsWith("/api/product/order/")) return;
-  const { user } = await requireSession(request);
-  if (request.method !== "GET") requireOrigin(request);
-  try {
-    if (path === "/api/product/billing" && request.method === "GET") return json({ subscription: await payment.getSubscription(user.id), orders: await payment.listOrders(user.id) });
-    if (path === "/api/product/orders" && request.method === "GET") { await requireAdministrator(request); return json(await payment.listAllOrders({ limit: 20, offset: (pageOf(request) - 1) * 20 })); }
-    if (path.startsWith("/api/product/order/") && request.method === "GET") {
-      const order = await payment.getOrder(user.id, decodeURIComponent(path.slice("/api/product/order/".length)));
-      if (!order) throw new HttpError(404, "not_found");
-      return json({ order, qrImage: {{#if (includes module.providers "wechat")}}order.status === "pending" && order.qrCodeUrl ? await QRCode.toDataURL(order.qrCodeUrl, { width: 256, margin: 2 }) : {{/if}}null });
-    }
-    if (path === "/api/payment/checkout" && request.method === "POST") {
-      const data = input.parse(await readJson(request)); if (!isLocale(data.locale)) throw new HttpError(400, "invalid_locale");
-      return json({ url: await payment.checkout({ user, planId: data.planId, provider: data.provider, checkoutPath: \`/\${data.locale}/payment\`, successPath: \`/\${data.locale}/dashboard/billing?status=success\`, cancelPath: \`/\${data.locale}/pricing\` }) });
-    }
-    if (path === "/api/payment/portal" && request.method === "POST") {
-      const data = z.object({ locale: z.string() }).strict().parse(await readJson(request)); if (!isLocale(data.locale)) throw new HttpError(400, "invalid_locale");
-      return json({ url: await payment.portalUrl(user.id, \`/\${data.locale}/dashboard/billing\`) });
-    }
-{{#if (includes module.providers "mock")}}
-    if (path === "/api/payment/mock") {
-      if (ENV.NODE_ENV === "production") throw new HttpError(404, "not_found");
-      const params = request.method === "GET" ? new URL(request.url).searchParams : new URLSearchParams(await request.text());
-      const order = await payment.getOrder(user.id, params.get("orderId") ?? "");
-      if (!order || order.provider !== "mock") throw new HttpError(404, "not_found");
-      const origin = new URL(ENV.BETTER_AUTH_URL).origin;
-      const safeUrl = (value: string | null) => { const url = new URL(value ?? \`/\${defaultLocale}/dashboard/billing\`, origin); return url.origin === origin ? url.href : new URL(\`/\${defaultLocale}/dashboard/billing\`, origin).href; };
-      if (request.method === "GET") {
-        const hidden = [...params].map(([key, value]) => \`<input type="hidden" name="\${escape(key)}" value="\${escape(value)}">\`).join("");
-        return new Response(\`<!doctype html><html lang="en"><head><title>Mock checkout</title></head><body><h1>Mock checkout</h1><p>No real payment is made.</p><form method="post">\${hidden}<button>Pay</button></form><a href="\${escape(safeUrl(params.get("cancel")))}">Cancel</a></body></html>\`, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
-      }
-      if (request.method === "POST") {
-        params.set("userId", user.id); params.set("planId", order.planId);
-        await payment.handleWebhook("mock", new Request(request.url, { method: "POST", body: params.toString() }));
-        return new Response(null, { status: 303, headers: { Location: safeUrl(params.get("success")), "Cache-Control": "no-store" } });
-      }
-    }
-{{/if}}
-    return json({ error: "method_not_allowed" }, 405);
-  } catch (error) { if (error instanceof PaymentError) return json({ error: error.code }, 400); throw error; }
-}
+  ["modules/payment/frameworks/http-server/apps/backend/src/lib/native/payment.ts.hbs", `{{> payment/payment}}
+`],
+  ["modules/payment/frameworks/http-server/apps/fullstack-web/src/lib/native/payment.ts.hbs", `{{> payment/payment}}
 `],
   ["modules/payment/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/billing/page.tsx.hbs", `import { payment } from "@{{projectName}}/app-services";
 import { getPlan } from "@{{projectName}}/payment";
@@ -37351,6 +37525,7 @@ export async function POST(
   { params }: { params: Promise<{ provider: string }> },
 ) {
   const { provider } = await params;
+  if (provider === "mock") return Response.json({ error: "not_found" }, { status: 404 });
   try {
     await payment.handleWebhook(provider, request);
     if (provider === "alipay") return new Response("success");
@@ -37612,6 +37787,17 @@ import { orderSchema, formatMoney } from "@/lib/payment-data";
 export const Route = createFileRoute("/$lang/admin/orders")({ validateSearch: z.object({ page: z.coerce.number().int().min(1).catch(1) }), loaderDeps: ({ search }) => search, loader: ({ params, deps }) => loadProduct(\`/api/product/orders?page=\${deps.page}\`, params.lang, z.object({ rows: z.array(z.object({ order: orderSchema, email: z.string().nullable() })), total: z.number() })), component: Orders });
 function Orders() { const data = Route.useLoaderData(); const { page } = Route.useSearch(); const locale = useLocale(); const t = useT(); return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("payment.admin.title")}</h1><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["date", "customer", "plan", "provider", "status", "amount"].map((label) => <th className="border-b p-3" key={label}>{label}</th>)}</tr></thead><tbody>{data.rows.map(({ order, email }) => <tr key={order.id}><td className="border-b p-3">{new Date(order.createdAt).toLocaleString(locale)}</td><td className="border-b p-3">{email}</td><td className="border-b p-3">{order.planId}</td><td className="border-b p-3">{order.provider}</td><td className="border-b p-3">{order.status}</td><td className="border-b p-3">{formatMoney(order.amount, order.currency, locale)}</td></tr>)}</tbody></table></div>{!data.rows.length && <p>{t("payment.admin.empty")}</p>}<nav className="flex justify-between" aria-label="Pagination">{page > 1 ? <a href={\`?page=\${page - 1}\`}>Previous</a> : <span />}{page * 20 < data.total && <a href={\`?page=\${page + 1}\`}>Next</a>}</nav></section>; }
 `],
+  ["modules/payment/integrations/admin/shared/client/frameworks/react-router/src/components/admin/admin-orders.tsx.hbs", `import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { AdminPagination } from "@/components/product-pagination";
+import { formatMoney, orderSchema, planLabel, providerLabel } from "@/lib/payment-contract";
+
+export const ordersSchema = z.object({ rows: z.array(z.object({ order: orderSchema, email: z.string() })), total: z.number() });
+export function AdminOrders({ data, page }: { data: z.infer<typeof ordersSchema>; page: number }) {
+  const t = useT(); const locale = useLocale();
+  return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("payment.admin.title")}</h1><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("payment.admin.title")}</caption><thead><tr>{(["date", "customer", "plan", "provider", "status", "amount"] as const).map((key) => <th key={key} scope="col" className="border-b p-3">{t(\`payment.admin.columns.\${key}\`)}</th>)}</tr></thead><tbody>{data.rows.map(({ order, email }) => <tr key={order.id}><td className="border-b p-3">{order.createdAt.slice(0, 10)}</td><td className="border-b p-3">{email}<span className="block text-xs text-muted-foreground">{order.id}</span></td><td className="border-b p-3">{planLabel(t, order.planId)}</td><td className="border-b p-3">{providerLabel(t, order.provider)}</td><td className="border-b p-3">{t(\`payment.admin.status.\${order.status}\`)}</td><td className="border-b p-3">{formatMoney(order.amount, order.currency, locale)}</td></tr>)}{!data.rows.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{t("payment.admin.empty")}</td></tr>}</tbody></table></div><AdminPagination page={page} total={data.total} path="orders" /></section>;
+}
+`],
   ["modules/payment/providers/alipay/packages/payment/src/providers/alipay.ts", `import { createPrivateKey, createPublicKey } from "node:crypto";
 
 import { AlipaySdk } from "alipay-sdk";
@@ -37789,38 +37975,43 @@ export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>
   };
 }
 `],
-  ["modules/payment/providers/mock/frameworks/next/apps/fullstack-web/src/app/api/payment/mock/route.ts.hbs", `import { payment } from "@{{projectName}}/app-services";
+  ["modules/payment/providers/mock/frameworks/next/apps/fullstack-web/src/app/api/payment/mock/route.ts.hbs", `import { auth, payment } from "@{{projectName}}/app-services";
+import { plans } from "@{{projectName}}/payment";
+import { defaultLocale } from "@{{projectName}}/i18n";
+import { ENV } from "@/env.server";
 
-function notFound() {
-  return new Response("Not found", { status: 404 });
+const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+const privateHeaders = { "Cache-Control": "no-store" };
+
+/** A session-owned checkout simulator, disabled in production. */
+async function handle(request: Request) {
+  if (ENV.NODE_ENV === "production") return new Response("Not found", { status: 404, headers: privateHeaders });
+  const origin = new URL(ENV.BETTER_AUTH_URL).origin;
+  if (request.method === "POST" && request.headers.get("origin") !== origin) return new Response("Forbidden", { status: 403, headers: privateHeaders });
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) return new Response("Unauthorized", { status: 401, headers: privateHeaders });
+  const params = request.method === "GET" ? new URL(request.url).searchParams : new URLSearchParams(await request.text());
+  const order = await payment.getOrder(session.user.id, params.get("orderId") ?? "");
+  if (!order || order.provider !== "mock") return new Response("Not found", { status: 404, headers: privateHeaders });
+  const safeUrl = (value: string | null) => {
+    const fallback = new URL(\`/\${defaultLocale}/dashboard/billing\`, origin).href;
+    try { const url = new URL(value ?? fallback, origin); return url.origin === origin ? url.href : fallback; }
+    catch { return fallback; }
+  };
+  if (request.method === "GET") {
+    const hidden = [...params].map(([key, value]) => \`<input type="hidden" name="\${escape(key)}" value="\${escape(value)}">\`).join("");
+    return new Response(\`<!doctype html><html lang="en"><head><title>Mock checkout</title></head><body><h1>Mock checkout</h1><p>No real payment is made.</p><form method="post">\${hidden}<button>Pay</button></form><a href="\${escape(safeUrl(params.get("cancel")))}">Cancel</a></body></html>\`, { headers: { ...privateHeaders, "Content-Type": "text/html; charset=utf-8" } });
+  }
+  const plan = plans.find((candidate) => candidate.id === order.planId);
+  params.set("userId", session.user.id);
+  params.set("planId", order.planId);
+  params.set("interval", plan && "interval" in plan && typeof plan.interval === "string" ? plan.interval : "");
+  await payment.handleWebhook("mock", new Request(request.url, { method: "POST", body: params.toString() }));
+  return new Response(null, { status: 303, headers: { ...privateHeaders, Location: safeUrl(params.get("success")) } });
 }
 
-/** A stand-in checkout page for local development. */
-export function GET(request: Request) {
-  if (process.env.NODE_ENV === "production") return notFound();
-  const params = new URL(request.url).searchParams;
-  const hidden = [...params]
-    .map(([name, value]) => \`<input type="hidden" name="\${name}" value="\${encodeURI(value)}">\`)
-    .join("");
-
-  return new Response(
-    \`<!doctype html><html><body style="font-family:system-ui;max-width:420px;margin:15vh auto;padding:0 16px">
-<h1 style="font-size:20px">Mock checkout</h1>
-<p>Plan <strong>\${encodeURI(params.get("planId") ?? "")}</strong>. No real payment is made.</p>
-<form method="post">\${hidden}<button style="padding:8px 16px">Pay</button>
-<a href="\${encodeURI(params.get("cancel") ?? "/")}" style="margin-left:12px">Cancel</a></form>
-</body></html>\`,
-    { headers: { "content-type": "text/html; charset=utf-8" } },
-  );
-}
-
-export async function POST(request: Request) {
-  if (process.env.NODE_ENV === "production") return notFound();
-  const body = await request.text();
-  await payment.handleWebhook("mock", new Request(request.url, { method: "POST", body }));
-  const success = new URLSearchParams(body).get("success");
-  return Response.redirect(success ?? new URL("/", request.url), 303);
-}
+export const GET = handle;
+export const POST = handle;
 `],
   ["modules/payment/providers/mock/packages/payment/src/providers/mock.ts", `import type { PaymentProvider, ProviderOptions, WebhookEvent } from "../types";
 
@@ -37834,7 +38025,7 @@ const PERIOD_DAYS = { month: 30, year: 365 } as const;
  * Simulates checkout locally: the "checkout page" is \`/api/payment/mock\`, which posts
  * back a fake webhook. Refuses to run in production.
  */
-export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>): PaymentProvider {
+export function createProvider({ env }: ProviderOptions<ProviderConfig>): PaymentProvider {
   const guard = () => {
     if (env.NODE_ENV === "production") {
       throw new Error("The mock payment provider is disabled in production");
@@ -37847,7 +38038,7 @@ export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>
 
     async createCheckout({ orderId, plan, customer, successUrl, cancelUrl }) {
       guard();
-      const url = new URL("/api/payment/mock", baseUrl);
+      const url = new URL("/api/payment/mock", successUrl);
       url.search = new URLSearchParams({
         orderId,
         userId: customer.id,
@@ -37997,6 +38188,8 @@ export function createProvider({ env }: ProviderOptions<ProviderConfig>): Paymen
               type: "checkout.completed",
               orderId,
               providerRef: order.checkout_id ?? order.id,
+              amount: order.total_amount,
+              currency: order.currency,
               customerRef: order.customer_id,
               subscriptionRef: order.subscription_id ?? undefined,
             },
@@ -38129,6 +38322,8 @@ export function createProvider({ env }: ProviderOptions<ProviderConfig>): Paymen
               type: "checkout.completed",
               orderId,
               providerRef: session.id,
+              amount: session.amount_total ?? undefined,
+              currency: session.currency ?? undefined,
               customerRef: ref(session.customer),
               subscriptionRef: ref(session.subscription),
             },
@@ -38405,6 +38600,163 @@ export function createProvider({ env, baseUrl }: ProviderOptions<ProviderConfig>
       ];
     },
   };
+}
+`],
+  ["modules/payment/shared/client/frameworks/react-router/src/components/payment/payment-pages.tsx.hbs", `import { useState } from "react";
+import { useRevalidator } from "react-router";
+import type { z } from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { ProductRequestError } from "@/lib/product-contract";
+import { billingPortal, checkout, formatMoney, planLabel, providerLabel, type billingSchema, type orderSchema, type paymentOrderSchema, type pricingSchema } from "@/lib/payment-contract";
+{{#if (includes product.features "credits")}}
+import { PlanCredits } from "@/components/credits/payment-credits";
+{{/if}}
+
+export function Pricing({ data, signedIn }: { data: z.infer<typeof pricingSchema>; signedIn: boolean }) {
+  const t = useT(); const locale = useLocale();
+  const [pending, setPending] = useState(""); const [error, setError] = useState("");
+  async function purchase(planId: string, provider: string) {
+    if (pending) return;
+    if (!signedIn) { window.location.assign(\`/\${locale}/login?next=\${encodeURIComponent(\`/\${locale}/pricing\`)}\`); return; }
+    setPending(\`\${planId}:\${provider}\`); setError("");
+    try { const result = await checkout({ planId, provider, locale }); window.location.assign(result.url); }
+    catch (error) { setError(t(error instanceof ProductRequestError && error.code === "already_subscribed" ? "payment.errors.alreadySubscribed" : "payment.errors.checkout")); setPending(""); }
+  }
+  return <section className="space-y-8"><header className="max-w-2xl space-y-4"><h1 className="font-serif text-4xl">{t("payment.pricing.title")}</h1><p className="text-lg text-muted-foreground">{t("payment.pricing.subtitle")}</p></header>
+    {error && <p role="alert" className="text-destructive">{error}</p>}
+    <div className="grid gap-6 md:grid-cols-2">{data.plans.map((plan) => <article key={plan.id} className={\`flex flex-col gap-5 rounded-lg border p-8 \${plan.highlighted ? "border-foreground" : ""}\`}><div className="space-y-2"><h2 className="font-serif text-2xl">{planLabel(t, plan.id)}</h2><p className="text-muted-foreground">{planLabel(t, plan.id, "description")}</p></div><p className="font-serif text-4xl">{formatMoney(plan.amount, plan.currency, locale)} <span className="font-sans text-sm text-muted-foreground">{plan.mode === "subscription" && plan.interval ? t(\`payment.pricing.per.\${plan.interval}\`) : t("payment.pricing.oneTime")}</span></p>
+{{#if (includes product.features "credits")}}
+      <PlanCredits credits={plan.credits} />
+{{/if}}
+      <div className="mt-auto grid gap-3">{plan.providers.map((provider) => <Button key={provider} type="button" disabled={!!pending} variant={plan.highlighted ? "default" : "outline"} onClick={() => void purchase(plan.id, provider)}>{t(plan.mode === "subscription" ? "payment.pricing.subscribeWith" : "payment.pricing.buyWith", { provider: providerLabel(t, provider) })}</Button>)}{!plan.providers.length && <p className="text-sm text-muted-foreground">{t("payment.pricing.noProviders")}</p>}</div></article>)}</div>
+  </section>;
+}
+
+export function OrderHistory({ orders }: { orders: z.infer<typeof orderSchema>[] }) {
+  const t = useT(); const locale = useLocale();
+  return <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("payment.billing.history")}</caption><thead><tr>{(["date", "plan", "provider", "amount", "status"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(\`payment.admin.columns.\${key}\`)}</th>)}</tr></thead><tbody>{orders.map((order) => <tr key={order.id}><td className="border-b p-3">{order.createdAt.slice(0, 10)}</td><td className="border-b p-3"><a className="underline" href={\`/\${locale}/payment/\${encodeURIComponent(order.id)}\`}>{planLabel(t, order.planId)}</a></td><td className="border-b p-3">{providerLabel(t, order.provider)}</td><td className="border-b p-3">{formatMoney(order.amount, order.currency, locale)}</td><td className="border-b p-3">{t(\`payment.admin.status.\${order.status}\`)}</td></tr>)}{!orders.length && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">{t("payment.billing.noOrders")}</td></tr>}</tbody></table></div>;
+}
+
+export function Billing({ data, returned }: { data: z.infer<typeof billingSchema>; returned: boolean }) {
+  const t = useT(); const locale = useLocale(); const revalidator = useRevalidator();
+  const [pending, setPending] = useState(false); const [error, setError] = useState("");
+  async function portal() {
+    if (pending) return; setPending(true); setError("");
+    try { const result = await billingPortal(locale); window.location.assign(result.url); }
+    catch { setError(t("payment.errors.checkout")); setPending(false); }
+  }
+  const subscription = data.subscription;
+  return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("payment.billing.title")}</h1>{returned && <p role="status" className="rounded-lg border p-4">{t("payment.billing.success")}</p>}{error && <p role="alert" className="text-destructive">{error}</p>}<section className="space-y-4 rounded-lg border p-6"><h2 className="text-xl font-semibold">{t("payment.billing.subscription")}</h2>{subscription ? <><p>{planLabel(t, subscription.planId)} · {t(\`payment.billing.status.\${subscription.status}\`)}</p>{subscription.currentPeriodEnd && <p className="text-muted-foreground">{t(subscription.cancelAtPeriodEnd ? "payment.billing.endsOn" : "payment.billing.renewsOn", { date: subscription.currentPeriodEnd.slice(0, 10) })}</p>}<Button disabled={pending} onClick={() => void portal()}>{t("payment.billing.manage")}</Button></> : <p className="text-muted-foreground">{t("payment.billing.none")}</p>}<div className="flex flex-wrap items-center gap-5"><a className="underline" href={\`/\${locale}/pricing\`}>{t("payment.billing.viewPlans")}</a><Button variant="outline" disabled={revalidator.state !== "idle"} onClick={() => void revalidator.revalidate()}>{t("payment.checkout.refresh")}</Button></div></section><section className="space-y-4"><h2 className="text-xl font-semibold">{t("payment.billing.history")}</h2><OrderHistory orders={data.orders} /></section></section>;
+}
+
+export function PaymentOrder({ data }: { data: z.infer<typeof paymentOrderSchema> }) {
+  const t = useT(); const locale = useLocale(); const revalidator = useRevalidator();
+  const { order, qrImage } = data;
+  return <section className="mx-auto max-w-xl space-y-6 rounded-lg border p-8"><h1 className="font-serif text-4xl">{t("payment.checkout.title")}</h1><p className="break-all text-sm text-muted-foreground">{order.id} · {providerLabel(t, order.provider)}</p><dl><dt className="text-sm text-muted-foreground">{t("payment.checkout.amount")}</dt><dd className="mt-2 font-serif text-3xl">{formatMoney(order.amount, order.currency, locale)}</dd></dl>{order.status === "pending" && qrImage && <div className="space-y-4"><p>{t("payment.checkout.scan")}</p><img className="mx-auto h-64 w-64" src={qrImage} alt={t("payment.checkout.qrAlt")} width={256} height={256} /></div>}<p role="status">{order.status === "paid" ? t("payment.checkout.paid") : order.status === "pending" ? t("payment.checkout.pending") : t(\`payment.admin.status.\${order.status}\`)}</p><div className="flex flex-wrap items-center gap-4"><Button variant="outline" disabled={revalidator.state !== "idle"} onClick={() => void revalidator.revalidate()}>{t("payment.checkout.refresh")}</Button><a className="underline" href={\`/\${locale}/dashboard/billing\`}>{t("payment.checkout.billing")}</a></div></section>;
+}
+`],
+  ["modules/payment/shared/client/frameworks/react-router/src/lib/payment-contract.ts.hbs", `import { z } from "zod";
+import type { Translator } from "@{{projectName}}/i18n";
+import { productRequest } from "@/lib/product-contract";
+
+export const planSchema = z.object({
+  id: z.string(), mode: z.enum(["payment", "subscription"]), amount: z.number(), currency: z.string(),
+  interval: z.enum(["month", "year"]).optional(), credits: z.number().optional(), highlighted: z.boolean().optional(), providers: z.array(z.string()),
+});
+export const pricingSchema = z.object({ plans: z.array(planSchema) });
+export const orderSchema = z.object({
+  id: z.string(), planId: z.string(), provider: z.string(), amount: z.number(), currency: z.string(),
+  status: z.enum(["pending", "paid", "failed", "refunded"]), createdAt: z.string(),
+});
+export const billingSchema = z.object({
+  subscription: z.object({ planId: z.string(), provider: z.string(), status: z.enum(["active", "trialing", "past_due", "canceled", "incomplete", "unpaid"]), currentPeriodEnd: z.string().nullable(), cancelAtPeriodEnd: z.boolean() }).nullish(),
+  orders: z.array(orderSchema),
+});
+export const paymentOrderSchema = z.object({ order: orderSchema, qrImage: z.string().nullable() });
+const destinationSchema = z.object({ url: z.string().refine((value) => {
+  try { const url = new URL(value, "https://client.invalid"); return (url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password; } catch { return false; }
+}) });
+export function checkout(input: { planId: string; provider: string; locale: string }) { return productRequest("/api/payment/checkout", input, destinationSchema); }
+export function billingPortal(locale: string) { return productRequest("/api/payment/portal", { locale }, destinationSchema); }
+export function formatMoney(amount: number, currency: string, locale: string) { return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount / 100); }
+export function planLabel(t: Translator, id: string, field: "name" | "description" = "name") {
+  return id === "starter" || id === "pro" ? t(\`payment.plans.\${id}.\${field}\`) : field === "name" ? id : "";
+}
+export function providerLabel(t: Translator, id: string) {
+  return id === "stripe" || id === "polar" || id === "wechat" || id === "alipay" || id === "mock" ? t(\`payment.providers.\${id}\`) : id;
+}
+`],
+  ["modules/payment/shared/partials/payment.hbs", `import { payment } from "@{{projectName}}/app-services";
+import { PaymentError, plans } from "@{{projectName}}/payment";
+import { isLocale{{#if (includes module.providers "mock")}}, defaultLocale{{/if}} } from "@{{projectName}}/i18n";
+import { z } from "zod";
+{{#if (includes module.providers "mock")}}
+import { ENV } from "@/env.server";
+{{/if}}
+import { HttpError, json, pageOf, readJson, requireAdministrator, requireOrigin, requireSession } from "../product-api";
+{{#if (includes module.providers "wechat")}}
+import QRCode from "qrcode";
+{{/if}}
+const input = z.object({ planId: z.string().min(1), provider: z.string().min(1), locale: z.string() }).strict();
+{{#if (includes module.providers "mock")}}
+const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+{{/if}}
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path === "/api/product/pricing" && request.method === "GET") return json({ plans: plans.map((plan) => ({ ...plan, providers: payment.availableProviders(plan.id) })) });
+  if (path.startsWith("/api/payment/webhook/") && request.method === "POST") {
+    const provider = path.slice("/api/payment/webhook/".length);
+    // Mock completion is authenticated below, never accepted as a public callback.
+    if (provider === "mock") return json({ error: "not_found" }, 404);
+    try { await payment.handleWebhook(provider, request); return provider === "alipay" ? new Response("success") : provider === "wechat" ? new Response(null, { status: 204 }) : json({ received: true }); }
+    catch { console.error("Payment webhook failed"); return provider === "alipay" ? new Response("failure", { status: 400 }) : json({ error: "Webhook handling failed" }, 400); }
+  }
+  if (!["/api/product/billing", "/api/product/orders", "/api/payment/checkout", "/api/payment/portal", "/api/payment/mock"].includes(path) && !path.startsWith("/api/product/order/")) return;
+  const { user } = await requireSession(request);
+  if (request.method !== "GET") requireOrigin(request);
+  try {
+    if (path === "/api/product/billing" && request.method === "GET") return json({ subscription: await payment.getSubscription(user.id), orders: await payment.listOrders(user.id) });
+    if (path === "/api/product/orders" && request.method === "GET") { await requireAdministrator(request); return json(await payment.listAllOrders({ limit: 20, offset: (pageOf(request) - 1) * 20 })); }
+    if (path.startsWith("/api/product/order/") && request.method === "GET") {
+      const order = await payment.getOrder(user.id, decodeURIComponent(path.slice("/api/product/order/".length)));
+      if (!order) throw new HttpError(404, "not_found");
+      return json({ order, qrImage: {{#if (includes module.providers "wechat")}}order.status === "pending" && order.qrCodeUrl ? await QRCode.toDataURL(order.qrCodeUrl, { width: 256, margin: 2 }) : {{/if}}null });
+    }
+    if (path === "/api/payment/checkout" && request.method === "POST") {
+      const data = input.parse(await readJson(request)); if (!isLocale(data.locale)) throw new HttpError(400, "invalid_locale");
+      return json({ url: await payment.checkout({ user, planId: data.planId, provider: data.provider, {{#if application.nativeSplit}}returnOrigin: new URL(request.url).origin, {{/if}}checkoutPath: \`/\${data.locale}/payment\`, successPath: \`/\${data.locale}/dashboard/billing?status=success\`, cancelPath: \`/\${data.locale}/pricing\` }) });
+    }
+    if (path === "/api/payment/portal" && request.method === "POST") {
+      const data = z.object({ locale: z.string() }).strict().parse(await readJson(request)); if (!isLocale(data.locale)) throw new HttpError(400, "invalid_locale");
+      return json({ url: await payment.portalUrl(user.id, \`/\${data.locale}/dashboard/billing\`{{#if application.nativeSplit}}, new URL(request.url).origin{{/if}}) });
+    }
+{{#if (includes module.providers "mock")}}
+    if (path === "/api/payment/mock") {
+      if (ENV.NODE_ENV === "production") throw new HttpError(404, "not_found");
+      const params = request.method === "GET" ? new URL(request.url).searchParams : new URLSearchParams(await request.text());
+      const order = await payment.getOrder(user.id, params.get("orderId") ?? "");
+      if (!order || order.provider !== "mock") throw new HttpError(404, "not_found");
+      const origin = new URL({{#if application.nativeSplit}}request.url{{else}}ENV.BETTER_AUTH_URL{{/if}}).origin;
+      const safeUrl = (value: string | null) => {
+        const fallback = new URL(\`/\${defaultLocale}/dashboard/billing\`, origin).href;
+        try { const url = new URL(value ?? fallback, origin); return url.origin === origin ? url.href : fallback; }
+        catch { return fallback; }
+      };
+      if (request.method === "GET") {
+        const hidden = [...params].map(([key, value]) => \`<input type="hidden" name="\${escape(key)}" value="\${escape(value)}">\`).join("");
+        return new Response(\`<!doctype html><html lang="en"><head><title>Mock checkout</title></head><body><h1>Mock checkout</h1><p>No real payment is made.</p><form method="post">\${hidden}<button>Pay</button></form><a href="\${escape(safeUrl(params.get("cancel")))}">Cancel</a></body></html>\`, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+      }
+      if (request.method === "POST") {
+        params.set("userId", user.id); params.set("planId", order.planId);
+        const plan = plans.find((candidate) => candidate.id === order.planId);
+        params.set("interval", plan && "interval" in plan && typeof plan.interval === "string" ? plan.interval : "");
+        await payment.handleWebhook("mock", new Request(request.url, { method: "POST", body: params.toString() }));
+        return new Response(null, { status: 303, headers: { Location: safeUrl(params.get("success")), "Cache-Control": "no-store" } });
+      }
+    }
+{{/if}}
+    return json({ error: "method_not_allowed" }, 405);
+  } catch (error) { if (error instanceof PaymentError) return json({ error: error.code }, 400); throw error; }
 }
 `],
   ["modules/seo/files/docs/modules/seo.md", `# Search metadata
@@ -42027,4 +42379,4 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 `]
 ]);
 
-export const TEMPLATE_COUNT = 884;
+export const TEMPLATE_COUNT = 909;

@@ -1,0 +1,6 @@
+import { useLocale, useT } from "@/components/i18n-provider";
+
+export function AdminPagination({ page, total, path }: { page: number; total: number; path: string }) {
+  const t = useT(); const locale = useLocale(); const pages = Math.max(1, Math.ceil(total / 20));
+  return <nav aria-label="Pagination" className="flex items-center justify-between gap-4"><span>{t("admin.pagination.page", { page, pages })}</span><div className="flex gap-4">{page > 1 && <a className="underline" href={`/${locale}/admin/${path}?page=${page - 1}`}>{t("admin.pagination.previous")}</a>}{page < pages && <a className="underline" href={`/${locale}/admin/${path}?page=${page + 1}`}>{t("admin.pagination.next")}</a>}</div></nav>;
+}

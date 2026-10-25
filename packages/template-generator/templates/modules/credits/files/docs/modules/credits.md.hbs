@@ -22,13 +22,17 @@ await credits.adjust(userId, -20, "manual correction");
 ## Sources
 
 {{#if module.options.signupBonus}}
-- **Sign-up bonus:** {{module.options.signupBonus}} credits for each new account (`{{appPath "fullstack-web"}}/src/integrations/credits-signup.ts`).
+- **Sign-up bonus:** {{module.options.signupBonus}} credits for each new account (`{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/integrations/credits-signup.ts`).
 {{else}}
-- **Sign-up bonus:** disabled. Set the credits `signupBonus` option, or edit `{{appPath "fullstack-web"}}/src/integrations/credits-signup.ts`.
+- **Sign-up bonus:** disabled. Set the credits `signupBonus` option, or edit `{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/integrations/credits-signup.ts`.
 {{/if}}
 {{#if (includes module.integrations "payment")}}
 - **Purchases:** each paid order grants its plan's `credits` (`packages/payment/src/plans.ts`), keyed by `order:<orderId>`. Subscription renewals grant them again every period.
 {{/if}}
 {{#if (includes module.integrations "admin")}}
 - **Admin:** `/admin/credits` lists all transactions and lets admins adjust a user's balance by email.
+{{/if}}
+
+{{#if application.nativeSplit}}
+The backend owns balance/schema/ledger and subscribes to signup/payment events once. Clients do not import `app-services` or `credits`; signed-in pages use `/api/product/credits`, while `/api/product/credit-transactions` independently requires administrator authorization. Never grant credits from a browser checkout-return handler.
 {{/if}}

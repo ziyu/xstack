@@ -1,32 +1,37 @@
-import { payment } from "@{{projectName}}/app-services";
+import { auth, payment } from "@{{projectName}}/app-services";
+import { plans } from "@{{projectName}}/payment";
+import { defaultLocale } from "@{{projectName}}/i18n";
+import { ENV } from "@/env.server";
 
-function notFound() {
-  return new Response("Not found", { status: 404 });
+const escape = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+const privateHeaders = { "Cache-Control": "no-store" };
+
+/** A session-owned checkout simulator, disabled in production. */
+async function handle(request: Request) {
+  if (ENV.NODE_ENV === "production") return new Response("Not found", { status: 404, headers: privateHeaders });
+  const origin = new URL(ENV.BETTER_AUTH_URL).origin;
+  if (request.method === "POST" && request.headers.get("origin") !== origin) return new Response("Forbidden", { status: 403, headers: privateHeaders });
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) return new Response("Unauthorized", { status: 401, headers: privateHeaders });
+  const params = request.method === "GET" ? new URL(request.url).searchParams : new URLSearchParams(await request.text());
+  const order = await payment.getOrder(session.user.id, params.get("orderId") ?? "");
+  if (!order || order.provider !== "mock") return new Response("Not found", { status: 404, headers: privateHeaders });
+  const safeUrl = (value: string | null) => {
+    const fallback = new URL(`/${defaultLocale}/dashboard/billing`, origin).href;
+    try { const url = new URL(value ?? fallback, origin); return url.origin === origin ? url.href : fallback; }
+    catch { return fallback; }
+  };
+  if (request.method === "GET") {
+    const hidden = [...params].map(([key, value]) => `<input type="hidden" name="${escape(key)}" value="${escape(value)}">`).join("");
+    return new Response(`<!doctype html><html lang="en"><head><title>Mock checkout</title></head><body><h1>Mock checkout</h1><p>No real payment is made.</p><form method="post">${hidden}<button>Pay</button></form><a href="${escape(safeUrl(params.get("cancel")))}">Cancel</a></body></html>`, { headers: { ...privateHeaders, "Content-Type": "text/html; charset=utf-8" } });
+  }
+  const plan = plans.find((candidate) => candidate.id === order.planId);
+  params.set("userId", session.user.id);
+  params.set("planId", order.planId);
+  params.set("interval", plan && "interval" in plan && typeof plan.interval === "string" ? plan.interval : "");
+  await payment.handleWebhook("mock", new Request(request.url, { method: "POST", body: params.toString() }));
+  return new Response(null, { status: 303, headers: { ...privateHeaders, Location: safeUrl(params.get("success")) } });
 }
 
-/** A stand-in checkout page for local development. */
-export function GET(request: Request) {
-  if (process.env.NODE_ENV === "production") return notFound();
-  const params = new URL(request.url).searchParams;
-  const hidden = [...params]
-    .map(([name, value]) => `<input type="hidden" name="${name}" value="${encodeURI(value)}">`)
-    .join("");
-
-  return new Response(
-    `<!doctype html><html><body style="font-family:system-ui;max-width:420px;margin:15vh auto;padding:0 16px">
-<h1 style="font-size:20px">Mock checkout</h1>
-<p>Plan <strong>${encodeURI(params.get("planId") ?? "")}</strong>. No real payment is made.</p>
-<form method="post">${hidden}<button style="padding:8px 16px">Pay</button>
-<a href="${encodeURI(params.get("cancel") ?? "/")}" style="margin-left:12px">Cancel</a></form>
-</body></html>`,
-    { headers: { "content-type": "text/html; charset=utf-8" } },
-  );
-}
-
-export async function POST(request: Request) {
-  if (process.env.NODE_ENV === "production") return notFound();
-  const body = await request.text();
-  await payment.handleWebhook("mock", new Request(request.url, { method: "POST", body }));
-  const success = new URLSearchParams(body).get("success");
-  return Response.redirect(success ?? new URL("/", request.url), 303);
-}
+export const GET = handle;
+export const POST = handle;

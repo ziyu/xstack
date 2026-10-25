@@ -13,6 +13,7 @@ export default defineModule({
   requires: ["auth"],
   enhances: ["payment", "admin"],
   supports: NATIVE_SHELL_DB,
+  nativeSplit: true,
   options: {
     signupBonus: {
       type: "number",

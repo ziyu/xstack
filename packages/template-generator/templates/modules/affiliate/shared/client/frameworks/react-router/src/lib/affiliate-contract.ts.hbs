@@ -1,0 +1,5 @@
+import { z } from "zod";
+
+export const commissionSchema = z.object({ orderId: z.string(), userId: z.string(), referrerId: z.string(), credits: z.number(), status: z.enum(["pending", "granted"]), createdAt: z.string(), grantedAt: z.string().nullable() });
+export const affiliateSchema = z.object({ code: z.string(), origin: z.string().url(), commissionPercent: z.number(), referredSignups: z.number(), convertedOrders: z.number(), earnedCredits: z.number(), pendingCredits: z.number(), conversions: z.array(commissionSchema) });
+export const referralSchema = z.object({ commissionPercent: z.number() });

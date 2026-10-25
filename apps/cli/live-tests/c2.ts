@@ -16,6 +16,8 @@ import {
 } from "./c2-applications";
 import { c2Cases, c2Input, type C2Case } from "./c2-cases";
 import { C2Database, exerciseC2, type C2Result } from "./c2-http";
+import { c3Cases, c3Input } from "./c3-cases";
+import { exerciseC3Http } from "./c3-http";
 import { Commands } from "./command";
 
 const { values, positionals } = parseArgs({
@@ -24,28 +26,33 @@ const { values, positionals } = parseArgs({
   options: {
     case: { type: "string", default: "all" },
     directory: { type: "string" },
+    stage: { type: "string", default: "c2" },
   },
 });
 const action = positionals[0] ?? "plan";
+assert.ok(values.stage === "c2" || values.stage === "c3", "Expected --stage c2|c3");
+const stage = values.stage;
+const cases: readonly C2Case[] = stage === "c3" ? c3Cases : c2Cases;
+const createInput = stage === "c3" ? c3Input : c2Input;
 assert.ok(
   ["plan", "prepare", "check", "runtime", "run", "report", "cleanup"].includes(action),
   "Expected plan|prepare|check|runtime|run|report|cleanup",
 );
 const root = path.resolve(import.meta.dir, "../../..");
 const smoke = path.join(root, "apps/cli/.smoke");
-const directory = path.resolve(values.directory ?? path.join(smoke, "c2"));
+const directory = path.resolve(values.directory ?? path.join(smoke, stage));
 assert.ok(
   directory.startsWith(smoke + path.sep),
   "C2 artifacts must be strictly inside apps/cli/.smoke",
 );
-const selected = c2Cases.filter(
+const selected = cases.filter(
   (test) => values.case === "all" || values.case!.split(",").includes(test.id),
 );
 assert.ok(selected.length, "No matching C2 cases");
 if (values.case !== "all")
   for (const id of values.case!.split(","))
     assert.ok(
-      c2Cases.some((test) => test.id === id),
+      cases.some((test) => test.id === id),
       `Unknown C2 case: ${id}`,
     );
 const signal = new AbortController();
@@ -65,7 +72,7 @@ type CaseReport = {
   detail?: string;
 };
 const reports: CaseReport[] = [];
-const plan = selected.map((test) => ({ ...test, input: c2Input(test, `c2-${test.id}`) }));
+const plan = selected.map((test) => ({ ...test, input: createInput(test, `${stage}-${test.id}`) }));
 if (action === "plan") {
   console.log(
     JSON.stringify(
@@ -78,12 +85,23 @@ if (action === "plan") {
           "Exclusive loopback application ports from generated applications.json, plus fixture port 4399",
           "Postgres: empty disposable database via C2_DATABASE_URL and C2_DISPOSABLE_POSTGRES=1",
         ],
-        evidence: {
-          email: "development console hooks",
-          sms: "development console hooks",
-          captcha: "local Siteverify protocol fixture",
-          oauth: "authorization/state + isolated WeChat exchange; no cloud credential verification",
-        },
+        evidence:
+          stage === "c3"
+            ? {
+                payment:
+                  "signed Stripe/Polar/WeChat/Alipay callbacks and authenticated development mock; no live purchases",
+                credits:
+                  "actual generated SQLite/Postgres atomic ledger and concurrent debit/refund",
+                affiliate: "actual signed attribution and duplicate-safe commission integrations",
+                auth: "real signup/login with explicitly DB-seeded verified state; C2 owns email verification coverage",
+              }
+            : {
+                email: "development console hooks",
+                sms: "development console hooks",
+                captcha: "local Siteverify protocol fixture",
+                oauth:
+                  "authorization/state + isolated WeChat exchange; no cloud credential verification",
+              },
       },
       null,
       2,
@@ -107,7 +125,7 @@ if (action === "plan") {
       signal.signal.throwIfAborted();
       const caseDirectory = path.join(directory, test.id);
       const manifestPath = path.join(caseDirectory, "prepared.json");
-      const project = path.join(caseDirectory, `c2-${test.id}`);
+      const project = path.join(caseDirectory, `${stage}-${test.id}`);
       await mkdir(caseDirectory, { recursive: true, mode: 0o700 });
       const report: CaseReport = { id: test.id, action, status: "failed", results: [] };
       const commands = new Commands(caseDirectory, signal.signal);
@@ -165,7 +183,7 @@ if (action === "plan") {
                 path.join(root, "apps/cli/dist/cli.mjs"),
                 "create-json",
                 "--json",
-                JSON.stringify(c2Input(test, path.basename(project))),
+                JSON.stringify(createInput(test, path.basename(project))),
               ]);
             });
             resolved = await readC2Applications(project);
@@ -247,7 +265,9 @@ if (action === "plan") {
                 ) as { dependencies?: Record<string, string> };
                 for (const dependency of Object.keys(packageJson.dependencies ?? {}))
                   assert.ok(
-                    !/\/(?:db|auth|sms|email|captcha|events)$/.test(dependency),
+                    !/\/(?:db|auth|sms|email|captcha|events|payment|credits|affiliate)$/.test(
+                      dependency,
+                    ),
                     `${app.id} imports server workspace ${dependency}`,
                   );
                 const contents = await readFile(path.join(project, app.directory, ".env"), "utf8");
@@ -302,20 +322,33 @@ if (action === "plan") {
               );
             }
             database = new C2Database(prepared.databaseUrl);
-            await exerciseC2({
-              targets: resolved.targets,
-              database,
-              fixture: "http://127.0.0.1:4399",
-              administrator: prepared.env.ADMIN_EMAILS!,
-              transcript: () => output,
-              results: report.results,
-              save,
-              signal: signal.signal,
-            });
+            if (stage === "c3") {
+              await exerciseC3Http({
+                project,
+                administrator: prepared.env.ADMIN_EMAILS!,
+                targets: resolved.targets,
+                database,
+                fixture: "http://127.0.0.1:4399",
+                results: report.results,
+                save,
+                signal: signal.signal,
+              });
+            } else {
+              await exerciseC2({
+                targets: resolved.targets,
+                database,
+                fixture: "http://127.0.0.1:4399",
+                administrator: prepared.env.ADMIN_EMAILS!,
+                transcript: () => output,
+                results: report.results,
+                save,
+                signal: signal.signal,
+              });
+            }
             await commands.stopAll();
             // Standalone protocol fixture uses the actual generated auth service and DB.
             // No provider success is implied beyond this exact HTTP interception.
-            if (test.database === "sqlite")
+            if (stage === "c2" && test.database === "sqlite")
               await step("wechat-provider-protocol-and-event-chain", async () => {
                 await commands.run(
                   "wechat-protocol",
@@ -325,6 +358,29 @@ if (action === "plan") {
                   { NODE_ENV: "development" },
                 );
               });
+            if (stage === "c3") {
+              await step("signed-payment-affiliate-ledger-protocol", async () => {
+                await commands.run(
+                  "c3-protocol",
+                  root,
+                  "bun",
+                  [path.join(import.meta.dir, "c3-protocol.ts"), project],
+                  { ...prepared.env, NODE_ENV: "test" },
+                );
+              });
+              if (test.database === "sqlite") {
+                for (const fixture of ["payments", "affiliate"])
+                  await step(`${fixture}-extended-protocol`, async () => {
+                    await commands.run(
+                      fixture,
+                      root,
+                      "bun",
+                      [path.join(import.meta.dir, `${fixture}.ts`), project],
+                      { NODE_ENV: "test" },
+                    );
+                  });
+              }
+            }
             report.status = "passed";
           } else report.status = action === "prepare" ? "prepared" : "checked";
         }
@@ -485,6 +541,17 @@ async function cleanPostgres(url: string, caseDirectory: string) {
       "phone_otp_challenge",
       "rate_limit",
       "__drizzle_migrations",
+      ...(stage === "c3"
+        ? [
+            "payment_order",
+            "payment_subscription",
+            "credit_balance",
+            "credit_transaction",
+            "affiliate_profile",
+            "affiliate_referral",
+            "affiliate_commission",
+          ]
+        : []),
     ]);
     const tables = (await sql.unsafe(
       "SELECT schemaname, tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema')",

@@ -39,6 +39,15 @@ Passing local acceptance does **not** establish provider cloud acceptance. Email
 
 For the isolated bootstrap regression, generate an `auth+email+admin` SQLite project without captcha under `.smoke`, install and migrate it, then run `bun apps/cli/live-tests/c2-bootstrap.ts <fixture>`. It proves an allowlisted but unverified email stays `user`, actual verification grants `admin`, and replay cannot undo a later demotion. The complete C2 matrix exercises the same invariant with captcha enabled through real HTTP.
 
+## C3 transaction acceptance
+
+`bun apps/cli/live-tests/c3.ts plan` lists the Next/Start/Nuxt fullstack, SQLite/Postgres split and renamed-app-plus-CLI cases. The runner reuses the C2 prepare/check/runtime/report/cleanup lifecycle and application metadata; use a separate `.smoke` directory. `C2_INSTALL_ARGS`, `C2_DATABASE_URL` and `C2_DISPOSABLE_POSTGRES` keep their existing meanings.
+
+Every case selects Stripe, Polar, WeChat Pay, Alipay and explicit development mock. Runtime uses real generated auth, DB, payment verification, ledger and referral integrations: forged/mismatched signed settlements, repeated concurrent fulfillment, unique buyer/referrer grants, concurrent debits/refunds, cross-user isolation and admin denial. HTTP checks cover owned checkout and returns, public mock callback rejection, authenticated mock tampering/replay and frontend/admin SSR. Next uses its existing server-action adapter; shared HTTP endpoint assertions run only where that adapter is generated. Local account verification/administrator state is explicitly seeded for C3; C2 tests the email verification lifecycle.
+
+`c3-protocol.ts <fixture>` is also directly runnable (Postgres needs `DATABASE_URL`). SQLite runs reuse `payments.ts` and `affiliate.ts`, which resolve the backend from `applications.json`. Signatures and local mock payment are protocol fixtures, not cloud purchases. Polar checkout still requires real plan product references; merchant approvals, actual provider checkout/portal and payment delivery need independent staging credentials. Never deploy fixture transports.
+
+
 
 ### Native Cloudflare D1 and R2 binding
 

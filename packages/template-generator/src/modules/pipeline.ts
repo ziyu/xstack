@@ -396,14 +396,14 @@ export function finalizeModules(vfs: VirtualFileSystem, config: ApplicationConfi
     config,
     plan.modules
       .flatMap((m) => m.manifest.services ?? [])
-      .map((service) =>
-        config.application?.nativeSplit && service.name === "auth"
-          ? {
-              ...service,
-              init: `createAuth(ENV, db, events, ${JSON.stringify(config.application.clientOrigins)})`,
-            }
-          : service,
-      ),
+      .map((service) => ({
+        ...service,
+        init: Handlebars.compile(service.init)({
+          clientOrigins: JSON.stringify(
+            config.application?.nativeSplit ? config.application.clientOrigins : [],
+          ),
+        }),
+      })),
   );
   finalizeCloudflareModules(vfs, config, plan);
 }

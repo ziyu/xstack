@@ -13,6 +13,7 @@ export default defineModule({
   requires: ["auth"],
   enhances: ["admin"],
   supports: NATIVE_SHELL_DB,
+  nativeSplit: true,
   providers: {
     min: 1,
     default: { global: ["stripe"], cn: ["wechat", "alipay"] },
@@ -94,7 +95,7 @@ export default defineModule({
     {
       name: "payment",
       imports: [{ from: "@app/payment", names: ["createPayment"] }],
-      init: "createPayment({ env: ENV, db, events, baseUrl: ENV.BETTER_AUTH_URL })",
+      init: "createPayment({ env: ENV, db, events, baseUrl: ENV.BETTER_AUTH_URL, clientOrigins: {{{clientOrigins}}} })",
     },
   ],
   nav: [

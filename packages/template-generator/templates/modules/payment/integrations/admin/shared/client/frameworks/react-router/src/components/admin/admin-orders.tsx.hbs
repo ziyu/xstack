@@ -1,0 +1,10 @@
+import { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { AdminPagination } from "@/components/product-pagination";
+import { formatMoney, orderSchema, planLabel, providerLabel } from "@/lib/payment-contract";
+
+export const ordersSchema = z.object({ rows: z.array(z.object({ order: orderSchema, email: z.string() })), total: z.number() });
+export function AdminOrders({ data, page }: { data: z.infer<typeof ordersSchema>; page: number }) {
+  const t = useT(); const locale = useLocale();
+  return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("payment.admin.title")}</h1><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("payment.admin.title")}</caption><thead><tr>{(["date", "customer", "plan", "provider", "status", "amount"] as const).map((key) => <th key={key} scope="col" className="border-b p-3">{t(`payment.admin.columns.${key}`)}</th>)}</tr></thead><tbody>{data.rows.map(({ order, email }) => <tr key={order.id}><td className="border-b p-3">{order.createdAt.slice(0, 10)}</td><td className="border-b p-3">{email}<span className="block text-xs text-muted-foreground">{order.id}</span></td><td className="border-b p-3">{planLabel(t, order.planId)}</td><td className="border-b p-3">{providerLabel(t, order.provider)}</td><td className="border-b p-3">{t(`payment.admin.status.${order.status}`)}</td><td className="border-b p-3">{formatMoney(order.amount, order.currency, locale)}</td></tr>)}{!data.rows.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{t("payment.admin.empty")}</td></tr>}</tbody></table></div><AdminPagination page={page} total={data.total} path="orders" /></section>;
+}

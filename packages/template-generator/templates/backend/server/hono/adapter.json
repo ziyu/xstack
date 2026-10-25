@@ -6,7 +6,7 @@
       "productContribution": {
         "mode": "server",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -15,7 +15,7 @@
           "webDeploy": ["none"]
         },
         "frameworks": [
-          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha"] },
+          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] },
           { "id": "hono", "modules": ["core"] }
         ]
       },

@@ -91,6 +91,8 @@ export function createProvider({ env }: ProviderOptions<ProviderConfig>): Paymen
               type: "checkout.completed",
               orderId,
               providerRef: session.id,
+              amount: session.amount_total ?? undefined,
+              currency: session.currency ?? undefined,
               customerRef: ref(session.customer),
               subscriptionRef: ref(session.subscription),
             },

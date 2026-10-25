@@ -1,0 +1,13 @@
+import type { Services } from "../services";
+
+export default function registerAffiliateSignup({ events, affiliate }: Services) {
+  events.on("auth.user_created", async ({ userId }) => {
+    try {
+      await affiliate.bindSignup(userId);
+    } catch {
+      // Account creation already committed. Payment fulfillment can recover from
+      // the immutable private signup token; don't report the signup as failed.
+      console.error("[affiliate] Signup attribution deferred until settlement");
+    }
+  });
+}

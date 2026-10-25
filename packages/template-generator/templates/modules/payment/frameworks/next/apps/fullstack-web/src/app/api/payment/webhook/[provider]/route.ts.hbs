@@ -6,6 +6,7 @@ export async function POST(
   { params }: { params: Promise<{ provider: string }> },
 ) {
   const { provider } = await params;
+  if (provider === "mock") return Response.json({ error: "not_found" }, { status: 404 });
   try {
     await payment.handleWebhook(provider, request);
     if (provider === "alipay") return new Response("success");

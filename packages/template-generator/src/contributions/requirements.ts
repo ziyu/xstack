@@ -206,14 +206,45 @@ export function requiredModuleContributions(
         : frameworks,
     );
     requireSource(`module:${id}`, "files");
+    const serviceApplication = contribution?.mode === "server" ? applicationType : "fullstack-web";
+    if (id === "credits") {
+      requireSource(
+        "module:credits:signup",
+        `files/apps/${serviceApplication}/src/integrations/credits-signup.ts.hbs`,
+      );
+      requireSource("module:credits:signup:partial", "shared/partials/credits-signup.hbs");
+    }
+    if (id === "affiliate") {
+      for (const integration of ["affiliate-signup", "affiliate-payment"]) {
+        requireSource(
+          `module:affiliate:${integration}`,
+          `files/apps/${serviceApplication}/src/integrations/${integration}.ts.hbs`,
+        );
+        requireSource(
+          `module:affiliate:${integration}:partial`,
+          `shared/partials/${integration}.hbs`,
+        );
+      }
+    }
     if (moduleFrameworks.has("http-server")) {
       const partials = {
         core: ["product-api"],
         auth: ["social-providers", "social-providers.server"],
         admin: ["admin"],
         captcha: ["captcha"],
+        payment: ["payment"],
+        credits: ["credits"],
+        affiliate: ["affiliate"],
       };
-      if (id === "core" || id === "auth" || id === "admin" || id === "captcha")
+      if (
+        id === "core" ||
+        id === "auth" ||
+        id === "admin" ||
+        id === "captcha" ||
+        id === "payment" ||
+        id === "credits" ||
+        id === "affiliate"
+      )
         for (const partial of partials[id])
           requireSource(`module:${id}:partial:${partial}`, `shared/partials/${partial}.hbs`);
     }
@@ -269,6 +300,13 @@ export function requiredModuleContributions(
       }
       if ((id === "email" || id === "sms") && integration === "auth")
         requireSource(`${source}:partial`, `shared/partials/auth-${id}.hbs`);
+      if (id === "credits" && integration === "payment") {
+        requireSource(
+          `${source}:handler`,
+          `integrations/payment/apps/${serviceApplication}/src/integrations/payment-credits.ts.hbs`,
+        );
+        requireSource(`${source}:partial`, "shared/partials/payment-credits.hbs");
+      }
     }
   }
   return requirements;

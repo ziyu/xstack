@@ -719,3 +719,13 @@ C2 七模块在既有 Next/TanStack Start/Nuxt 全栈及 React Router/Hono 拆�
 WorkspacePlan 统一生成 directory/port/origin/devArgs，applications.json 对运行工具暴露这些解析结果。端口按职责分配，重命名不改变前后端含义；全栈原有默认 3001 保留。C2 runner 按 roles/bindings 取服务和客户端，启动参数来自 adapter，移除 portal/console 实例名及固定端口推断。固定示例名字仅存在 case 输入数据；新增独立 CLI 参与安装、检查和构建，不被当 HTTP 服务探测。Builder 也消费声明解析结果。
 
 验收：68 项生成器测试、58 项 Web/CLI 测试通过；类型检查、定向 lint 通过。新增 control-room 类型和 custom-router adapter 仅靠 manifest、adapter 及实际模板接入；缺失 overlay 明确拒绝。其生成项目安装/类型/构建/schema、启动、真实注册/验证/admin SSR/API 通过。split-renamed-cli（全部改名并加独立 CLI）及 Next 全栈安装/构建/迁移和完整 C2 HTTP 验收通过。旧无 apps 模式、框架专用底层生成器和部署处理器仍有技术分支，不能据此宣称新增任意协议/框架完全不需实现代码；新增既有职责的 app 类型和复用 adapter 不需改中央调度器。
+
+### 27.8 C3 交易闭环
+
+C2 与应用声明驱动改动已提交 `fb26ce4`。C3 通过 adapter 声明扩展 payment/credits/affiliate，不新增实例 ID 分支。WHATWG 支付/积分/邀请 handler 与四份事件集成抽为共享 partial，fullstack-web/backend 各有明确来源；服务端唯一 owner 持有 schema、账本、回调和秘密。React Router 客户端提供定价、结账/QR、账单、积分/邀请报告，admin 提供订单/积分调整/邀请佣金，均消费类型化同源 BFF；新增来源缺失在预检拒绝。
+
+支付服务分开 canonical backend webhook URL 与可信浏览器 return origin；checkout/portal/邀请返回客户端 host，通知始终指向 backend。服务初始化通过声明模板 clientOrigins 上下文，不新增 service 名称分支。Stripe/Polar settlement 加入签名来源金额/币种与存储订单核对。公开 webhook/mock 返回 404，开发 mock 结算必须登录且拥有订单、通过 Origin 检查，user/plan/interval 来自服务端订单而非隐藏表单；生产禁用。订单一次状态更新与至少一次事件重试语义保持，积分引用及佣金意图负责幂等恢复。
+
+六组生成项目（Next/Start/Nuxt SQLite、split SQLite/Postgres、改名 split+CLI）安装/类型/构建/迁移及 C3 runtime 全部通过。五 provider 的本地签名回调：伪造/金额/币种不匹配拒绝，并发重复履约只产生一个购买积分及邀请佣金；并发扣减不透支、退款唯一、跨用户订单/账本/邀请隔离通过。SQLite 追加原支付与邀请协议测试，覆盖签名 Native checkout、Alipay form、失败后恢复、renewal 不奖励邀请。HTTP/SSR 管理授权、return origin、mock 字段篡改及重放通过；Next 保留现有服务端 action 架构，未为测试虚构 product API。
+
+浏览器完成定价→开发 mock 结账→账单→积分到账，以及 admin 余额调整与佣金列表。仓库回归 128 项通过、相关类型及定向 lint 通过。持久命令 `bun apps/cli/live-tests/c3.ts plan|prepare|check|runtime|report|cleanup` 复用应用元数据执行；旧 fixtures 不再固定 apps/web。真实云端支付、Polar product checkout/portal、微信扫码、商户资质与服务商通知送达仍需独立 staging 凭据，不用本地协议结果替代。未新增现金分佣、退款/拒付自动逆转或 C4–C6 功能。

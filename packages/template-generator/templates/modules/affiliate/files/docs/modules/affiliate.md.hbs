@@ -22,6 +22,10 @@ The policy is configured at generation with `affiliate.commissionPercent` (0–1
 
 `GET /api/affiliate` returns the authenticated account's code, referral count, conversion count, granted/pending credit totals, and latest 50 conversions. It never uses a requested user ID. `/<locale>/admin/affiliate` is generated only with `admin` and authorizes administrators before querying all commission intents. No invitee email is exposed in the owned report. Both English and Simplified Chinese pages label rewards as credits.
 
+{{#if application.nativeSplit}}
+In split applications, referral links, capture cookies and signup return to the validated client host through its BFF. `{{appPath "backend"}}/src/integrations/affiliate-signup.ts` and `affiliate-payment.ts` alone bind attribution and grant purchase rewards. No client copy of signing secrets, payment subscriptions or award handlers is generated. Admin reports remain protected on the backend even when requested directly.
+{{/if}}
+
 ## Refunds and chargebacks
 
 The payment service currently has no refund/chargeback domain event. **There is no automatic commission reversal.** Administrators must reconcile refunds/chargebacks with the provider and apply an audited negative credit adjustment in the credits console. Do not promise automatic clawbacks, a refund hold period, or cash payouts. The protocol regression explicitly verifies that an unsupported refund webhook is a no-op, not a fabricated refund integration.

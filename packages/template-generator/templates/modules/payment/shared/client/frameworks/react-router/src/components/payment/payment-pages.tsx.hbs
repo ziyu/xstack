@@ -1,0 +1,53 @@
+import { useState } from "react";
+import { useRevalidator } from "react-router";
+import type { z } from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { ProductRequestError } from "@/lib/product-contract";
+import { billingPortal, checkout, formatMoney, planLabel, providerLabel, type billingSchema, type orderSchema, type paymentOrderSchema, type pricingSchema } from "@/lib/payment-contract";
+{{#if (includes product.features "credits")}}
+import { PlanCredits } from "@/components/credits/payment-credits";
+{{/if}}
+
+export function Pricing({ data, signedIn }: { data: z.infer<typeof pricingSchema>; signedIn: boolean }) {
+  const t = useT(); const locale = useLocale();
+  const [pending, setPending] = useState(""); const [error, setError] = useState("");
+  async function purchase(planId: string, provider: string) {
+    if (pending) return;
+    if (!signedIn) { window.location.assign(`/${locale}/login?next=${encodeURIComponent(`/${locale}/pricing`)}`); return; }
+    setPending(`${planId}:${provider}`); setError("");
+    try { const result = await checkout({ planId, provider, locale }); window.location.assign(result.url); }
+    catch (error) { setError(t(error instanceof ProductRequestError && error.code === "already_subscribed" ? "payment.errors.alreadySubscribed" : "payment.errors.checkout")); setPending(""); }
+  }
+  return <section className="space-y-8"><header className="max-w-2xl space-y-4"><h1 className="font-serif text-4xl">{t("payment.pricing.title")}</h1><p className="text-lg text-muted-foreground">{t("payment.pricing.subtitle")}</p></header>
+    {error && <p role="alert" className="text-destructive">{error}</p>}
+    <div className="grid gap-6 md:grid-cols-2">{data.plans.map((plan) => <article key={plan.id} className={`flex flex-col gap-5 rounded-lg border p-8 ${plan.highlighted ? "border-foreground" : ""}`}><div className="space-y-2"><h2 className="font-serif text-2xl">{planLabel(t, plan.id)}</h2><p className="text-muted-foreground">{planLabel(t, plan.id, "description")}</p></div><p className="font-serif text-4xl">{formatMoney(plan.amount, plan.currency, locale)} <span className="font-sans text-sm text-muted-foreground">{plan.mode === "subscription" && plan.interval ? t(`payment.pricing.per.${plan.interval}`) : t("payment.pricing.oneTime")}</span></p>
+{{#if (includes product.features "credits")}}
+      <PlanCredits credits={plan.credits} />
+{{/if}}
+      <div className="mt-auto grid gap-3">{plan.providers.map((provider) => <Button key={provider} type="button" disabled={!!pending} variant={plan.highlighted ? "default" : "outline"} onClick={() => void purchase(plan.id, provider)}>{t(plan.mode === "subscription" ? "payment.pricing.subscribeWith" : "payment.pricing.buyWith", { provider: providerLabel(t, provider) })}</Button>)}{!plan.providers.length && <p className="text-sm text-muted-foreground">{t("payment.pricing.noProviders")}</p>}</div></article>)}</div>
+  </section>;
+}
+
+export function OrderHistory({ orders }: { orders: z.infer<typeof orderSchema>[] }) {
+  const t = useT(); const locale = useLocale();
+  return <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("payment.billing.history")}</caption><thead><tr>{(["date", "plan", "provider", "amount", "status"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(`payment.admin.columns.${key}`)}</th>)}</tr></thead><tbody>{orders.map((order) => <tr key={order.id}><td className="border-b p-3">{order.createdAt.slice(0, 10)}</td><td className="border-b p-3"><a className="underline" href={`/${locale}/payment/${encodeURIComponent(order.id)}`}>{planLabel(t, order.planId)}</a></td><td className="border-b p-3">{providerLabel(t, order.provider)}</td><td className="border-b p-3">{formatMoney(order.amount, order.currency, locale)}</td><td className="border-b p-3">{t(`payment.admin.status.${order.status}`)}</td></tr>)}{!orders.length && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">{t("payment.billing.noOrders")}</td></tr>}</tbody></table></div>;
+}
+
+export function Billing({ data, returned }: { data: z.infer<typeof billingSchema>; returned: boolean }) {
+  const t = useT(); const locale = useLocale(); const revalidator = useRevalidator();
+  const [pending, setPending] = useState(false); const [error, setError] = useState("");
+  async function portal() {
+    if (pending) return; setPending(true); setError("");
+    try { const result = await billingPortal(locale); window.location.assign(result.url); }
+    catch { setError(t("payment.errors.checkout")); setPending(false); }
+  }
+  const subscription = data.subscription;
+  return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("payment.billing.title")}</h1>{returned && <p role="status" className="rounded-lg border p-4">{t("payment.billing.success")}</p>}{error && <p role="alert" className="text-destructive">{error}</p>}<section className="space-y-4 rounded-lg border p-6"><h2 className="text-xl font-semibold">{t("payment.billing.subscription")}</h2>{subscription ? <><p>{planLabel(t, subscription.planId)} · {t(`payment.billing.status.${subscription.status}`)}</p>{subscription.currentPeriodEnd && <p className="text-muted-foreground">{t(subscription.cancelAtPeriodEnd ? "payment.billing.endsOn" : "payment.billing.renewsOn", { date: subscription.currentPeriodEnd.slice(0, 10) })}</p>}<Button disabled={pending} onClick={() => void portal()}>{t("payment.billing.manage")}</Button></> : <p className="text-muted-foreground">{t("payment.billing.none")}</p>}<div className="flex flex-wrap items-center gap-5"><a className="underline" href={`/${locale}/pricing`}>{t("payment.billing.viewPlans")}</a><Button variant="outline" disabled={revalidator.state !== "idle"} onClick={() => void revalidator.revalidate()}>{t("payment.checkout.refresh")}</Button></div></section><section className="space-y-4"><h2 className="text-xl font-semibold">{t("payment.billing.history")}</h2><OrderHistory orders={data.orders} /></section></section>;
+}
+
+export function PaymentOrder({ data }: { data: z.infer<typeof paymentOrderSchema> }) {
+  const t = useT(); const locale = useLocale(); const revalidator = useRevalidator();
+  const { order, qrImage } = data;
+  return <section className="mx-auto max-w-xl space-y-6 rounded-lg border p-8"><h1 className="font-serif text-4xl">{t("payment.checkout.title")}</h1><p className="break-all text-sm text-muted-foreground">{order.id} · {providerLabel(t, order.provider)}</p><dl><dt className="text-sm text-muted-foreground">{t("payment.checkout.amount")}</dt><dd className="mt-2 font-serif text-3xl">{formatMoney(order.amount, order.currency, locale)}</dd></dl>{order.status === "pending" && qrImage && <div className="space-y-4"><p>{t("payment.checkout.scan")}</p><img className="mx-auto h-64 w-64" src={qrImage} alt={t("payment.checkout.qrAlt")} width={256} height={256} /></div>}<p role="status">{order.status === "paid" ? t("payment.checkout.paid") : order.status === "pending" ? t("payment.checkout.pending") : t(`payment.admin.status.${order.status}`)}</p><div className="flex flex-wrap items-center gap-4"><Button variant="outline" disabled={revalidator.state !== "idle"} onClick={() => void revalidator.revalidate()}>{t("payment.checkout.refresh")}</Button><a className="underline" href={`/${locale}/dashboard/billing`}>{t("payment.checkout.billing")}</a></div></section>;
+}

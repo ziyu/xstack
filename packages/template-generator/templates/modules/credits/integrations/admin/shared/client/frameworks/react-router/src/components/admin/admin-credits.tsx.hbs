@@ -1,0 +1,28 @@
+import { useState, type FormEvent } from "react";
+import { useRevalidator } from "react-router";
+import { z } from "zod";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useT } from "@/components/i18n-provider";
+import { AdminPagination } from "@/components/product-pagination";
+import { creditTransactionSchema } from "@/lib/credits-contract";
+import { ProductRequestError, productRequest } from "@/lib/product-contract";
+
+export const adminCreditsSchema = z.object({ rows: z.array(z.object({ transaction: creditTransactionSchema, email: z.string() })), total: z.number() });
+export function AdminCredits({ data, page }: { data: z.infer<typeof adminCreditsSchema>; page: number }) {
+  const t = useT(); const revalidator = useRevalidator();
+  const [pending, setPending] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
+  async function adjust(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (pending) return;
+    const form = event.currentTarget; const values = new FormData(form);
+    const email = String(values.get("email") ?? "").trim(); const amount = Number(values.get("amount")); const reason = String(values.get("reason") ?? "").trim();
+    setError(""); setNotice("");
+    if (!email || !Number.isSafeInteger(amount) || amount === 0 || Math.abs(amount) > 2147483647) { setError(t("credits.admin.errors.invalid")); return; }
+    setPending(true);
+    try {
+      await productRequest("/api/product/credit-transactions", { email, amount, reason }, z.object({ success: z.literal(true) }));
+      form.reset(); await revalidator.revalidate(); setNotice(t("credits.admin.done"));
+    } catch (error) { setError(t(error instanceof ProductRequestError && error.code === "user_not_found" ? "credits.admin.errors.user" : error instanceof ProductRequestError && error.code === "insufficient_credits" ? "credits.admin.errors.balance" : "auth.errors.generic")); }
+    finally { setPending(false); }
+  }
+  return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("credits.admin.title")}</h1><form onSubmit={(event) => void adjust(event)} className="max-w-xl space-y-4 rounded-lg border p-6"><h2 className="text-xl font-semibold">{t("credits.admin.adjust")}</h2><label className="grid gap-2">{t("credits.admin.email")}<input name="email" type="email" autoComplete="off" required className="rounded-md border bg-background p-2" disabled={pending} /></label><label className="grid gap-2">{t("credits.admin.amount")}<input name="amount" type="number" step="1" min={-2147483647} max={2147483647} required aria-describedby="credit-amount-hint" className="rounded-md border bg-background p-2" disabled={pending} /></label><p id="credit-amount-hint" className="text-sm text-muted-foreground">{t("credits.admin.amountHint")}</p><label className="grid gap-2">{t("credits.admin.reason")}<input name="reason" maxLength={1000} className="rounded-md border bg-background p-2" disabled={pending} /></label><Button type="submit" disabled={pending}>{t("credits.admin.submit")}</Button>{error && <p role="alert" className="text-destructive">{error}</p>}{notice && <p role="status">{notice}</p>}</form><div className="overflow-x-auto"><table className="w-full text-left text-sm" aria-busy={pending}><caption className="sr-only">{t("credits.page.history")}</caption><thead><tr>{(["date", "user", "type", "reason", "amount", "balance"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(`credits.admin.columns.${key}`)}</th>)}</tr></thead><tbody>{data.rows.map(({ transaction: entry, email }) => <tr key={entry.id}><td className="border-b p-3">{entry.createdAt.slice(0, 10)}</td><td className="border-b p-3">{email}</td><td className="border-b p-3">{t(`credits.types.${entry.type}`)}</td><td className="border-b p-3">{entry.reason ?? "—"}</td><td className="border-b p-3 tabular-nums">{entry.amount > 0 ? "+" : ""}{entry.amount}</td><td className="border-b p-3 tabular-nums">{entry.balanceAfter}</td></tr>)}{!data.rows.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{t("credits.admin.empty")}</td></tr>}</tbody></table></div><AdminPagination page={page} total={data.total} path="credits" /></section>;
+}

@@ -1,0 +1,15 @@
+import type { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import type { creditsSchema } from "@/lib/credits-contract";
+{{#if (includes product.features "payment")}}
+import { BuyCredits } from "@/components/credits/payment-credits";
+{{/if}}
+
+export function CreditsPage({ data }: { data: z.infer<typeof creditsSchema> }) {
+  const t = useT();
+  return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("credits.page.title")}</h1><section className="space-y-4 rounded-lg border p-6"><h2 className="text-sm text-muted-foreground">{t("credits.page.balance")}</h2><p className="font-serif text-5xl">{data.balance}</p>
+{{#if (includes product.features "payment")}}
+    <BuyCredits />
+{{/if}}
+    </section><section className="space-y-4"><h2 className="text-xl font-semibold">{t("credits.page.history")}</h2><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("credits.page.history")}</caption><thead><tr>{(["date", "type", "reason", "amount", "balance"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(`credits.admin.columns.${key}`)}</th>)}</tr></thead><tbody>{data.transactions.map((entry) => <tr key={entry.id}><td className="border-b p-3">{entry.createdAt.slice(0, 10)}</td><td className="border-b p-3">{t(`credits.types.${entry.type}`)}</td><td className="border-b p-3">{entry.reason ?? "—"}</td><td className="border-b p-3 tabular-nums">{entry.amount > 0 ? "+" : ""}{entry.amount}</td><td className="border-b p-3 tabular-nums">{entry.balanceAfter}</td></tr>)}{!data.transactions.length && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">{t("credits.page.empty")}</td></tr>}</tbody></table></div></section></section>;
+}

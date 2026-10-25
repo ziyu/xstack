@@ -123,7 +123,7 @@ export type ServiceSpec = {
   /** Exported binding name in `services.ts`; replaces a stack-generated binding of the same name. */
   name: string;
   imports: { from: string; names: string[] }[];
-  /** Initializer expression; may reference `ENV` and previously declared services. */
+  /** Handlebars initializer; ENV/prior services are runtime bindings, clientOrigins is a JSON literal. */
   init: string;
 };
 

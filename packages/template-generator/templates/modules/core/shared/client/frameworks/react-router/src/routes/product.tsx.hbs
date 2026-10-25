@@ -22,6 +22,27 @@ import PhoneSignInForm from "@/components/auth/phone-sign-in-form";
 {{#if (includes product.features "admin")}}
 import { AdminOverview, AdminUsers } from "@/components/admin/admin-pages";
 {{/if}}
+{{#if (includes product.features "payment")}}
+import { Pricing, Billing, PaymentOrder } from "@/components/payment/payment-pages";
+import { pricingSchema, billingSchema, paymentOrderSchema } from "@/lib/payment-contract";
+{{/if}}
+{{#if (includes product.features "credits")}}
+import { CreditsPage } from "@/components/credits/credits-page";
+import { creditsSchema } from "@/lib/credits-contract";
+{{/if}}
+{{#if (includes product.features "affiliate")}}
+import { AffiliatePage, ReferralPage } from "@/components/affiliate/affiliate-pages";
+import { affiliateSchema, referralSchema } from "@/lib/affiliate-contract";
+{{/if}}
+{{#if (and (includes product.features "payment") (includes product.features "admin"))}}
+import { AdminOrders, ordersSchema } from "@/components/admin/admin-orders";
+{{/if}}
+{{#if (and (includes product.features "credits") (includes product.features "admin"))}}
+import { AdminCredits, adminCreditsSchema } from "@/components/admin/admin-credits";
+{{/if}}
+{{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}
+import { AdminAffiliate, adminAffiliateSchema } from "@/components/admin/admin-affiliate";
+{{/if}}
 
 export const headers: HeadersFunction = ({ loaderHeaders, errorHeaders }) => {
   const output = new Headers(privateHeaders);
@@ -40,16 +61,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const locale = segments[0];
   if (!isLocale(locale)) throw new Response("Not found", { status: 404, headers });
   const page = segments.slice(1).join("/");
-  const publicPages: string[] = ["", {{#if (includes product.features "auth")}}"login", "signup",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "email"))}} "forgot-password", "reset-password", "verify-email",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "sms"))}} "login/phone",{{/if}}];
-  const accountPages: string[] = [{{#if (includes product.features "auth")}}"dashboard", "dashboard/settings"{{/if}}];
-  const adminPages: string[] = [{{#if (includes product.features "admin")}}"admin", "admin/users"{{/if}}];
-  if (!publicPages.includes(page) && !accountPages.includes(page) && !(isAdminClient && adminPages.includes(page))) throw new Response("Not found", { status: 404, headers });
+  const orderId = {{#if (includes product.features "payment")}}/^payment\/[^/]+$/.test(page) ? page.slice("payment/".length) : {{/if}}null;
+  const referralCode = {{#if (includes product.features "affiliate")}}/^ref\/[a-zA-Z0-9_-]+$/.test(page) ? page.slice("ref/".length) : {{/if}}null;
+  const publicPages: string[] = ["", {{#if (includes product.features "auth")}}"login", "signup",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "email"))}} "forgot-password", "reset-password", "verify-email",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "sms"))}} "login/phone",{{/if}}{{#if (includes product.features "payment")}} "pricing",{{/if}}];
+  const accountPages: string[] = [{{#if (includes product.features "auth")}}"dashboard", "dashboard/settings",{{/if}}{{#if (includes product.features "payment")}} "dashboard/billing",{{/if}}{{#if (includes product.features "credits")}} "dashboard/credits",{{/if}}{{#if (includes product.features "affiliate")}} "dashboard/affiliate",{{/if}}];
+  const adminPages: string[] = [{{#if (includes product.features "admin")}}"admin", "admin/users",{{#if (includes product.features "payment")}} "admin/orders",{{/if}}{{#if (includes product.features "credits")}} "admin/credits",{{/if}}{{#if (includes product.features "affiliate")}} "admin/affiliate",{{/if}}{{/if}}];
+  if (!publicPages.includes(page) && !accountPages.includes(page) && !orderId && !referralCode && !(isAdminClient && adminPages.includes(page))) throw new Response("Not found", { status: 404, headers });
   let user: ProductUser | null = null;
   let config: ReturnType<typeof configSchema.parse> = { socialProviders: [], verifyEmail: false, canResetPassword: false };
 {{#if (includes product.features "auth")}}
   const session = await readBackend(request, "/api/product/session", sessionSchema, headers);
   user = session?.user ?? null;
-  const privatePage = accountPages.includes(page) || adminPages.includes(page);
+  const privatePage = accountPages.includes(page) || adminPages.includes(page) || !!orderId;
   if (privatePage && !user) throw redirect(`/${locale}/login?next=${encodeURIComponent(`/${segments.join("/")}${url.search}`)}`, { headers });
   if (privatePage && ({{#if (includes product.features "admin")}}isAdminClient || {{/if}}adminPages.includes(page)) && !isAdministrator(user)) throw new Response("Forbidden", { status: 403, headers });
   if (publicPages.includes(page)) config = await readBackend(request, "/api/product/config", configSchema, headers);
@@ -61,7 +84,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const search = { q: url.searchParams.get("q") ?? "", page: Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1)) };
   const overview = {{#if (includes product.features "admin")}}page === "admin" ? await readBackend(request, "/api/product/admin", overviewSchema, headers) : {{/if}}null;
   const users = {{#if (includes product.features "admin")}}page === "admin/users" ? await readBackend(request, `/api/product/users?${new URLSearchParams({ q: search.q, page: String(search.page) })}`, usersSchema, headers) : {{/if}}null;
-  return data({ locale, page, user, config, next, nextPath, search, overview, users, token: url.searchParams.get("token") ?? "", error: url.searchParams.get("error") }, { headers });
+  const pricing = {{#if (includes product.features "payment")}}page === "pricing" ? await readBackend(request, "/api/product/pricing", pricingSchema, headers) : {{/if}}null;
+  const billing = {{#if (includes product.features "payment")}}page === "dashboard/billing" ? await readBackend(request, "/api/product/billing", billingSchema, headers) : {{/if}}null;
+  const paymentOrder = {{#if (includes product.features "payment")}}orderId ? await readBackend(request, `/api/product/order/${encodeURIComponent(orderId)}`, paymentOrderSchema, headers) : {{/if}}null;
+  const credits = {{#if (includes product.features "credits")}}page === "dashboard/credits" ? await readBackend(request, "/api/product/credits", creditsSchema, headers) : {{/if}}null;
+  const affiliate = {{#if (includes product.features "affiliate")}}page === "dashboard/affiliate" ? await readBackend(request, "/api/product/affiliate", affiliateSchema, headers) : {{/if}}null;
+{{#if (includes product.features "affiliate")}}
+  if (referralCode) await readBackend(request, `/api/product/referral/${encodeURIComponent(referralCode)}`, referralSchema, headers);
+{{/if}}
+  const orders = {{#if (and (includes product.features "payment") (includes product.features "admin"))}}page === "admin/orders" ? await readBackend(request, `/api/product/orders?page=${search.page}`, ordersSchema, headers) : {{/if}}null;
+  const adminCredits = {{#if (and (includes product.features "credits") (includes product.features "admin"))}}page === "admin/credits" ? await readBackend(request, `/api/product/credit-transactions?page=${search.page}`, adminCreditsSchema, headers) : {{/if}}null;
+  const adminAffiliate = {{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}page === "admin/affiliate" ? await readBackend(request, `/api/product/referrals?page=${search.page}`, adminAffiliateSchema, headers) : {{/if}}null;
+  return data({ locale, page, user, config, next, nextPath, search, overview, users, pricing, billing, paymentOrder, credits, affiliate, referralCode, orders, adminCredits, adminAffiliate, returned: url.searchParams.get("status") === "success", token: url.searchParams.get("token") ?? "", error: url.searchParams.get("error") }, { headers });
 }
 
 export default function ProductPage() {
@@ -95,6 +129,27 @@ function Content({ result }: { result: ReturnType<typeof useLoaderData<typeof lo
 {{#if (includes product.features "admin")}}
   if (page === "admin" && result.overview) return <AdminOverview data={result.overview} locale={locale} />;
   if (page === "admin/users" && result.users && user) return <AdminUsers data={result.users} search={result.search} locale={locale} currentUser={user} />;
+{{/if}}
+{{#if (includes product.features "payment")}}
+  if (page === "pricing" && result.pricing) return <Pricing data={result.pricing} signedIn={!!user} />;
+  if (page === "dashboard/billing" && result.billing) return <Billing data={result.billing} returned={result.returned} />;
+  if (result.paymentOrder) return <PaymentOrder data={result.paymentOrder} />;
+{{/if}}
+{{#if (includes product.features "credits")}}
+  if (page === "dashboard/credits" && result.credits) return <CreditsPage data={result.credits} />;
+{{/if}}
+{{#if (includes product.features "affiliate")}}
+  if (page === "dashboard/affiliate" && result.affiliate) return <AffiliatePage data={result.affiliate} />;
+  if (result.referralCode) return <ReferralPage code={result.referralCode} signedIn={!!user} />;
+{{/if}}
+{{#if (and (includes product.features "payment") (includes product.features "admin"))}}
+  if (page === "admin/orders" && result.orders) return <AdminOrders data={result.orders} page={result.search.page} />;
+{{/if}}
+{{#if (and (includes product.features "credits") (includes product.features "admin"))}}
+  if (page === "admin/credits" && result.adminCredits) return <AdminCredits data={result.adminCredits} page={result.search.page} />;
+{{/if}}
+{{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}
+  if (page === "admin/affiliate" && result.adminAffiliate) return <AdminAffiliate data={result.adminAffiliate} page={result.search.page} />;
 {{/if}}
   return <section className="space-y-10 py-12"><div className="max-w-3xl space-y-6"><p className="text-sm uppercase tracking-widest">{{projectName}}</p><h1 className="font-serif text-5xl">{t("core.landing.title")}</h1><p className="text-lg text-muted-foreground">{t("core.landing.subtitle")}</p>{{#if (includes product.features "auth")}}<a href={`/${locale}/${user ? isAdminClient && {{#if (includes product.features "admin")}}true{{else}}false{{/if}} ? "admin" : "dashboard" : "signup"}`} className="inline-block border bg-foreground px-6 py-3 text-background">{t("core.landing.cta")}</a>{{/if}}</div><section className="space-y-6"><h2 className="text-2xl">{t("core.landing.features.title")}</h2><div className="grid gap-6 md:grid-cols-3">{(["modular", "portable", "deploy"] as const).map((feature) => <article key={feature} className="space-y-3 border p-6"><h3 className="font-semibold">{t(`core.landing.features.${feature}.title`)}</h3><p className="text-muted-foreground">{t(`core.landing.features.${feature}.body`)}</p></article>)}</div></section></section>;
 }
