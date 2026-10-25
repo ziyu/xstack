@@ -1,0 +1,100 @@
+import { data, redirect, useLoaderData, type HeadersFunction, type LoaderFunctionArgs } from "react-router";
+import { getMessages, isLocale, localeFromHeaders } from "@{{projectName}}/i18n";
+import { I18nProvider, useT } from "@/components/i18n-provider";
+import { ProductShell } from "@/components/product-shell";
+import { privateHeaders, readBackend } from "@/lib/backend.server";
+import { configSchema, isAdministrator, overviewSchema, safeNext, sessionSchema, usersSchema, type ProductUser } from "@/lib/product-contract";
+import { isAdminClient } from "@/lib/client-role";
+{{#if (includes product.features "auth")}}
+import { AuthCard } from "@/components/auth/auth-card";
+import SignInForm from "@/components/auth/sign-in-form";
+import SignUpForm from "@/components/auth/sign-up-form";
+import { PasswordForm, ProfileForm } from "@/components/auth/account-forms";
+import { isSocialProvider } from "@/lib/social-providers";
+{{/if}}
+{{#if (and (includes product.features "auth") (includes product.features "email"))}}
+import { ForgotPasswordForm, ResetPasswordForm } from "@/components/auth/password-reset-forms";
+import { VerificationForm } from "@/components/auth/verification-form";
+{{/if}}
+{{#if (and (includes product.features "auth") (includes product.features "sms"))}}
+import PhoneSignInForm from "@/components/auth/phone-sign-in-form";
+{{/if}}
+{{#if (includes product.features "admin")}}
+import { AdminOverview, AdminUsers } from "@/components/admin/admin-pages";
+{{/if}}
+
+export const headers: HeadersFunction = ({ loaderHeaders, errorHeaders }) => {
+  const output = new Headers(privateHeaders);
+  for (const source of [loaderHeaders, errorHeaders]) {
+    if (source) for (const cookie of source.getSetCookie()) output.append("Set-Cookie", cookie);
+  }
+  return output;
+};
+export const meta = () => [{ title: "{{projectName}}" }, { name: "robots", content: "noindex, nofollow" }];
+
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const headers = new Headers(privateHeaders);
+  const segments = (params["*"] ?? "").split("/").filter(Boolean);
+  if (!segments.length) throw redirect(`/${localeFromHeaders(request.headers)}`, { headers });
+  const locale = segments[0];
+  if (!isLocale(locale)) throw new Response("Not found", { status: 404, headers });
+  const page = segments.slice(1).join("/");
+  const publicPages: string[] = ["", {{#if (includes product.features "auth")}}"login", "signup",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "email"))}} "forgot-password", "reset-password", "verify-email",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "sms"))}} "login/phone",{{/if}}];
+  const accountPages: string[] = [{{#if (includes product.features "auth")}}"dashboard", "dashboard/settings"{{/if}}];
+  const adminPages: string[] = [{{#if (includes product.features "admin")}}"admin", "admin/users"{{/if}}];
+  if (!publicPages.includes(page) && !accountPages.includes(page) && !(isAdminClient && adminPages.includes(page))) throw new Response("Not found", { status: 404, headers });
+  let user: ProductUser | null = null;
+  let config: ReturnType<typeof configSchema.parse> = { socialProviders: [], verifyEmail: false, canResetPassword: false };
+{{#if (includes product.features "auth")}}
+  const session = await readBackend(request, "/api/product/session", sessionSchema, headers);
+  user = session?.user ?? null;
+  const privatePage = accountPages.includes(page) || adminPages.includes(page);
+  if (privatePage && !user) throw redirect(`/${locale}/login?next=${encodeURIComponent(`/${segments.join("/")}${url.search}`)}`, { headers });
+  if (privatePage && ({{#if (includes product.features "admin")}}isAdminClient || {{/if}}adminPages.includes(page)) && !isAdministrator(user)) throw new Response("Forbidden", { status: 403, headers });
+  if (publicPages.includes(page)) config = await readBackend(request, "/api/product/config", configSchema, headers);
+{{/if}}
+  const home = `/${locale}/${isAdminClient && {{#if (includes product.features "admin")}}true{{else}}false{{/if}} ? "admin" : "dashboard"}`;
+  const destination = safeNext(url.searchParams.get("next"), home, url.origin);
+  const next = new URL(destination, url.origin).href;
+  const nextPath = `${new URL(next).pathname}${new URL(next).search}${new URL(next).hash}`;
+  const search = { q: url.searchParams.get("q") ?? "", page: Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1)) };
+  const overview = {{#if (includes product.features "admin")}}page === "admin" ? await readBackend(request, "/api/product/admin", overviewSchema, headers) : {{/if}}null;
+  const users = {{#if (includes product.features "admin")}}page === "admin/users" ? await readBackend(request, `/api/product/users?${new URLSearchParams({ q: search.q, page: String(search.page) })}`, usersSchema, headers) : {{/if}}null;
+  return data({ locale, page, user, config, next, nextPath, search, overview, users, token: url.searchParams.get("token") ?? "", error: url.searchParams.get("error") }, { headers });
+}
+
+export default function ProductPage() {
+  const result = useLoaderData<typeof loader>();
+  return <I18nProvider locale={result.locale} messages={getMessages(result.locale)}><ProductShell user={result.user}><Content result={result} /></ProductShell></I18nProvider>;
+}
+function Content({ result }: { result: ReturnType<typeof useLoaderData<typeof loader>> }) {
+  const t = useT();
+  const { locale, page, user, config, next } = result;
+{{#if (includes product.features "auth")}}
+  const providers = config.socialProviders.filter(isSocialProvider);
+  if (page === "login") return <AuthCard title={t("auth.signIn.title")} description={t("auth.signIn.subtitle")} footer={<span>{t("auth.signIn.noAccount")} <a className="underline" href={`/${locale}/signup?next=${encodeURIComponent(result.nextPath)}`}>{t("auth.signIn.signUpLink")}</a></span>}>
+    {result.error && <p role="alert" className="text-sm text-destructive">{t("auth.errors.generic")}</p>}
+    <SignInForm next={next} providers={providers} canResetPassword={config.canResetPassword} />
+{{#if (includes product.features "sms")}}
+    <a href={`/${locale}/login/phone?next=${encodeURIComponent(result.nextPath)}`} className="text-center text-sm underline">{t("auth.phone.link")}</a>
+{{/if}}
+  </AuthCard>;
+  if (page === "signup") return <AuthCard title={t("auth.signUp.title")} description={t("auth.signUp.subtitle")} footer={<span>{t("auth.signUp.hasAccount")} <a className="underline" href={`/${locale}/login?next=${encodeURIComponent(result.nextPath)}`}>{t("auth.signUp.signInLink")}</a></span>}><SignUpForm next={next} providers={providers} verifyEmail={config.verifyEmail} /></AuthCard>;
+  if (page === "dashboard/settings" && user) return <section className="max-w-xl space-y-8"><h1 className="font-serif text-4xl">{t("auth.settings.title")}</h1><section className="space-y-4"><h2 className="text-xl font-semibold">{t("auth.settings.profile")}</h2><ProfileForm name={user.name} email={user.email} /></section><section className="space-y-4"><h2 className="text-xl font-semibold">{t("auth.settings.password")}</h2><PasswordForm /></section></section>;
+  if (page === "dashboard" && user) return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("auth.dashboard.title")}</h1><p>{t("auth.dashboard.welcome", { name: user.name })}</p><dl className="grid max-w-xl gap-4 rounded-lg border p-6"><div><dt className="text-sm text-muted-foreground">{t("auth.fields.name")}</dt><dd>{user.name}</dd></div><div><dt className="text-sm text-muted-foreground">{t("auth.fields.email")}</dt><dd>{user.email}</dd></div></dl><a href={`/${locale}/dashboard/settings`} className="underline">{t("auth.settings.title")}</a></section>;
+{{/if}}
+{{#if (and (includes product.features "auth") (includes product.features "email"))}}
+  if (page === "forgot-password") return <AuthCard title={t("auth.forgot.title")} description={t("auth.forgot.subtitle")} footer={<a href={`/${locale}/login`} className="underline">{t("auth.forgot.back")}</a>}><ForgotPasswordForm /></AuthCard>;
+  if (page === "reset-password") return <AuthCard title={t("auth.reset.title")}>{result.token && !result.error ? <ResetPasswordForm token={result.token} /> : <p role="alert">{t("auth.reset.invalidToken")}</p>}</AuthCard>;
+  if (page === "verify-email") return <AuthCard title={t("auth.verification.title")} description={t("auth.verification.subtitle")} footer={<a href={`/${locale}/login`} className="underline">{t("auth.forgot.back")}</a>}><VerificationForm next={next} /></AuthCard>;
+{{/if}}
+{{#if (and (includes product.features "auth") (includes product.features "sms"))}}
+  if (page === "login/phone") return <AuthCard title={t("auth.phone.title")} description={t("auth.phone.subtitle")} footer={<a href={`/${locale}/login`} className="underline">{t("auth.phone.emailLink")}</a>}><PhoneSignInForm next={next} /></AuthCard>;
+{{/if}}
+{{#if (includes product.features "admin")}}
+  if (page === "admin" && result.overview) return <AdminOverview data={result.overview} locale={locale} />;
+  if (page === "admin/users" && result.users && user) return <AdminUsers data={result.users} search={result.search} locale={locale} currentUser={user} />;
+{{/if}}
+  return <section className="space-y-10 py-12"><div className="max-w-3xl space-y-6"><p className="text-sm uppercase tracking-widest">{{projectName}}</p><h1 className="font-serif text-5xl">{t("core.landing.title")}</h1><p className="text-lg text-muted-foreground">{t("core.landing.subtitle")}</p>{{#if (includes product.features "auth")}}<a href={`/${locale}/${user ? isAdminClient && {{#if (includes product.features "admin")}}true{{else}}false{{/if}} ? "admin" : "dashboard" : "signup"}`} className="inline-block border bg-foreground px-6 py-3 text-background">{t("core.landing.cta")}</a>{{/if}}</div><section className="space-y-6"><h2 className="text-2xl">{t("core.landing.features.title")}</h2><div className="grid gap-6 md:grid-cols-3">{(["modular", "portable", "deploy"] as const).map((feature) => <article key={feature} className="space-y-3 border p-6"><h3 className="font-semibold">{t(`core.landing.features.${feature}.title`)}</h3><p className="text-muted-foreground">{t(`core.landing.features.${feature}.body`)}</p></article>)}</div></section></section>;
+}

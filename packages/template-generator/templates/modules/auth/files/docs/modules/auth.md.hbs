@@ -1,14 +1,18 @@
 # Authentication
 
-Built on [Better Auth](https://better-auth.com). The `packages/auth` package exports `createAuth(env, db, events)`; `{{appPath "fullstack-web"}}/src/services.ts` creates the instance.
+Built on [Better Auth](https://better-auth.com). The `packages/auth` package exports `createAuth(env, db, events, clientOrigins?)`; `{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/services.ts` creates the instance.
 
-The HTTP boundary is `/api/auth/**` on every framework. {{#if (includes frontend "next")}}Next.js uses the Better Auth `nextCookies` adapter.{{else if (includes frontend "tanstack-start")}}TanStack Start uses `tanstackStartCookies` as the last auth plugin so server API calls can propagate session cookies.{{else}}Nuxt forwards the H3 request to the Better Auth WHATWG handler and returns its response, including every session cookie.{{/if}} Never cache authenticated responses or expose the server service graph to client bundles.
+The HTTP boundary is `/api/auth/**` on every framework. {{#if application.nativeSplit}}React Router clients proxy same-origin requests to the Hono backend through their `/api/*` route. The proxy preserves Cookie, Origin and every Set-Cookie. SSR reads the same backend session; clients never import the server service graph.{{else if (includes frontend "next")}}Next.js uses the Better Auth `nextCookies` adapter.{{else if (includes frontend "tanstack-start")}}TanStack Start uses `tanstackStartCookies` as the last auth plugin so server API calls can propagate session cookies.{{else}}Nuxt forwards the H3 request to the Better Auth WHATWG handler and returns its response, including every session cookie.{{/if}} Never cache authenticated responses.
+{{#if application.nativeSplit}}
+
+The generated client Origin allowlist is explicit in backend services and `src/lib/native-request.ts`. Client `VITE_SERVER_URL` selects the upstream backend, not the browser auth URL. The BFF overwrites `X-XStack-Client-Origin`; the backend only accepts declared origins and ignores generic forwarding headers. OAuth callbacks and verification/reset links return through the originating client host, so host-only cookies survive SSR on separate hosts. Register `<client-origin>/api/auth/callback/<provider>` for each client with the provider. Update the explicit allowlist when changing client origins; changing CORS alone is insufficient. Automated deployment remains unsupported for explicit application layouts.
+{{/if}}
 
 ## What you get
 
 - Email and password sign-up and sign-in (`/login`, `/signup`)
 {{#if (includes module.integrations "email")}}
-- Email verification on sign-up and password reset (`/forgot-password`, `/reset-password`), sent by the email module
+- Email verification on sign-up, captcha-aware verification resend at `/[locale]/verify-email`, and password reset (`/forgot-password`, `/reset-password`), sent by the email module
 {{/if}}
 {{#if (includes module.integrations "sms")}}
 - Phone OTP sign-up and sign-in (`/[lang]/login/phone`), delivered by the SMS module
@@ -18,6 +22,7 @@ The HTTP boundary is `/api/auth/**` on every framework. {{#if (includes frontend
 {{/each}}
 - Roles (`user`, `admin`) through the Better Auth admin plugin
 - Account settings at `/dashboard/settings`
+- SSR session renewal preserves Set-Cookie through Next proxy, Start server bridge, Nuxt SSR fetch and split-client BFF; expired/revoked sessions cannot be restored by replaying old cookies
 {{#if (includes product.features "captcha")}}
 - Mandatory server-verified Turnstile for password login/signup/reset and phone OTP sending. Configure keys before using these forms; see [Bot protection / 人机验证](captcha.md). OAuth callbacks and sessions do not require captcha.
 {{/if}}
@@ -27,16 +32,16 @@ The HTTP boundary is `/api/auth/**` on every framework. {{#if (includes frontend
 | Variable | Purpose |
 | --- | --- |
 | `BETTER_AUTH_SECRET` | Session signing secret, at least 32 characters |
-| `BETTER_AUTH_URL` | Public URL of the app |
-| `ADMIN_EMAILS` | Comma-separated emails that get the `admin` role when they sign up |
+| `BETTER_AUTH_URL` | Public backend URL in split layouts; app URL in fullstack layouts |
+| `ADMIN_EMAILS` | Bootstrap allowlist; admin role is granted only after email ownership is verified, never from a claimed signup address |
 {{#if (includes module.providers "google")}}
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth app. Redirect URI: `<BETTER_AUTH_URL>/api/auth/callback/google` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth app. Redirect URI: `{{#if application.nativeSplit}}<client-origin>{{else}}<BETTER_AUTH_URL>{{/if}}/api/auth/callback/google` |
 {{/if}}
 {{#if (includes module.providers "github")}}
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub OAuth app. Callback URL: `<BETTER_AUTH_URL>/api/auth/callback/github` |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub OAuth app. Callback URL: `{{#if application.nativeSplit}}<client-origin>{{else}}<BETTER_AUTH_URL>{{/if}}/api/auth/callback/github` |
 {{/if}}
 {{#if (includes module.providers "wechat")}}
-| `WECHAT_CLIENT_ID`, `WECHAT_CLIENT_SECRET` | Approved WeChat Open Platform **website application** AppID and AppSecret. Callback URL: `<BETTER_AUTH_URL>/api/auth/callback/wechat` |
+| `WECHAT_CLIENT_ID`, `WECHAT_CLIENT_SECRET` | Approved WeChat Open Platform **website application** AppID and AppSecret. Callback URL: `{{#if application.nativeSplit}}<client-origin>{{else}}<BETTER_AUTH_URL>{{/if}}/api/auth/callback/wechat` |
 {{/if}}
 
 OAuth buttons appear only when both the client ID and secret are set.
@@ -45,7 +50,7 @@ OAuth buttons appear only when both the client ID and secret are set.
 ### WeChat website login
 
 1. Register and obtain approval for a website application at [WeChat Open Platform](https://open.weixin.qq.com/). Official-account or mini-program credentials are not interchangeable with website application credentials.
-2. Configure its authorization callback domain to match the public domain of `BETTER_AUTH_URL`. Use HTTPS for production. Localhost alone is not a usable WeChat callback domain; use an approved development domain and tunnel when testing with real accounts.
+2. Configure its authorization callback domain to match {{#if application.nativeSplit}}the originating client public domain{{else}}the public domain of `BETTER_AUTH_URL`{{/if}}. Use HTTPS for production. Localhost alone is not a usable WeChat callback domain; use an approved development domain and tunnel when testing with real accounts.
 3. Set `WECHAT_CLIENT_ID` and `WECHAT_CLIENT_SECRET` in the server environment and restart the application. Both values are required for the login button to appear.
 4. Open the login or signup page and choose **Continue with WeChat**. The browser goes to WeChat's hosted `qrconnect` page (`snsapi_login`); scan and approve there, then return to `/api/auth/callback/wechat`. Supported desktop clients may offer WeChat's quick-login confirmation instead of scanning.
 
@@ -65,7 +70,7 @@ No inline QR script or provider secret is sent to the browser. AppSecret and tok
 | `auth.phone_verification_requested` | A phone OTP should be sent; payload is `{ phoneNumber, code }` |
 {{/if}}
 
-Subscribe in `{{appPath "fullstack-web"}}/src/integrations/*.ts`.
+Subscribe in `{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/integrations/*.ts`; integrations execute once in the backend process, not in clients.
 
 {{#if (includes module.integrations "sms")}}
 ## Phone sign-up and sign-in
@@ -99,7 +104,7 @@ Use the generated framework's protected page loader and preserve incoming reques
 
 ## Schema changes
 
-After adding Better Auth plugins, regenerate the schema with `bun run auth:generate` in `{{appPath "fullstack-web"}}`, then `bun run db:push`.
+After adding Better Auth plugins, regenerate the schema with `bun run auth:generate` in `{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}`, then `bun run db:push`.
 {{#if (includes module.integrations "sms")}}
 
 The generated Drizzle auth schema already includes nullable, unique `user.phoneNumber`, `phoneNumberVerified`, `phone_otp_challenge`, and `rate_limit` for {{database}}. Preserve the custom challenge table when regenerating Better Auth's schema: it is managed by this integration rather than the upstream phone plugin. Apply the schema to the deployment database before accepting phone sign-ins.

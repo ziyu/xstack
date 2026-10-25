@@ -35,9 +35,9 @@ export default function LocaleSwitcher() {
             key={value}
             disabled={value === locale}
             onClick={() => {
-              document.cookie = `${LOCALE_COOKIE}=${value}; path=/; max-age=31536000`;
+              document.cookie = `${LOCALE_COOKIE}=${value}; path=/; max-age=31536000; SameSite=Lax`;
               const rest = pathname.split("/").slice(2).join("/");
-              router.push(`/${value}${rest ? `/${rest}` : ""}` as Route);
+              router.push(`/${value}${rest ? `/${rest}` : ""}${window.location.search}${window.location.hash}` as Route);
             }}
           >
             {localeNames[value]}

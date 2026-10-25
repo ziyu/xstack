@@ -1,0 +1,6 @@
+import { useNavigate, useRevalidator } from "react-router";
+export function useProductNavigation() {
+  const navigate = useNavigate();
+  const revalidator = useRevalidator();
+  return { push: (href: string) => navigate(href), refresh: () => revalidator.revalidate() };
+}

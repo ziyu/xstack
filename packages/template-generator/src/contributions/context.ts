@@ -1,21 +1,31 @@
 import type { ProjectConfig } from "@xstack/types";
 
 import type { ResolvedApplication } from "../apps/plan";
+import type { StackContext } from "../modules/types";
 import type { ApplicationRenderContext } from "../types";
 
-export type ApplicationConfig = ProjectConfig & { application?: ApplicationRenderContext };
+export type ApplicationConfig = ProjectConfig &
+  Pick<StackContext, "moduleApplication" | "productContributions" | "productRuntime"> & {
+    application?: ApplicationRenderContext;
+  };
 
 /** Browser-safe projection shared by capability checks, preflight and rendering. */
 export function resolveApplicationContext(
   config: ProjectConfig,
   app: ResolvedApplication,
-): ProjectConfig {
+): ApplicationConfig {
   const independent = app.manifest.scope === "independent";
   return {
     ...config,
     ...app.adapter.stack,
     apps: undefined,
     frontend: app.adapter.stack.frontend ?? ["none"],
+    moduleApplication: {
+      type: app.selection.type,
+      framework: app.selection.stack.framework ?? "",
+      roles: app.manifest.roles,
+      contribution: independent ? undefined : app.adapter.productContribution,
+    },
     backend: independent
       ? (app.adapter.stack.backend ?? "none")
       : (app.adapter.stack.backend ?? config.backend),
@@ -46,7 +56,7 @@ export function appOutputPath(
   if (!root && application) {
     const local =
       kind === "server"
-        ? application.type === "backend" || application.type === "fullstack-web"
+        ? application.roles.includes("backend")
         : kind === "native"
           ? config.frontend.some((frontend) => frontend.startsWith("native-"))
           : config.frontend.some(

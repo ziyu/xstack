@@ -242,6 +242,22 @@ export function inventoryContributions(templates: Map<string, string>): Contribu
             cursor++;
             continue;
           }
+          if (layer === "shared" && parts[cursor + 1] === "partials") {
+            payload = cursor + 2 < parts.length && source.endsWith(".hbs");
+            break;
+          }
+          if (
+            layer === "shared" &&
+            parts[cursor + 1] === "client" &&
+            parts[cursor + 2] === "frameworks"
+          ) {
+            entry.framework = parts[cursor + 3];
+            if (!entry.framework || !frameworks.has(entry.framework)) {
+              issue("unknown-framework", source, `Unknown shared client framework at ${source}`);
+            }
+            payload = cursor + 4 < parts.length;
+            break;
+          }
           if (layer === "apps") {
             entry.appType = parts[cursor + 1];
             validateApp(source, entry.appType);

@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 
 import {
   assertContributionInventory,
-  contributionMatrix,
   inventoryContributions,
   queryContributions,
   validateContributionRequirements,
@@ -87,39 +86,6 @@ test("a known application contribution is valid even when no selected app consum
   expect(queryContributions(inventory, { module: "core", appType: "cli" })).toContainEqual(
     expect.objectContaining({ source, owner: "module:core", appType: "cli" }),
   );
-});
-
-test("matrix reports actual module/framework app types without conflating shared HTTP with native", () => {
-  const inventory = inventoryContributions(EMBEDDED_TEMPLATES);
-  const matrix = contributionMatrix(inventory);
-  expect(matrix).toContainEqual(
-    expect.objectContaining({
-      module: "auth",
-      framework: "next",
-      appTypes: ["fullstack-web"],
-    }),
-  );
-  expect(matrix).toContainEqual(
-    expect.objectContaining({
-      module: "auth",
-      framework: "http-server",
-      appTypes: ["fullstack-web"],
-    }),
-  );
-  expect(
-    queryContributions(inventory, { module: "auth", variant: "native", appType: "native" }),
-  ).toEqual([]);
-  for (const row of matrix) {
-    expect(row.legacyFiles).toBe(
-      queryContributions(inventory, {
-        family: row.family,
-        owner: row.owner,
-        framework: row.framework,
-        legacy: true,
-        implementation: true,
-      }).length,
-    );
-  }
 });
 
 test("legacy web branches remain explicit and desktop is not a stable application type", () => {

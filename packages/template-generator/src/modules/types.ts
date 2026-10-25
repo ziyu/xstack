@@ -1,4 +1,4 @@
-import type { ProjectConfig } from "@xstack/types";
+import type { ApplicationAdapter, ProjectConfig } from "@xstack/types";
 
 export type Localized = { en: string; "zh-CN": string };
 
@@ -165,6 +165,8 @@ export type ModuleManifest = {
   conflicts?: string[];
   /** Where the native implementation (the module's own templates) works. */
   supports?: Support;
+  /** Opt-in to adapter-declared native HTTP server/client implementations. */
+  nativeSplit?: true;
   domain?: ModuleDomain;
   providers?: ProvidersSpec;
   options?: Record<string, OptionSpec>;
@@ -220,7 +222,21 @@ export type ResolvedPlan = {
   domains: Partial<Record<DomainField, string>>;
 };
 
+export type ProductContribution = NonNullable<ApplicationAdapter["productContribution"]>;
+
 export type StackContext = Pick<
   ProjectConfig,
   "frontend" | "backend" | "database" | "orm" | "api" | "webDeploy" | "projectName"
-> & { dbSetup?: ProjectConfig["dbSetup"] };
+> & {
+  dbSetup?: ProjectConfig["dbSetup"];
+  runtime?: ProjectConfig["runtime"];
+  apps?: ProjectConfig["apps"];
+  productContributions?: ProductContribution[];
+  productRuntime?: ProjectConfig["runtime"];
+  moduleApplication?: {
+    type: string;
+    framework: string;
+    roles: string[];
+    contribution?: ProductContribution;
+  };
+};

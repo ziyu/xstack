@@ -20,5 +20,5 @@ export async function requireUser(locale: Locale, next?: `/${string}`) {
 
 /** Accepts only same-origin paths so `?next=` cannot redirect off-site. */
 export function safeNext(value: string | undefined, fallback: string): string {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : fallback;
+  return value?.startsWith("/") && !value.startsWith("//") && !value.includes("\\") && !/[\u0000-\u001f\u007f]/.test(value) ? value : fallback;
 }

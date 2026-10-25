@@ -14,6 +14,32 @@ The complete matrix has millions of core cases before addon and example subsets.
 
 `--limit N` bounds a run for development; a limited run reports incomplete coverage and exits nonzero. Zero matching cases also exits nonzero. An enumerated case only passes after its runtime checks and resource cleanup succeed. Missing adapters or credentials are blocked, never passed.
 
+## Complete C2 local acceptance
+
+The persistent C2 runner selects core/i18n/auth/admin/email/sms/captcha on named Next, TanStack Start and Nuxt fullstack apps (SQLite), plus React Router frontend/admin and Hono backend (SQLite and PostgreSQL). Cases cover Resend/SMTP, Aliyun/Tencent/Twilio and Google/GitHub/WeChat selections. `split-renamed-cli` uses different instance IDs and an independent CLI. Execution discovers directory, origin, port, dev arguments and role bindings from generated `applications.json`; fixture names exist only in case input data. Renaming or adding an independent application does not require editing execution code.
+
+```sh
+bun apps/cli/live-tests/c2.ts plan
+bun apps/cli/live-tests/c2.ts run --case next-sqlite --directory apps/cli/.smoke/c2-run
+# Separate stages avoid repeating dependency installation and builds:
+bun apps/cli/live-tests/c2.ts prepare --case all --directory apps/cli/.smoke/c2-matrix
+bun apps/cli/live-tests/c2.ts check --case all --directory apps/cli/.smoke/c2-matrix
+bun apps/cli/live-tests/c2.ts runtime --case all --directory apps/cli/.smoke/c2-matrix
+bun apps/cli/live-tests/c2.ts report --case all --directory apps/cli/.smoke/c2-matrix
+bun apps/cli/live-tests/c2.ts cleanup --case all --directory apps/cli/.smoke/c2-matrix
+```
+
+Build the repository CLI/templates first. Bun, Node, registry access and exclusive loopback ports 3000–3002/4399 are required. Optional `C2_INSTALL_ARGS` is a JSON array of Bun install arguments, e.g. `'["--cafile=/etc/ssl/cert.pem","--network-concurrency=2"]'`. PostgreSQL requires `C2_DATABASE_URL` pointing at an **empty disposable loopback database** plus `C2_DISPOSABLE_POSTGRES=1`. The runner records ownership before generation; cleanup requires the same explicit disposal flag, rejects unknown tables and never drops the database/container. The caller owns that infrastructure.
+
+`prepare` generates through the real CLI, installs and initializes/migrates the DB; `check` typechecks/builds; `runtime` starts the generated development applications and exercises real HTTP and SSR. HTTP checks cover signup, verification/reset delivery hooks, login/logout, session refresh/expiry/revocation, admin denial/verified bootstrap/demotion/ban, OTP races/expiry/replay, captcha host/action/time/origin bindings, and OAuth authorization/state boundaries. SQLite runs additionally reuse `wechat.ts` for the exact upstream exchange fixture and real user-created event. No generated production code is replaced. Node listeners are constrained to loopback by the harness-only preload.
+
+Every case writes `result.json`, the run writes `results.json`, command logs are private, and failure sets a nonzero exit code. Artifacts and disposable accounts remain until explicit cleanup; services stop on completion/failure/signals. After a hard kill, stop any orphan process before removing `runner.lock`. New `run`/`prepare` calls refuse existing projects; use `runtime` to repeat HTTP acceptance or a new directory after changing templates.
+
+Passing local acceptance does **not** establish provider cloud acceptance. Email/SMS use generated development console delivery, Turnstile uses the isolated Siteverify fixture, and successful Google/GitHub cloud exchange is explicitly unverified. No cloud credentials are needed or sent. Generated build-only cases are selectable with `XSTACK_BUILD_SAMPLES=1 XSTACK_BUILD_SAMPLE_FILTER=product-c2 bun test apps/cli/test/generated-builds.test.ts`.
+
+For the isolated bootstrap regression, generate an `auth+email+admin` SQLite project without captcha under `.smoke`, install and migrate it, then run `bun apps/cli/live-tests/c2-bootstrap.ts <fixture>`. It proves an allowlisted but unverified email stays `user`, actual verification grants `admin`, and replay cannot undo a later demotion. The complete C2 matrix exercises the same invariant with captcha enabled through real HTTP.
+
+
 ### Native Cloudflare D1 and R2 binding
 
 Generate a disposable Next/self/Drizzle project with `--web-deploy cloudflare --database sqlite --db-setup d1`, storage provider `r2-binding`, and compatible full providers (`email=resend`, `sms=twilio`, `payment=stripe`). Explicit Node-only provider selections are errors, not automatic substitutions. From the generated root, run `db:generate` then `db:migrate:local`. Set the app origin/credentials in `.env`, copy them to `apps/web/.dev.vars`, and run `build:cloudflare` then `preview:cloudflare` from `apps/web`. This uses real local workerd/D1/R2 without a Cloudflare account; it does not verify deployed cloud IAM or paid providers.

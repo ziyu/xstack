@@ -1,14 +1,16 @@
 # Admin console
 
-The admin area lives at `/admin` and is visible only to users with the `admin` role. Everyone else gets a 404.
+The locale-prefixed admin area lives at `/[locale]/admin`. {{#if application.nativeSplit}}Only the admin application exposes it: anonymous users redirect to login and ordinary users receive 403. The web frontend does not publish admin pages.{{else}}It is visible only to users with the `admin` role; other users receive 404.{{/if}} Backend admin APIs independently authorize every request.
 
 ## Becoming an admin
 
-Set `ADMIN_EMAILS` before signing up:
+Set `ADMIN_EMAILS` before enrollment, then prove email ownership through the email verification flow or a trusted OAuth provider's verified email:
 
 ```bash
 ADMIN_EMAILS=you@example.com
 ```
+
+An unverified signup never receives administrator privileges, even when it claims a listed email. With neither email verification nor verified-email OAuth configured, an operator must promote the first administrator through a trusted database administration channel after checking their identity. Never expose that bootstrap operation as a public endpoint. Phone-only and synthetic WeChat addresses are not bootstrap identities.
 
 Existing admins can promote other users from `/admin/users`.
 
@@ -33,11 +35,15 @@ Protected page loaders and API handlers check the authenticated session's admin 
 
 ## Adding pages
 
-{{#if (includes frontend "next")}}
+{{#if application.nativeSplit}}
+Add the page to the admin client's `src/routes/product.tsx`, extend its typed HTTP contract, and add its protected handler under `{{appPath "backend"}}/src/lib/native/`. Ordinary users must remain rejected even when calling the endpoint directly. Existing user-management mutations reject self-demotion/self-ban, verify Origin, and delegate role/ban operations to Better Auth.
+{{else if (includes frontend "next")}}
 Create `{{appPath "fullstack-web"}}/src/app/[lang]/admin/<page>/page.tsx`.
 {{else if (includes frontend "tanstack-start")}}
 Add a locale-prefixed admin route under `{{appPath "fullstack-web"}}/src/routes/` with a server-authorized loader.
 {{else}}
 Add the page in `{{appPath "fullstack-web"}}/app/pages/` and its protected data handler in `{{appPath "fullstack-web"}}/server/`.
 {{/if}}
+{{#unless application.nativeSplit}}
 Add an entry to `navigation.admin` in `{{appPath "fullstack-web"}}/src/config/navigation.ts`. Modules such as payment and credits add their pages this way.
+{{/unless}}

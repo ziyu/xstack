@@ -12,6 +12,7 @@ export default defineModule({
   category: "identity",
   requires: ["auth"],
   supports: NATIVE_SHELL_DB,
+  nativeSplit: true,
   providers: {
     min: 1,
     max: 1,

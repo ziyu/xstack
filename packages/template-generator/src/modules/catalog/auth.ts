@@ -12,6 +12,7 @@ export default defineModule({
   requires: ["core"],
   enhances: ["email", "sms"],
   supports: NATIVE_SHELL_DB,
+  nativeSplit: true,
   domain: {
     field: "auth",
     value: ({ options }) => String(options.engine),
@@ -71,7 +72,7 @@ export default defineModule({
       key: "ADMIN_EMAILS",
       required: false,
       sensitive: false,
-      comment: "Comma-separated emails that receive the admin role when they sign up",
+      comment: "Comma-separated bootstrap emails; admin access requires verified email ownership",
     },
   ],
   services: [
@@ -81,6 +82,7 @@ export default defineModule({
       init: "createAuth(ENV, db, events)",
     },
   ],
+  proxy: [{ id: "auth-session", from: "./lib/auth-proxy", name: "authSessionStep", order: 90 }],
   nav: [
     { area: "main", href: "/dashboard", labelKey: "nav.dashboard", order: 90, auth: true },
     { area: "dashboard", href: "/dashboard", labelKey: "nav.overview", order: 0 },

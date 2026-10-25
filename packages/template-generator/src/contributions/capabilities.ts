@@ -4,6 +4,7 @@ import { APPLICATION_TEMPLATES } from "../applications.generated";
 import { resolveApplicationConfig } from "../apps/config";
 import { resolveApplications } from "../apps/plan";
 import { MODULE_CATALOG } from "../modules/catalog";
+import { supportsNativeSplit } from "../modules/native-split";
 import { resolveModules, toSelection } from "../modules/resolver";
 import type { ResolvedPlan } from "../modules/types";
 import { resolveApplicationContext } from "./context";
@@ -40,11 +41,20 @@ export function resolveWorkspaceCapabilities(
         return {
           id: app.selection.id,
           type: app.selection.type,
+          roles: app.manifest.roles,
           independent,
           config: resolveApplicationContext(config, app),
         };
       })
-    : [{ id: "web", type: "fullstack-web", independent: false, config }];
+    : [
+        {
+          id: "web",
+          type: "fullstack-web",
+          roles: ["backend", "web-frontend"],
+          independent: false,
+          config,
+        },
+      ];
   for (const context of contexts) {
     const plan: ResolvedPlan = resolveModules(
       toSelection(context.config.product),
@@ -57,7 +67,14 @@ export function resolveWorkspaceCapabilities(
       const reasons = plan.issues
         .filter((issue) => issue.level === "error" && issue.module === module.manifest.id)
         .map((issue) => issue.message);
-      if (module.variant === "native" && context.type !== "fullstack-web") {
+      if (
+        module.variant === "native" &&
+        !(
+          context.roles.includes("backend") &&
+          context.roles.some((role) => role === "web-frontend" || role === "admin")
+        ) &&
+        !(module.manifest.nativeSplit && supportsNativeSplit(context.config, module.manifest.id))
+      ) {
         reasons.push(
           `Module ${module.manifest.id} has no ${context.type} application contribution`,
         );
@@ -85,7 +102,8 @@ export function resolveWorkspaceCapabilities(
     // The current native shell wires database seams even if only its i18n foundation remains.
     const core = MODULE_CATALOG.get("core")?.supports;
     if (
-      context.type === "fullstack-web" &&
+      context.roles.includes("backend") &&
+      context.roles.some((role) => role === "web-frontend" || role === "admin") &&
       context.config.backend === "self" &&
       context.config.api === "none" &&
       context.config.frontend.some((f) => core?.frameworks?.includes(f))

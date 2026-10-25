@@ -2,6 +2,7 @@
   "id": "astro",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["astro"],
         "backend": "self",
@@ -10,6 +11,7 @@
       }
     },
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["astro"],
         "runtime": "none",

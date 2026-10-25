@@ -1,0 +1,35 @@
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@{{projectName}}/ui/components/card";
+
+export function AuthCard({
+  title,
+  description,
+  footer,
+  children,
+}: {
+  title: string;
+  description?: string;
+  footer?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-1 items-center justify-center px-4 py-12">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">{title}</CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">{children}</CardContent>
+        {footer && (
+          <CardFooter className="justify-center text-muted-foreground text-xs">{footer}</CardFooter>
+        )}
+      </Card>
+    </div>
+  );
+}

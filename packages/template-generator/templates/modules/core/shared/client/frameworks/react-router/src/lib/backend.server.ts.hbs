@@ -1,0 +1,41 @@
+import { ENV } from "@/env";
+import type { z } from "zod";
+
+const upstream = new URL(ENV.VITE_SERVER_URL);
+const hopByHop = ["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade", "host", "content-length"];
+export const privateHeaders = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" };
+
+/** Only the declared backend is reachable; browser-supplied forwarding headers are replaced. */
+export async function backendRequest(request: Request, path: string, forwardBody = false): Promise<Response> {
+  const original = new URL(request.url);
+  const destination = new URL(upstream.origin);
+  destination.pathname = path.split("?")[0]!;
+  destination.search = path.includes("?") ? path.slice(path.indexOf("?")) : "";
+  const headers = new Headers(request.headers);
+  for (const name of hopByHop) headers.delete(name);
+  headers.delete("forwarded");
+  headers.delete("x-forwarded-for");
+  headers.delete("x-forwarded-host");
+  headers.delete("x-forwarded-proto");
+  headers.delete("x-forwarded-port");
+  headers.set("x-xstack-client-origin", original.origin);
+  headers.set("accept-encoding", "identity");
+  const response = await fetch(destination, {
+    method: forwardBody ? request.method : "GET", headers, redirect: "manual", cache: "no-store",
+    ...(forwardBody && request.method !== "GET" && request.method !== "HEAD" ? { body: await request.arrayBuffer() } : {}),
+  });
+  const outgoing = new Headers(response.headers);
+  for (const name of hopByHop) outgoing.delete(name);
+  outgoing.delete("content-encoding");
+  outgoing.delete("set-cookie");
+  for (const cookie of response.headers.getSetCookie()) outgoing.append("set-cookie", cookie);
+  for (const [name, value] of Object.entries(privateHeaders)) outgoing.set(name, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers: outgoing });
+}
+
+export async function readBackend<T>(request: Request, path: string, schema: z.ZodType<T>, headers: Headers): Promise<T> {
+  const response = await backendRequest(request, path);
+  for (const cookie of response.headers.getSetCookie()) headers.append("Set-Cookie", cookie);
+  if (!response.ok) throw new Response(response.status === 403 ? "Forbidden" : response.status === 401 ? "Unauthorized" : "Backend request failed", { status: response.status, headers });
+  return schema.parse(await response.json());
+}

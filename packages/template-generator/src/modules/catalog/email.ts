@@ -12,6 +12,7 @@ export default defineModule({
   requires: ["core"],
   enhances: ["auth"],
   supports: NATIVE_SHELL,
+  nativeSplit: true,
   providers: {
     min: 1,
     max: 1,

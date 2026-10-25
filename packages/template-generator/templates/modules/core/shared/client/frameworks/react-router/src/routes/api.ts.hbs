@@ -1,0 +1,9 @@
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { backendRequest } from "@/lib/backend.server";
+
+function proxy(request: Request) {
+  const url = new URL(request.url);
+  return backendRequest(request, `${url.pathname}${url.search}`, true);
+}
+export function loader({ request }: LoaderFunctionArgs) { return proxy(request); }
+export function action({ request }: ActionFunctionArgs) { return proxy(request); }

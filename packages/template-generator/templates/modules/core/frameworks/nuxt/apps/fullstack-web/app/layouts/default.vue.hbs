@@ -5,18 +5,21 @@ const { locale, locales, localeNames, path, label, t } = useProductLocale();
 const route = useRoute();
 const theme = useCookie<"light" | "dark">("theme", { default: () => "light", sameSite: "lax" });
 useHead(() => ({ htmlAttrs: { lang: locale.value, class: theme.value } }));
-const localeCookie = useCookie(LOCALE_COOKIE, { sameSite: "lax" });
+const localeCookie = useCookie(LOCALE_COOKIE, { path: "/", maxAge: 31536000, sameSite: "lax" });
 async function changeLocale(event: Event) {
   const value = (event.target as HTMLSelectElement).value;
   localeCookie.value = value;
-  await navigateTo(`/${value}${route.path.replace(/^\/[^/]+/, "")}`);
+  await navigateTo({ path: `/${value}${route.path.replace(/^\/[^/]+/, "")}`, query: route.query, hash: route.hash });
 }
 {{#if (includes product.features "auth")}}
-const { data: session } = await useFetch<{ user: { id: string; name: string; role?: string | null } } | null>("/api/product/session", { key: "product-session" });
+const { data: session } = await useProductSession();
+const { pending, error, run } = useProductAction();
 async function signOut() {
-  await productRequest("/api/auth/sign-out", productJson({}));
-  session.value = null;
-  await navigateTo(path("login"));
+  await run(async () => {
+    await productRequest("/api/auth/sign-out", productJson({}));
+    session.value = null;
+    await navigateTo(path("login"));
+  });
 }
 {{/if}}
 const mainNavigation = computed(() => navigation.main.filter((item) => canSee(item, {{#if (includes product.features "auth")}}session.value?.user{{else}}null{{/if}})));
@@ -29,13 +32,14 @@ const mainNavigation = computed(() => navigation.main.filter((item) => canSee(it
     <nav :aria-label="label('Main navigation', '主导航')">
       <NuxtLink v-for="item in mainNavigation" :key="item.href" :to="path(item.href)">\{{ t(item.labelKey) }}</NuxtLink>
       {{#if (includes product.features "auth")}}
-      <button v-if="session" class="text-button" @click="signOut">\{{ label('Sign out', '退出') }}</button>
+      <button v-if="session" class="text-button" :disabled="pending" @click="signOut">\{{ label('Sign out', '退出') }}</button>
       <NuxtLink v-else :to="path('login')">\{{ label('Sign in', '登录') }}</NuxtLink>
       {{/if}}
       <select :value="locale" :aria-label="label('Language', '语言')" @change="changeLocale"><option v-for="code in locales" :key="code" :value="code">\{{ localeNames[code] }}</option></select>
       <button class="text-button" :aria-label="label('Toggle theme', '切换主题')" @click="theme = theme === 'dark' ? 'light' : 'dark'">\{{ theme === 'dark' ? label('Light', '浅色') : label('Dark', '深色') }}</button>
     </nav>
   </header>
+  {{#if (includes product.features "auth")}}<p v-if="error" role="alert" class="error">\{{ error }}</p>{{/if}}
   <main id="main" tabindex="-1"><slot /></main>
   <footer class="site-footer">{{projectName}} <span>\{{ label('Built for your next chapter.', '为你的下一篇章而构建。') }}</span></footer>
 </template>

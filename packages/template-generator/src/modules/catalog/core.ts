@@ -12,6 +12,7 @@ export default defineModule({
   hidden: true,
   requires: ["i18n"],
   supports: NATIVE_SHELL_DB,
+  nativeSplit: true,
   packages: [{ dir: "events" }],
   services: [
     {
@@ -22,6 +23,12 @@ export default defineModule({
   ],
   nav: [{ area: "main", href: "/", labelKey: "nav.home", order: 0 }],
   frameworkReplaces: {
+    "react-router": [
+      "apps/web/src/root.tsx",
+      "apps/web/src/routes.ts",
+      "apps/web/src/routes/_index.tsx",
+      "apps/web/src/components/header.tsx",
+    ],
     next: [
       "apps/web/src/app/layout.tsx",
       "apps/web/src/app/page.tsx",

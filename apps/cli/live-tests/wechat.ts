@@ -73,6 +73,9 @@ const auth = createAuth(
 );
 const origin = "http://localhost:4391";
 async function begin(callbackURL = `${origin}/en/dashboard`) {
+  // Independent protocol cases share one fixture IP; preserve production rate limits.
+  if (sqlite.query("SELECT name FROM sqlite_master WHERE name = 'rate_limit'").get())
+    sqlite.exec("DELETE FROM rate_limit");
   const response = await auth.handler(
     new Request(`${origin}/api/auth/sign-in/social`, {
       method: "POST",

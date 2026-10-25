@@ -1,0 +1,25 @@
+import { auth } from "@{{projectName}}/app-services";
+import { z } from "zod";
+import { HttpError, json, pageOf, readJson, requireAdministrator, requireOrigin } from "../product-api";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path !== "/api/product/admin" && path !== "/api/product/users") return;
+  const { user } = await requireAdministrator(request);
+  if (path === "/api/product/admin" && request.method === "GET") {
+    const [recent, admins] = await Promise.all([auth.api.listUsers({ headers: request.headers, query: { limit: 5, sortBy: "createdAt", sortDirection: "desc" } }), auth.api.listUsers({ headers: request.headers, query: { limit: 1, filterField: "role", filterValue: "admin", filterOperator: "eq" } })]);
+    return json({ users: recent.total, admins: admins.total, recent: recent.users });
+  }
+  if (path === "/api/product/users" && request.method === "GET") {
+    const q = new URL(request.url).searchParams.get("q") ?? "";
+    return json(await auth.api.listUsers({ headers: request.headers, query: { limit: 20, offset: (pageOf(request) - 1) * 20, sortBy: "createdAt", sortDirection: "desc", ...(q ? { searchValue: q, searchField: "email", searchOperator: "contains" as const } : {}) } }));
+  }
+  if (path === "/api/product/users" && request.method === "POST") {
+    requireOrigin(request);
+    const data = z.discriminatedUnion("action", [z.object({ action: z.literal("role"), userId: z.string().min(1), role: z.enum(["admin", "user"]) }).strict(), z.object({ action: z.literal("ban"), userId: z.string().min(1), reason: z.string().max(1000).optional() }).strict(), z.object({ action: z.literal("unban"), userId: z.string().min(1) }).strict()]).parse(await readJson(request));
+    if (data.userId === user.id) throw new HttpError(403, "self_modification");
+    if (data.action === "role") await auth.api.setRole({ headers: request.headers, body: { userId: data.userId, role: data.role } });
+    else if (data.action === "ban") await auth.api.banUser({ headers: request.headers, body: { userId: data.userId, banReason: data.reason } });
+    else await auth.api.unbanUser({ headers: request.headers, body: { userId: data.userId } });
+    return json({ success: true });
+  }
+  return json({ error: "method_not_allowed" }, 405);
+}

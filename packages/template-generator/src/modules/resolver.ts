@@ -1,5 +1,6 @@
 import type { ProductConfig } from "@xstack/types";
 
+import { supportsNativeSplit } from "./native-split";
 import type {
   DeployTarget,
   Dialect,
@@ -163,7 +164,11 @@ function resolveAttempt(
   } else {
     for (const manifest of catalog.values()) {
       if (!manifest.hidden || reasons.has(manifest.id)) continue;
-      if (supportGaps(manifest.supports, stack, manifest.id).length) continue;
+      if (
+        !(manifest.nativeSplit && supportsNativeSplit(stack, manifest.id)) &&
+        supportGaps(manifest.supports, stack, manifest.id).length
+      )
+        continue;
       reasons.set(manifest.id, { kind: "foundation" });
       queue.push(manifest.id);
     }
@@ -235,7 +240,9 @@ function resolveEntry(
   const nativeGaps = forceStack
     ? []
     : [
-        ...supportGaps(manifest.supports, stack, `Module "${id}"`),
+        ...(manifest.nativeSplit && supportsNativeSplit(stack, id)
+          ? []
+          : supportGaps(manifest.supports, stack, `Module "${id}"`)),
         ...candidates.flatMap((provider) =>
           supportGaps(
             manifest.providers?.options[provider]?.supports,

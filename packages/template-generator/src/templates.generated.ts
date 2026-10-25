@@ -3414,6 +3414,23 @@ fastify.listen({ port: 3000{{#if (or (eq serverDeploy "docker") (eq serverDeploy
   "id": "hono",
   "apps": {
     "backend": {
+      "devArgs": [],
+      "productContribution": {
+        "mode": "server",
+        "protocol": "product-http-v1",
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "constraints": {
+          "runtime": ["bun", "node"],
+          "api": ["none"],
+          "orm": ["drizzle"],
+          "database": ["sqlite", "postgres"],
+          "webDeploy": ["none"]
+        },
+        "frameworks": [
+          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha"] },
+          { "id": "hono", "modules": ["core"] }
+        ]
+      },
       "stack": {
         "backend": "hono",
         "runtime": "bun",
@@ -3423,7 +3440,11 @@ fastify.listen({ port: 3000{{#if (or (eq serverDeploy "docker") (eq serverDeploy
   }
 }
 `],
-  ["backend/server/hono/apps/backend/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+  ["backend/server/hono/apps/backend/src/index.ts.hbs", `{{#if application.nativeSplit}}
+import { handleNativeRequest } from "./lib/native-request";
+{{else}}
+{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+{{/if}}
 {{#if (eq api "orpc")}}
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -3438,6 +3459,7 @@ import { trpcServer } from "@hono/trpc-server";
 import { createContext } from "@{{projectName}}/api/context";
 import { appRouter } from "@{{projectName}}/api/routers/index";
 {{/if}}
+{{#unless application.nativeSplit}}
 {{#if (eq auth "better-auth")}}
 {{#if (or (eq runtime "workers") (eq serverDeploy "cloudflare") (and (eq backend "self") (eq webDeploy "cloudflare")))}}
 import { createAuth } from "@{{projectName}}/auth";
@@ -3445,6 +3467,7 @@ import { createAuth } from "@{{projectName}}/auth";
 import { auth } from "@{{projectName}}/auth";
 {{/if}}
 {{/if}}
+{{/unless}}
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -3455,10 +3478,10 @@ app.use(logger());
 app.use(
 	"/*",
 	cors({
-        origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
+        origin: {{#if application.nativeSplit}}[{{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}}{{/if}},
 		allowMethods: ["GET", "POST", "OPTIONS"],
 {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
-		allowHeaders: ["Content-Type", "Authorization"],
+		allowHeaders: ["Content-Type", "Authorization"{{#if application.nativeSplit}}, "X-Captcha-Token", "Accept-Language"{{/if}}],
 {{/if}}
 {{#if (eq auth "better-auth")}}
 		credentials: true,
@@ -3466,6 +3489,9 @@ app.use(
 	})
 );
 
+{{#if application.nativeSplit}}
+app.all("/api/*", (c) => handleNativeRequest(c.req.raw));
+{{else}}
 {{#if (eq auth "better-auth")}}
 app.on(
 	["POST", "GET"],
@@ -3477,6 +3503,7 @@ app.on(
 		auth.handler(c.req.raw)
 {{/if}}
 );
+{{/if}}
 {{/if}}
 
 {{#if (eq api "orpc")}}
@@ -3556,7 +3583,7 @@ if (!process.env.VERCEL) {
 	serve(
 		{
 			fetch: app.fetch,
-			port: 3000,
+			port: {{#if application.port}}{{application.port}}{{else}}3000{{/if}},
 		},
 		(info) => {
 			console.log(\`Server is running on http://localhost:\${info.port}\`);
@@ -3567,7 +3594,11 @@ if (!process.env.VERCEL) {
 {{/if}}
 {{else}}
 {{#if (eq runtime "bun")}}
+{{#if application.nativeSplit}}
+export default { port: {{application.port}}, fetch: app.fetch };
+{{else}}
 export default app;
+{{/if}}
 {{/if}}
 {{#if (eq runtime "workers")}}
 export default app;
@@ -5810,6 +5841,7 @@ declare module "cloudflare:workers" {
   "id": "astro",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["astro"],
         "backend": "self",
@@ -5818,6 +5850,7 @@ declare module "cloudflare:workers" {
       }
     },
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["astro"],
         "runtime": "none",
@@ -9732,6 +9765,7 @@ declare module "*.css";
   "id": "nuxt",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["nuxt"],
         "backend": "self",
@@ -9740,6 +9774,7 @@ declare module "*.css";
       }
     },
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["nuxt"],
         "runtime": "none",
@@ -10492,6 +10527,8 @@ Disallow:
   "id": "next",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--hostname", "127.0.0.1"],
+      "sharedPackages": ["ui"],
       "stack": {
         "frontend": ["next"],
         "backend": "self",
@@ -10500,6 +10537,8 @@ Disallow:
       }
     },
     "web-frontend": {
+      "devArgs": ["--hostname", "127.0.0.1"],
+      "sharedPackages": ["ui"],
       "stack": {
         "frontend": ["next"],
         "runtime": "none",
@@ -11249,6 +11288,26 @@ export function ThemeProvider({
   "id": "react-router",
   "apps": {
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
+      "sharedPackages": ["ui"],
+      "productContribution": {
+        "mode": "client",
+        "protocol": "product-http-v1",
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "constraints": {
+          "runtime": ["bun", "node"],
+          "api": ["none"],
+          "orm": ["drizzle"],
+          "database": ["sqlite", "postgres"],
+          "webDeploy": ["none"]
+        },
+        "frameworks": [{ "id": "react-router", "modules": ["core"] }],
+        "client": {
+          "framework": "react-router",
+          "modules": ["core", "i18n", "auth", "admin", "captcha"],
+          "integrations": ["email", "sms"]
+        }
+      },
       "stack": {
         "frontend": ["react-router"],
         "runtime": "none",
@@ -11256,6 +11315,26 @@ export function ThemeProvider({
       }
     },
     "admin": {
+      "devArgs": ["--host", "127.0.0.1"],
+      "sharedPackages": ["ui"],
+      "productContribution": {
+        "mode": "client",
+        "protocol": "product-http-v1",
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "constraints": {
+          "runtime": ["bun", "node"],
+          "api": ["none"],
+          "orm": ["drizzle"],
+          "database": ["sqlite", "postgres"],
+          "webDeploy": ["none"]
+        },
+        "frameworks": [{ "id": "react-router", "modules": ["core"] }],
+        "client": {
+          "framework": "react-router",
+          "modules": ["core", "i18n", "auth", "admin", "captcha"],
+          "integrations": ["email", "sms"]
+        }
+      },
       "stack": {
         "frontend": ["react-router"],
         "runtime": "none",
@@ -12535,6 +12614,8 @@ export default function Loader() {
   "id": "tanstack-router",
   "apps": {
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
+      "sharedPackages": ["ui"],
       "stack": {
         "frontend": ["tanstack-router"],
         "runtime": "none",
@@ -13017,6 +13098,8 @@ export default defineConfig({
   "id": "tanstack-start",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--host", "127.0.0.1"],
+      "sharedPackages": ["ui"],
       "stack": {
         "frontend": ["tanstack-start"],
         "backend": "self",
@@ -13025,6 +13108,8 @@ export default defineConfig({
       }
     },
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
+      "sharedPackages": ["ui"],
       "stack": {
         "frontend": ["tanstack-start"],
         "runtime": "none",
@@ -14332,6 +14417,7 @@ Disallow:
   "id": "solid",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["solid"],
         "backend": "self",
@@ -14340,6 +14426,7 @@ Disallow:
       }
     },
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["solid"],
         "runtime": "none",
@@ -14990,6 +15077,7 @@ body {
   "id": "svelte",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["svelte"],
         "backend": "self",
@@ -14998,6 +15086,7 @@ body {
       }
     },
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["svelte"],
         "runtime": "none",
@@ -15731,15 +15820,17 @@ export {};
   ["frontend/svelte/shared/static/favicon.png", `[Binary file]`],
   ["modules/admin/files/docs/modules/admin.md.hbs", `# Admin console
 
-The admin area lives at \`/admin\` and is visible only to users with the \`admin\` role. Everyone else gets a 404.
+The locale-prefixed admin area lives at \`/[locale]/admin\`. {{#if application.nativeSplit}}Only the admin application exposes it: anonymous users redirect to login and ordinary users receive 403. The web frontend does not publish admin pages.{{else}}It is visible only to users with the \`admin\` role; other users receive 404.{{/if}} Backend admin APIs independently authorize every request.
 
 ## Becoming an admin
 
-Set \`ADMIN_EMAILS\` before signing up:
+Set \`ADMIN_EMAILS\` before enrollment, then prove email ownership through the email verification flow or a trusted OAuth provider's verified email:
 
 \`\`\`bash
 ADMIN_EMAILS=you@example.com
 \`\`\`
+
+An unverified signup never receives administrator privileges, even when it claims a listed email. With neither email verification nor verified-email OAuth configured, an operator must promote the first administrator through a trusted database administration channel after checking their identity. Never expose that bootstrap operation as a public endpoint. Phone-only and synthetic WeChat addresses are not bootstrap identities.
 
 Existing admins can promote other users from \`/admin/users\`.
 
@@ -15764,14 +15855,18 @@ Protected page loaders and API handlers check the authenticated session's admin 
 
 ## Adding pages
 
-{{#if (includes frontend "next")}}
+{{#if application.nativeSplit}}
+Add the page to the admin client's \`src/routes/product.tsx\`, extend its typed HTTP contract, and add its protected handler under \`{{appPath "backend"}}/src/lib/native/\`. Ordinary users must remain rejected even when calling the endpoint directly. Existing user-management mutations reject self-demotion/self-ban, verify Origin, and delegate role/ban operations to Better Auth.
+{{else if (includes frontend "next")}}
 Create \`{{appPath "fullstack-web"}}/src/app/[lang]/admin/<page>/page.tsx\`.
 {{else if (includes frontend "tanstack-start")}}
 Add a locale-prefixed admin route under \`{{appPath "fullstack-web"}}/src/routes/\` with a server-authorized loader.
 {{else}}
 Add the page in \`{{appPath "fullstack-web"}}/app/pages/\` and its protected data handler in \`{{appPath "fullstack-web"}}/server/\`.
 {{/if}}
+{{#unless application.nativeSplit}}
 Add an entry to \`navigation.admin\` in \`{{appPath "fullstack-web"}}/src/config/navigation.ts\`. Modules such as payment and credits add their pages this way.
+{{/unless}}
 `],
   ["modules/admin/files/packages/i18n/src/messages/en/admin.ts", `export default {
   nav: {
@@ -15887,35 +15982,13 @@ export type Actor = { id: string; role?: string | null };
 /** Rules per role. Admins manage everything; extend this for finer-grained roles. */
 export function defineAbilityFor(actor: Actor | null | undefined): AppAbility {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
-  if (actor?.role === "admin") can("manage", "all");
+  if (actor?.role?.split(",").includes("admin")) can("manage", "all");
   return build();
 }
 `],
-  ["modules/admin/frameworks/http-server/apps/fullstack-web/src/lib/native/admin.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
-import { z } from "zod";
-import { HttpError, json, pageOf, readJson, requireAdministrator, requireOrigin } from "../product-api";
-export async function handle(request: Request, path: string): Promise<Response | undefined> {
-  if (path !== "/api/product/admin" && path !== "/api/product/users") return;
-  const { user } = await requireAdministrator(request);
-  if (path === "/api/product/admin" && request.method === "GET") {
-    const [recent, admins] = await Promise.all([auth.api.listUsers({ headers: request.headers, query: { limit: 5, sortBy: "createdAt", sortDirection: "desc" } }), auth.api.listUsers({ headers: request.headers, query: { limit: 1, filterField: "role", filterValue: "admin", filterOperator: "eq" } })]);
-    return json({ users: recent.total, admins: admins.total, recent: recent.users });
-  }
-  if (path === "/api/product/users" && request.method === "GET") {
-    const q = new URL(request.url).searchParams.get("q") ?? "";
-    return json(await auth.api.listUsers({ headers: request.headers, query: { limit: 20, offset: (pageOf(request) - 1) * 20, sortBy: "createdAt", sortDirection: "desc", ...(q ? { searchValue: q, searchField: "email", searchOperator: "contains" as const } : {}) } }));
-  }
-  if (path === "/api/product/users" && request.method === "POST") {
-    requireOrigin(request);
-    const data = z.discriminatedUnion("action", [z.object({ action: z.literal("role"), userId: z.string().min(1), role: z.enum(["admin", "user"]) }).strict(), z.object({ action: z.literal("ban"), userId: z.string().min(1), reason: z.string().max(1000).optional() }).strict(), z.object({ action: z.literal("unban"), userId: z.string().min(1) }).strict()]).parse(await readJson(request));
-    if (data.userId === user.id) throw new HttpError(403, "self_modification");
-    if (data.action === "role") await auth.api.setRole({ headers: request.headers, body: { userId: data.userId, role: data.role } });
-    else if (data.action === "ban") await auth.api.banUser({ headers: request.headers, body: { userId: data.userId, banReason: data.reason } });
-    else await auth.api.unbanUser({ headers: request.headers, body: { userId: data.userId } });
-    return json({ success: true });
-  }
-  return json({ error: "method_not_allowed" }, 405);
-}
+  ["modules/admin/frameworks/http-server/apps/backend/src/lib/native/admin.ts.hbs", `{{> admin/admin}}
+`],
+  ["modules/admin/frameworks/http-server/apps/fullstack-web/src/lib/native/admin.ts.hbs", `{{> admin/admin}}
 `],
   ["modules/admin/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/layout.tsx", `import SideNav from "@/components/side-nav";
 import { requireAdmin } from "@/lib/admin";
@@ -16074,7 +16147,7 @@ export default async function AdminUsersPage({ params, searchParams }: Props) {
                   {user.id !== me.id && (
                     <UserActions
                       userId={user.id}
-                      isAdmin={user.role === "admin"}
+                      isAdmin={user.role?.split(",").includes("admin") ?? false}
                       banned={Boolean(user.banned)}
                     />
                   )}
@@ -16248,13 +16321,13 @@ async function change(user: User, action: "role" | "ban" | "unban") {
   const reason = action === "ban" ? window.prompt(label("Reason for suspension", "封禁原因")) : undefined;
   if (action === "ban" && !reason?.trim()) return;
   if (!window.confirm(label("Apply this account change?", "确认修改此账户？"))) return;
-  await run(async () => { await productRequest("/api/product/users", productJson({ userId: user.id, action, ...(action === "role" ? { role: user.role === "admin" ? "user" : "admin" } : {}), ...(reason ? { reason } : {}) })); await refresh(); notice.value = label("Account updated.", "账户已更新。"); });
+  await run(async () => { await productRequest("/api/product/users", productJson({ userId: user.id, action, ...(action === "role" ? { role: user.role?.split(",").includes("admin") ? "user" : "admin" } : {}), ...(reason ? { reason } : {}) })); await refresh(); notice.value = label("Account updated.", "账户已更新。"); });
 }
 </script>
 <template>
   <p v-if="error || loadError" role="alert" class="error">\\{{ error || loadError?.message }}</p><p v-if="notice" role="status">\\{{ notice }}</p>
   <form class="actions" @submit.prevent="query = search.trim(); page = 1"><label>\\{{ label('Search users', '搜索用户') }}<input v-model="search" type="search" /></label><button>\\{{ label('Search', '搜索') }}</button></form>
-  <div class="table-wrap"><table><thead><tr><th>\\{{ label('User', '用户') }}</th><th>\\{{ label('Role', '角色') }}</th><th>\\{{ label('Status', '状态') }}</th><th>\\{{ label('Actions', '操作') }}</th></tr></thead><tbody><tr v-for="user in data?.users ?? []" :key="user.id"><td>\\{{ user.name }}<br /><small>\\{{ user.email }}</small></td><td>\\{{ user.role ?? 'user' }}</td><td>\\{{ user.banned ? label('Suspended', '已封禁') : label('Active', '正常') }}<small v-if="user.banReason"> · \\{{ user.banReason }}</small></td><td><div class="actions"><button class="text-button" :disabled="pending" @click="change(user, 'role')">\\{{ user.role === 'admin' ? label('Make user', '设为用户') : label('Make admin', '设为管理员') }}</button><button class="text-button" :disabled="pending" @click="change(user, user.banned ? 'unban' : 'ban')">\\{{ user.banned ? label('Restore', '恢复') : label('Suspend', '封禁') }}</button></div></td></tr></tbody></table></div>
+  <div class="table-wrap"><table><thead><tr><th>\\{{ label('User', '用户') }}</th><th>\\{{ label('Role', '角色') }}</th><th>\\{{ label('Status', '状态') }}</th><th>\\{{ label('Actions', '操作') }}</th></tr></thead><tbody><tr v-for="user in data?.users ?? []" :key="user.id"><td>\\{{ user.name }}<br /><small>\\{{ user.email }}</small></td><td>\\{{ user.role ?? 'user' }}</td><td>\\{{ user.banned ? label('Suspended', '已封禁') : label('Active', '正常') }}<small v-if="user.banReason"> · \\{{ user.banReason }}</small></td><td><div class="actions"><button class="text-button" :disabled="pending" @click="change(user, 'role')">\\{{ user.role?.split(',').includes('admin') ? label('Make user', '设为用户') : label('Make admin', '设为管理员') }}</button><button class="text-button" :disabled="pending" @click="change(user, user.banned ? 'unban' : 'ban')">\\{{ user.banned ? label('Restore', '恢复') : label('Suspend', '封禁') }}</button></div></td></tr></tbody></table></div>
   <nav class="actions" :aria-label="label('Pagination', '分页')"><button class="text-button" :disabled="page <= 1" @click="page--">\\{{ label('Previous', '上一页') }}</button><span>\\{{ page }} · \\{{ data?.total ?? 0 }} \\{{ label('users', '用户') }}</span><button class="text-button" :disabled="page * 20 >= (data?.total ?? 0)" @click="page++">\\{{ label('Next', '下一页') }}</button></nav>
 </template>
 `],
@@ -16268,7 +16341,7 @@ function Overview() { const data = Route.useLoaderData(); const t = useT(); retu
 `],
   ["modules/admin/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.tsx.hbs", `import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 import { loadUser } from "@/lib/auth-data";
-export const Route = createFileRoute("/$lang/admin")({ beforeLoad: async ({ params }) => { const user = await loadUser(params.lang); if (!user.role?.split(",").includes("admin")) throw notFound(); return { user }; }, component: Outlet, head: () => ({ meta: [{ name: "robots", content: "noindex,nofollow" }] }) });
+export const Route = createFileRoute("/$lang/admin")({ beforeLoad: async ({ params, location }) => { const user = await loadUser(params.lang, location.href); if (!user.role?.split(",").includes("admin")) throw notFound(); return { user }; }, component: Outlet, head: () => ({ meta: [{ name: "robots", content: "noindex,nofollow" }] }) });
 `],
   ["modules/admin/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.admin.users.tsx.hbs", `import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
@@ -16279,8 +16352,86 @@ import { userSchema } from "@/lib/auth-data";
 const searchSchema = z.object({ q: z.string().default(""), page: z.coerce.number().int().min(1).catch(1) });
 export const Route = createFileRoute("/$lang/admin/users")({ validateSearch: searchSchema, loaderDeps: ({ search }) => search, loader: ({ params, deps }) => loadProduct(\`/api/product/users?\${new URLSearchParams({ q: deps.q, page: String(deps.page) })}\`, params.lang, z.object({ users: z.array(userSchema.extend({ banned: z.boolean().nullish(), createdAt: z.string() })), total: z.number() })), component: Users });
 function Users() { const data = Route.useLoaderData(); const search = Route.useSearch(); const { user: me } = Route.useRouteContext(); const locale = useLocale(); const t = useT(); const router = useRouter(); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  async function update(input: { action: "role" | "ban" | "unban"; userId: string; role?: "admin" | "user" }) { setBusy(true); setError(""); try { await mutateProduct("/api/product/users", input); await router.invalidate(); } catch { setError("The account could not be updated."); } finally { setBusy(false); } }
-  return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("admin.users.title")}</h1><form className="flex gap-2"><label className="sr-only" htmlFor="user-search">{t("admin.users.search")}</label><input id="user-search" name="q" className="border bg-background p-2" defaultValue={search.q} placeholder={t("admin.users.searchPlaceholder")} /><button className="border px-4">{t("admin.users.search")}</button></form>{error && <p role="alert">{error}</p>}<div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{["name", "email", "role", "status", "joined"].map((label) => <th className="border-b p-3" key={label}>{label}</th>)}<th className="border-b p-3">Actions</th></tr></thead><tbody>{data.users.map((user) => <tr key={user.id}><td className="border-b p-3">{user.name}</td><td className="border-b p-3">{user.email}</td><td className="border-b p-3">{user.role}</td><td className="border-b p-3">{t(user.banned ? "admin.users.status.banned" : "admin.users.status.active")}</td><td className="border-b p-3">{new Date(user.createdAt).toLocaleDateString(locale)}</td><td className="space-x-3 border-b p-3">{user.id !== me.id && <><button disabled={busy} className="underline" onClick={() => void update({ action: "role", userId: user.id, role: user.role === "admin" ? "user" : "admin" })}>{user.role === "admin" ? "Make user" : "Make admin"}</button><button disabled={busy} className="underline" onClick={() => void update({ action: user.banned ? "unban" : "ban", userId: user.id })}>{user.banned ? "Unban" : "Ban"}</button></>}</td></tr>)}</tbody></table></div>{!data.users.length && <p>{t("admin.users.empty")}</p>}<nav className="flex justify-between" aria-label="Pagination">{search.page > 1 ? <a href={\`?\${new URLSearchParams({ q: search.q, page: String(search.page - 1) })}\`}>Previous</a> : <span />}{search.page * 20 < data.total && <a href={\`?\${new URLSearchParams({ q: search.q, page: String(search.page + 1) })}\`}>Next</a>}</nav></section>; }
+  async function update(input: { action: "role" | "ban" | "unban"; userId: string; role?: "admin" | "user" }) { setBusy(true); setError(""); try { await mutateProduct("/api/product/users", input); await router.invalidate(); } catch { setError(t("auth.errors.generic")); } finally { setBusy(false); } }
+  return <section className="space-y-6">
+    <h1 className="font-serif text-4xl">{t("admin.users.title")}</h1>
+    <form className="flex gap-2"><label className="sr-only" htmlFor="user-search">{t("admin.users.search")}</label><input id="user-search" name="q" className="border bg-background p-2" defaultValue={search.q} placeholder={t("admin.users.searchPlaceholder")} /><button className="border px-4">{t("admin.users.search")}</button></form>
+    {error && <p role="alert">{error}</p>}
+    <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{(["name", "email", "role", "status", "joined"] as const).map((label) => <th className="border-b p-3" key={label}>{t(\`admin.users.columns.\${label}\`)}</th>)}<th className="border-b p-3" /></tr></thead><tbody>{data.users.map((user) => <tr key={user.id}>
+      <td className="border-b p-3">{user.name}</td><td className="border-b p-3">{user.email}</td><td className="border-b p-3">{user.role}</td><td className="border-b p-3">{t(user.banned ? "admin.users.status.banned" : "admin.users.status.active")}</td><td className="border-b p-3">{new Date(user.createdAt).toLocaleDateString(locale)}</td>
+      <td className="space-x-3 border-b p-3">{user.id !== me.id && <><button disabled={busy} className="underline" onClick={() => void update({ action: "role", userId: user.id, role: user.role?.split(",").includes("admin") ? "user" : "admin" })}>{t(user.role?.split(",").includes("admin") ? "admin.users.actions.removeAdmin" : "admin.users.actions.makeAdmin")}</button><button disabled={busy} className="underline" onClick={() => void update({ action: user.banned ? "unban" : "ban", userId: user.id })}>{t(user.banned ? "admin.users.actions.unban" : "admin.users.actions.ban")}</button></>}</td>
+    </tr>)}</tbody></table></div>
+    {!data.users.length && <p>{t("admin.users.empty")}</p>}
+    <nav className="flex justify-between" aria-label="Pagination">{search.page > 1 ? <a href={\`?\${new URLSearchParams({ q: search.q, page: String(search.page - 1) })}\`}>{t("admin.pagination.previous")}</a> : <span />}{search.page * 20 < data.total && <a href={\`?\${new URLSearchParams({ q: search.q, page: String(search.page + 1) })}\`}>{t("admin.pagination.next")}</a>}</nav>
+  </section>;
+}
+`],
+  ["modules/admin/shared/client/frameworks/react-router/src/components/admin/admin-pages.tsx.hbs", `import { useState } from "react";
+import { useRevalidator } from "react-router";
+import type { z } from "zod";
+import type { Locale } from "@{{projectName}}/i18n";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useT } from "@/components/i18n-provider";
+import { isAdministrator, mutateUser, type overviewSchema, type usersSchema, type ProductUser, type UserMutation } from "@/lib/product-contract";
+
+type Overview = z.infer<typeof overviewSchema>;
+type Users = z.infer<typeof usersSchema>;
+
+export function AdminOverview({ data, locale }: { data: Overview; locale: Locale }) {
+  const t = useT();
+  return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("admin.overview.title")}</h1><div className="grid gap-4 sm:grid-cols-2">{(["users", "admins"] as const).map((key) => <div key={key} className="rounded-lg border p-6"><p className="text-sm text-muted-foreground">{t(\`admin.overview.\${key}\`)}</p><p className="mt-2 font-serif text-4xl">{data[key]}</p></div>)}</div><section className="space-y-4"><h2 className="text-xl font-semibold">{t("admin.overview.recent")}</h2>{data.recent.length ? <ul className="divide-y rounded-lg border">{data.recent.map((user) => <li key={user.id} className="flex flex-wrap justify-between gap-3 p-4"><span>{user.name}</span><span className="text-sm text-muted-foreground">{user.email}</span></li>)}</ul> : <p className="text-muted-foreground">{t("admin.users.empty")}</p>}<a className="inline-block underline" href={\`/\${locale}/admin/users\`}>{t("admin.nav.users")}</a></section></section>;
+}
+
+export function AdminUsers({ data, search, locale, currentUser }: { data: Users; search: { q: string; page: number }; locale: Locale; currentUser: ProductUser }) {
+  const t = useT();
+  const revalidator = useRevalidator();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const pages = Math.max(1, Math.ceil(data.total / 20));
+  const pageHref = (page: number) => \`/\${locale}/admin/users?\${new URLSearchParams({ q: search.q, page: String(page) })}\`;
+  async function update(input: UserMutation) {
+    if (busy) return;
+    setBusy(true); setError("");
+    try { await mutateUser(input); await revalidator.revalidate(); }
+    catch { setError(t("auth.errors.generic")); }
+    finally { setBusy(false); }
+  }
+  return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("admin.users.title")}</h1>
+    <form method="get" className="flex gap-2"><label className="sr-only" htmlFor="user-search">{t("admin.users.search")}</label><input id="user-search" name="q" type="search" className="rounded-md border bg-background p-2" defaultValue={search.q} placeholder={t("admin.users.searchPlaceholder")} /><Button type="submit">{t("admin.users.search")}</Button></form>
+    {error && <p role="alert" className="text-destructive">{error}</p>}
+    <div className="overflow-x-auto"><table className="w-full text-left text-sm" aria-busy={busy}><caption className="sr-only">{t("admin.users.title")}</caption><thead><tr>{(["name", "email", "role", "status", "joined"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(\`admin.users.columns.\${key}\`)}</th>)}<th scope="col" className="border-b p-3"><span className="sr-only">Actions</span></th></tr></thead><tbody>
+    {data.users.map((user) => <tr key={user.id}><td className="border-b p-3">{user.name}</td><td className="border-b p-3">{user.email}</td><td className="border-b p-3">{user.role ?? "user"}</td><td className="border-b p-3">{t(user.banned ? "admin.users.status.banned" : "admin.users.status.active")}</td><td className="border-b p-3">{user.createdAt ? new Date(user.createdAt).toISOString().slice(0, 10) : "—"}</td><td className="border-b p-3"><div className="flex gap-2"><Button type="button" variant="outline" size="sm" disabled={busy || user.id === currentUser.id} onClick={() => void update({ action: "role", userId: user.id, role: isAdministrator(user) ? "user" : "admin" })}>{t(isAdministrator(user) ? "admin.users.actions.removeAdmin" : "admin.users.actions.makeAdmin")}</Button><Button type="button" variant="outline" size="sm" disabled={busy || user.id === currentUser.id} onClick={() => void update(user.banned ? { action: "unban", userId: user.id } : { action: "ban", userId: user.id, reason: t("admin.users.banReason") })}>{t(user.banned ? "admin.users.actions.unban" : "admin.users.actions.ban")}</Button></div></td></tr>)}
+    {!data.users.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{t("admin.users.empty")}</td></tr>}
+    </tbody></table></div>
+    <nav aria-label="Pagination" className="flex items-center justify-between gap-4"><span>{t("admin.pagination.page", { page: search.page, pages })}</span><div className="flex gap-4">{search.page > 1 && <a className="underline" href={pageHref(search.page - 1)}>{t("admin.pagination.previous")}</a>}{search.page < pages && <a className="underline" href={pageHref(search.page + 1)}>{t("admin.pagination.next")}</a>}</div></nav>
+  </section>;
+}
+`],
+  ["modules/admin/shared/partials/admin.hbs", `import { auth } from "@{{projectName}}/app-services";
+import { z } from "zod";
+import { HttpError, json, pageOf, readJson, requireAdministrator, requireOrigin } from "../product-api";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path !== "/api/product/admin" && path !== "/api/product/users") return;
+  const { user } = await requireAdministrator(request);
+  if (path === "/api/product/admin" && request.method === "GET") {
+    const [recent, admins] = await Promise.all([auth.api.listUsers({ headers: request.headers, query: { limit: 5, sortBy: "createdAt", sortDirection: "desc" } }), auth.api.listUsers({ headers: request.headers, query: { limit: 1, filterField: "role", filterValue: "admin", filterOperator: "eq" } })]);
+    return json({ users: recent.total, admins: admins.total, recent: recent.users });
+  }
+  if (path === "/api/product/users" && request.method === "GET") {
+    const q = new URL(request.url).searchParams.get("q") ?? "";
+    return json(await auth.api.listUsers({ headers: request.headers, query: { limit: 20, offset: (pageOf(request) - 1) * 20, sortBy: "createdAt", sortDirection: "desc", ...(q ? { searchValue: q, searchField: "email", searchOperator: "contains" as const } : {}) } }));
+  }
+  if (path === "/api/product/users" && request.method === "POST") {
+    requireOrigin(request);
+    const data = z.discriminatedUnion("action", [z.object({ action: z.literal("role"), userId: z.string().min(1), role: z.enum(["admin", "user"]) }).strict(), z.object({ action: z.literal("ban"), userId: z.string().min(1), reason: z.string().max(1000).optional() }).strict(), z.object({ action: z.literal("unban"), userId: z.string().min(1) }).strict()]).parse(await readJson(request));
+    if (data.userId === user.id) throw new HttpError(403, "self_modification");
+    if (data.action === "role") await auth.api.setRole({ headers: request.headers, body: { userId: data.userId, role: data.role } });
+    else if (data.action === "ban") await auth.api.banUser({ headers: request.headers, body: { userId: data.userId, banReason: data.reason } });
+    else await auth.api.unbanUser({ headers: request.headers, body: { userId: data.userId } });
+    return json({ success: true });
+  }
+  return json({ error: "method_not_allowed" }, 405);
+}
 `],
   ["modules/affiliate/dialects/postgres/packages/db/src/schema/affiliate.ts", `import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
@@ -18403,15 +18554,19 @@ export const authRelations = defineRelationsPart({ user, session, account, verif
 `],
   ["modules/auth/files/docs/modules/auth.md.hbs", `# Authentication
 
-Built on [Better Auth](https://better-auth.com). The \`packages/auth\` package exports \`createAuth(env, db, events)\`; \`{{appPath "fullstack-web"}}/src/services.ts\` creates the instance.
+Built on [Better Auth](https://better-auth.com). The \`packages/auth\` package exports \`createAuth(env, db, events, clientOrigins?)\`; \`{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/services.ts\` creates the instance.
 
-The HTTP boundary is \`/api/auth/**\` on every framework. {{#if (includes frontend "next")}}Next.js uses the Better Auth \`nextCookies\` adapter.{{else if (includes frontend "tanstack-start")}}TanStack Start uses \`tanstackStartCookies\` as the last auth plugin so server API calls can propagate session cookies.{{else}}Nuxt forwards the H3 request to the Better Auth WHATWG handler and returns its response, including every session cookie.{{/if}} Never cache authenticated responses or expose the server service graph to client bundles.
+The HTTP boundary is \`/api/auth/**\` on every framework. {{#if application.nativeSplit}}React Router clients proxy same-origin requests to the Hono backend through their \`/api/*\` route. The proxy preserves Cookie, Origin and every Set-Cookie. SSR reads the same backend session; clients never import the server service graph.{{else if (includes frontend "next")}}Next.js uses the Better Auth \`nextCookies\` adapter.{{else if (includes frontend "tanstack-start")}}TanStack Start uses \`tanstackStartCookies\` as the last auth plugin so server API calls can propagate session cookies.{{else}}Nuxt forwards the H3 request to the Better Auth WHATWG handler and returns its response, including every session cookie.{{/if}} Never cache authenticated responses.
+{{#if application.nativeSplit}}
+
+The generated client Origin allowlist is explicit in backend services and \`src/lib/native-request.ts\`. Client \`VITE_SERVER_URL\` selects the upstream backend, not the browser auth URL. The BFF overwrites \`X-XStack-Client-Origin\`; the backend only accepts declared origins and ignores generic forwarding headers. OAuth callbacks and verification/reset links return through the originating client host, so host-only cookies survive SSR on separate hosts. Register \`<client-origin>/api/auth/callback/<provider>\` for each client with the provider. Update the explicit allowlist when changing client origins; changing CORS alone is insufficient. Automated deployment remains unsupported for explicit application layouts.
+{{/if}}
 
 ## What you get
 
 - Email and password sign-up and sign-in (\`/login\`, \`/signup\`)
 {{#if (includes module.integrations "email")}}
-- Email verification on sign-up and password reset (\`/forgot-password\`, \`/reset-password\`), sent by the email module
+- Email verification on sign-up, captcha-aware verification resend at \`/[locale]/verify-email\`, and password reset (\`/forgot-password\`, \`/reset-password\`), sent by the email module
 {{/if}}
 {{#if (includes module.integrations "sms")}}
 - Phone OTP sign-up and sign-in (\`/[lang]/login/phone\`), delivered by the SMS module
@@ -18421,6 +18576,7 @@ The HTTP boundary is \`/api/auth/**\` on every framework. {{#if (includes fronte
 {{/each}}
 - Roles (\`user\`, \`admin\`) through the Better Auth admin plugin
 - Account settings at \`/dashboard/settings\`
+- SSR session renewal preserves Set-Cookie through Next proxy, Start server bridge, Nuxt SSR fetch and split-client BFF; expired/revoked sessions cannot be restored by replaying old cookies
 {{#if (includes product.features "captcha")}}
 - Mandatory server-verified Turnstile for password login/signup/reset and phone OTP sending. Configure keys before using these forms; see [Bot protection / 人机验证](captcha.md). OAuth callbacks and sessions do not require captcha.
 {{/if}}
@@ -18430,16 +18586,16 @@ The HTTP boundary is \`/api/auth/**\` on every framework. {{#if (includes fronte
 | Variable | Purpose |
 | --- | --- |
 | \`BETTER_AUTH_SECRET\` | Session signing secret, at least 32 characters |
-| \`BETTER_AUTH_URL\` | Public URL of the app |
-| \`ADMIN_EMAILS\` | Comma-separated emails that get the \`admin\` role when they sign up |
+| \`BETTER_AUTH_URL\` | Public backend URL in split layouts; app URL in fullstack layouts |
+| \`ADMIN_EMAILS\` | Bootstrap allowlist; admin role is granted only after email ownership is verified, never from a claimed signup address |
 {{#if (includes module.providers "google")}}
-| \`GOOGLE_CLIENT_ID\`, \`GOOGLE_CLIENT_SECRET\` | Google OAuth app. Redirect URI: \`<BETTER_AUTH_URL>/api/auth/callback/google\` |
+| \`GOOGLE_CLIENT_ID\`, \`GOOGLE_CLIENT_SECRET\` | Google OAuth app. Redirect URI: \`{{#if application.nativeSplit}}<client-origin>{{else}}<BETTER_AUTH_URL>{{/if}}/api/auth/callback/google\` |
 {{/if}}
 {{#if (includes module.providers "github")}}
-| \`GITHUB_CLIENT_ID\`, \`GITHUB_CLIENT_SECRET\` | GitHub OAuth app. Callback URL: \`<BETTER_AUTH_URL>/api/auth/callback/github\` |
+| \`GITHUB_CLIENT_ID\`, \`GITHUB_CLIENT_SECRET\` | GitHub OAuth app. Callback URL: \`{{#if application.nativeSplit}}<client-origin>{{else}}<BETTER_AUTH_URL>{{/if}}/api/auth/callback/github\` |
 {{/if}}
 {{#if (includes module.providers "wechat")}}
-| \`WECHAT_CLIENT_ID\`, \`WECHAT_CLIENT_SECRET\` | Approved WeChat Open Platform **website application** AppID and AppSecret. Callback URL: \`<BETTER_AUTH_URL>/api/auth/callback/wechat\` |
+| \`WECHAT_CLIENT_ID\`, \`WECHAT_CLIENT_SECRET\` | Approved WeChat Open Platform **website application** AppID and AppSecret. Callback URL: \`{{#if application.nativeSplit}}<client-origin>{{else}}<BETTER_AUTH_URL>{{/if}}/api/auth/callback/wechat\` |
 {{/if}}
 
 OAuth buttons appear only when both the client ID and secret are set.
@@ -18448,7 +18604,7 @@ OAuth buttons appear only when both the client ID and secret are set.
 ### WeChat website login
 
 1. Register and obtain approval for a website application at [WeChat Open Platform](https://open.weixin.qq.com/). Official-account or mini-program credentials are not interchangeable with website application credentials.
-2. Configure its authorization callback domain to match the public domain of \`BETTER_AUTH_URL\`. Use HTTPS for production. Localhost alone is not a usable WeChat callback domain; use an approved development domain and tunnel when testing with real accounts.
+2. Configure its authorization callback domain to match {{#if application.nativeSplit}}the originating client public domain{{else}}the public domain of \`BETTER_AUTH_URL\`{{/if}}. Use HTTPS for production. Localhost alone is not a usable WeChat callback domain; use an approved development domain and tunnel when testing with real accounts.
 3. Set \`WECHAT_CLIENT_ID\` and \`WECHAT_CLIENT_SECRET\` in the server environment and restart the application. Both values are required for the login button to appear.
 4. Open the login or signup page and choose **Continue with WeChat**. The browser goes to WeChat's hosted \`qrconnect\` page (\`snsapi_login\`); scan and approve there, then return to \`/api/auth/callback/wechat\`. Supported desktop clients may offer WeChat's quick-login confirmation instead of scanning.
 
@@ -18468,7 +18624,7 @@ No inline QR script or provider secret is sent to the browser. AppSecret and tok
 | \`auth.phone_verification_requested\` | A phone OTP should be sent; payload is \`{ phoneNumber, code }\` |
 {{/if}}
 
-Subscribe in \`{{appPath "fullstack-web"}}/src/integrations/*.ts\`.
+Subscribe in \`{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/integrations/*.ts\`; integrations execute once in the backend process, not in clients.
 
 {{#if (includes module.integrations "sms")}}
 ## Phone sign-up and sign-in
@@ -18502,7 +18658,7 @@ Use the generated framework's protected page loader and preserve incoming reques
 
 ## Schema changes
 
-After adding Better Auth plugins, regenerate the schema with \`bun run auth:generate\` in \`{{appPath "fullstack-web"}}\`, then \`bun run db:push\`.
+After adding Better Auth plugins, regenerate the schema with \`bun run auth:generate\` in \`{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}\`, then \`bun run db:push\`.
 {{#if (includes module.integrations "sms")}}
 
 The generated Drizzle auth schema already includes nullable, unique \`user.phoneNumber\`, \`phoneNumberVerified\`, \`phone_otp_challenge\`, and \`rate_limit\` for {{database}}. Preserve the custom challenge table when regenerating Better Auth's schema: it is managed by this integration rather than the upstream phone plugin. Apply the schema to the deployment database before accepting phone sign-ins.
@@ -18535,6 +18691,7 @@ import { createCaptchaBeforeHook, type CaptchaConfig } from "@{{projectName}}/ca
 {{/if}}
 {{#if (includes module.integrations "email")}}
 import { localeFromHeaders } from "@{{projectName}}/i18n";
+import { and, eq } from "drizzle-orm";
 {{/if}}
 import { betterAuth } from "better-auth";
 {{#if (includes frontend "next")}}
@@ -18580,7 +18737,7 @@ function parseEmails(value: string | undefined): Set<string> {
   );
 }
 
-export function createAuth(env: AuthConfig, database: Database, events: EventBus) {
+export function createAuth(env: AuthConfig, database: Database, events: EventBus, clientOrigins: readonly string[] = []) {
   const adminEmails = parseEmails(env.ADMIN_EMAILS);
 
   return betterAuth({
@@ -18592,8 +18749,10 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
       {{/if}}
     }),
     secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.BETTER_AUTH_URL,
-    trustedOrigins: [env.BETTER_AUTH_URL],
+    baseURL: clientOrigins.length ? {
+      allowedHosts: [new URL(env.BETTER_AUTH_URL).origin, ...clientOrigins],
+    } : env.BETTER_AUTH_URL,
+    trustedOrigins: [env.BETTER_AUTH_URL, ...clientOrigins],
     {{#if (includes product.features "affiliate")}}
     user: {
       additionalFields: {
@@ -18602,7 +18761,7 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
     },
     {{/if}}
 {{#if (includes product.features "captcha")}}
-    hooks: { before: createCaptchaBeforeHook(env) },
+    hooks: { before: createCaptchaBeforeHook(env, clientOrigins) },
 {{/if}}
 {{#if (includes module.integrations "sms")}}
     rateLimit: {
@@ -18631,6 +18790,12 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
     },
 {{#if (includes module.integrations "email")}}
     emailVerification: {
+      afterEmailVerification: async (user) => {
+        if (!adminEmails.has(user.email.toLowerCase())) return;
+        await database.update(schema.user).set({ role: "admin" }).where(and(
+          eq(schema.user.id, user.id), eq(schema.user.emailVerified, true), eq(schema.user.role, "user"),
+        ));
+      },
       sendOnSignUp: true,
       autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user, url }, request) => {
@@ -18699,7 +18864,7 @@ export function createAuth(env: AuthConfig, database: Database, events: EventBus
             {{/if}}
             return { data: {
               ...user,
-              role: {{#if (includes module.integrations "sms")}}!user.email.toLowerCase().endsWith("@phone.invalid") && {{/if}}{{#if (includes module.providers "wechat")}}!user.email.toLowerCase().endsWith("@wechat.invalid") && {{/if}}adminEmails.has(user.email.toLowerCase()) ? "admin" : "user",
+              role: user.emailVerified === true && {{#if (includes module.integrations "sms")}}!user.email.toLowerCase().endsWith("@phone.invalid") && {{/if}}{{#if (includes module.providers "wechat")}}!user.email.toLowerCase().endsWith("@wechat.invalid") && {{/if}}adminEmails.has(user.email.toLowerCase()) ? "admin" : "user",
               {{#if (includes product.features "affiliate")}}
               affiliateReferralToken: token && token.length <= 1024 ? token : null,
               {{/if}}
@@ -18810,6 +18975,12 @@ export type Session = Auth["$Infer"]["Session"];
     submit: "Update password",
     success: "Password updated. Sign in with your new password.",
     invalidToken: "This reset link is invalid or has expired.",
+  },
+  verification: {
+    title: "Verify your email",
+    subtitle: "Request a new verification link for your account.",
+    submit: "Resend verification email",
+    sent: "If {email} needs verification, a new link is on its way.",
   },
   settings: {
     title: "Account settings",
@@ -18923,6 +19094,12 @@ export type Session = Auth["$Infer"]["Session"];
     success: "密码已更新，请使用新密码登录。",
     invalidToken: "重置链接无效或已过期。",
   },
+  verification: {
+    title: "验证邮箱",
+    subtitle: "为你的账户申请新的验证链接。",
+    submit: "重新发送验证邮件",
+    sent: "若 {email} 需要验证，新的验证链接已发出。",
+  },
   settings: {
     title: "账户设置",
     profile: "个人资料",
@@ -18947,28 +19124,13 @@ export type Session = Auth["$Infer"]["Session"];
   },
 } as const;
 `],
-  ["modules/auth/frameworks/http-server/apps/fullstack-web/src/lib/social-providers.server.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
-
-import { isSocialProvider, type SocialProvider } from "./social-providers";
-
-/** OAuth providers whose credentials are configured. */
-export function enabledSocialProviders(): SocialProvider[] {
-  return Object.keys(auth.options.socialProviders).filter(isSocialProvider);
-}
+  ["modules/auth/frameworks/http-server/apps/backend/src/lib/social-providers.server.ts.hbs", `{{> auth/social-providers.server}}
 `],
-  ["modules/auth/frameworks/http-server/apps/fullstack-web/src/lib/social-providers.ts.hbs", `export const socialProviderLabels = {
-  google: "Google",
-  github: "GitHub",
-{{#if (includes module.providers "wechat")}}
-  wechat: "WeChat",
-{{/if}}
-} as const;
-
-export type SocialProvider = keyof typeof socialProviderLabels;
-
-export function isSocialProvider(value: string): value is SocialProvider {
-  return value in socialProviderLabels;
-}
+  ["modules/auth/frameworks/http-server/apps/backend/src/lib/social-providers.ts.hbs", `{{> auth/social-providers}}
+`],
+  ["modules/auth/frameworks/http-server/apps/fullstack-web/src/lib/social-providers.server.ts.hbs", `{{> auth/social-providers.server}}
+`],
+  ["modules/auth/frameworks/http-server/apps/fullstack-web/src/lib/social-providers.ts.hbs", `{{> auth/social-providers}}
 `],
   ["modules/auth/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/layout.tsx", `import SideNav from "@/components/side-nav";
 import { resolveLocale } from "@/lib/i18n/server";
@@ -18998,6 +19160,7 @@ export default async function DashboardLayout({
   ["modules/auth/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/page.tsx", `import type { Metadata } from "next";
 
 import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { localePath } from "@/lib/i18n/paths";
 import { requireUser } from "@/lib/session";
 
 type Props = { params: Promise<{ lang: string }> };
@@ -19015,7 +19178,11 @@ export default async function DashboardPage({ params }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="font-semibold text-2xl">{t("auth.dashboard.welcome", { name: user.name })}</h1>
-      <p className="text-muted-foreground text-sm">{t("auth.dashboard.empty")}</p>
+      <dl className="grid max-w-xl gap-4 rounded-lg border p-6">
+        <div><dt className="text-sm text-muted-foreground">{t("auth.fields.name")}</dt><dd>{user.name}</dd></div>
+        <div><dt className="text-sm text-muted-foreground">{t("auth.fields.email")}</dt><dd>{user.email}</dd></div>
+      </dl>
+      <a href={localePath(locale, "/dashboard/settings")} className="text-sm underline">{t("auth.settings.title")}</a>
     </div>
   );
 }
@@ -19070,7 +19237,7 @@ import { enabledSocialProviders } from "@/lib/social-providers.server";
 
 type Props = {
   params: Promise<{ lang: string }>;
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -19081,7 +19248,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function LoginPage({ params, searchParams }: Props) {
   const locale = resolveLocale((await params).lang);
   const t = getTranslator(locale);
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
   const target = safeNext(next, localePath(locale, "/dashboard"));
 
   return (
@@ -19100,6 +19267,7 @@ export default async function LoginPage({ params, searchParams }: Props) {
         </>
       }
     >
+      {error && <p role="alert" className="text-sm text-destructive">{t("auth.errors.generic")}</p>}
       <SignInForm
         next={target}
         providers={enabledSocialProviders()}
@@ -19155,7 +19323,7 @@ export default async function SignUpPage({ params, searchParams }: Props) {
         <>
           {t("auth.signUp.hasAccount")}&nbsp;
           <Link
-            href={localePath(locale, "/login")}
+            href={ { pathname: localePath(locale, "/login"), query: { next: safeNext(next, localePath(locale, "/dashboard")) } } }
             className="text-foreground underline-offset-4 hover:underline"
           >
             {t("auth.signUp.signInLink")}
@@ -19259,6 +19427,26 @@ import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({ plugins: [adminClient(){{#if (includes module.integrations "sms")}}, phoneNumberClient(){{/if}}] });
 `],
+  ["modules/auth/frameworks/next/apps/fullstack-web/src/lib/auth-proxy.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
+import { NextResponse } from "next/server";
+import type { ProxyStep } from "./proxy";
+
+/** Renew cookies before Server Components, where response cookie mutation is forbidden. */
+export const authSessionStep: ProxyStep = async (request) => {
+  if (!request.headers.has("cookie")) return undefined;
+  const url = request.nextUrl.clone();
+  url.pathname = "/api/auth/get-session";
+  url.search = "";
+  const refreshed = await auth.handler(new Request(url.href, { headers: request.headers }));
+  if (!refreshed.ok) return new NextResponse(null, { status: refreshed.status, headers: { "Cache-Control": "private, no-store" } });
+  const cookies = refreshed.headers.getSetCookie();
+  if (!cookies.length) return undefined;
+  const response = NextResponse.next();
+  for (const cookie of cookies) response.headers.append("Set-Cookie", cookie);
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
+};
+`],
   ["modules/auth/frameworks/next/apps/fullstack-web/src/lib/session.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
 import type { Locale } from "@{{projectName}}/i18n";
 import { headers } from "next/headers";
@@ -19281,7 +19469,7 @@ export async function requireUser(locale: Locale, next?: \`/\${string}\`) {
 
 /** Accepts only same-origin paths so \`?next=\` cannot redirect off-site. */
 export function safeNext(value: string | undefined, fallback: string): string {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : fallback;
+  return value?.startsWith("/") && !value.startsWith("//") && !value.includes("\\\\") && !/[\\u0000-\\u001f\\u007f]/.test(value) ? value : fallback;
 }
 `],
   ["modules/auth/frameworks/next/apps/fullstack-web/src/lib/social-providers.server.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
@@ -19318,11 +19506,12 @@ const captchaToken = ref(""); const captchaGeneration = ref(0);
 const token = computed(() => typeof route.query.token === "string" ? route.query.token : "");
 const next = computed(() => {
   const value = route.query.next;
-  return typeof value === "string" && value.startsWith(path("dashboard")) && !value.includes("\\\\") && !/[\\u0000-\\u001f]/.test(value) ? value : path("dashboard");
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") && !value.includes("\\\\") && !/[\\u0000-\\u001f\\u007f]/.test(value) ? value : path("dashboard");
 });
 const title = computed(() => ({ login: label("Welcome back", "欢迎回来"), signup: label("Create your account", "创建账户"), "forgot-password": label("Reset your password", "重设密码"), "reset-password": label("Choose a new password", "设置新密码"), "verify-email": label("Verify your email", "验证邮箱") })[props.mode]);
 const action = computed(() => ({ login: "login", signup: "signup", "forgot-password": "password_reset_request", "reset-password": "password_reset", "verify-email": "email_verification" })[props.mode] ?? "login");
 const { data: config } = await useFetch<{ socialProviders: string[] }>("/api/product/config");
+if (route.query.error) error.value = label("The authentication link is invalid or expired. Please try again.", "认证链接无效或已过期，请重试。");
 async function submit() {
   await run(async () => {
     const endpoint = props.mode === "signup" ? "sign-up/email" : props.mode === "login" ? "sign-in/email" : props.mode === "forgot-password" ? "request-password-reset" : props.mode === "reset-password" ? "reset-password" : "send-verification-email";
@@ -19390,12 +19579,12 @@ async function verifyPhone() {
       <label v-if="mode === 'signup'">\\{{ label('Name', '姓名') }}<input v-model="name" autocomplete="name" maxlength="100" required /></label>
       <label v-if="mode !== 'reset-password'">\\{{ label('Email', '邮箱') }}<input v-model="email" type="email" autocomplete="email" maxlength="254" required /></label>
       <label v-if="['login', 'signup', 'reset-password'].includes(mode)">\\{{ label('Password', '密码') }}<input v-model="password" type="password" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" minlength="8" maxlength="128" required /></label>
-      <p v-if="mode === 'reset-password' && !token" role="alert" class="error">\\{{ label('The reset link is missing its token. Request a new link.', '重置链接缺少令牌，请重新申请。') }}</p>
+      <p v-if="mode === 'reset-password' && (!token || route.query.error)" role="alert" class="error">\\{{ label('The reset link is invalid or expired. Request a new link.', '重置链接无效或已过期，请重新申请。') }}</p>
       {{#if (includes product.features "captcha")}}<ProductCaptcha :key="captchaGeneration" v-model="captchaToken" :action="action" />{{/if}}
-      <button :disabled="pending || (mode === 'reset-password' && !token){{#if (includes product.features "captcha")}} || !captchaToken{{/if}}">\\{{ pending ? label('Please wait…', '请稍候…') : title }}</button>
+      <button :disabled="pending || (mode === 'reset-password' && (!token || !!route.query.error)){{#if (includes product.features "captcha")}} || !captchaToken{{/if}}">\\{{ pending ? label('Please wait…', '请稍候…') : title }}</button>
     </form>
     <div v-if="['login', 'signup'].includes(mode)" class="stack"><button v-for="provider in config?.socialProviders ?? []" :key="provider" class="text-button" :disabled="pending" @click="social(provider)">\\{{ label('Continue with', '使用以下方式继续') }} \\{{ provider }}</button></div>
-    <div class="actions"><NuxtLink :to="path(mode === 'login' ? 'signup' : 'login')">\\{{ mode === 'login' ? label('Create an account', '创建账户') : label('Sign in', '登录') }}</NuxtLink>
+    <div class="actions"><NuxtLink :to="{ path: path(mode === 'login' ? 'signup' : 'login'), query: { next } }">\\{{ mode === 'login' ? label('Create an account', '创建账户') : label('Sign in', '登录') }}</NuxtLink>
       {{#if (includes product.features "email")}}<NuxtLink :to="path('forgot-password')">\\{{ label('Forgot password?', '忘记密码？') }}</NuxtLink><NuxtLink :to="path('verify-email')">\\{{ label('Resend verification', '重新发送验证邮件') }}</NuxtLink>{{/if}}
     </div>
   </section>
@@ -19408,7 +19597,7 @@ const { label, path } = useProductLocale();
 const { pending, error, notice, run } = useProductAction();
 const name = ref(props.user.name); const currentPassword = ref(""); const newPassword = ref("");
 async function saveProfile() { await run(async () => { await productRequest("/api/auth/update-user", productJson({ name: name.value.trim() })); await refreshNuxtData("product-session"); notice.value = label("Profile updated.", "资料已更新。"); }); }
-async function changePassword() { await run(async () => { await productRequest("/api/auth/change-password", productJson({ currentPassword: currentPassword.value, newPassword: newPassword.value, revokeOtherSessions: true })); currentPassword.value = ""; newPassword.value = ""; notice.value = label("Password updated and other sessions revoked.", "密码已更新，其他会话已退出。"); }); }
+async function changePassword() { await run(async () => { await productRequest("/api/auth/change-password", productJson({ currentPassword: currentPassword.value, newPassword: newPassword.value, revokeOtherSessions: true })); currentPassword.value = ""; newPassword.value = ""; await refreshNuxtData("product-session"); notice.value = label("Password updated and other sessions revoked.", "密码已更新，其他会话已退出。"); }); }
 </script>
 <template>
   <p v-if="error" class="error" role="alert">\\{{ error }}</p><p v-if="notice" class="notice" role="status">\\{{ notice }}</p>
@@ -19441,6 +19630,21 @@ const titles: Record<string, string> = { "": label("Overview", "概览"), settin
   </div>
 </template>
 `],
+  ["modules/auth/frameworks/nuxt/apps/fullstack-web/app/composables/useProductSession.ts.hbs", `import { appendResponseHeader } from "h3";
+
+type ProductSession = { user: { id: string; name: string; email: string; role?: string | null; emailVerified: boolean } } | null;
+
+/** Preserve renewed auth cookies when Nuxt fetches the session during SSR. */
+export function useProductSession() {
+  const event = import.meta.server ? useRequestEvent() : undefined;
+  return useFetch<ProductSession>("/api/product/session", {
+    key: "product-session",
+    onResponse({ response }) {
+      if (event) for (const cookie of response.headers.getSetCookie()) appendResponseHeader(event, "set-cookie", cookie);
+    },
+  });
+}
+`],
   ["modules/auth/frameworks/react/apps/fullstack-web/src/components/auth/account-forms.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
@@ -19464,14 +19668,13 @@ function useSubmit(
     event.preventDefault();
     const target = event.currentTarget;
     setPending(true);
-    const { error } = await action(new FormData(target));
-    setPending(false);
-    if (error) {
-      toast.error(error.message ?? t("auth.errors.generic"));
-      return;
-    }
-    toast.success(t("auth.settings.saved"));
-    if (reset) target.reset();
+    try {
+      const { error } = await action(new FormData(target));
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      toast.success(t("auth.settings.saved"));
+      if (reset) target.reset();
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); }
   }
 
   return { pending, onSubmit };
@@ -19482,7 +19685,7 @@ export function ProfileForm({ name, email }: { name: string; email: string }) {
   const navigation = useProductNavigation();
   const { pending, onSubmit } = useSubmit(async (form) => {
     const result = await authClient.updateUser({ name: formValue(form, "name") });
-    navigation.refresh();
+    if (!result.error) navigation.refresh();
     return result;
   });
 
@@ -19628,17 +19831,16 @@ export default function SignInForm({
 {{/if}}
     const form = new FormData(event.currentTarget);
     setPending(true);
-    const { error } = await authClient.signIn.email({
-      email: formValue(form, "email"),
-      password: formValue(form, "password"),
-      callbackURL: next,
-    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
-    setPending(false);
-    if (error) {
-      toast.error(error.message ?? t("auth.errors.generic"));
-      return;
-    }
-    window.location.assign(next);
+    try {
+      const { error } = await authClient.signIn.email({
+        email: formValue(form, "email"),
+        password: formValue(form, "password"),
+        callbackURL: next,
+      }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      window.location.assign(next);
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
   }
 
   return (
@@ -19668,6 +19870,9 @@ export default function SignInForm({
           {t("auth.signIn.submit")}
         </Button>
       </form>
+{{#if (includes product.features "email")}}
+      <a href={\`\${localePath(locale, "/verify-email")}?next=\${encodeURIComponent(next.startsWith("/") ? next : new URL(next).pathname + new URL(next).search + new URL(next).hash)}\`} className="text-center text-sm underline">{t("auth.verification.submit")}</a>
+{{/if}}
     </>
   );
 }
@@ -19681,7 +19886,7 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import type { SocialProvider } from "@/lib/social-providers";
 
-import { useT } from "../i18n-provider";
+import { useLocale, useT } from "../i18n-provider";
 import { Field, formValue } from "./field";
 import { SocialButtons } from "./social-buttons";
 {{#if (includes product.features "captcha")}}
@@ -19699,6 +19904,7 @@ export default function SignUpForm({
   verifyEmail: boolean;
 }) {
   const t = useT();
+  const locale = useLocale();
   const [pending, setPending] = useState(false);
   const [sentTo, setSentTo] = useState<string>();
 {{#if (includes product.features "captcha")}}
@@ -19713,23 +19919,22 @@ export default function SignUpForm({
     const form = new FormData(event.currentTarget);
     const email = formValue(form, "email");
     setPending(true);
-    const { error } = await authClient.signUp.email({
-      name: formValue(form, "name"),
-      email,
-      password: formValue(form, "password"),
-      callbackURL: next,
-    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
-    setPending(false);
-    if (error) {
-      toast.error(error.message ?? t("auth.errors.generic"));
-      return;
-    }
-    if (verifyEmail) setSentTo(email);
-    else window.location.assign(next);
+    try {
+      const { error } = await authClient.signUp.email({
+        name: formValue(form, "name"),
+        email,
+        password: formValue(form, "password"),
+        callbackURL: next,
+      }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      if (verifyEmail) setSentTo(email);
+      else window.location.assign(next);
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
   }
 
   if (sentTo) {
-    return <p className="text-sm">{t("auth.signUp.checkEmail", { email: sentTo })}</p>;
+    return <div className="space-y-4"><p role="status" className="text-sm">{t("auth.signUp.checkEmail", { email: sentTo })}</p>{{#if (includes product.features "email")}}<a href={\`/\${locale}/verify-email?next=\${encodeURIComponent(next.startsWith("/") ? next : new URL(next).pathname + new URL(next).search + new URL(next).hash)}\`} className="text-sm underline">{t("auth.verification.submit")}</a>{{/if}}</div>;
   }
 
   return (
@@ -19827,13 +20032,13 @@ import { loadProduct } from "./product-data";
 export const userSchema = z.object({ id: z.string(), name: z.string(), email: z.string(), role: z.string().nullish(), emailVerified: z.boolean() });
 export const sessionSchema = z.object({ user: userSchema }).nullable();
 export const authConfigSchema = z.object({ socialProviders: z.array(z.enum(["google", "github"{{#if (includes module.providers "wechat")}}, "wechat"{{/if}}])), verifyEmail: z.boolean(), canResetPassword: z.boolean() });
-export async function loadUser(locale: string) {
+export async function loadUser(locale: string, next = \`/\${locale}/dashboard\`) {
   const session = await loadProduct("/api/product/session", locale, sessionSchema);
-  if (!session) throw redirect({ href: \`/\${locale}/login\` });
+  if (!session) throw redirect({ href: \`/\${locale}/login?next=\${encodeURIComponent(safeNext(next, \`/\${locale}/dashboard\`))}\` });
   return session.user;
 }
 export function safeNext(value: string | undefined, fallback: string): string {
-  if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\\\")) return fallback;
+  if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\\\") || /[\\u0000-\\u001f\\u007f]/.test(value)) return fallback;
   return value;
 }
 `],
@@ -19850,7 +20055,7 @@ function Settings() { const { user } = Route.useRouteContext(); const t = useT()
 `],
   ["modules/auth/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.tsx.hbs", `import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { loadUser } from "@/lib/auth-data";
-export const Route = createFileRoute("/$lang/dashboard")({ beforeLoad: async ({ params }) => ({ user: await loadUser(params.lang) }), component: Outlet });
+export const Route = createFileRoute("/$lang/dashboard")({ beforeLoad: async ({ params, location }) => ({ user: await loadUser(params.lang, location.href) }), component: Outlet });
 `],
   ["modules/auth/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.login.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
@@ -19859,8 +20064,8 @@ import { AuthCard } from "@/components/auth/auth-card";
 import { useLocale, useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
 import { authConfigSchema, safeNext } from "@/lib/auth-data";
-export const Route = createFileRoute("/$lang/login")({ validateSearch: z.object({ next: z.string().optional() }), loader: ({ params }) => loadProduct("/api/product/config", params.lang, authConfigSchema), component: AuthPage });
-function AuthPage() { const config = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const next = safeNext(Route.useSearch().next, \`/\${locale}/dashboard\`); return <AuthCard title={t("auth.signIn.title")} footer={<a href={\`/\${locale}/signup\`} className="underline">{t("auth.signUp.title")}</a>}><SignInForm next={next} providers={config.socialProviders} canResetPassword={config.canResetPassword} />{{#if (includes product.features "sms")}}<a className="text-sm underline" href={\`/\${locale}/login/phone\`}>{t("auth.phone.title")}</a>{{/if}}</AuthCard>; }
+export const Route = createFileRoute("/$lang/login")({ validateSearch: z.object({ next: z.string().optional(), error: z.string().optional() }), loader: ({ params }) => loadProduct("/api/product/config", params.lang, authConfigSchema), component: AuthPage });
+function AuthPage() { const config = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const search = Route.useSearch(); const next = safeNext(search.next, \`/\${locale}/dashboard\`); return <AuthCard title={t("auth.signIn.title")} footer={<a href={\`/\${locale}/signup?next=\${encodeURIComponent(next)}\`} className="underline">{t("auth.signUp.title")}</a>}>{search.error && <p role="alert" className="text-sm text-destructive">{t("auth.errors.generic")}</p>}<SignInForm next={next} providers={config.socialProviders} canResetPassword={config.canResetPassword} />{{#if (includes product.features "sms")}}<a className="text-sm underline" href={\`/\${locale}/login/phone?next=\${encodeURIComponent(next)}\`}>{t("auth.phone.title")}</a>{{/if}}</AuthCard>; }
 `],
   ["modules/auth/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.signup.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
@@ -19870,7 +20075,7 @@ import { useLocale, useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
 import { authConfigSchema, safeNext } from "@/lib/auth-data";
 export const Route = createFileRoute("/$lang/signup")({ validateSearch: z.object({ next: z.string().optional() }), loader: ({ params }) => loadProduct("/api/product/config", params.lang, authConfigSchema), component: AuthPage });
-function AuthPage() { const config = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const next = safeNext(Route.useSearch().next, \`/\${locale}/dashboard\`); return <AuthCard title={t("auth.signUp.title")} footer={<a href={\`/\${locale}/login\`} className="underline">{t("auth.signIn.title")}</a>}><SignUpForm next={next} providers={config.socialProviders} verifyEmail={config.verifyEmail} />{{#if (includes product.features "sms")}}<a className="text-sm underline" href={\`/\${locale}/login/phone\`}>{t("auth.phone.title")}</a>{{/if}}</AuthCard>; }
+function AuthPage() { const config = Route.useLoaderData(); const locale = useLocale(); const t = useT(); const next = safeNext(Route.useSearch().next, \`/\${locale}/dashboard\`); return <AuthCard title={t("auth.signUp.title")} footer={<a href={\`/\${locale}/login?next=\${encodeURIComponent(next)}\`} className="underline">{t("auth.signIn.title")}</a>}><SignUpForm next={next} providers={config.socialProviders} verifyEmail={config.verifyEmail} />{{#if (includes product.features "sms")}}<a className="text-sm underline" href={\`/\${locale}/login/phone?next=\${encodeURIComponent(next)}\`}>{t("auth.phone.title")}</a>{{/if}}</AuthCard>; }
 `],
   ["modules/auth/integrations/email/frameworks/next/apps/fullstack-web/src/app/[lang]/forgot-password/page.tsx", `import type { Metadata } from "next";
 import Link from "next/link";
@@ -19945,6 +20150,24 @@ export default async function ResetPasswordPage({ params, searchParams }: Props)
   );
 }
 `],
+  ["modules/auth/integrations/email/frameworks/next/apps/fullstack-web/src/app/[lang]/verify-email/page.tsx", `import { AuthCard } from "@/components/auth/auth-card";
+import { VerificationForm } from "@/components/auth/verification-form";
+import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
+import { safeNext } from "@/lib/session";
+
+export const metadata = { robots: { index: false, follow: false } };
+
+export default async function VerificationPage({ params, searchParams }: {
+  params: Promise<{ lang: string }>;
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const locale = resolveLocale((await params).lang);
+  const t = getTranslator(locale);
+  const next = safeNext((await searchParams).next, localePath(locale, "/dashboard"));
+  return <AuthCard title={t("auth.verification.title")} description={t("auth.verification.subtitle")} footer={<a href={localePath(locale, "/login")} className="underline">{t("auth.forgot.back")}</a>}><VerificationForm next={next} /></AuthCard>;
+}
+`],
   ["modules/auth/integrations/email/frameworks/react/apps/fullstack-web/src/components/auth/password-reset-forms.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
@@ -19976,16 +20199,15 @@ export function ForgotPasswordForm() {
 {{/if}}
     const email = formValue(new FormData(event.currentTarget), "email");
     setPending(true);
-    const { error } = await authClient.requestPasswordReset({
-      email,
-      redirectTo: localePath(locale, "/reset-password"),
-    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
-    setPending(false);
-    if (error) {
-      toast.error(error.message ?? t("auth.errors.generic"));
-      return;
-    }
-    setSentTo(email);
+    try {
+      const { error } = await authClient.requestPasswordReset({
+        email,
+        redirectTo: localePath(locale, "/reset-password"),
+      }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      setSentTo(email);
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
   }
 
   if (sentTo) return <p className="text-sm">{t("auth.forgot.sent", { email: sentTo })}</p>;
@@ -20017,17 +20239,16 @@ export function ResetPasswordForm({ token }: { token: string }) {
     if (!captcha.token || pending) return;
 {{/if}}
     setPending(true);
-    const { error } = await authClient.resetPassword({
-      token,
-      newPassword: formValue(new FormData(event.currentTarget), "newPassword"),
-    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
-    setPending(false);
-    if (error) {
-      toast.error(error.message ?? t("auth.errors.generic"));
-      return;
-    }
-    toast.success(t("auth.reset.success"));
-    window.location.assign(localePath(locale, "/login"));
+    try {
+      const { error } = await authClient.resetPassword({
+        token,
+        newPassword: formValue(new FormData(event.currentTarget), "newPassword"),
+      }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      toast.success(t("auth.reset.success"));
+      window.location.assign(localePath(locale, "/login"));
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
   }
 
   return (
@@ -20049,6 +20270,47 @@ export function ResetPasswordForm({ token }: { token: string }) {
   );
 }
 `],
+  ["modules/auth/integrations/email/frameworks/react/apps/fullstack-web/src/components/auth/verification-form.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+import { toast } from "sonner";
+import { authClient } from "@/lib/auth-client";
+import { useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
+
+export function VerificationForm({ next }: { next: string }) {
+  const t = useT();
+  const [pending, setPending] = useState(false);
+  const [sentTo, setSentTo] = useState("");
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}}) return;
+    const email = formValue(new FormData(event.currentTarget), "email");
+    setPending(true);
+    try {
+      const result = await authClient.sendVerificationEmail({ email, callbackURL: next }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (result.error) { toast.error(result.error.message ?? t("auth.errors.generic")); return; }
+      setSentTo(email);
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
+  }
+  return <form onSubmit={submit} className="flex flex-col gap-4" aria-busy={pending}>
+    {sentTo && <p role="status" className="text-sm">{t("auth.verification.sent", { email: sentTo })}</p>}
+    <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+{{#if (includes product.features "captcha")}}
+    <Captcha action="email_verification" challenge={captcha} />
+{{/if}}
+    <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>{t("auth.verification.submit")}</Button>
+  </form>;
+}
+`],
   ["modules/auth/integrations/email/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.forgot-password.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { ForgotPasswordForm } from "@/components/auth/password-reset-forms";
@@ -20061,9 +20323,170 @@ function PasswordPage() { const t = useT();  return <AuthCard title={t("auth.for
 import { z } from "zod";
 import { ResetPasswordForm } from "@/components/auth/password-reset-forms";
 import { AuthCard } from "@/components/auth/auth-card";
-import { useT } from "@/components/i18n-provider";
-export const Route = createFileRoute("/$lang/reset-password")({ validateSearch: z.object({ token: z.string().optional() }), component: PasswordPage });
-function PasswordPage() { const t = useT(); const { token } = Route.useSearch(); return <AuthCard title={t("auth.reset.title")}><ResetPasswordForm token={token ?? ""} /></AuthCard>; }
+import { useLocale, useT } from "@/components/i18n-provider";
+export const Route = createFileRoute("/$lang/reset-password")({ validateSearch: z.object({ token: z.string().optional(), error: z.string().optional() }), head: () => ({ meta: [{ name: "robots", content: "noindex, nofollow" }] }), component: PasswordPage });
+function PasswordPage() { const t = useT(); const locale = useLocale(); const { token, error } = Route.useSearch(); return <AuthCard title={t("auth.reset.title")}>{token && !error ? <ResetPasswordForm token={token} /> : <><p role="alert">{t("auth.reset.invalidToken")}</p><a href={\`/\${locale}/forgot-password\`} className="underline">{t("auth.forgot.submit")}</a></>}</AuthCard>; }
+`],
+  ["modules/auth/integrations/email/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.verify-email.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { AuthCard } from "@/components/auth/auth-card";
+import { VerificationForm } from "@/components/auth/verification-form";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { safeNext } from "@/lib/auth-data";
+
+export const Route = createFileRoute("/$lang/verify-email")({
+  validateSearch: z.object({ next: z.string().optional() }),
+  head: () => ({ meta: [{ name: "robots", content: "noindex, nofollow" }] }),
+  component: VerificationPage,
+});
+function VerificationPage() {
+  const locale = useLocale(); const t = useT();
+  const next = safeNext(Route.useSearch().next, \`/\${locale}/dashboard\`);
+  return <AuthCard title={t("auth.verification.title")} description={t("auth.verification.subtitle")} footer={<a href={\`/\${locale}/login\`} className="underline">{t("auth.forgot.back")}</a>}><VerificationForm next={next} /></AuthCard>;
+}
+`],
+  ["modules/auth/integrations/email/shared/client/frameworks/react-router/src/components/auth/password-reset-forms.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+import { localePath } from "@/lib/i18n/paths";
+
+import { useLocale, useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
+
+export function ForgotPasswordForm() {
+  const locale = useLocale();
+  const t = useT();
+  const [pending, setPending] = useState(false);
+  const [sentTo, setSentTo] = useState<string>();
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
+    const email = formValue(new FormData(event.currentTarget), "email");
+    setPending(true);
+    try {
+      const { error } = await authClient.requestPasswordReset({
+        email,
+        redirectTo: new URL(localePath(locale, "/reset-password"), window.location.origin).href,
+      }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      setSentTo(email);
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
+  }
+
+  if (sentTo) return <p className="text-sm">{t("auth.forgot.sent", { email: sentTo })}</p>;
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+{{#if (includes product.features "captcha")}}
+      <Captcha action="password_reset_request" challenge={captcha} />
+{{/if}}
+      <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
+        {t("auth.forgot.submit")}
+      </Button>
+    </form>
+  );
+}
+
+export function ResetPasswordForm({ token }: { token: string }) {
+  const locale = useLocale();
+  const t = useT();
+  const [pending, setPending] = useState(false);
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
+    setPending(true);
+    try {
+      const { error } = await authClient.resetPassword({
+        token,
+        newPassword: formValue(new FormData(event.currentTarget), "newPassword"),
+      }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      toast.success(t("auth.reset.success"));
+      window.location.assign(localePath(locale, "/login"));
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field
+        label={t("auth.fields.newPassword")}
+        name="newPassword"
+        type="password"
+        autoComplete="new-password"
+        minLength={8}
+      />
+{{#if (includes product.features "captcha")}}
+      <Captcha action="password_reset" challenge={captcha} />
+{{/if}}
+      <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
+        {t("auth.reset.submit")}
+      </Button>
+    </form>
+  );
+}
+`],
+  ["modules/auth/integrations/email/shared/client/frameworks/react-router/src/components/auth/verification-form.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+import { toast } from "sonner";
+import { authClient } from "@/lib/auth-client";
+import { useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
+
+export function VerificationForm({ next }: { next: string }) {
+  const t = useT();
+  const [pending, setPending] = useState(false);
+  const [sentTo, setSentTo] = useState("");
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}}) return;
+    const email = formValue(new FormData(event.currentTarget), "email");
+    setPending(true);
+    try {
+      const result = await authClient.sendVerificationEmail({ email, callbackURL: next }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (result.error) { toast.error(result.error.message ?? t("auth.errors.generic")); return; }
+      setSentTo(email);
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
+  }
+  return <form onSubmit={submit} className="flex flex-col gap-4" aria-busy={pending}>
+    {sentTo && <p role="status" className="text-sm">{t("auth.verification.sent", { email: sentTo })}</p>}
+    <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+{{#if (includes product.features "captcha")}}
+    <Captcha action="email_verification" challenge={captcha} />
+{{/if}}
+    <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>{t("auth.verification.submit")}</Button>
+  </form>;
+}
 `],
   ["modules/auth/integrations/sms/frameworks/next/apps/fullstack-web/src/app/[lang]/login/phone/page.tsx", `import type { Metadata } from "next";
 import Link from "next/link";
@@ -20430,6 +20853,614 @@ export function createPhoneAuth(secret: string, database: Database, events: Even
       ],
     },
   };
+}
+`],
+  ["modules/auth/integrations/sms/shared/client/frameworks/react-router/src/components/auth/phone-sign-in-form.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useEffect, useState } from "react";
+
+import { authClient } from "@/lib/auth-client";
+
+import { useT } from "../i18n-provider";
+import { Field } from "./field";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
+
+export default function PhoneSignInForm({ next }: { next: string }) {
+  const t = useT();
+  const [phone, setPhone] = useState("");
+  const [sentTo, setSentTo] = useState<string>();
+  const [code, setCode] = useState("");
+  const [pending, setPending] = useState<"send" | "verify">();
+  const [error, setError] = useState<string>();
+  const [cooldown, setCooldown] = useState({ phone: "", until: 0 });
+  const [now, setNow] = useState(0);
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
+  const remaining = cooldown.phone === phone.trim() ? Math.max(0, Math.ceil((cooldown.until - now) / 1000)) : 0;
+
+  useEffect(() => {
+    if (cooldown.until <= Date.now()) return;
+    const timer = window.setInterval(() => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= cooldown.until) window.clearInterval(timer);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown.until]);
+
+  function startCooldown(value: string, seconds: number) {
+    const current = Date.now();
+    setNow(current);
+    setCooldown({ phone: value, until: current + seconds * 1000 });
+  }
+
+  async function sendCode() {
+    if (pending || remaining > 0) return;
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token) return;
+{{/if}}
+    const value = phone.trim();
+    if (!/^\\+[1-9]\\d{7,14}$/.test(value)) {
+      setError(t("auth.phone.invalidPhone"));
+      return;
+    }
+    setPhone(value);
+    setPending("send");
+    setError(undefined);
+    let retryAfter: string | null = null;
+    try {
+      const result = await authClient.phoneNumber.sendOtp({ phoneNumber: value }, {
+{{#if (includes product.features "captcha")}}
+        headers: captcha.headers,
+{{/if}}
+        onError: ({ response }) => {
+          retryAfter = response.headers.get("Retry-After") ?? response.headers.get("X-Retry-After");
+        },
+      });
+      if (result.error) {
+        if (result.error.status === 429) {
+          const seconds = Number(retryAfter);
+          startCooldown(value, Number.isFinite(seconds) && seconds > 0 ? seconds : 60);
+          setError(t("auth.phone.rateLimited"));
+        } else if (result.error.code === "INVALID_PHONE_NUMBER") {
+          setError(t("auth.phone.invalidPhone"));
+        } else {
+          startCooldown(value, 60);
+          setError(t("auth.phone.deliveryFailed"));
+        }
+        return;
+      }
+      startCooldown(value, 60);
+      setSentTo(value);
+      setCode("");
+    } catch {
+      setError(t("auth.phone.deliveryFailed"));
+    } finally {
+      setPending(undefined);
+      {{#if (includes product.features "captcha")}}
+      captcha.reset();
+      {{/if}}
+    }
+  }
+
+  async function verifyCode() {
+    if (pending || !sentTo) return;
+    if (!/^\\d{6}$/.test(code)) {
+      setError(t("auth.phone.invalidCode"));
+      return;
+    }
+    setPending("verify");
+    setError(undefined);
+    try {
+      const result = await authClient.phoneNumber.verify({ phoneNumber: sentTo, code });
+      if (result.error) {
+        setError(t(result.error.status === 429 ? "auth.phone.rateLimited" : "auth.phone.invalidCode"));
+        return;
+      }
+      // The server page has already constrained next with safeNext.
+      window.location.assign(next);
+    } catch {
+      setError(t("auth.errors.generic"));
+    } finally {
+      setPending(undefined);
+    }
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      aria-busy={Boolean(pending)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void (sentTo ? verifyCode() : sendCode());
+      }}
+    >
+      <Field
+        label={t("auth.phone.number")}
+        name="phoneNumber"
+        type="tel"
+        autoComplete="tel"
+        value={phone}
+        onChange={(event) => setPhone(event.target.value)}
+        readOnly={Boolean(sentTo)}
+        disabled={Boolean(pending)}
+        aria-describedby="phone-hint"
+        maxLength={16}
+      />
+      <p id="phone-hint" className="-mt-2 text-xs text-muted-foreground">{t("auth.phone.numberHint")}</p>
+      {sentTo && (
+        <>
+          <div className="flex flex-col gap-2">
+            <p role="status" className="text-sm text-muted-foreground">{t("auth.phone.sent", { phone: sentTo })}</p>
+            <button
+              type="button"
+              className="self-start text-sm underline underline-offset-4 disabled:opacity-50"
+              disabled={Boolean(pending)}
+              onClick={() => {
+                setSentTo(undefined);
+                setCode("");
+                setError(undefined);
+              }}
+            >
+              {t("auth.phone.edit")}
+            </button>
+          </div>
+          <Field
+            label={t("auth.phone.code")}
+            name="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]{6}"
+            minLength={6}
+            maxLength={6}
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\\D/g, "").slice(0, 6))}
+            disabled={Boolean(pending)}
+          />
+        </>
+      )}
+{{#if (includes product.features "captcha")}}
+      <Captcha action="phone_otp" challenge={captcha} />
+{{/if}}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <Button type="submit" disabled={Boolean(pending) || (!sentTo && (remaining > 0{{#if (includes product.features "captcha")}} || !captcha.token{{/if}}))}>
+        {pending === "send" ? t("auth.phone.sending") : pending === "verify" ? t("auth.phone.verifying") : sentTo ? t("auth.phone.verify") : t("auth.phone.send")}
+      </Button>
+      {sentTo && (
+        <Button type="button" variant="outline" disabled={Boolean(pending) || remaining > 0{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} } onClick={() => void sendCode()}>
+          {t("auth.phone.resend")}
+        </Button>
+      )}
+      {remaining > 0 && <p className="text-center text-xs text-muted-foreground">{t("auth.phone.cooldown", { seconds: remaining })}</p>}
+    </form>
+  );
+}
+`],
+  ["modules/auth/shared/client/frameworks/react-router/src/components/auth/account-forms.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useProductNavigation } from "@/lib/product-navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+
+import { useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+
+function useSubmit(
+  action: (form: FormData) => Promise<{ error: { message?: string } | null }>,
+  { reset = false } = {},
+) {
+  const t = useT();
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const target = event.currentTarget;
+    setPending(true);
+    try {
+      const { error } = await action(new FormData(target));
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      toast.success(t("auth.settings.saved"));
+      if (reset) target.reset();
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); }
+  }
+
+  return { pending, onSubmit };
+}
+
+export function ProfileForm({ name, email }: { name: string; email: string }) {
+  const t = useT();
+  const navigation = useProductNavigation();
+  const { pending, onSubmit } = useSubmit(async (form) => {
+    const result = await authClient.updateUser({ name: formValue(form, "name") });
+    if (!result.error) navigation.refresh();
+    return result;
+  });
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field label={t("auth.fields.email")} name="email" value={email} disabled readOnly />
+      <Field label={t("auth.fields.name")} name="name" defaultValue={name} autoComplete="name" />
+      <Button type="submit" disabled={pending} className="self-start">
+        {t("auth.settings.save")}
+      </Button>
+    </form>
+  );
+}
+
+export function PasswordForm() {
+  const t = useT();
+  const { pending, onSubmit } = useSubmit(
+    (form) =>
+      authClient.changePassword({
+        currentPassword: formValue(form, "currentPassword"),
+        newPassword: formValue(form, "newPassword"),
+        revokeOtherSessions: true,
+      }),
+    { reset: true },
+  );
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <Field
+        label={t("auth.fields.currentPassword")}
+        name="currentPassword"
+        type="password"
+        autoComplete="current-password"
+      />
+      <Field
+        label={t("auth.fields.newPassword")}
+        name="newPassword"
+        type="password"
+        autoComplete="new-password"
+        minLength={8}
+      />
+      <Button type="submit" disabled={pending} className="self-start">
+        {t("auth.settings.save")}
+      </Button>
+    </form>
+  );
+}
+`],
+  ["modules/auth/shared/client/frameworks/react-router/src/components/auth/auth-card.tsx.hbs", `import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@{{projectName}}/ui/components/card";
+
+export function AuthCard({
+  title,
+  description,
+  footer,
+  children,
+}: {
+  title: string;
+  description?: string;
+  footer?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-1 items-center justify-center px-4 py-12">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">{title}</CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">{children}</CardContent>
+        {footer && (
+          <CardFooter className="justify-center text-muted-foreground text-xs">{footer}</CardFooter>
+        )}
+      </Card>
+    </div>
+  );
+}
+`],
+  ["modules/auth/shared/client/frameworks/react-router/src/components/auth/field.tsx.hbs", `import { Input } from "@{{projectName}}/ui/components/input";
+import { Label } from "@{{projectName}}/ui/components/label";
+
+export function Field({
+  label,
+  name,
+  ...props
+}: { label: string; name: string } & React.ComponentProps<"input">) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={name}>{label}</Label>
+      <Input id={name} name={name} required {...props} />
+    </div>
+  );
+}
+
+export function formValue(form: FormData, name: string): string {
+  const value = form.get(name);
+  return value instanceof File ? "" : (value ?? "");
+}
+`],
+  ["modules/auth/shared/client/frameworks/react-router/src/components/auth/sign-in-form.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+import { localePath } from "@/lib/i18n/paths";
+import type { SocialProvider } from "@/lib/social-providers";
+
+import { useLocale, useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+import { SocialButtons } from "./social-buttons";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
+
+export default function SignInForm({
+  next,
+  providers,
+  canResetPassword,
+}: {
+  next: string;
+  providers: SocialProvider[];
+  canResetPassword: boolean;
+}) {
+  const locale = useLocale();
+  const t = useT();
+  const [pending, setPending] = useState(false);
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
+    const form = new FormData(event.currentTarget);
+    setPending(true);
+    try {
+      const { error } = await authClient.signIn.email({
+        email: formValue(form, "email"),
+        password: formValue(form, "password"),
+        callbackURL: next,
+      }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      window.location.assign(next);
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
+  }
+
+  return (
+    <>
+      <SocialButtons providers={providers} callbackURL={next} />
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+        <Field
+          label={t("auth.fields.password")}
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          minLength={8}
+        />
+        {canResetPassword && (
+          <a
+            href={localePath(locale, "/forgot-password")}
+            className="self-end text-muted-foreground text-xs hover:text-foreground"
+          >
+            {t("auth.signIn.forgot")}
+          </a>
+        )}
+{{#if (includes product.features "captcha")}}
+        <Captcha action="login" challenge={captcha} />
+{{/if}}
+        <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
+          {t("auth.signIn.submit")}
+        </Button>
+      </form>
+{{#if (includes product.features "email")}}
+      <a href={\`\${localePath(locale, "/verify-email")}?next=\${encodeURIComponent(next.startsWith("/") ? next : new URL(next).pathname + new URL(next).search + new URL(next).hash)}\`} className="text-center text-sm underline">{t("auth.verification.submit")}</a>
+{{/if}}
+    </>
+  );
+}
+`],
+  ["modules/auth/shared/client/frameworks/react-router/src/components/auth/sign-up-form.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { authClient } from "@/lib/auth-client";
+import type { SocialProvider } from "@/lib/social-providers";
+
+import { useLocale, useT } from "../i18n-provider";
+import { Field, formValue } from "./field";
+import { SocialButtons } from "./social-buttons";
+{{#if (includes product.features "captcha")}}
+import { Captcha, useCaptcha } from "./captcha";
+{{/if}}
+
+export default function SignUpForm({
+  next,
+  providers,
+  verifyEmail,
+}: {
+  next: string;
+  providers: SocialProvider[];
+  /** Accounts must confirm their email before they can sign in. */
+  verifyEmail: boolean;
+}) {
+  const t = useT();
+  const locale = useLocale();
+  const [pending, setPending] = useState(false);
+  const [sentTo, setSentTo] = useState<string>();
+{{#if (includes product.features "captcha")}}
+  const captcha = useCaptcha();
+{{/if}}
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+{{#if (includes product.features "captcha")}}
+    if (!captcha.token || pending) return;
+{{/if}}
+    const form = new FormData(event.currentTarget);
+    const email = formValue(form, "email");
+    setPending(true);
+    try {
+      const { error } = await authClient.signUp.email({
+        name: formValue(form, "name"),
+        email,
+        password: formValue(form, "password"),
+        callbackURL: next,
+      }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      if (verifyEmail) setSentTo(email);
+      else window.location.assign(next);
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
+  }
+
+  if (sentTo) {
+    return <div className="space-y-4"><p role="status" className="text-sm">{t("auth.signUp.checkEmail", { email: sentTo })}</p>{{#if (includes product.features "email")}}<a href={\`/\${locale}/verify-email?next=\${encodeURIComponent(next.startsWith("/") ? next : new URL(next).pathname + new URL(next).search + new URL(next).hash)}\`} className="text-sm underline">{t("auth.verification.submit")}</a>{{/if}}</div>;
+  }
+
+  return (
+    <>
+      <SocialButtons providers={providers} callbackURL={next} />
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <Field label={t("auth.fields.name")} name="name" autoComplete="name" />
+        <Field label={t("auth.fields.email")} name="email" type="email" autoComplete="email" />
+        <Field
+          label={t("auth.fields.password")}
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          minLength={8}
+        />
+{{#if (includes product.features "captcha")}}
+        <Captcha action="signup" challenge={captcha} />
+{{/if}}
+        <Button type="submit" disabled={pending{{#if (includes product.features "captcha")}} || !captcha.token{{/if}} }>
+          {t("auth.signUp.submit")}
+        </Button>
+      </form>
+    </>
+  );
+}
+`],
+  ["modules/auth/shared/client/frameworks/react-router/src/components/auth/social-buttons.tsx.hbs", `"use client";
+
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useState } from "react";
+
+import { authClient } from "@/lib/auth-client";
+import { type SocialProvider, socialProviderLabels } from "@/lib/social-providers";
+
+import { useT } from "../i18n-provider";
+
+export function SocialButtons({
+  providers,
+  callbackURL,
+}: {
+  providers: SocialProvider[];
+  callbackURL: string;
+}) {
+  const t = useT();
+  const [pending, setPending] = useState<SocialProvider>();
+  const [error, setError] = useState(false);
+  if (providers.length === 0) return null;
+
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        {providers.map((provider) => (
+          <Button
+            key={provider}
+            variant="outline"
+            type="button"
+            disabled={Boolean(pending)}
+            onClick={async () => {
+              setPending(provider);
+              setError(false);
+              try {
+                const result = await authClient.signIn.social({ provider, callbackURL });
+                if (result.error) {
+                  setError(true);
+                  setPending(undefined);
+                }
+              } catch {
+                setError(true);
+                setPending(undefined);
+              }
+            }}
+          >
+            { {{#if (includes module.providers "wechat")}}provider === "wechat" ? t("auth.social.wechat") : {{/if}}t("auth.social.continueWith", { provider: socialProviderLabels[provider] })}
+          </Button>
+        ))}
+      </div>
+      {error && <p role="alert" className="text-sm text-destructive">{t("auth.errors.generic")}</p>}
+      <div className="flex items-center gap-3 text-muted-foreground text-xs">
+        <span className="h-px flex-1 bg-border" />
+        {t("auth.social.divider")}
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    </>
+  );
+}
+`],
+  ["modules/auth/shared/client/frameworks/react-router/src/lib/auth-client.ts.hbs", `import { adminClient{{#if (includes product.features "sms")}}, phoneNumberClient{{/if}} } from "better-auth/client/plugins";
+import { createAuthClient } from "better-auth/react";
+
+/** Same-origin BFF keeps session cookies available to both browser and SSR. */
+export const authClient = createAuthClient({
+  basePath: "/api/auth",
+  fetchOptions: { credentials: "include" },
+  plugins: [adminClient(){{#if (includes product.features "sms")}}, phoneNumberClient(){{/if}}],
+});
+`],
+  ["modules/auth/shared/client/frameworks/react-router/src/lib/social-providers.ts.hbs", `export const socialProviderLabels = {
+  google: "Google",
+  github: "GitHub",
+{{#if (includes module.providers "wechat")}}
+  wechat: "WeChat",
+{{/if}}
+} as const;
+
+export type SocialProvider = keyof typeof socialProviderLabels;
+
+export function isSocialProvider(value: string): value is SocialProvider {
+  return value in socialProviderLabels;
+}
+`],
+  ["modules/auth/shared/partials/social-providers.hbs", `export const socialProviderLabels = {
+  google: "Google",
+  github: "GitHub",
+{{#if (includes module.providers "wechat")}}
+  wechat: "WeChat",
+{{/if}}
+} as const;
+
+export type SocialProvider = keyof typeof socialProviderLabels;
+
+export function isSocialProvider(value: string): value is SocialProvider {
+  return value in socialProviderLabels;
+}
+`],
+  ["modules/auth/shared/partials/social-providers.server.hbs", `import { auth } from "@{{projectName}}/app-services";
+
+import { isSocialProvider, type SocialProvider } from "./social-providers";
+
+/** OAuth providers whose credentials are configured. */
+export function enabledSocialProviders(): SocialProvider[] {
+  return Object.keys(auth.options.socialProviders).filter(isSocialProvider);
 }
 `],
   ["modules/auth/stack/better-auth/apps/fullstack-web/frameworks/astro/src/app.d.ts.hbs", `/// <reference path="../.astro/types.d.ts" />
@@ -32064,7 +33095,7 @@ TURNSTILE_SECRET_KEY=your-widget-secret
 TURNSTILE_TEST_MODE=false
 \`\`\`
 
-\`BETTER_AUTH_URL\` supplies both the trusted Origin and the exact expected hostname (no wildcard/subdomain matching). Missing keys, accidental public dummy keys, inaccessible Siteverify, malformed responses and failed challenges **fail closed**. Unconfigured protected actions return \`503 CAPTCHA_NOT_CONFIGURED\`; missing tokens return \`400 CAPTCHA_REQUIRED\`; rejected/expired/spent tokens return \`400 CAPTCHA_INVALID\`. Tokens are valid for at most 300 seconds and single-use according to Siteverify. Do not retry requests with a consumed token, including requests whose auth validation failed after verification. No forwarding header is trusted as an IP; the optional Siteverify \`remoteip\` is deliberately omitted.
+The backend URL and explicitly declared client origins form the exact trusted Origin allowlist (no wildcard/subdomain matching). Siteverify hostname must equal the hostname of the actual trusted requesting Origin, including split-client requests. Missing keys, accidental public dummy keys, inaccessible Siteverify, malformed responses and failed challenges **fail closed**. Unconfigured protected actions return \`503 CAPTCHA_NOT_CONFIGURED\`; missing tokens return \`400 CAPTCHA_REQUIRED\`; rejected/expired/spent tokens return \`400 CAPTCHA_INVALID\`. Tokens are valid for at most 300 seconds and single-use according to Siteverify. Do not retry requests with a consumed token, including requests whose auth validation failed after verification. No forwarding header is trusted as an IP; the optional Siteverify \`remoteip\` is deliberately omitted.
 
 Only the site key is returned by \`/api/captcha/config\` at runtime, avoiding build-time public environment substitution. Never expose the secret through a \`NEXT_PUBLIC_\` variable. Allow \`https://challenges.cloudflare.com\` in your CSP \`script-src\` and \`frame-src\`; do not self-host or cache the widget script. Keep the provider reachable from the server (including Workers).
 
@@ -32155,14 +33186,20 @@ export function captchaPublicConfig(env: CaptchaConfig) {
   }
 }
 
-export function createCaptchaBeforeHook(env: CaptchaConfig) {
+export function createCaptchaBeforeHook(env: CaptchaConfig, clientOrigins: readonly string[] = []) {
+  const trustedOrigins = new Set([new URL(env.BETTER_AUTH_URL).origin, ...clientOrigins]);
   return createAuthMiddleware(async (ctx) => {
     const action = actions[ctx.path];
     if (!action) return; // OAuth callbacks, sessions and webhooks are not challenges.
     const config = configuration(env);
     const headers = ctx.headers ?? ctx.request?.headers;
-    if (headers?.get("origin") !== config.origin.origin) {
+    const origin = headers?.get("origin");
+    if (!headers || !origin || !trustedOrigins.has(origin)) {
       throw new APIError("FORBIDDEN", { code: "CAPTCHA_ORIGIN_REJECTED", message: "A trusted Origin is required" });
+    }
+    const hostname = new URL(origin).hostname;
+    if (config.test && !["localhost", "127.0.0.1", "[::1]"].includes(hostname)) {
+      throw new APIError("FORBIDDEN", { code: "CAPTCHA_ORIGIN_REJECTED", message: "Turnstile test mode requires a loopback requesting Origin" });
     }
     const token = tokenSchema.safeParse(headers.get("x-captcha-token"));
     if (!token.success) {
@@ -32189,7 +33226,7 @@ export function createCaptchaBeforeHook(env: CaptchaConfig) {
     // Public dummy tokens do not bind hostname/action/time. This explicit development-only
     // mode still calls Siteverify; production always validates every binding below.
     const validBinding = config.test || (
-      result.hostname === config.origin.hostname && result.action === action &&
+      result.hostname === hostname && result.action === action &&
       Number.isFinite(timestamp) && timestamp <= Date.now() + 30_000 && Date.now() - timestamp <= 300_000
     );
     if (!result.success || result["error-codes"]?.length || !validBinding) {
@@ -32212,12 +33249,9 @@ export function createCaptchaBeforeHook(env: CaptchaConfig) {
   retry: "重新验证",
 };
 `],
-  ["modules/captcha/frameworks/http-server/apps/fullstack-web/src/lib/native/captcha.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
-import { ENV } from "@/env.server";
-import { json } from "../product-api";
-export async function handle(request: Request, path: string): Promise<Response | undefined> {
-  if (path === "/api/captcha/config" && request.method === "GET") return json(captchaPublicConfig(ENV));
-}
+  ["modules/captcha/frameworks/http-server/apps/backend/src/lib/native/captcha.ts.hbs", `{{> captcha/captcha}}
+`],
+  ["modules/captcha/frameworks/http-server/apps/fullstack-web/src/lib/native/captcha.ts.hbs", `{{> captcha/captcha}}
 `],
   ["modules/captcha/frameworks/next/apps/fullstack-web/src/app/api/captcha/config/route.ts.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
 import { ENV } from "@/env.server";
@@ -32395,9 +33429,137 @@ export function Captcha({ action, challenge }: {
   );
 }
 `],
-  ["modules/core/files/apps/fullstack-web/src/config/site.ts.hbs", `export const site = {
-  name: "{{projectName}}",
+  ["modules/captcha/shared/client/frameworks/react-router/src/components/auth/captcha.tsx.hbs", `"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import { useLocale, useT } from "../i18n-provider";
+
+type Turnstile = {
+  render(container: HTMLElement, options: {
+    sitekey: string;
+    action: string;
+    language: "en" | "zh-CN";
+    callback(token: string): void;
+    "expired-callback"(): void;
+    "error-callback"(): void;
+    "timeout-callback"(): void;
+    "response-field": false;
+  }): string;
+  remove(id: string): void;
 };
+declare global { interface Window { turnstile?: Turnstile } }
+let scriptPromise: Promise<Turnstile> | undefined;
+function loadTurnstile(): Promise<Turnstile> {
+  if (window.turnstile) return Promise.resolve(window.turnstile);
+  if (scriptPromise) return scriptPromise;
+  scriptPromise = new Promise<Turnstile>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    const timeout = window.setTimeout(() => fail(), 15_000);
+    function fail() {
+      window.clearTimeout(timeout);
+      script.remove();
+      reject(new Error("Turnstile unavailable"));
+    }
+    script.onerror = fail;
+    script.onload = () => {
+      window.clearTimeout(timeout);
+      if (window.turnstile) resolve(window.turnstile);
+      else fail();
+    };
+    document.head.appendChild(script);
+  }).catch((error: unknown) => {
+    scriptPromise = undefined;
+    throw error;
+  });
+  return scriptPromise;
+}
+
+export function useCaptcha() {
+  const [token, setToken] = useState("");
+  const [generation, setGeneration] = useState(0);
+  const reset = useCallback(() => {
+    setToken("");
+    setGeneration((current) => current + 1);
+  }, []);
+  return { token, setToken, generation, reset, headers: { "x-captcha-token": token } };
+}
+
+export function Captcha({ action, challenge }: {
+  action: "signup" | "login" | "password_reset_request" | "password_reset" | "email_verification" | "phone_otp";
+  challenge: ReturnType<typeof useCaptcha>;
+}) {
+  const t = useT();
+  const locale = useLocale();
+  const container = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "configuration">("loading");
+  const { setToken, generation, reset } = challenge;
+  useEffect(() => {
+    const controller = new AbortController();
+    let disposed = false;
+    let widget: { api: Turnstile; id: string } | undefined;
+    setToken("");
+    setStatus("loading");
+    async function render() {
+      try {
+        const response = await fetch("/api/captcha/config", { credentials: "include", cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Configuration unavailable");
+        const config = z.object({ siteKey: z.string().min(1).nullable() }).parse(await response.json());
+        if (disposed) return;
+        if (!config.siteKey) { setStatus("configuration"); return; }
+        const api = await loadTurnstile();
+        if (disposed || !container.current) return;
+        const invalidate = () => { if (!disposed) { setToken(""); setStatus("error"); } };
+        const id = api.render(container.current, {
+          sitekey: config.siteKey,
+          action,
+          language: locale,
+          "response-field": false,
+          callback: (token) => { if (!disposed) { setToken(token); setStatus("ready"); } },
+          "expired-callback": invalidate,
+          "error-callback": invalidate,
+          "timeout-callback": invalidate,
+        });
+        widget = { api, id };
+      } catch {
+        if (!disposed) { setToken(""); setStatus("error"); }
+      }
+    }
+    void render();
+    return () => {
+      disposed = true;
+      controller.abort();
+      if (widget) widget.api.remove(widget.id);
+    };
+  }, [action, generation, locale, setToken]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div ref={container} />
+      {status === "loading" && <p role="status" className="text-xs text-muted-foreground">{t("captcha.loading")}</p>}
+      {status === "configuration" && <p role="alert" className="text-sm text-destructive">{t("captcha.configuration")}</p>}
+      {status === "error" && (
+        <div role="alert" className="text-sm text-destructive">
+          <p>{t("captcha.error")}</p>
+          <button type="button" className="underline underline-offset-4" onClick={reset}>{t("captcha.retry")}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+`],
+  ["modules/captcha/shared/partials/captcha.hbs", `import { captchaPublicConfig } from "@{{projectName}}/captcha";
+import { ENV } from "@/env.server";
+import { json } from "../product-api";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path === "/api/captcha/config" && request.method === "GET") return json(captchaPublicConfig(ENV));
+}
+`],
+  ["modules/core/files/apps/backend/src/config/site.ts.hbs", `{{> core/site}}
+`],
+  ["modules/core/files/apps/fullstack-web/src/config/site.ts.hbs", `{{> core/site}}
 `],
   ["modules/core/files/docs/modules/core.md.hbs", `# Product shell
 
@@ -32405,15 +33567,21 @@ The shell every feature module plugs into.
 
 ## Layout
 
-{{#if (includes frontend "next")}}
+{{#if application.nativeSplit}}
+- React Router clients own \`src/routes/product.tsx\`, typed client data contracts and the same-origin \`src/routes/api.ts\` proxy. Their \`src/config/navigation.ts\` describes role-scoped navigation.
+- \`{{appPath "backend"}}/src/services.ts\` owns domain factories; \`src/lib/native-request.ts\` validates declared client origins before the shared WHATWG handler.
+- Client applications never import database, auth-service, email or SMS packages. Only the backend runs domain integrations. Use \`bun run dev:<id>\` for each named application; assigned ports are in \`applications.json\`.
+{{else if (includes frontend "next")}}
 - Product pages live in \`{{appPath "fullstack-web"}}/src/app/[lang]/\`.
 {{else if (includes frontend "tanstack-start")}}
 - Product routes live in \`{{appPath "fullstack-web"}}/src/routes/\`, with locale-prefixed URLs and server loaders for protected pages.
 {{else}}
 - Product pages live in \`{{appPath "fullstack-web"}}/app/pages/\`; server adapters live in \`{{appPath "fullstack-web"}}/server/\`. Nuxt's \`~/\` alias points to the app and \`@/\` points to the shared \`src/\` directory.
 {{/if}}
+{{#unless application.nativeSplit}}
 - \`{{appPath "fullstack-web"}}/src/config/navigation.ts\` is generated from the modules you picked. Edit it freely; it is plain data.
 - \`{{appPath "fullstack-web"}}/src/services.ts\` is the composition root: every package exports a factory, and this file wires them with environment variables and each other.
+{{/unless}}
 
 {{#if (includes frontend "tanstack-start")}}
 ## TanStack Start workflow
@@ -32444,7 +33612,7 @@ Use \`{{packageManager}} run build\` for the workspace production build and \`{{
    \`\`\`
 
 2. It emits them: \`await events.emit("order.paid", { orderId, userId })\`.
-3. Code that connects two modules lives in \`{{appPath "fullstack-web"}}/src/integrations/*.ts\` and subscribes with \`events.on(...)\`.
+3. Code that connects two modules lives in \`{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/integrations/*.ts\` and subscribes with \`events.on(...)\`.
 
 Handlers run in order and an error rejects \`emit\`, so a failed side effect surfaces to the caller. Replace \`createEventBus\` with a queue-backed implementation if you need retries; the interface stays the same.
 
@@ -32563,76 +33731,36 @@ export function createEventBus(): EventBus {
   },
 };
 `],
-  ["modules/core/frameworks/http-server/apps/fullstack-web/src/lib/product-api.ts.hbs", `import { z } from "zod";
-{{#if (includes product.features "auth")}}
-import { auth } from "@{{projectName}}/app-services";
-import { enabledSocialProviders } from "./social-providers.server";
+  ["modules/core/frameworks/hono/apps/backend/src/lib/native-request.ts.hbs", `{{#if (includes product.features "auth")}}
+import { ENV } from "../env.server";
 {{/if}}
-{{#if (or (includes product.features "auth") (includes product.features "seo"))}}
-import { ENV } from "@/env.server";
-{{/if}}
-{{#each product.features}}
-{{#if (or (eq this "storage") (eq this "ai") (eq this "blog") (eq this "affiliate") (eq this "payment") (eq this "credits") (eq this "admin") (eq this "captcha") (eq this "seo"))}}
-import { handle as handle_{{this}} } from "./native/{{this}}";
-{{/if}}
-{{/each}}
+import { handleProductRequest, json } from "./product-api";
 
-export const privateHeaders = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" };
-export function json<T>(data: T, status = 200) { return Response.json(data, { status, headers: privateHeaders }); }
-export class HttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
-export function pageOf(request: Request) { return z.coerce.number().int().min(1).max(100000).parse(new URL(request.url).searchParams.get("page") ?? 1); }
-{{#if (includes product.features "auth")}}
-export function requireOrigin(request: Request) {
-  if (request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new HttpError(403, "forbidden");
-}
-export async function requireSession(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) throw new HttpError(401, "unauthorized");
-  return session;
-}
-export async function requireAdministrator(request: Request) {
-  const session = await requireSession(request);
-  if (!session.user.role?.split(",").includes("admin")) throw new HttpError(403, "forbidden");
-  return session;
-}
-{{/if}}
-/** The request body is bounded before parsing; callers still validate their exact input schema. */
-export async function readJson(request: Request): Promise<unknown> {
-  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new HttpError(400, "invalid_input");
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = []; let size = 0;
-  try { while (true) { const part = await reader.read(); if (part.done) break; size += part.value.byteLength; if (size > 40000) { await reader.cancel(); throw new HttpError(413, "too_large"); } chunks.push(part.value); } }
-  finally { reader.releaseLock(); }
-  const bytes = new Uint8Array(size); let offset = 0;
-  for (const part of chunks) { bytes.set(part, offset); offset += part.byteLength; }
-  try { return JSON.parse(new TextDecoder().decode(bytes)) as unknown; } catch { throw new HttpError(400, "invalid_input"); }
-}
+const backendOrigin = {{#if (includes product.features "auth")}}new URL(ENV.BETTER_AUTH_URL).origin{{else}}"{{application.backendOrigin}}"{{/if}};
+const clientOrigins = new Set<string>([{{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]);
 
-/** Shared native service boundary. Framework adapters must forward original headers and body. */
-export async function handleProductRequest(request: Request): Promise<Response> {
-  const path = new URL(request.url).pathname.replace(/\\/$/, "");
-  try {
-{{#if (includes product.features "auth")}}
-    if (path.startsWith("/api/auth/")) return auth.handler(request);
-    if (path === "/api/product/config" && request.method === "GET") return json({ socialProviders: enabledSocialProviders(), siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}ENV.BETTER_AUTH_URL{{/if}}, verifyEmail: {{#if (includes product.features "email")}}true{{else}}false{{/if}}, canResetPassword: {{#if (includes product.features "email")}}true{{else}}false{{/if}} });
-    if (path === "/api/product/session" && request.method === "GET") return json(await auth.api.getSession({ headers: request.headers }));
-{{/if}}
-{{#unless (includes product.features "auth")}}
-    if (path === "/api/product/config" && request.method === "GET") return json({ socialProviders: [], siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}new URL(request.url).origin{{/if}}, verifyEmail: false, canResetPassword: false });
-{{/unless}}
-{{#each product.features}}
-{{#if (or (eq this "storage") (eq this "ai") (eq this "blog") (eq this "affiliate") (eq this "payment") (eq this "credits") (eq this "admin") (eq this "captcha") (eq this "seo"))}}
-    { const response = await handle_{{this}}(request, path); if (response) return response; }
-{{/if}}
-{{/each}}
-    return json({ error: "not_found" }, 404);
-  } catch (error) {
-    if (error instanceof HttpError) return json({ error: error.message }, error.status);
-    if (error instanceof z.ZodError) return json({ error: "invalid_input" }, 400);
-    console.error("Product request failed");
-    return json({ error: "server_error" }, 500);
+/** Only declared BFF origins may select the public auth URL; forwarded headers never do. */
+export async function handleNativeRequest(request: Request): Promise<Response> {
+  const clientOrigin = request.headers.get("x-xstack-client-origin");
+  const origin = request.headers.get("origin");
+  if ((clientOrigin !== null && !clientOrigins.has(clientOrigin)) ||
+      (origin !== null && origin !== backendOrigin && !clientOrigins.has(origin))) {
+    return json({ error: "forbidden" }, 403);
   }
+  const publicOrigin = clientOrigin ?? backendOrigin;
+  const url = new URL(request.url);
+  const selected = new URL(publicOrigin);
+  url.protocol = selected.protocol;
+  url.host = selected.host;
+  const headers = new Headers(request.headers);
+  headers.set("host", selected.host);
+  for (const name of ["forwarded", "x-forwarded-host", "x-forwarded-proto", "x-forwarded-port", "x-xstack-client-origin"]) headers.delete(name);
+  return handleProductRequest(new Request(url.href, new Request(request, { headers })));
 }
+`],
+  ["modules/core/frameworks/http-server/apps/backend/src/lib/product-api.ts.hbs", `{{> core/product-api}}
+`],
+  ["modules/core/frameworks/http-server/apps/fullstack-web/src/lib/product-api.ts.hbs", `{{> core/product-api}}
 `],
   ["modules/core/frameworks/next/apps/fullstack-web/src/app/[lang]/layout.tsx.hbs", `import { getMessages, locales } from "@{{projectName}}/i18n";
 import type { Metadata } from "next";
@@ -32963,18 +34091,21 @@ const { locale, locales, localeNames, path, label, t } = useProductLocale();
 const route = useRoute();
 const theme = useCookie<"light" | "dark">("theme", { default: () => "light", sameSite: "lax" });
 useHead(() => ({ htmlAttrs: { lang: locale.value, class: theme.value } }));
-const localeCookie = useCookie(LOCALE_COOKIE, { sameSite: "lax" });
+const localeCookie = useCookie(LOCALE_COOKIE, { path: "/", maxAge: 31536000, sameSite: "lax" });
 async function changeLocale(event: Event) {
   const value = (event.target as HTMLSelectElement).value;
   localeCookie.value = value;
-  await navigateTo(\`/\${value}\${route.path.replace(/^\\/[^/]+/, "")}\`);
+  await navigateTo({ path: \`/\${value}\${route.path.replace(/^\\/[^/]+/, "")}\`, query: route.query, hash: route.hash });
 }
 {{#if (includes product.features "auth")}}
-const { data: session } = await useFetch<{ user: { id: string; name: string; role?: string | null } } | null>("/api/product/session", { key: "product-session" });
+const { data: session } = await useProductSession();
+const { pending, error, run } = useProductAction();
 async function signOut() {
-  await productRequest("/api/auth/sign-out", productJson({}));
-  session.value = null;
-  await navigateTo(path("login"));
+  await run(async () => {
+    await productRequest("/api/auth/sign-out", productJson({}));
+    session.value = null;
+    await navigateTo(path("login"));
+  });
 }
 {{/if}}
 const mainNavigation = computed(() => navigation.main.filter((item) => canSee(item, {{#if (includes product.features "auth")}}session.value?.user{{else}}null{{/if}})));
@@ -32987,13 +34118,14 @@ const mainNavigation = computed(() => navigation.main.filter((item) => canSee(it
     <nav :aria-label="label('Main navigation', '主导航')">
       <NuxtLink v-for="item in mainNavigation" :key="item.href" :to="path(item.href)">\\{{ t(item.labelKey) }}</NuxtLink>
       {{#if (includes product.features "auth")}}
-      <button v-if="session" class="text-button" @click="signOut">\\{{ label('Sign out', '退出') }}</button>
+      <button v-if="session" class="text-button" :disabled="pending" @click="signOut">\\{{ label('Sign out', '退出') }}</button>
       <NuxtLink v-else :to="path('login')">\\{{ label('Sign in', '登录') }}</NuxtLink>
       {{/if}}
       <select :value="locale" :aria-label="label('Language', '语言')" @change="changeLocale"><option v-for="code in locales" :key="code" :value="code">\\{{ localeNames[code] }}</option></select>
       <button class="text-button" :aria-label="label('Toggle theme', '切换主题')" @click="theme = theme === 'dark' ? 'light' : 'dark'">\\{{ theme === 'dark' ? label('Light', '浅色') : label('Dark', '深色') }}</button>
     </nav>
   </header>
+  {{#if (includes product.features "auth")}}<p v-if="error" role="alert" class="error">\\{{ error }}</p>{{/if}}
   <main id="main" tabindex="-1"><slot /></main>
   <footer class="site-footer">{{projectName}} <span>\\{{ label('Built for your next chapter.', '为你的下一篇章而构建。') }}</span></footer>
 </template>
@@ -33014,10 +34146,11 @@ const allowed = [""{{#if (includes product.features "auth")}}, "login", "signup"
 if (!allowed.includes(section)) throw createError({ statusCode: 404, statusMessage: "Page not found" });
 const depth = section === "admin" && segments[1] === "blog" ? 3 : ["dashboard", "admin", "blog", "payment", "ref"].includes(section) ? 2 : {{#if (includes product.features "sms")}}section === "login" && segments[1] === "phone" ? 2 : {{/if}}1;
 if (segments.length > depth || (["payment", "ref"].includes(section) && !segments[1])) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+if (section === "login" && segments.length > 1 && {{#if (includes product.features "sms")}}segments[1] !== "phone"{{else}}true{{/if}}) throw createError({ statusCode: 404, statusMessage: "Page not found" });
 {{#if (includes product.features "auth")}}
-const { data: session } = await useFetch<{ user: { id: string; name: string; email: string; role?: string | null; emailVerified: boolean } } | null>("/api/product/session", { key: "product-session" });
+const { data: session } = await useProductSession();
 if (["dashboard", "admin", "payment"].includes(section) && !session.value) await navigateTo(\`\${path("login")}?next=\${encodeURIComponent(route.fullPath)}\`, { replace: true });
-if (section === "admin" && session.value && session.value.user.role !== "admin") throw createError({ statusCode: 403, statusMessage: "Forbidden" });
+if (section === "admin" && session.value && !session.value.user.role?.split(",").includes("admin")) throw createError({ statusCode: 403, statusMessage: "Forbidden" });
 {{/if}}
 const privatePage = ["dashboard", "admin", "payment", "login", "signup", "forgot-password", "reset-password", "verify-email", "ref"].includes(section);
 useSeoMeta({ title: \`\${section ? section.charAt(0).toUpperCase() + section.slice(1) : "{{projectName}}"} · {{projectName}}\`, robots: privatePage ? "noindex, nofollow" : "index, follow" });
@@ -33077,10 +34210,14 @@ export default defineEventHandler((event) => {
   }
 });
 `],
+  ["modules/core/frameworks/react-router/apps/admin/src/lib/client-role.ts.hbs", `export const isAdminClient: boolean = {{#if (includes application.roles "admin")}}true{{else}}false{{/if}};
+`],
+  ["modules/core/frameworks/react-router/apps/web-frontend/src/lib/client-role.ts.hbs", `export const isAdminClient: boolean = {{#if (includes application.roles "admin")}}true{{else}}false{{/if}};
+`],
   ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/components/product-shell.tsx.hbs", `import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useLocation } from "@tanstack/react-router";
-import { locales } from "@{{projectName}}/i18n";
+import { LOCALE_COOKIE, locales, localeNames } from "@{{projectName}}/i18n";
 import { canSee, navigation{{#if (includes product.features "auth")}}, type NavUser{{/if}} } from "@/config/navigation";
 import { useLocale, useT } from "./i18n-provider";
 {{#if (includes product.features "auth")}}
@@ -33093,11 +34230,44 @@ export function ProductShell({ children{{#if (includes product.features "auth")}
 {{#if (includes product.features "auth")}}
   const { data: session, isPending } = authClient.useSession();
   const user = isPending ? initialUser : session?.user;
+  const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState("");
+  async function signOut() {
+    setSigningOut(true); setError("");
+    try {
+      const result = await authClient.signOut();
+      if (result.error) throw result.error;
+      window.location.assign(\`/\${locale}\`);
+    } catch { setError(t("auth.errors.generic")); setSigningOut(false); }
+  }
 {{else}}
   const user = null;
 {{/if}}
-  const area = location.pathname.includes("/admin") ? "admin" : location.pathname.includes("/dashboard") ? "dashboard" : null;
-  return <div className="min-h-screen bg-background text-foreground"><a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4">Skip to content</a><header className="border-b"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-6 px-6 py-5"><a href={\`/\${locale}\`} className="mr-auto font-serif text-2xl font-semibold tracking-tight">{{projectName}}</a><nav aria-label="Main" className="flex gap-5 text-sm">{navigation.main.filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={\`/\${locale}\${item.href === "/" ? "" : item.href}\`} aria-current={location.pathname === \`/\${locale}\${item.href}\` ? "page" : undefined}>{t(item.labelKey)}</a>)}</nav><label className="sr-only" htmlFor="locale">Language</label><select id="locale" aria-label="Language" value={locale} className="border bg-background p-2 text-xs" onChange={(event) => window.location.assign(\`/\${event.target.value}\${location.pathname.slice(locale.length + 1)}\${location.searchStr}\`)}>{locales.map((lang) => <option key={lang} value={lang}>{lang === "en" ? "English" : "简体中文"}</option>)}</select><button type="button" className="border px-3 py-2 text-xs" aria-label="Toggle color theme" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>{mounted && resolvedTheme === "dark" ? "Light" : "Dark"}</button>{{#if (includes product.features "auth")}}{user ? <button className="text-sm underline" onClick={() => void authClient.signOut().then(() => window.location.assign(\`/\${locale}\`))}>{t("auth.user.signOut")}</button> : <a href={\`/\${locale}/login\`} className="text-sm underline">{t("auth.user.signIn")}</a>}{{/if}}</div></header><div className={area ? "mx-auto grid max-w-7xl gap-10 px-6 py-12 md:grid-cols-[180px_1fr]" : ""}>{area && <aside><nav aria-label={area} className="flex flex-wrap gap-4 md:flex-col">{navigation[area].filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={\`/\${locale}\${item.href}\`} className={\`border-l-2 py-2 pl-4 text-sm \${location.pathname === \`/\${locale}\${item.href}\` ? "border-foreground font-semibold" : "border-transparent text-muted-foreground"}\`}>{t(item.labelKey)}</a>)}</nav></aside>}<main id="main-content" className="min-w-0">{children}</main></div><footer className="mx-auto mt-16 max-w-7xl border-t px-6 py-8 text-xs text-muted-foreground">{t("core.footer.rights", { year: new Date().getFullYear(), name: "{{projectName}}" })}</footer></div>;
+  const section = location.pathname.split("/")[2];
+  const area = section === "admin" || section === "dashboard" ? section : null;
+  return <div className="min-h-screen bg-background text-foreground">
+    <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4">Skip to content</a>
+    <header className="border-b"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-6 px-6 py-5">
+      <a href={\`/\${locale}\`} className="mr-auto font-serif text-2xl font-semibold tracking-tight">{{projectName}}</a>
+      <nav aria-label="Main" className="flex gap-5 text-sm">{navigation.main.filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={\`/\${locale}\${item.href === "/" ? "" : item.href}\`} aria-current={location.pathname === \`/\${locale}\${item.href === "/" ? "" : item.href}\` ? "page" : undefined}>{t(item.labelKey)}</a>)}</nav>
+      <label className="sr-only" htmlFor="locale">{t("i18n.switcher.label")}</label><select id="locale" value={locale} className="border bg-background p-2 text-xs" onChange={(event) => {
+        document.cookie = \`\${LOCALE_COOKIE}=\${event.target.value}; path=/; max-age=31536000; SameSite=Lax\`;
+        window.location.assign(\`/\${event.target.value}\${location.pathname.slice(locale.length + 1)}\${location.searchStr}\${window.location.hash}\`);
+      }}>{locales.map((lang) => <option key={lang} value={lang}>{localeNames[lang]}</option>)}</select>
+      <button type="button" className="border px-3 py-2 text-xs" aria-label="Toggle color theme" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>{mounted && resolvedTheme === "dark" ? "Light" : "Dark"}</button>
+{{#if (includes product.features "auth")}}
+      {user ? <button className="text-sm underline" disabled={signingOut} onClick={() => void signOut()}>{t("auth.user.signOut")}</button> : <a href={\`/\${locale}/login\`} className="text-sm underline">{t("auth.user.signIn")}</a>}
+{{/if}}
+    </div></header>
+{{#if (includes product.features "auth")}}
+    {error && <p role="alert" className="mx-auto max-w-7xl px-6 pt-4 text-destructive">{error}</p>}
+{{/if}}
+    <div className={area ? "mx-auto grid max-w-7xl gap-10 px-6 py-12 md:grid-cols-[180px_1fr]" : ""}>
+      {area && <aside><nav aria-label={area} className="flex flex-wrap gap-4 md:flex-col">{navigation[area].filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={\`/\${locale}\${item.href}\`} className={\`border-l-2 py-2 pl-4 text-sm \${location.pathname === \`/\${locale}\${item.href}\` ? "border-foreground font-semibold" : "border-transparent text-muted-foreground"}\`}>{t(item.labelKey)}</a>)}</nav></aside>}
+      <main id="main-content" className="min-w-0">{children}</main>
+    </div>
+    <footer className="mx-auto mt-16 max-w-7xl border-t px-6 py-8 text-xs text-muted-foreground">{t("core.footer.rights", { year: new Date().getFullYear(), name: "{{projectName}}" })}</footer>
+  </div>;
 }
 `],
   ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/lib/product-data.ts.hbs", `import { createServerFn } from "@tanstack/react-start";
@@ -33114,6 +34284,8 @@ export const productResponse = createServerFn({ method: "GET" })
     setResponseHeader("Cache-Control", "no-store");
     const incoming = getRequest();
     const response = await handleProductRequest(new Request(new URL(data.path, incoming.url), { headers: incoming.headers }));
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length) setResponseHeader("Set-Cookie", cookies);
     if (response.status === 401) throw redirect({ href: \`/\${data.locale}/login\` });
     if (response.status === 403 || response.status === 404) throw notFound();
     if (!response.ok) throw new Error(\`Request failed (\${response.status})\`);
@@ -33223,8 +34395,395 @@ export const Route = createFileRoute("/api/$")({
 });
 `],
   ["modules/core/frameworks/tanstack-start/apps/fullstack-web/src/routes/index.tsx.hbs", `import { createFileRoute, redirect } from "@tanstack/react-router";
-import { defaultLocale } from "@{{projectName}}/i18n";
-export const Route = createFileRoute("/")({ beforeLoad: () => { throw redirect({ href: \`/\${defaultLocale}\` }); } });
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { localeFromHeaders } from "@{{projectName}}/i18n";
+
+const preferredLocale = createServerFn({ method: "GET" }).handler(() => localeFromHeaders(getRequest().headers));
+export const Route = createFileRoute("/")({ beforeLoad: async () => { throw redirect({ href: \`/\${await preferredLocale()}\` }); } });
+`],
+  ["modules/core/shared/client/frameworks/react-router/src/components/product-shell.tsx.hbs", `import { useEffect, useState } from "react";
+import { useLocation } from "react-router";
+import { useTheme } from "next-themes";
+import { LOCALE_COOKIE, locales, localeNames } from "@{{projectName}}/i18n";
+import { canSee, navigation } from "@/config/navigation";
+import { useLocale, useT } from "./i18n-provider";
+import type { ProductUser } from "@/lib/product-contract";
+{{#if (includes product.features "auth")}}
+import { authClient } from "@/lib/auth-client";
+{{/if}}
+
+export function ProductShell({ user, children }: { user: ProductUser | null; children: React.ReactNode }) {
+  const locale = useLocale();
+  const t = useT();
+  const location = useLocation();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const area = location.pathname.split("/")[2];
+  const sideNavigation = area === "admin" || area === "dashboard" ? navigation[area].filter((item) => canSee(item, user)) : [];
+  useEffect(() => { document.documentElement.lang = locale; }, [locale]);
+{{#if (includes product.features "auth")}}
+  async function signOut() {
+    setPending(true); setError("");
+    try {
+      const result = await authClient.signOut();
+      if (result.error) throw result.error;
+      window.location.assign(\`/\${locale}/login\`);
+    } catch { setError(t("auth.errors.generic")); setPending(false); }
+  }
+{{/if}}
+  return <div className="min-h-screen bg-background text-foreground">
+    <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4">Skip to content</a>
+    <header className="border-b"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-6 px-6 py-5">
+      <a href={\`/\${locale}\`} className="mr-auto font-serif text-2xl font-semibold tracking-tight">{{projectName}}</a>
+      <nav aria-label="Main" className="flex gap-5 text-sm">
+        {navigation.main.filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={\`/\${locale}\${item.href === "/" ? "" : item.href}\`} aria-current={location.pathname === \`/\${locale}\${item.href === "/" ? "" : item.href}\` ? "page" : undefined}>{t(item.labelKey)}</a>)}
+{{#if (includes product.features "auth")}}
+        {!user && <><a href={\`/\${locale}/login\`}>{t("auth.user.signIn")}</a><a href={\`/\${locale}/signup\`}>{t("auth.signUp.submit")}</a></>}
+{{/if}}
+      </nav>
+      <label className="sr-only" htmlFor="locale-select">{t("i18n.switcher.label")}</label><select id="locale-select" value={locale} className="border bg-background p-2 text-sm" onChange={(event) => {
+        document.cookie = \`\${LOCALE_COOKIE}=\${event.target.value}; path=/; max-age=31536000; SameSite=Lax\`;
+        window.location.assign(\`/\${event.target.value}\${location.pathname.slice(locale.length + 1)}\${location.search}\${location.hash}\`);
+      }}>{locales.map((value) => <option key={value} value={value}>{localeNames[value]}</option>)}</select>
+      <button type="button" className="text-sm underline" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>Theme</button>
+{{#if (includes product.features "auth")}}
+      {user && <button type="button" className="text-sm underline" disabled={pending} onClick={() => void signOut()}>{t("auth.user.signOut")}</button>}
+{{/if}}
+    </div></header>
+    {error && <p role="alert" className="mx-auto max-w-7xl px-6 pt-4 text-destructive">{error}</p>}
+    <div className={\`mx-auto max-w-7xl gap-10 px-6 py-10 \${sideNavigation.length ? "grid md:grid-cols-[180px_1fr]" : ""}\`}>
+      {sideNavigation.length > 0 && <aside><nav aria-label={area} className="flex flex-wrap gap-4 md:flex-col">{sideNavigation.map((item) => <a key={item.href} href={\`/\${locale}\${item.href}\`} aria-current={location.pathname === \`/\${locale}\${item.href}\` ? "page" : undefined} className={location.pathname === \`/\${locale}\${item.href}\` ? "font-semibold" : "text-muted-foreground"}>{t(item.labelKey)}</a>)}</nav></aside>}
+      <main id="main-content" className="min-w-0">{children}</main>
+    </div>
+    <footer className="mx-auto max-w-7xl border-t px-6 py-8 text-xs text-muted-foreground">{t("core.footer.rights", { year: new Date().getFullYear(), name: "{{projectName}}" })}</footer>
+  </div>;
+}
+`],
+  ["modules/core/shared/client/frameworks/react-router/src/lib/backend.server.ts.hbs", `import { ENV } from "@/env";
+import type { z } from "zod";
+
+const upstream = new URL(ENV.VITE_SERVER_URL);
+const hopByHop = ["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade", "host", "content-length"];
+export const privateHeaders = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" };
+
+/** Only the declared backend is reachable; browser-supplied forwarding headers are replaced. */
+export async function backendRequest(request: Request, path: string, forwardBody = false): Promise<Response> {
+  const original = new URL(request.url);
+  const destination = new URL(upstream.origin);
+  destination.pathname = path.split("?")[0]!;
+  destination.search = path.includes("?") ? path.slice(path.indexOf("?")) : "";
+  const headers = new Headers(request.headers);
+  for (const name of hopByHop) headers.delete(name);
+  headers.delete("forwarded");
+  headers.delete("x-forwarded-for");
+  headers.delete("x-forwarded-host");
+  headers.delete("x-forwarded-proto");
+  headers.delete("x-forwarded-port");
+  headers.set("x-xstack-client-origin", original.origin);
+  headers.set("accept-encoding", "identity");
+  const response = await fetch(destination, {
+    method: forwardBody ? request.method : "GET", headers, redirect: "manual", cache: "no-store",
+    ...(forwardBody && request.method !== "GET" && request.method !== "HEAD" ? { body: await request.arrayBuffer() } : {}),
+  });
+  const outgoing = new Headers(response.headers);
+  for (const name of hopByHop) outgoing.delete(name);
+  outgoing.delete("content-encoding");
+  outgoing.delete("set-cookie");
+  for (const cookie of response.headers.getSetCookie()) outgoing.append("set-cookie", cookie);
+  for (const [name, value] of Object.entries(privateHeaders)) outgoing.set(name, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers: outgoing });
+}
+
+export async function readBackend<T>(request: Request, path: string, schema: z.ZodType<T>, headers: Headers): Promise<T> {
+  const response = await backendRequest(request, path);
+  for (const cookie of response.headers.getSetCookie()) headers.append("Set-Cookie", cookie);
+  if (!response.ok) throw new Response(response.status === 403 ? "Forbidden" : response.status === 401 ? "Unauthorized" : "Backend request failed", { status: response.status, headers });
+  return schema.parse(await response.json());
+}
+`],
+  ["modules/core/shared/client/frameworks/react-router/src/lib/i18n/paths.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+export function localePath(locale: Locale, path = "/") {
+  return \`/\${locale}\${path === "/" ? "" : path}\`;
+}
+`],
+  ["modules/core/shared/client/frameworks/react-router/src/lib/product-contract.ts.hbs", `import { z } from "zod";
+
+export const userSchema = z.object({
+  id: z.string(), name: z.string(), email: z.string(), emailVerified: z.boolean(),
+  role: z.string().nullish(), banned: z.boolean().nullish(), createdAt: z.string().optional(),
+});
+export type ProductUser = z.infer<typeof userSchema>;
+export const sessionSchema = z.object({ user: userSchema }).nullable();
+export const configSchema = z.object({
+  socialProviders: z.array(z.enum(["google", "github", "wechat"])),
+  verifyEmail: z.boolean(), canResetPassword: z.boolean(),
+});
+export const overviewSchema = z.object({ users: z.number(), admins: z.number(), recent: z.array(userSchema) });
+export const usersSchema = z.object({ users: z.array(userSchema), total: z.number() });
+export type UserMutation =
+  | { action: "role"; userId: string; role: "admin" | "user" }
+  | { action: "ban"; userId: string; reason?: string }
+  | { action: "unban"; userId: string };
+export function isAdministrator(user: ProductUser | null | undefined) {
+  return user?.role?.split(",").includes("admin") ?? false;
+}
+export function safeNext(value: string | null, fallback: string, origin: string) {
+  if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\\\") || /[\\u0000-\\u001f\\u007f]/.test(value)) return fallback;
+  try {
+    const target = new URL(value, origin);
+    return target.origin === origin ? \`\${target.pathname}\${target.search}\${target.hash}\` : fallback;
+  } catch { return fallback; }
+}
+export async function mutateUser(input: UserMutation): Promise<void> {
+  const response = await fetch("/api/product/users", {
+    method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(\`Account update failed (\${response.status})\`);
+  z.object({ success: z.literal(true) }).parse(await response.json());
+}
+`],
+  ["modules/core/shared/client/frameworks/react-router/src/lib/product-navigation.ts.hbs", `import { useNavigate, useRevalidator } from "react-router";
+export function useProductNavigation() {
+  const navigate = useNavigate();
+  const revalidator = useRevalidator();
+  return { push: (href: string) => navigate(href), refresh: () => revalidator.revalidate() };
+}
+`],
+  ["modules/core/shared/client/frameworks/react-router/src/root.tsx.hbs", `import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration, useRouteError } from "react-router";
+import { ThemeProvider } from "./components/theme-provider";
+import { Toaster } from "@{{projectName}}/ui/components/sonner";
+import "./index.css";
+
+export function Layout({ children }: { children: React.ReactNode }) {
+  return <html lang="en" suppressHydrationWarning><head><meta charSet="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><Meta /><Links /></head><body>{children}<ScrollRestoration /><Scripts /></body></html>;
+}
+export default function App() {
+  return <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange><Outlet /><Toaster richColors /></ThemeProvider>;
+}
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const status = isRouteErrorResponse(error) ? error.status : 500;
+  return <main className="mx-auto max-w-3xl space-y-4 px-6 py-16"><h1 className="font-serif text-4xl">{status === 403 ? "Access denied" : status === 404 ? "Page not found" : "Unable to load this page"}</h1><p>{status === 403 ? "An administrator account is required." : "Please return to the home page and try again."}</p><a className="underline" href="/">Home</a>{{#if (includes product.features "auth")}}<a className="ml-4 underline" href="/en/login">Sign in</a>{{/if}}</main>;
+}
+`],
+  ["modules/core/shared/client/frameworks/react-router/src/routes.ts.hbs", `import { index, route, type RouteConfig } from "@react-router/dev/routes";
+
+export default [
+  index("routes/index.ts"),
+  route("api/*", "routes/api.ts"),
+  route("*", "routes/product.tsx"),
+] satisfies RouteConfig;
+`],
+  ["modules/core/shared/client/frameworks/react-router/src/routes/api.ts.hbs", `import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { backendRequest } from "@/lib/backend.server";
+
+function proxy(request: Request) {
+  const url = new URL(request.url);
+  return backendRequest(request, \`\${url.pathname}\${url.search}\`, true);
+}
+export function loader({ request }: LoaderFunctionArgs) { return proxy(request); }
+export function action({ request }: ActionFunctionArgs) { return proxy(request); }
+`],
+  ["modules/core/shared/client/frameworks/react-router/src/routes/index.ts.hbs", `import { localeFromHeaders } from "@{{projectName}}/i18n";
+import { redirect, type LoaderFunctionArgs } from "react-router";
+
+export function loader({ request }: LoaderFunctionArgs) {
+  return redirect(\`/\${localeFromHeaders(request.headers)}\`, { headers: { "Cache-Control": "no-store" } });
+}
+export default function Index() { return null; }
+`],
+  ["modules/core/shared/client/frameworks/react-router/src/routes/product.tsx.hbs", `import { data, redirect, useLoaderData, type HeadersFunction, type LoaderFunctionArgs } from "react-router";
+import { getMessages, isLocale, localeFromHeaders } from "@{{projectName}}/i18n";
+import { I18nProvider, useT } from "@/components/i18n-provider";
+import { ProductShell } from "@/components/product-shell";
+import { privateHeaders, readBackend } from "@/lib/backend.server";
+import { configSchema, isAdministrator, overviewSchema, safeNext, sessionSchema, usersSchema, type ProductUser } from "@/lib/product-contract";
+import { isAdminClient } from "@/lib/client-role";
+{{#if (includes product.features "auth")}}
+import { AuthCard } from "@/components/auth/auth-card";
+import SignInForm from "@/components/auth/sign-in-form";
+import SignUpForm from "@/components/auth/sign-up-form";
+import { PasswordForm, ProfileForm } from "@/components/auth/account-forms";
+import { isSocialProvider } from "@/lib/social-providers";
+{{/if}}
+{{#if (and (includes product.features "auth") (includes product.features "email"))}}
+import { ForgotPasswordForm, ResetPasswordForm } from "@/components/auth/password-reset-forms";
+import { VerificationForm } from "@/components/auth/verification-form";
+{{/if}}
+{{#if (and (includes product.features "auth") (includes product.features "sms"))}}
+import PhoneSignInForm from "@/components/auth/phone-sign-in-form";
+{{/if}}
+{{#if (includes product.features "admin")}}
+import { AdminOverview, AdminUsers } from "@/components/admin/admin-pages";
+{{/if}}
+
+export const headers: HeadersFunction = ({ loaderHeaders, errorHeaders }) => {
+  const output = new Headers(privateHeaders);
+  for (const source of [loaderHeaders, errorHeaders]) {
+    if (source) for (const cookie of source.getSetCookie()) output.append("Set-Cookie", cookie);
+  }
+  return output;
+};
+export const meta = () => [{ title: "{{projectName}}" }, { name: "robots", content: "noindex, nofollow" }];
+
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const headers = new Headers(privateHeaders);
+  const segments = (params["*"] ?? "").split("/").filter(Boolean);
+  if (!segments.length) throw redirect(\`/\${localeFromHeaders(request.headers)}\`, { headers });
+  const locale = segments[0];
+  if (!isLocale(locale)) throw new Response("Not found", { status: 404, headers });
+  const page = segments.slice(1).join("/");
+  const publicPages: string[] = ["", {{#if (includes product.features "auth")}}"login", "signup",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "email"))}} "forgot-password", "reset-password", "verify-email",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "sms"))}} "login/phone",{{/if}}];
+  const accountPages: string[] = [{{#if (includes product.features "auth")}}"dashboard", "dashboard/settings"{{/if}}];
+  const adminPages: string[] = [{{#if (includes product.features "admin")}}"admin", "admin/users"{{/if}}];
+  if (!publicPages.includes(page) && !accountPages.includes(page) && !(isAdminClient && adminPages.includes(page))) throw new Response("Not found", { status: 404, headers });
+  let user: ProductUser | null = null;
+  let config: ReturnType<typeof configSchema.parse> = { socialProviders: [], verifyEmail: false, canResetPassword: false };
+{{#if (includes product.features "auth")}}
+  const session = await readBackend(request, "/api/product/session", sessionSchema, headers);
+  user = session?.user ?? null;
+  const privatePage = accountPages.includes(page) || adminPages.includes(page);
+  if (privatePage && !user) throw redirect(\`/\${locale}/login?next=\${encodeURIComponent(\`/\${segments.join("/")}\${url.search}\`)}\`, { headers });
+  if (privatePage && ({{#if (includes product.features "admin")}}isAdminClient || {{/if}}adminPages.includes(page)) && !isAdministrator(user)) throw new Response("Forbidden", { status: 403, headers });
+  if (publicPages.includes(page)) config = await readBackend(request, "/api/product/config", configSchema, headers);
+{{/if}}
+  const home = \`/\${locale}/\${isAdminClient && {{#if (includes product.features "admin")}}true{{else}}false{{/if}} ? "admin" : "dashboard"}\`;
+  const destination = safeNext(url.searchParams.get("next"), home, url.origin);
+  const next = new URL(destination, url.origin).href;
+  const nextPath = \`\${new URL(next).pathname}\${new URL(next).search}\${new URL(next).hash}\`;
+  const search = { q: url.searchParams.get("q") ?? "", page: Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1)) };
+  const overview = {{#if (includes product.features "admin")}}page === "admin" ? await readBackend(request, "/api/product/admin", overviewSchema, headers) : {{/if}}null;
+  const users = {{#if (includes product.features "admin")}}page === "admin/users" ? await readBackend(request, \`/api/product/users?\${new URLSearchParams({ q: search.q, page: String(search.page) })}\`, usersSchema, headers) : {{/if}}null;
+  return data({ locale, page, user, config, next, nextPath, search, overview, users, token: url.searchParams.get("token") ?? "", error: url.searchParams.get("error") }, { headers });
+}
+
+export default function ProductPage() {
+  const result = useLoaderData<typeof loader>();
+  return <I18nProvider locale={result.locale} messages={getMessages(result.locale)}><ProductShell user={result.user}><Content result={result} /></ProductShell></I18nProvider>;
+}
+function Content({ result }: { result: ReturnType<typeof useLoaderData<typeof loader>> }) {
+  const t = useT();
+  const { locale, page, user, config, next } = result;
+{{#if (includes product.features "auth")}}
+  const providers = config.socialProviders.filter(isSocialProvider);
+  if (page === "login") return <AuthCard title={t("auth.signIn.title")} description={t("auth.signIn.subtitle")} footer={<span>{t("auth.signIn.noAccount")} <a className="underline" href={\`/\${locale}/signup?next=\${encodeURIComponent(result.nextPath)}\`}>{t("auth.signIn.signUpLink")}</a></span>}>
+    {result.error && <p role="alert" className="text-sm text-destructive">{t("auth.errors.generic")}</p>}
+    <SignInForm next={next} providers={providers} canResetPassword={config.canResetPassword} />
+{{#if (includes product.features "sms")}}
+    <a href={\`/\${locale}/login/phone?next=\${encodeURIComponent(result.nextPath)}\`} className="text-center text-sm underline">{t("auth.phone.link")}</a>
+{{/if}}
+  </AuthCard>;
+  if (page === "signup") return <AuthCard title={t("auth.signUp.title")} description={t("auth.signUp.subtitle")} footer={<span>{t("auth.signUp.hasAccount")} <a className="underline" href={\`/\${locale}/login?next=\${encodeURIComponent(result.nextPath)}\`}>{t("auth.signUp.signInLink")}</a></span>}><SignUpForm next={next} providers={providers} verifyEmail={config.verifyEmail} /></AuthCard>;
+  if (page === "dashboard/settings" && user) return <section className="max-w-xl space-y-8"><h1 className="font-serif text-4xl">{t("auth.settings.title")}</h1><section className="space-y-4"><h2 className="text-xl font-semibold">{t("auth.settings.profile")}</h2><ProfileForm name={user.name} email={user.email} /></section><section className="space-y-4"><h2 className="text-xl font-semibold">{t("auth.settings.password")}</h2><PasswordForm /></section></section>;
+  if (page === "dashboard" && user) return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("auth.dashboard.title")}</h1><p>{t("auth.dashboard.welcome", { name: user.name })}</p><dl className="grid max-w-xl gap-4 rounded-lg border p-6"><div><dt className="text-sm text-muted-foreground">{t("auth.fields.name")}</dt><dd>{user.name}</dd></div><div><dt className="text-sm text-muted-foreground">{t("auth.fields.email")}</dt><dd>{user.email}</dd></div></dl><a href={\`/\${locale}/dashboard/settings\`} className="underline">{t("auth.settings.title")}</a></section>;
+{{/if}}
+{{#if (and (includes product.features "auth") (includes product.features "email"))}}
+  if (page === "forgot-password") return <AuthCard title={t("auth.forgot.title")} description={t("auth.forgot.subtitle")} footer={<a href={\`/\${locale}/login\`} className="underline">{t("auth.forgot.back")}</a>}><ForgotPasswordForm /></AuthCard>;
+  if (page === "reset-password") return <AuthCard title={t("auth.reset.title")}>{result.token && !result.error ? <ResetPasswordForm token={result.token} /> : <p role="alert">{t("auth.reset.invalidToken")}</p>}</AuthCard>;
+  if (page === "verify-email") return <AuthCard title={t("auth.verification.title")} description={t("auth.verification.subtitle")} footer={<a href={\`/\${locale}/login\`} className="underline">{t("auth.forgot.back")}</a>}><VerificationForm next={next} /></AuthCard>;
+{{/if}}
+{{#if (and (includes product.features "auth") (includes product.features "sms"))}}
+  if (page === "login/phone") return <AuthCard title={t("auth.phone.title")} description={t("auth.phone.subtitle")} footer={<a href={\`/\${locale}/login\`} className="underline">{t("auth.phone.emailLink")}</a>}><PhoneSignInForm next={next} /></AuthCard>;
+{{/if}}
+{{#if (includes product.features "admin")}}
+  if (page === "admin" && result.overview) return <AdminOverview data={result.overview} locale={locale} />;
+  if (page === "admin/users" && result.users && user) return <AdminUsers data={result.users} search={result.search} locale={locale} currentUser={user} />;
+{{/if}}
+  return <section className="space-y-10 py-12"><div className="max-w-3xl space-y-6"><p className="text-sm uppercase tracking-widest">{{projectName}}</p><h1 className="font-serif text-5xl">{t("core.landing.title")}</h1><p className="text-lg text-muted-foreground">{t("core.landing.subtitle")}</p>{{#if (includes product.features "auth")}}<a href={\`/\${locale}/\${user ? isAdminClient && {{#if (includes product.features "admin")}}true{{else}}false{{/if}} ? "admin" : "dashboard" : "signup"}\`} className="inline-block border bg-foreground px-6 py-3 text-background">{t("core.landing.cta")}</a>{{/if}}</div><section className="space-y-6"><h2 className="text-2xl">{t("core.landing.features.title")}</h2><div className="grid gap-6 md:grid-cols-3">{(["modular", "portable", "deploy"] as const).map((feature) => <article key={feature} className="space-y-3 border p-6"><h3 className="font-semibold">{t(\`core.landing.features.\${feature}.title\`)}</h3><p className="text-muted-foreground">{t(\`core.landing.features.\${feature}.body\`)}</p></article>)}</div></section></section>;
+}
+`],
+  ["modules/core/shared/partials/product-api.hbs", `import { z } from "zod";
+{{#if (includes product.features "auth")}}
+import { auth } from "@{{projectName}}/app-services";
+import { isAPIError } from "better-auth/api";
+import { enabledSocialProviders } from "./social-providers.server";
+{{/if}}
+{{#if (or (includes product.features "auth") (includes product.features "seo"))}}
+import { ENV } from "@/env.server";
+{{/if}}
+{{#each product.features}}
+{{#if (or (eq this "storage") (eq this "ai") (eq this "blog") (eq this "affiliate") (eq this "payment") (eq this "credits") (eq this "admin") (eq this "captcha") (eq this "seo"))}}
+import { handle as handle_{{this}} } from "./native/{{this}}";
+{{/if}}
+{{/each}}
+
+export const privateHeaders = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" };
+export function json<T>(data: T, status = 200) { return Response.json(data, { status, headers: privateHeaders }); }
+export class HttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
+export function pageOf(request: Request) { return z.coerce.number().int().min(1).max(100000).parse(new URL(request.url).searchParams.get("page") ?? 1); }
+{{#if (includes product.features "auth")}}
+const trustedOrigins = new Set([new URL(ENV.BETTER_AUTH_URL).origin{{#if application.nativeSplit}}{{#each application.clientOrigins}}, "{{this}}"{{/each}}{{/if}}]);
+function privateResponse(response: Response) {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(privateHeaders)) headers.set(name, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+export function requireOrigin(request: Request) {
+  if (!trustedOrigins.has(request.headers.get("origin") ?? "")) throw new HttpError(403, "forbidden");
+}
+export async function requireSession(request: Request) {
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) throw new HttpError(401, "unauthorized");
+  return session;
+}
+export async function requireAdministrator(request: Request) {
+  const session = await requireSession(request);
+  if (!session.user.role?.split(",").includes("admin")) throw new HttpError(403, "forbidden");
+  return session;
+}
+{{/if}}
+/** The request body is bounded before parsing; callers still validate their exact input schema. */
+export async function readJson(request: Request): Promise<unknown> {
+  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new HttpError(400, "invalid_input");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = []; let size = 0;
+  try { while (true) { const part = await reader.read(); if (part.done) break; size += part.value.byteLength; if (size > 40000) { await reader.cancel(); throw new HttpError(413, "too_large"); } chunks.push(part.value); } }
+  finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size); let offset = 0;
+  for (const part of chunks) { bytes.set(part, offset); offset += part.byteLength; }
+  try { return JSON.parse(new TextDecoder().decode(bytes)) as unknown; } catch { throw new HttpError(400, "invalid_input"); }
+}
+
+/** Shared native service boundary. Framework adapters must forward original headers and body. */
+export async function handleProductRequest(request: Request): Promise<Response> {
+  const path = new URL(request.url).pathname.replace(/\\/$/, "");
+  try {
+{{#if (includes product.features "auth")}}
+    if (path.startsWith("/api/auth/")) return privateResponse(await auth.handler(request));
+    if (path === "/api/product/config" && request.method === "GET") return json({ socialProviders: enabledSocialProviders(), siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}ENV.BETTER_AUTH_URL{{/if}}, verifyEmail: {{#if (includes product.features "email")}}true{{else}}false{{/if}}, canResetPassword: {{#if (includes product.features "email")}}true{{else}}false{{/if}} });
+    if (path === "/api/product/session" && request.method === "GET") {
+      const url = new URL(request.url);
+      url.pathname = "/api/auth/get-session";
+      return privateResponse(await auth.handler(new Request(url.href, request)));
+    }
+{{/if}}
+{{#unless (includes product.features "auth")}}
+    if (path === "/api/product/config" && request.method === "GET") return json({ socialProviders: [], siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}new URL(request.url).origin{{/if}}, verifyEmail: false, canResetPassword: false });
+{{/unless}}
+{{#each product.features}}
+{{#if (or (eq this "storage") (eq this "ai") (eq this "blog") (eq this "affiliate") (eq this "payment") (eq this "credits") (eq this "admin") (eq this "captcha") (eq this "seo"))}}
+    { const response = await handle_{{this}}(request, path); if (response) return response; }
+{{/if}}
+{{/each}}
+    return json({ error: "not_found" }, 404);
+  } catch (error) {
+    if (error instanceof HttpError) return json({ error: error.message }, error.status);
+    if (error instanceof z.ZodError) return json({ error: "invalid_input" }, 400);
+{{#if (includes product.features "auth")}}
+    if (isAPIError(error) && error.statusCode >= 400 && error.statusCode < 500)
+      return json({ error: error.body?.code ?? "auth_request_rejected" }, error.statusCode);
+{{/if}}
+    console.error("Product request failed");
+    return json({ error: "server_error" }, 500);
+  }
+}
+`],
+  ["modules/core/shared/partials/site.hbs", `export const site = {
+  name: "{{projectName}}",
+};
 `],
   ["modules/credits/dialects/postgres/packages/db/src/schema/credits.ts", `import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
@@ -34020,7 +35579,7 @@ A provider is one file implementing \`createTransport(env): Transport | undefine
 
 ## Auth emails
 
-\`{{appPath "fullstack-web"}}/src/integrations/auth-email.ts\` subscribes to \`auth.verification_requested\` and \`auth.password_reset_requested\` and sends localized emails. The copy lives in \`packages/i18n/src/messages/*/auth.ts\` under \`emails\`.
+\`{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/integrations/auth-email.ts\` subscribes to \`auth.verification_requested\` and \`auth.password_reset_requested\` and sends localized emails. The copy lives in \`packages/i18n/src/messages/*/auth.ts\` under \`emails\`. Credentials, mail delivery and event subscriptions stay in the backend owner; clients only consume the auth HTTP API.
 {{/if}}
 `],
   ["modules/email/files/packages/email/src/index.ts.hbs", `import { createTransport, type ProviderConfig } from "./providers/{{module.providers.[0]}}";
@@ -34115,35 +35674,9 @@ export type Transport = {
   send(message: EmailMessage & { from: string }): Promise<void>;
 };
 `],
-  ["modules/email/integrations/auth/apps/fullstack-web/src/integrations/auth-email.ts.hbs", `import { renderEmail } from "@{{projectName}}/email";
-import { createTranslator, getMessages, type Locale } from "@{{projectName}}/i18n";
-
-import { site } from "@/config/site";
-
-import type { Services } from "../services";
-
-type AuthEmail = { email: string; name: string; url: string; locale: Locale };
-
-/** Sends the emails requested by the auth module. */
-export default function registerAuthEmail({ events, mailer }: Services) {
-  const send = (kind: "verify" | "reset") => async (data: AuthEmail) => {
-    const t = createTranslator(getMessages(data.locale));
-    await mailer.send({
-      to: data.email,
-      subject: t(\`auth.emails.\${kind}.subject\`),
-      ...renderEmail({
-        brand: site.name,
-        heading: t(\`auth.emails.\${kind}.heading\`),
-        paragraphs: [t(\`auth.emails.\${kind}.body\`, { name: data.name })],
-        action: { label: t(\`auth.emails.\${kind}.action\`), url: data.url },
-        footer: t("auth.emails.ignore"),
-      }),
-    });
-  };
-
-  events.on("auth.verification_requested", send("verify"));
-  events.on("auth.password_reset_requested", send("reset"));
-}
+  ["modules/email/integrations/auth/apps/backend/src/integrations/auth-email.ts.hbs", `{{> email/auth-email}}
+`],
+  ["modules/email/integrations/auth/apps/fullstack-web/src/integrations/auth-email.ts.hbs", `{{> email/auth-email}}
 `],
   ["modules/email/providers/resend/packages/email/src/providers/resend.ts", `import { Resend } from "resend";
 
@@ -34191,6 +35724,36 @@ export function createTransport(env: ProviderConfig): Transport | undefined {
       await transporter.sendMail(message);
     },
   };
+}
+`],
+  ["modules/email/shared/partials/auth-email.hbs", `import { renderEmail } from "@{{projectName}}/email";
+import { createTranslator, getMessages, type Locale } from "@{{projectName}}/i18n";
+
+import { site } from "@/config/site";
+
+import type { Services } from "../services";
+
+type AuthEmail = { email: string; name: string; url: string; locale: Locale };
+
+/** Sends the emails requested by the auth module. */
+export default function registerAuthEmail({ events, mailer }: Services) {
+  const send = (kind: "verify" | "reset") => async (data: AuthEmail) => {
+    const t = createTranslator(getMessages(data.locale));
+    await mailer.send({
+      to: data.email,
+      subject: t(\`auth.emails.\${kind}.subject\`),
+      ...renderEmail({
+        brand: site.name,
+        heading: t(\`auth.emails.\${kind}.heading\`),
+        paragraphs: [t(\`auth.emails.\${kind}.body\`, { name: data.name })],
+        action: { label: t(\`auth.emails.\${kind}.action\`), url: data.url },
+        footer: t("auth.emails.ignore"),
+      }),
+    });
+  };
+
+  events.on("auth.verification_requested", send("verify"));
+  events.on("auth.password_reset_requested", send("reset"));
 }
 `],
   ["modules/i18n/files/docs/modules/i18n.md.hbs", `# Internationalization
@@ -34352,9 +35915,9 @@ export default function LocaleSwitcher() {
             key={value}
             disabled={value === locale}
             onClick={() => {
-              document.cookie = \`\${LOCALE_COOKIE}=\${value}; path=/; max-age=31536000\`;
+              document.cookie = \`\${LOCALE_COOKIE}=\${value}; path=/; max-age=31536000; SameSite=Lax\`;
               const rest = pathname.split("/").slice(2).join("/");
-              router.push(\`/\${value}\${rest ? \`/\${rest}\` : ""}\` as Route);
+              router.push(\`/\${value}\${rest ? \`/\${rest}\` : ""}\${window.location.search}\${window.location.hash}\` as Route);
             }}
           >
             {localeNames[value]}
@@ -34444,6 +36007,45 @@ export function useT(): Translator {
 `],
   ["modules/i18n/frameworks/tanstack-start/apps/fullstack-web/src/lib/i18n/paths.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
 export function localePath(locale: Locale, href: \`/\${string}\`): string { return \`/\${locale}\${href === "/" ? "" : href}\`; }
+`],
+  ["modules/i18n/shared/client/frameworks/react-router/src/components/i18n-provider.tsx.hbs", `"use client";
+
+import {
+  createTranslator,
+  type Locale,
+  type Messages,
+  type Translator,
+} from "@{{projectName}}/i18n";
+import { createContext, useContext, useMemo } from "react";
+
+const I18nContext = createContext<{ locale: Locale; t: Translator } | null>(null);
+
+export function I18nProvider({
+  locale,
+  messages,
+  children,
+}: {
+  locale: Locale;
+  messages: Messages;
+  children: React.ReactNode;
+}) {
+  const value = useMemo(() => ({ locale, t: createTranslator(messages) }), [locale, messages]);
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+function useI18n() {
+  const context = useContext(I18nContext);
+  if (!context) throw new Error("useI18n must be used inside <I18nProvider>");
+  return context;
+}
+
+export function useLocale(): Locale {
+  return useI18n().locale;
+}
+
+export function useT(): Translator {
+  return useI18n().t;
+}
 `],
   ["modules/payment/dialects/postgres/packages/db/src/schema/payment.ts", `import {
   boolean,
@@ -37071,7 +38673,7 @@ No adapter automatically retries OTP sends: after a timeout, the provider may al
 
 ## Phone authentication integration
 
-\`{{appPath "fullstack-web"}}/src/integrations/auth-sms.ts\` subscribes to \`auth.phone_verification_requested\` and awaits \`sms.sendOtp({ phoneNumber, code })\`. Authentication owns code generation and verification; SMS owns sending. Auth does not import the SMS package. The phone-login flow uses six-digit codes with a five-minute expiry.
+\`{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/integrations/auth-sms.ts\` subscribes to \`auth.phone_verification_requested\` and awaits \`sms.sendOtp({ phoneNumber, code })\`. Authentication owns code generation and verification; SMS owns sending. Auth does not import the SMS package. The phone-login flow uses six-digit codes with a five-minute expiry. In split layouts all credentials and subscriptions remain in the backend; clients send requests through their same-origin auth proxy.
 {{/if}}
 `],
   ["modules/sms/files/packages/sms/src/index.ts.hbs", `import { createTransport, type ProviderConfig } from "./providers/{{module.providers.[0]}}";
@@ -37140,14 +38742,9 @@ export type Sms = {
   sendOtp(message: OtpMessage): Promise<void>;
 };
 `],
-  ["modules/sms/integrations/auth/apps/fullstack-web/src/integrations/auth-sms.ts.hbs", `import type { Services } from "../services";
-
-/** Await provider acceptance so a failed request cannot appear to have sent an OTP. */
-export default function registerAuthSms({ events, sms }: Services) {
-  events.on("auth.phone_verification_requested", async ({ phoneNumber, code }) => {
-    await sms.sendOtp({ phoneNumber, code });
-  });
-}
+  ["modules/sms/integrations/auth/apps/backend/src/integrations/auth-sms.ts.hbs", `{{> sms/auth-sms}}
+`],
+  ["modules/sms/integrations/auth/apps/fullstack-web/src/integrations/auth-sms.ts.hbs", `{{> sms/auth-sms}}
 `],
   ["modules/sms/providers/aliyun/packages/sms/src/providers/aliyun.ts", `import Dysmsapi, { SendSmsRequest } from "@alicloud/dysmsapi20170525";
 import { $OpenApiUtil } from "@alicloud/openapi-core";
@@ -37344,6 +38941,15 @@ export function createTransport(env: ProviderConfig): Sms | undefined {
       }
     },
   };
+}
+`],
+  ["modules/sms/shared/partials/auth-sms.hbs", `import type { Services } from "../services";
+
+/** Await provider acceptance so a failed request cannot appear to have sent an OTP. */
+export default function registerAuthSms({ events, sms }: Services) {
+  events.on("auth.phone_verification_requested", async ({ phoneNumber, code }) => {
+    await sms.sendOtp({ phoneNumber, code });
+  });
 }
 `],
   ["modules/storage/dialects/postgres/packages/db/src/schema/storage.ts", `import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
@@ -40421,4 +42027,4 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 `]
 ]);
 
-export const TEMPLATE_COUNT = 836;
+export const TEMPLATE_COUNT = 884;

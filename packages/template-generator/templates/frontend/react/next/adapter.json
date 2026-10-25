@@ -2,6 +2,8 @@
   "id": "next",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--hostname", "127.0.0.1"],
+      "sharedPackages": ["ui"],
       "stack": {
         "frontend": ["next"],
         "backend": "self",
@@ -10,6 +12,8 @@
       }
     },
     "web-frontend": {
+      "devArgs": ["--hostname", "127.0.0.1"],
+      "sharedPackages": ["ui"],
       "stack": {
         "frontend": ["next"],
         "runtime": "none",

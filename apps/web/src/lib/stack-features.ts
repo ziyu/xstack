@@ -1,3 +1,4 @@
+import { resolveApplicationConfig } from "@xstack/template-generator/apps";
 import {
   MODULE_CATALOG,
   resolveModules,
@@ -17,8 +18,10 @@ export function selectedFeatures(stack: Pick<StackState, "features">): string[] 
 
 function stackContext(stack: StackState): StackContext {
   stack = projectApplicationStack(stack);
-  return {
+  const context: StackContext = {
     projectName: stack.projectName ?? "my-xstack-app",
+    apps: stack.apps,
+    runtime: stack.runtime,
     frontend: getStackFrontends(stack),
     backend: getStackBackend(stack.backend),
     database: stack.database,
@@ -27,6 +30,19 @@ function stackContext(stack: StackState): StackContext {
     webDeploy: stack.webDeploy,
     dbSetup: stack.dbSetup,
   };
+  if (!stack.apps) return context;
+  return resolveApplicationConfig({
+    ...context,
+    projectDir: "/virtual",
+    relativePath: "./virtual",
+    runtime: stack.runtime,
+    dbSetup: stack.dbSetup,
+    serverDeploy: stack.serverDeploy,
+    addons: stack.addons.filter((addon) => addon !== "none"),
+    packageManager: stack.packageManager,
+    git: false,
+    install: false,
+  });
 }
 
 /** The generator's complete plan, including provider and option validation. */

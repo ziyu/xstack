@@ -1,3 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { defaultLocale } from "@{{projectName}}/i18n";
-export const Route = createFileRoute("/")({ beforeLoad: () => { throw redirect({ href: `/${defaultLocale}` }); } });
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { localeFromHeaders } from "@{{projectName}}/i18n";
+
+const preferredLocale = createServerFn({ method: "GET" }).handler(() => localeFromHeaders(getRequest().headers));
+export const Route = createFileRoute("/")({ beforeLoad: async () => { throw redirect({ href: `/${await preferredLocale()}` }); } });

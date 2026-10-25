@@ -2,6 +2,23 @@
   "id": "hono",
   "apps": {
     "backend": {
+      "devArgs": [],
+      "productContribution": {
+        "mode": "server",
+        "protocol": "product-http-v1",
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "constraints": {
+          "runtime": ["bun", "node"],
+          "api": ["none"],
+          "orm": ["drizzle"],
+          "database": ["sqlite", "postgres"],
+          "webDeploy": ["none"]
+        },
+        "frameworks": [
+          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha"] },
+          { "id": "hono", "modules": ["core"] }
+        ]
+      },
       "stack": {
         "backend": "hono",
         "runtime": "bun",

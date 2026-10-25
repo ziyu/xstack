@@ -2,6 +2,8 @@
   "id": "tanstack-router",
   "apps": {
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
+      "sharedPackages": ["ui"],
       "stack": {
         "frontend": ["tanstack-router"],
         "runtime": "none",

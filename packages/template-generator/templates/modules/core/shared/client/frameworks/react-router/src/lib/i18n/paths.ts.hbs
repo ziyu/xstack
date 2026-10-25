@@ -1,0 +1,4 @@
+import type { Locale } from "@{{projectName}}/i18n";
+export function localePath(locale: Locale, path = "/") {
+  return `/${locale}${path === "/" ? "" : path}`;
+}

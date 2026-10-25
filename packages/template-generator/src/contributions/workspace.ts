@@ -3,6 +3,7 @@ import type { ProjectConfig } from "@xstack/types";
 import { requireApplicationPlan, resolveApplicationConfig } from "../apps/config";
 import type { ResolvedApplication } from "../apps/plan";
 import { processTemplateString, transformFilename } from "../core/template-processor";
+import { supportsNativeSplit } from "../modules/native-split";
 import { getModulePlan, toRenderConfig } from "../modules/pipeline";
 import { GeneratorError, type ApplicationRenderContext } from "../types";
 import { resolveApplicationContext } from "./context";
@@ -56,14 +57,20 @@ export function buildWorkspacePlan(
   const serverOwner = rootOwner;
   const webApps = ordered
     .filter((app) => app.manifest.roles.some((role) => role === "web-frontend" || role === "admin"))
-    .sort((a, b) => a.selection.id.localeCompare(b.selection.id));
-  const ports = new Map(webApps.map((app, index) => [app.selection.id, 3001 + index]));
+    .sort(
+      (a, b) =>
+        Number(a.manifest.roles.includes("admin")) - Number(b.manifest.roles.includes("admin")) ||
+        a.selection.id.localeCompare(b.selection.id),
+    );
+  const portOrder = [
+    ...ordered.filter((app) => app.manifest.roles.includes("backend")),
+    ...webApps.filter((app) => !app.manifest.roles.includes("backend")),
+    ...ordered.filter((app) => !app.manifest.roles.includes("backend") && !webApps.includes(app)),
+  ];
+  const firstApp = portOrder[0]!;
+  const basePort = webApps.includes(firstApp) ? 3001 : 3000;
+  const ports = new Map(portOrder.map((app, index) => [app.selection.id, basePort + index]));
   const clientOrigins = webApps.map((app) => `http://localhost:${ports.get(app.selection.id)}`);
-  const uiOwner = webApps.find((app) =>
-    app.adapter.stack.frontend?.some((frontend) =>
-      ["next", "tanstack-start", "react-router", "tanstack-router"].includes(frontend),
-    ),
-  )?.selection.id;
   const packageOwners = new Map<string, string>([
     ["config", rootOwner],
     ["db", serverOwner],
@@ -71,7 +78,11 @@ export function buildWorkspacePlan(
     ["auth", serverOwner],
     ["backend", serverOwner],
     ["infra", rootOwner],
-    ...(uiOwner ? [["ui", uiOwner] as [string, string]] : []),
+    ...ordered
+      .flatMap((app) =>
+        app.adapter.sharedPackages.map((name) => [name, app.selection.id] as [string, string]),
+      )
+      .reverse(),
   ]);
   for (const module of getModulePlan(config).modules) {
     for (const spec of module.manifest.packages ?? []) packageOwners.set(spec.dir, serverOwner);
@@ -101,21 +112,31 @@ export function buildWorkspacePlan(
   };
   const applications = ordered.map((app): WorkspaceApplication => {
     const appConfig = resolveApplicationContext(config, app);
+    const nativeSplit = supportsNativeSplit(appConfig);
     const targetRoot = `apps/${app.selection.id}`;
     const paths: ApplicationRenderContext["paths"] = { [`apps/${app.selection.type}`]: targetRoot };
+    for (const role of app.manifest.roles) paths[`apps/${role}`] = targetRoot;
+    if (app.bindings.backend) paths["apps/backend"] = `apps/${app.bindings.backend}`;
     if (
       app.adapter.stack.frontend?.some(
         (frontend) => frontend !== "none" && !frontend.startsWith("native-"),
       )
     )
       paths["apps/web"] = targetRoot;
-    if (app.selection.type === "backend") paths["apps/server"] = targetRoot;
+    if (app.manifest.roles.includes("backend")) paths["apps/server"] = targetRoot;
     const context: ApplicationRenderContext = {
       id: app.selection.id,
       type: app.selection.type,
+      roles: app.manifest.roles,
+      contribution: nativeSplit ? app.adapter.productContribution : undefined,
+      directory: targetRoot,
+      origin: `http://localhost:${ports.get(app.selection.id)!}`,
+      devArgs: app.adapter.devArgs,
       paths,
-      port: ports.get(app.selection.id) ?? 3000,
+      port: ports.get(app.selection.id)!,
       clientOrigins,
+      nativeSplit,
+      backendOrigin: `http://localhost:${ports.get(app.bindings.backend ?? app.selection.id)!}`,
       workspaceRuntime: config.runtime,
       backendRoot: app.manifest.roles.includes("backend")
         ? targetRoot

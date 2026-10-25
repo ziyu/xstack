@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useLocation } from "@tanstack/react-router";
-import { locales } from "@{{projectName}}/i18n";
+import { LOCALE_COOKIE, locales, localeNames } from "@{{projectName}}/i18n";
 import { canSee, navigation{{#if (includes product.features "auth")}}, type NavUser{{/if}} } from "@/config/navigation";
 import { useLocale, useT } from "./i18n-provider";
 {{#if (includes product.features "auth")}}
@@ -14,9 +14,42 @@ export function ProductShell({ children{{#if (includes product.features "auth")}
 {{#if (includes product.features "auth")}}
   const { data: session, isPending } = authClient.useSession();
   const user = isPending ? initialUser : session?.user;
+  const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState("");
+  async function signOut() {
+    setSigningOut(true); setError("");
+    try {
+      const result = await authClient.signOut();
+      if (result.error) throw result.error;
+      window.location.assign(`/${locale}`);
+    } catch { setError(t("auth.errors.generic")); setSigningOut(false); }
+  }
 {{else}}
   const user = null;
 {{/if}}
-  const area = location.pathname.includes("/admin") ? "admin" : location.pathname.includes("/dashboard") ? "dashboard" : null;
-  return <div className="min-h-screen bg-background text-foreground"><a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4">Skip to content</a><header className="border-b"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-6 px-6 py-5"><a href={`/${locale}`} className="mr-auto font-serif text-2xl font-semibold tracking-tight">{{projectName}}</a><nav aria-label="Main" className="flex gap-5 text-sm">{navigation.main.filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={`/${locale}${item.href === "/" ? "" : item.href}`} aria-current={location.pathname === `/${locale}${item.href}` ? "page" : undefined}>{t(item.labelKey)}</a>)}</nav><label className="sr-only" htmlFor="locale">Language</label><select id="locale" aria-label="Language" value={locale} className="border bg-background p-2 text-xs" onChange={(event) => window.location.assign(`/${event.target.value}${location.pathname.slice(locale.length + 1)}${location.searchStr}`)}>{locales.map((lang) => <option key={lang} value={lang}>{lang === "en" ? "English" : "简体中文"}</option>)}</select><button type="button" className="border px-3 py-2 text-xs" aria-label="Toggle color theme" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>{mounted && resolvedTheme === "dark" ? "Light" : "Dark"}</button>{{#if (includes product.features "auth")}}{user ? <button className="text-sm underline" onClick={() => void authClient.signOut().then(() => window.location.assign(`/${locale}`))}>{t("auth.user.signOut")}</button> : <a href={`/${locale}/login`} className="text-sm underline">{t("auth.user.signIn")}</a>}{{/if}}</div></header><div className={area ? "mx-auto grid max-w-7xl gap-10 px-6 py-12 md:grid-cols-[180px_1fr]" : ""}>{area && <aside><nav aria-label={area} className="flex flex-wrap gap-4 md:flex-col">{navigation[area].filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={`/${locale}${item.href}`} className={`border-l-2 py-2 pl-4 text-sm ${location.pathname === `/${locale}${item.href}` ? "border-foreground font-semibold" : "border-transparent text-muted-foreground"}`}>{t(item.labelKey)}</a>)}</nav></aside>}<main id="main-content" className="min-w-0">{children}</main></div><footer className="mx-auto mt-16 max-w-7xl border-t px-6 py-8 text-xs text-muted-foreground">{t("core.footer.rights", { year: new Date().getFullYear(), name: "{{projectName}}" })}</footer></div>;
+  const section = location.pathname.split("/")[2];
+  const area = section === "admin" || section === "dashboard" ? section : null;
+  return <div className="min-h-screen bg-background text-foreground">
+    <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4">Skip to content</a>
+    <header className="border-b"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-6 px-6 py-5">
+      <a href={`/${locale}`} className="mr-auto font-serif text-2xl font-semibold tracking-tight">{{projectName}}</a>
+      <nav aria-label="Main" className="flex gap-5 text-sm">{navigation.main.filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={`/${locale}${item.href === "/" ? "" : item.href}`} aria-current={location.pathname === `/${locale}${item.href === "/" ? "" : item.href}` ? "page" : undefined}>{t(item.labelKey)}</a>)}</nav>
+      <label className="sr-only" htmlFor="locale">{t("i18n.switcher.label")}</label><select id="locale" value={locale} className="border bg-background p-2 text-xs" onChange={(event) => {
+        document.cookie = `${LOCALE_COOKIE}=${event.target.value}; path=/; max-age=31536000; SameSite=Lax`;
+        window.location.assign(`/${event.target.value}${location.pathname.slice(locale.length + 1)}${location.searchStr}${window.location.hash}`);
+      }}>{locales.map((lang) => <option key={lang} value={lang}>{localeNames[lang]}</option>)}</select>
+      <button type="button" className="border px-3 py-2 text-xs" aria-label="Toggle color theme" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>{mounted && resolvedTheme === "dark" ? "Light" : "Dark"}</button>
+{{#if (includes product.features "auth")}}
+      {user ? <button className="text-sm underline" disabled={signingOut} onClick={() => void signOut()}>{t("auth.user.signOut")}</button> : <a href={`/${locale}/login`} className="text-sm underline">{t("auth.user.signIn")}</a>}
+{{/if}}
+    </div></header>
+{{#if (includes product.features "auth")}}
+    {error && <p role="alert" className="mx-auto max-w-7xl px-6 pt-4 text-destructive">{error}</p>}
+{{/if}}
+    <div className={area ? "mx-auto grid max-w-7xl gap-10 px-6 py-12 md:grid-cols-[180px_1fr]" : ""}>
+      {area && <aside><nav aria-label={area} className="flex flex-wrap gap-4 md:flex-col">{navigation[area].filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={`/${locale}${item.href}`} className={`border-l-2 py-2 pl-4 text-sm ${location.pathname === `/${locale}${item.href}` ? "border-foreground font-semibold" : "border-transparent text-muted-foreground"}`}>{t(item.labelKey)}</a>)}</nav></aside>}
+      <main id="main-content" className="min-w-0">{children}</main>
+    </div>
+    <footer className="mx-auto mt-16 max-w-7xl border-t px-6 py-8 text-xs text-muted-foreground">{t("core.footer.rights", { year: new Date().getFullYear(), name: "{{projectName}}" })}</footer>
+  </div>;
 }

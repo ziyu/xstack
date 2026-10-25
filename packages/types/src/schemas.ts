@@ -130,8 +130,57 @@ export const ApplicationManifestSchema = z
     }
   });
 
+/** Concrete native product implementation supplied by a technology adapter. */
+const ProductContributionSchema = z
+  .strictObject({
+    mode: z.enum(["server", "client"]),
+    protocol: ApplicationIdSchema,
+    modules: z.array(ApplicationIdSchema).min(1),
+    constraints: z.strictObject({
+      runtime: z.array(RuntimeSchema).min(1),
+      api: z.array(APISchema).min(1),
+      orm: z.array(ORMSchema).min(1),
+      database: z.array(DatabaseSchema).min(1),
+      webDeploy: z.array(z.string().min(1)).min(1),
+    }),
+    frameworks: z.array(
+      z.strictObject({
+        id: ApplicationIdSchema,
+        modules: z.array(ApplicationIdSchema).min(1),
+      }),
+    ),
+    client: z
+      .strictObject({
+        framework: ApplicationIdSchema,
+        modules: z.array(ApplicationIdSchema).min(1),
+        integrations: z.array(ApplicationIdSchema),
+      })
+      .optional(),
+  })
+  .superRefine((contribution, ctx) => {
+    if ((contribution.mode === "client") !== Boolean(contribution.client))
+      ctx.addIssue({
+        code: "custom",
+        path: ["client"],
+        message: "Only client contributions require shared client sources",
+      });
+    for (const module of [
+      ...contribution.frameworks.flatMap((layer) => layer.modules),
+      ...(contribution.client?.modules ?? []),
+    ])
+      if (!contribution.modules.includes(module))
+        ctx.addIssue({
+          code: "custom",
+          path: ["modules"],
+          message: `Source module ${module} must be supported by the contribution`,
+        });
+  });
+
 export const ApplicationAdapterSchema = z.strictObject({
   stack: ApplicationStackSchema,
+  devArgs: z.array(z.string().min(1)).default([]),
+  sharedPackages: z.array(ApplicationIdSchema).default([]),
+  productContribution: ProductContributionSchema.optional(),
 });
 
 export const FrameworkAdapterSchema = z.strictObject({

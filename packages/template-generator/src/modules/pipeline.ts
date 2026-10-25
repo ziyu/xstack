@@ -1,6 +1,7 @@
 import { AuthSchema, type ProjectConfig } from "@xstack/types";
 
 import { appOutputPath } from "../contributions/context";
+import type { ApplicationConfig } from "../contributions/context";
 import { Handlebars, isBinaryFile, transformFilename } from "../core/template-processor";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { TemplateData } from "../template-handlers/utils";
@@ -8,6 +9,7 @@ import { GeneratorError, type RenderConfig } from "../types";
 import { dependencyVersionMap } from "../utils/add-deps";
 import { MODULE_CATALOG } from "./catalog";
 import { finalizeCloudflareModules } from "./cloudflare";
+import { nativeSplitApplication, supportsNativeSplit } from "./native-split";
 import { hasErrors, resolveModules, toSelection } from "./resolver";
 import {
   addAppDependencies,
@@ -103,7 +105,20 @@ function requirePlan(
     });
   }
   const modules = plan.modules.filter((m) => m.variant === "native");
-  if (modules.length && config.application && config.application.type !== "fullstack-web") {
+  if (
+    modules.length &&
+    config.application &&
+    !(
+      config.application.roles.includes("backend") &&
+      config.application.roles.some((role) => role === "web-frontend" || role === "admin")
+    ) &&
+    !(
+      supportsNativeSplit(config) &&
+      modules.every(
+        (module) => module.manifest.nativeSplit && supportsNativeSplit(config, module.manifest.id),
+      )
+    )
+  ) {
     throw new GeneratorError({
       phase: "modules",
       message: `Application type "${config.application.type}" has no business module adapters; these modules currently require a fullstack-web application`,
@@ -145,19 +160,22 @@ function renderPrefix(
   prefix: string,
   context: ReturnType<typeof templateContext>,
   stackFiles: StackFiles,
+  targetRoot?: string,
 ) {
   const normalized = `${prefix}/`;
   for (const [templatePath, content] of templates) {
     if (!templatePath.startsWith(normalized)) continue;
     const relativePath = templatePath.slice(normalized.length);
     // Framework overlays are selected explicitly, never emitted as output directories.
-    if (relativePath.startsWith("frameworks/")) continue;
+    if (relativePath.startsWith("frameworks/") || relativePath.startsWith("shared/")) continue;
     const contributionType = relativePath.startsWith("apps/")
       ? relativePath.split("/")[1]
       : undefined;
     const selectedType = context.application?.type ?? "fullstack-web";
-    if (contributionType && contributionType !== selectedType) continue;
-    const destPath = vfs.resolvePath(transformFilename(relativePath));
+    if (!targetRoot && contributionType && contributionType !== selectedType) continue;
+    const destPath = vfs.resolvePath(
+      transformFilename(targetRoot ? `${targetRoot}/${relativePath}` : relativePath),
+    );
     if (!vfs.ownsPath(destPath)) continue;
     if (stackFiles.has(destPath)) {
       throw new GeneratorError({
@@ -215,10 +233,16 @@ function ensureWorkspacePackage(
 export function processModuleTemplates(
   vfs: VirtualFileSystem,
   templates: TemplateData,
-  config: ProjectConfig,
+  config: ApplicationConfig,
 ): void {
   const plan = requirePlan(config);
   if (!plan) return;
+  const contribution = supportsNativeSplit(config) ? nativeSplitApplication(config) : undefined;
+  const splitClient = contribution?.mode === "client";
+  for (const [path, content] of templates) {
+    const partial = /^modules\/([^/]+)\/shared\/partials\/(.+)\.hbs$/.exec(path);
+    if (partial) Handlebars.registerPartial(`${partial[1]}/${partial[2]}`, content);
+  }
 
   const stackFiles: StackFiles = new Set(vfs.getAllFiles());
   for (const module of plan.modules) {
@@ -245,24 +269,62 @@ export function processModuleTemplates(
       ...module.integrations.map((other) => `${base}/integrations/${other}`),
     ];
     for (const prefix of prefixes) renderPrefix(vfs, templates, prefix, context, stackFiles);
-    const frameworks = [
-      ...(config.frontend.some(
-        (framework) => framework === "tanstack-start" || framework === "nuxt",
-      )
-        ? ["http-server"]
-        : []),
-      ...(config.frontend.some(
-        (framework) => framework === "next" || framework === "tanstack-start",
-      )
-        ? ["react"]
-        : []),
-      ...config.frontend,
-    ];
+    const frameworks = contribution
+      ? contribution.frameworks
+          .filter((layer) => layer.modules.includes(manifest.id))
+          .map((layer) => layer.id)
+      : [
+          ...(config.frontend.some(
+            (framework) => framework === "tanstack-start" || framework === "nuxt",
+          )
+            ? ["http-server"]
+            : []),
+          ...(config.frontend.some(
+            (framework) => framework === "next" || framework === "tanstack-start",
+          )
+            ? ["react"]
+            : []),
+          ...config.frontend,
+        ];
     for (const framework of frameworks) {
       renderPrefix(vfs, templates, `${base}/frameworks/${framework}`, context, stackFiles);
       for (const prefix of prefixes) {
         renderPrefix(vfs, templates, `${prefix}/frameworks/${framework}`, context, stackFiles);
       }
+    }
+    if (splitClient) {
+      const target = `apps/${config.application!.type}`;
+      const client = contribution!.client!;
+      if (client.modules.includes(manifest.id))
+        renderPrefix(
+          vfs,
+          templates,
+          `${base}/shared/client/frameworks/${client.framework}`,
+          context,
+          stackFiles,
+          target,
+        );
+      for (const other of client.modules.includes(manifest.id) ? module.integrations : []) {
+        renderPrefix(
+          vfs,
+          templates,
+          `${base}/integrations/${other}/shared/client/frameworks/${client.framework}`,
+          context,
+          stackFiles,
+          target,
+        );
+      }
+      if (manifest.id === "i18n")
+        addAppDependencies(
+          vfs,
+          { [`@${config.projectName}/i18n`]: workspaceVersion(config) },
+          config,
+        );
+      if (manifest.id === "core")
+        addAppDependencies(vfs, { zod: dependencyVersionMap.zod }, config);
+      if (manifest.id === "auth")
+        addAppDependencies(vfs, { "better-auth": dependencyVersionMap["better-auth"] }, config);
+      continue;
     }
 
     const [primary] = manifest.packages ?? [];
@@ -299,7 +361,7 @@ export function processModuleTemplates(
 
   if (vfs.ownsPath("packages/i18n")) aggregateMessages(vfs, plan);
   if (vfs.ownsPath("packages/db")) indexDbSchema(vfs);
-  writeNavigation(vfs, config, plan);
+  if (contribution?.mode !== "server") writeNavigation(vfs, config, plan);
   if (config.frontend.includes("next")) writeProxy(vfs, plan, config);
   if (vfs.ownsPath("docs")) writeModuleDocsIndex(vfs, plan);
 }
@@ -317,20 +379,31 @@ function moduleEnv(plan: ResolvedPlan): ModuleEnvEntry[] {
 }
 
 /** Phase 2 (after stack env files exist): add module variables to the server `.env`. */
-export function processModuleEnv(vfs: VirtualFileSystem, config: ProjectConfig): void {
+export function processModuleEnv(vfs: VirtualFileSystem, config: ApplicationConfig): void {
+  if (config.application?.contribution?.mode === "client") return;
   const plan = requirePlan(config);
   if (plan) appendEnv(vfs, moduleEnv(plan), config);
 }
 
 /** Phase 3 (after the stack wrote `.env.schema` and `services.ts`): module-aware wiring. */
-export function finalizeModules(vfs: VirtualFileSystem, config: ProjectConfig): void {
+export function finalizeModules(vfs: VirtualFileSystem, config: ApplicationConfig): void {
+  if (config.application?.contribution?.mode === "client") return;
   const plan = requirePlan(config);
   if (!plan) return;
   declareEnvSchema(vfs, moduleEnv(plan), config);
   wireServices(
     vfs,
     config,
-    plan.modules.flatMap((m) => m.manifest.services ?? []),
+    plan.modules
+      .flatMap((m) => m.manifest.services ?? [])
+      .map((service) =>
+        config.application?.nativeSplit && service.name === "auth"
+          ? {
+              ...service,
+              init: `createAuth(ENV, db, events, ${JSON.stringify(config.application.clientOrigins)})`,
+            }
+          : service,
+      ),
   );
   finalizeCloudflareModules(vfs, config, plan);
 }
@@ -343,7 +416,7 @@ export function moduleReadmeSection(
   if (!plan) return "";
   const ids = new Set(plan.modules.map((m) => m.manifest.id));
   const run = `${config.packageManager} run`;
-  const webRoot = appOutputPath(config, "web");
+  const webRoot = appOutputPath(config, config.application?.nativeSplit ? "server" : "web");
 
   const modules = plan.modules.map(
     (m) =>
@@ -352,7 +425,7 @@ export function moduleReadmeSection(
   const steps = [
     `Fill in \`${webRoot}/.env\`; \`${webRoot}/.env.schema\` documents every variable and which ones are optional.`,
     ids.has("admin")
-      ? "Add your email to `ADMIN_EMAILS` before signing up so your account gets the admin role."
+      ? "Set `ADMIN_EMAILS` and verify ownership via email or verified-email OAuth to bootstrap an administrator; without either, use a trusted database administration channel after checking identity."
       : "",
     config.dbSetup === "d1"
       ? `Create tables with \`${run} db:generate\` then \`${run} db:migrate:local\`; see [Cloudflare deployment](docs/cloudflare.md).`
@@ -442,12 +515,22 @@ function aggregateMessages(vfs: VirtualFileSystem, plan: ResolvedPlan) {
   );
 }
 
-function writeNavigation(vfs: VirtualFileSystem, config: ProjectConfig, plan: ResolvedPlan) {
+function writeNavigation(vfs: VirtualFileSystem, config: ApplicationConfig, plan: ResolvedPlan) {
   const areas: NavArea[] = ["main", "dashboard", "admin", "footer"];
   const present = new Set(plan.modules.map((m) => m.manifest.id));
   const items = plan.modules.flatMap((m) =>
     (m.manifest.nav ?? [])
       .filter((item) => !item.when || present.has(item.when))
+      .filter(
+        (item) =>
+          !config.application?.nativeSplit ||
+          (config.application.roles.includes("admin") && present.has("admin")
+            ? item.area === "admin" ||
+              item.href === "/admin" ||
+              item.area === "dashboard" ||
+              item.href === "/dashboard"
+            : item.area !== "admin" && item.href !== "/admin"),
+      )
       .map((item) => ({
         ...item,
         labelKey: `${m.manifest.id}.${item.labelKey}`,
@@ -478,7 +561,7 @@ function writeNavigation(vfs: VirtualFileSystem, config: ProjectConfig, plan: Re
     "export type NavUser = { id: string; role?: string | null };",
     "",
     "export function canSee(item: NavItem, user: NavUser | null | undefined): boolean {",
-    "  if (item.role) return user?.role === item.role;",
+    '  if (item.role) return user?.role?.split(",").includes(item.role) ?? false;',
     "  return !item.auth || Boolean(user);",
     "}",
     "",

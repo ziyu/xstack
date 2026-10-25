@@ -1,0 +1,9 @@
+import { adminClient{{#if (includes product.features "sms")}}, phoneNumberClient{{/if}} } from "better-auth/client/plugins";
+import { createAuthClient } from "better-auth/react";
+
+/** Same-origin BFF keeps session cookies available to both browser and SSR. */
+export const authClient = createAuthClient({
+  basePath: "/api/auth",
+  fetchOptions: { credentials: "include" },
+  plugins: [adminClient(){{#if (includes product.features "sms")}}, phoneNumberClient(){{/if}}],
+});

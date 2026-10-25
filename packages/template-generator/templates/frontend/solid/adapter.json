@@ -2,6 +2,7 @@
   "id": "solid",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["solid"],
         "backend": "self",
@@ -10,6 +11,7 @@
       }
     },
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["solid"],
         "runtime": "none",

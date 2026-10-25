@@ -75,7 +75,7 @@ export default async function AdminUsersPage({ params, searchParams }: Props) {
                   {user.id !== me.id && (
                     <UserActions
                       userId={user.id}
-                      isAdmin={user.role === "admin"}
+                      isAdmin={user.role?.split(",").includes("admin") ?? false}
                       banned={Boolean(user.banned)}
                     />
                   )}

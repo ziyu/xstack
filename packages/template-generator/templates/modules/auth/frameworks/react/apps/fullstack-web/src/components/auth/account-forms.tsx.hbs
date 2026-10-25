@@ -21,14 +21,13 @@ function useSubmit(
     event.preventDefault();
     const target = event.currentTarget;
     setPending(true);
-    const { error } = await action(new FormData(target));
-    setPending(false);
-    if (error) {
-      toast.error(error.message ?? t("auth.errors.generic"));
-      return;
-    }
-    toast.success(t("auth.settings.saved"));
-    if (reset) target.reset();
+    try {
+      const { error } = await action(new FormData(target));
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      toast.success(t("auth.settings.saved"));
+      if (reset) target.reset();
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); }
   }
 
   return { pending, onSubmit };
@@ -39,7 +38,7 @@ export function ProfileForm({ name, email }: { name: string; email: string }) {
   const navigation = useProductNavigation();
   const { pending, onSubmit } = useSubmit(async (form) => {
     const result = await authClient.updateUser({ name: formValue(form, "name") });
-    navigation.refresh();
+    if (!result.error) navigation.refresh();
     return result;
   });
 

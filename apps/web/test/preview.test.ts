@@ -11,6 +11,7 @@ import { DEFAULT_STACK, PRESET_TEMPLATES } from "../src/lib/constant";
 import { findMatchingPreset } from "../src/lib/preset-stacks";
 import { APPLICATION_TYPES, applicationIssues } from "../src/lib/stack-applications";
 import { applyStackUpdate, resolveStackCompatibility } from "../src/lib/stack-compatibility";
+import { productPlan } from "../src/lib/stack-features";
 import { StackStateSchema, stackStateToConfig } from "../src/lib/stack-schema";
 import { loadStackParams, serializeStackParams } from "../src/lib/stack-url-state";
 import { stackParsers } from "../src/lib/stack-url-state.client";
@@ -46,6 +47,30 @@ function files(node: VirtualNode, result = new Map<string, string>()) {
   else for (const child of node.children) files(child, result);
   return result;
 }
+
+test("Builder preserves split topology when validating native identity and previewing server ownership", async () => {
+  const input = StackStateSchema.parse({
+    ...DEFAULT_STACK,
+    apps: splitApps.map((app) =>
+      app.type === "backend" ? { ...app, stack: { ...app.stack, api: "none" } } : app,
+    ),
+    features: ["auth", "admin"],
+    providers: { auth: [] },
+    database: "sqlite",
+    orm: "drizzle",
+    dbSetup: "none",
+  });
+  expect(productPlan(input).issues.filter((issue) => issue.level === "error")).toEqual([]);
+  expect(productPlan(input).modules.find((module) => module.manifest.id === "admin")?.variant).toBe(
+    "native",
+  );
+  const output = files((await client.preview(input)).root);
+  for (const app of ["site", "admin"]) {
+    const dependencies = JSON.parse(output.get(`apps/${app}/package.json`)!).dependencies;
+    for (const name of ["auth", "db", "events", "permissions"])
+      expect(dependencies[`@${input.projectName}/${name}`]).toBeUndefined();
+  }
+});
 
 describe("builder preview over oRPC", () => {
   test("keeps stable types and roles separate from default instance directories", () => {

@@ -2,6 +2,7 @@
   "id": "nuxt",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["nuxt"],
         "backend": "self",
@@ -10,6 +11,7 @@
       }
     },
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["nuxt"],
         "runtime": "none",

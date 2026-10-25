@@ -1,0 +1,29 @@
+import { renderEmail } from "@{{projectName}}/email";
+import { createTranslator, getMessages, type Locale } from "@{{projectName}}/i18n";
+
+import { site } from "@/config/site";
+
+import type { Services } from "../services";
+
+type AuthEmail = { email: string; name: string; url: string; locale: Locale };
+
+/** Sends the emails requested by the auth module. */
+export default function registerAuthEmail({ events, mailer }: Services) {
+  const send = (kind: "verify" | "reset") => async (data: AuthEmail) => {
+    const t = createTranslator(getMessages(data.locale));
+    await mailer.send({
+      to: data.email,
+      subject: t(`auth.emails.${kind}.subject`),
+      ...renderEmail({
+        brand: site.name,
+        heading: t(`auth.emails.${kind}.heading`),
+        paragraphs: [t(`auth.emails.${kind}.body`, { name: data.name })],
+        action: { label: t(`auth.emails.${kind}.action`), url: data.url },
+        footer: t("auth.emails.ignore"),
+      }),
+    });
+  };
+
+  events.on("auth.verification_requested", send("verify"));
+  events.on("auth.password_reset_requested", send("reset"));
+}

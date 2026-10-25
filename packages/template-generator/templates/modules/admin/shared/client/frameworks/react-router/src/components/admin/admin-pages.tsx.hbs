@@ -1,0 +1,40 @@
+import { useState } from "react";
+import { useRevalidator } from "react-router";
+import type { z } from "zod";
+import type { Locale } from "@{{projectName}}/i18n";
+import { Button } from "@{{projectName}}/ui/components/button";
+import { useT } from "@/components/i18n-provider";
+import { isAdministrator, mutateUser, type overviewSchema, type usersSchema, type ProductUser, type UserMutation } from "@/lib/product-contract";
+
+type Overview = z.infer<typeof overviewSchema>;
+type Users = z.infer<typeof usersSchema>;
+
+export function AdminOverview({ data, locale }: { data: Overview; locale: Locale }) {
+  const t = useT();
+  return <section className="space-y-8"><h1 className="font-serif text-4xl">{t("admin.overview.title")}</h1><div className="grid gap-4 sm:grid-cols-2">{(["users", "admins"] as const).map((key) => <div key={key} className="rounded-lg border p-6"><p className="text-sm text-muted-foreground">{t(`admin.overview.${key}`)}</p><p className="mt-2 font-serif text-4xl">{data[key]}</p></div>)}</div><section className="space-y-4"><h2 className="text-xl font-semibold">{t("admin.overview.recent")}</h2>{data.recent.length ? <ul className="divide-y rounded-lg border">{data.recent.map((user) => <li key={user.id} className="flex flex-wrap justify-between gap-3 p-4"><span>{user.name}</span><span className="text-sm text-muted-foreground">{user.email}</span></li>)}</ul> : <p className="text-muted-foreground">{t("admin.users.empty")}</p>}<a className="inline-block underline" href={`/${locale}/admin/users`}>{t("admin.nav.users")}</a></section></section>;
+}
+
+export function AdminUsers({ data, search, locale, currentUser }: { data: Users; search: { q: string; page: number }; locale: Locale; currentUser: ProductUser }) {
+  const t = useT();
+  const revalidator = useRevalidator();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const pages = Math.max(1, Math.ceil(data.total / 20));
+  const pageHref = (page: number) => `/${locale}/admin/users?${new URLSearchParams({ q: search.q, page: String(page) })}`;
+  async function update(input: UserMutation) {
+    if (busy) return;
+    setBusy(true); setError("");
+    try { await mutateUser(input); await revalidator.revalidate(); }
+    catch { setError(t("auth.errors.generic")); }
+    finally { setBusy(false); }
+  }
+  return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("admin.users.title")}</h1>
+    <form method="get" className="flex gap-2"><label className="sr-only" htmlFor="user-search">{t("admin.users.search")}</label><input id="user-search" name="q" type="search" className="rounded-md border bg-background p-2" defaultValue={search.q} placeholder={t("admin.users.searchPlaceholder")} /><Button type="submit">{t("admin.users.search")}</Button></form>
+    {error && <p role="alert" className="text-destructive">{error}</p>}
+    <div className="overflow-x-auto"><table className="w-full text-left text-sm" aria-busy={busy}><caption className="sr-only">{t("admin.users.title")}</caption><thead><tr>{(["name", "email", "role", "status", "joined"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(`admin.users.columns.${key}`)}</th>)}<th scope="col" className="border-b p-3"><span className="sr-only">Actions</span></th></tr></thead><tbody>
+    {data.users.map((user) => <tr key={user.id}><td className="border-b p-3">{user.name}</td><td className="border-b p-3">{user.email}</td><td className="border-b p-3">{user.role ?? "user"}</td><td className="border-b p-3">{t(user.banned ? "admin.users.status.banned" : "admin.users.status.active")}</td><td className="border-b p-3">{user.createdAt ? new Date(user.createdAt).toISOString().slice(0, 10) : "—"}</td><td className="border-b p-3"><div className="flex gap-2"><Button type="button" variant="outline" size="sm" disabled={busy || user.id === currentUser.id} onClick={() => void update({ action: "role", userId: user.id, role: isAdministrator(user) ? "user" : "admin" })}>{t(isAdministrator(user) ? "admin.users.actions.removeAdmin" : "admin.users.actions.makeAdmin")}</Button><Button type="button" variant="outline" size="sm" disabled={busy || user.id === currentUser.id} onClick={() => void update(user.banned ? { action: "unban", userId: user.id } : { action: "ban", userId: user.id, reason: t("admin.users.banReason") })}>{t(user.banned ? "admin.users.actions.unban" : "admin.users.actions.ban")}</Button></div></td></tr>)}
+    {!data.users.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{t("admin.users.empty")}</td></tr>}
+    </tbody></table></div>
+    <nav aria-label="Pagination" className="flex items-center justify-between gap-4"><span>{t("admin.pagination.page", { page: search.page, pages })}</span><div className="flex gap-4">{search.page > 1 && <a className="underline" href={pageHref(search.page - 1)}>{t("admin.pagination.previous")}</a>}{search.page < pages && <a className="underline" href={pageHref(search.page + 1)}>{t("admin.pagination.next")}</a>}</div></nav>
+  </section>;
+}

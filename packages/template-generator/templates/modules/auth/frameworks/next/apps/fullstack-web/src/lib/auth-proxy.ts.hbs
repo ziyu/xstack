@@ -1,0 +1,19 @@
+import { auth } from "@{{projectName}}/app-services";
+import { NextResponse } from "next/server";
+import type { ProxyStep } from "./proxy";
+
+/** Renew cookies before Server Components, where response cookie mutation is forbidden. */
+export const authSessionStep: ProxyStep = async (request) => {
+  if (!request.headers.has("cookie")) return undefined;
+  const url = request.nextUrl.clone();
+  url.pathname = "/api/auth/get-session";
+  url.search = "";
+  const refreshed = await auth.handler(new Request(url.href, { headers: request.headers }));
+  if (!refreshed.ok) return new NextResponse(null, { status: refreshed.status, headers: { "Cache-Control": "private, no-store" } });
+  const cookies = refreshed.headers.getSetCookie();
+  if (!cookies.length) return undefined;
+  const response = NextResponse.next();
+  for (const cookie of cookies) response.headers.append("Set-Cookie", cookie);
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
+};

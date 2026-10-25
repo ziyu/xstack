@@ -2,6 +2,8 @@
   "id": "tanstack-start",
   "apps": {
     "fullstack-web": {
+      "devArgs": ["--host", "127.0.0.1"],
+      "sharedPackages": ["ui"],
       "stack": {
         "frontend": ["tanstack-start"],
         "backend": "self",
@@ -10,6 +12,8 @@
       }
     },
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
+      "sharedPackages": ["ui"],
       "stack": {
         "frontend": ["tanstack-start"],
         "runtime": "none",

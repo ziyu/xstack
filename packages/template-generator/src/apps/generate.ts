@@ -204,13 +204,17 @@ export async function generateApplications(
   stage("application-inventory", () =>
     vfs.writeJson(
       "applications.json",
-      plan.applications.map(({ app }) => ({
+      plan.applications.map(({ app, context }) => ({
         id: app.selection.id,
         type: app.selection.type,
         stack: app.selection.stack,
         roles: app.manifest.roles,
         product: app.product ?? null,
         bindings: app.bindings,
+        directory: context.directory,
+        port: context.port,
+        origin: context.origin,
+        devArgs: context.devArgs,
       })),
     ),
   );

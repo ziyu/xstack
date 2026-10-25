@@ -53,14 +53,20 @@ export function captchaPublicConfig(env: CaptchaConfig) {
   }
 }
 
-export function createCaptchaBeforeHook(env: CaptchaConfig) {
+export function createCaptchaBeforeHook(env: CaptchaConfig, clientOrigins: readonly string[] = []) {
+  const trustedOrigins = new Set([new URL(env.BETTER_AUTH_URL).origin, ...clientOrigins]);
   return createAuthMiddleware(async (ctx) => {
     const action = actions[ctx.path];
     if (!action) return; // OAuth callbacks, sessions and webhooks are not challenges.
     const config = configuration(env);
     const headers = ctx.headers ?? ctx.request?.headers;
-    if (headers?.get("origin") !== config.origin.origin) {
+    const origin = headers?.get("origin");
+    if (!headers || !origin || !trustedOrigins.has(origin)) {
       throw new APIError("FORBIDDEN", { code: "CAPTCHA_ORIGIN_REJECTED", message: "A trusted Origin is required" });
+    }
+    const hostname = new URL(origin).hostname;
+    if (config.test && !["localhost", "127.0.0.1", "[::1]"].includes(hostname)) {
+      throw new APIError("FORBIDDEN", { code: "CAPTCHA_ORIGIN_REJECTED", message: "Turnstile test mode requires a loopback requesting Origin" });
     }
     const token = tokenSchema.safeParse(headers.get("x-captcha-token"));
     if (!token.success) {
@@ -87,7 +93,7 @@ export function createCaptchaBeforeHook(env: CaptchaConfig) {
     // Public dummy tokens do not bind hostname/action/time. This explicit development-only
     // mode still calls Siteverify; production always validates every binding below.
     const validBinding = config.test || (
-      result.hostname === config.origin.hostname && result.action === action &&
+      result.hostname === hostname && result.action === action &&
       Number.isFinite(timestamp) && timestamp <= Date.now() + 30_000 && Date.now() - timestamp <= 300_000
     );
     if (!result.success || result["error-codes"]?.length || !validBinding) {

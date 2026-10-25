@@ -685,3 +685,37 @@ resolveWorkspaceCapabilities 共用到生成入口、CLI 和 Builder；区分 na
 generate({trace:true}) 返回 provenance：按顺序记录物理路径、create/update/delete、template/processor 来源、app/owner 和 previousSource。所有生成顶层阶段有命名 scope，文本及二进制模板均保留源码路径，模块替换显式归因 module:<id>:replaces；合并复制不伪造新来源，后续根包处理承接原来源。trace 默认关闭，不收集内容、密钥或内容 hash；追踪异常保留原阶段并附来源。诊断脚本 trace:contributions 接收完整 ProjectConfig JSON，可按输出路径过滤，不落盘生成项目。
 
 验收：121 项测试通过，生成器/Web/CLI 类型检查与本批定向 lint 通过。原始模板→后处理→删除→重新创建来源链、嵌套同步/异步 scope 恢复、只读 owner、独立应用隔离和默认无 trace 已覆盖。实际生成 portal 全栈（auth+credits+CLI）及 public-ui/ops-ui/service-api 拆分 auth，安装/类型检查/构建/SQLite schema 通过；两套真实注册、会话及全栈积分页访问通过。source trace 命令显示 portal 页面由 Next 模板创建、随后由 core 声明替换，未含正文。业务 C2–C6 未扩充；本批只推进 C1 正确性和可诊断性。
+
+### 27.5 C2 首条原生拆分认证通路
+
+C1 上下文与来源追踪已提交 `71452c3`。本批原生贡献限定为显式 React Router web-frontend/admin + Hono backend（Bun/Node）、API none、Drizzle SQLite/Postgres；core/i18n/auth/admin/email/sms/captcha 显式声明 nativeSplit，其他模块不随之放开。RPC 及其他框架仍走既有能力判断。后端仍是 frontend:none，不伪装成全栈框架；内部 moduleApplication 只供计划投影，不写入用户配置。
+
+共享 WHATWG handler、站点配置、OAuth provider 信息、邮件/短信订阅抽为模块 partial，fullstack-web/backend 各有明确贡献包装。服务、schema、密钥、事件订阅仅归 backend；客户端只有安全共享包、UI 和类型化 HTTP 协议。React Router 提供登录/注册/退出、账户设置、邮件确认/重置、手机 OTP、captcha，以及独立 admin 用户列表/搜索/分页/角色/封禁操作。普通客户端不发布 admin 页面；后台页面与后端 API 分别鉴权。
+
+浏览器通过同源 BFF，SSR 转发 Cookie，响应保留 Set-Cookie；代理覆盖专用 client-origin 头并移除普通转发头，后端严格校验已声明 origin（协议/主机/端口）。Better Auth 动态回调回到客户端域名，保留 host-only Cookie；captcha 核对实际可信客户端 hostname。自定义域名仍需显式更新 Origin 白名单与服务商 callback，当前没有自动部署承诺。React Router loader 使用匹配后的路由 params，避免 .data 重验证被误判为未知页面。
+
+验收：SQLite+Bun 与 PostgreSQL+Node 的真实生成项目安装、全部 workspace 类型检查、构建、schema 应用及注册/登录/退出/会话、匿名 401/普通用户 403、角色升降、封禁/解封、会话撤销、自修改及第三方 Origin 拒绝通过。Next 全栈对照注册/会话/dashboard/admin 404 隔离/退出通过。浏览器验证 localhost 客户端对 127.0.0.1 后端的 host-only Cookie 与刷新 SSR、后台拒绝普通用户、管理员角色修改及重验证；Builder 原生 split 配置与真实预览、CLI create-json 通过。邮件确认、重置密码并撤销会话、手机 OTP 与重放拒绝、captcha 缺失/错误 action/hostname、OAuth 客户端 callback 与伪造 state 拒绝通过；邮件/SMS 使用显式开发控制台，captcha 使用签名本地 Siteverify 协议夹具，真实服务商送达及 OAuth token exchange 未验收。
+
+贡献审计为 877 个来源、125 行矩阵、零分类错误。全站生产构建在 showcase 预渲染连接本地 Convex 127.0.0.1:3210 时失败；生成项目构建及 Web 类型检查已通过，不将本地后端缺失算作全站构建成功。本批不宣称 C2 所有框架/provider 云端验收完成，C3–C6 尚未展开。
+
+最终回归：124 项测试通过（含新增 native split owner/必需贡献门禁与 Builder 拓扑保留回归），生成器/Web/CLI 测试类型检查及本批定向 lint 通过。删除依赖固定模板矩阵的旧静态断言，未重新锁定扩展后的文件清单。临时项目、数据库、开发送达日志与测试服务在验收后移除；Builder 保持运行。
+
+### 27.6 C2 实现收尾与可重复验收
+
+C2 七模块在既有 Next/TanStack Start/Nuxt 全栈及 React Router/Hono 拆分通路的实现已补齐；新增框架仍按 C5 扩展，不将 C5 混入 C2。邮件重发验证页及 captcha 钩子、账户设置和返回路径、语言偏好持久化、配置驱动导航、独立 email/sms 与 auth-only admin 壳均已对齐。admin 应用类型本身不等于管理权限，只有选中 admin 模块才提供受保护管理功能。拆分根路径使用显式 index loader，修复 React Router 通配路由不匹配根路径的空白页。
+
+修复安全边界：ADMIN_EMAILS 不再凭未验证注册邮箱授予管理员；可信 OAuth 已验证邮箱或邮件验证完成后才 bootstrap。验证链接重放不能重新提升已降权账户。无邮件/可信 OAuth 时必须通过可信数据库管理通道人工验证并初始化管理员。CASL、导航和各框架 UI 统一逗号分隔角色语义；共享 HTTP handler 保留 Better Auth 的明确 4xx 错误而不转成 500。Next proxy 通过 auth HTTP handler 在 RSC 前续期并传递 Set-Cookie；Start server bridge、Nuxt SSR fetch、拆分 BFF 保留会话续期 Cookie。
+
+持久验收入口为 `apps/cli/live-tests/c2.ts`（plan/prepare/check/runtime/run/report/cleanup），用真实 CLI 创建项目，不在生产模板内注入测试后门。矩阵包含 Next+SQLite/Resend/Twilio、Start+SQLite/SMTP/Aliyun、Nuxt+SQLite/Resend/Tencent、split+SQLite/SMTP/Twilio、split+Postgres/Resend/Tencent，三种 OAuth provider 均被选择。五组安装、类型检查、构建、迁移生成/重复应用与实际 HTTP/SSR 链路通过：注册/邮箱验证/登录/退出、SSR Cookie 续期（含 Next RSC）、失效/撤销、未验证管理员拒绝、角色升降/封禁、密码重置 token 重放拒绝、OTP 冷却/过期/次数/并发/重放、captcha host/action/time/origin、OAuth callback/state。SQLite 另通过 WeChat 精确 HTTP provider 协议交换及 user-created 事件验收。`c2-bootstrap.ts` 保留独立安全回归。
+
+真实浏览器检查 Next/Start/Nuxt 验证重发页面、Nuxt 手机切换、Start 与 split 的语言切换及根路径偏好跳转；失败或缺失真实 Turnstile 配置保持按钮禁用，没有绕过服务端钩子。36 个最小模块/框架组合实际生成通过。Provider 云端验收明确仍为 unverified：邮件/SMS 使用生成器已有开发控制台，验证码使用签名 Siteverify 协议夹具；Google/GitHub 成功云端 exchange、实际 WeChat 扫码、邮箱/手机送达和真实 Cloudflare token 需部署凭据与测试账户，不计入本地通过结论。C3–C6 未开展。
+
+收尾验证：最终五组 runtime 矩阵再次全部通过（含新增根路径语言偏好断言），124 项仓库回归通过，CLI 测试类型/Web 类型及定向 lint 通过。贡献清单 884 个来源、零分类错误。持久 harness 的 prepare/check/runtime/cleanup 都实际执行；临时 PostgreSQL 容器、项目、验证 token 与送达日志已清理，Builder 重启后 /new 返回 200。未提交或推送本批 C2 改动。
+
+### 27.7 应用声明驱动，移除实例名与类型白名单分支
+
+修正 C2 架构问题：实例 id 只标识目录、包名和绑定，不决定构建能力。adapter 的 productContribution 声明 server/client 模式、协议、模块范围、技术约束、framework 层和共享客户端来源；解析器核对参与方协议与约束，不再写死 Hono/React Router 或 backend/web-frontend/admin 类型白名单。角色控制服务端 env/dependencies/nav，真实 app-specific 来源缺失仍在写入前报错。sharedPackages 声明共享包 owner 候选，替代中央 UI 框架数组。
+
+WorkspacePlan 统一生成 directory/port/origin/devArgs，applications.json 对运行工具暴露这些解析结果。端口按职责分配，重命名不改变前后端含义；全栈原有默认 3001 保留。C2 runner 按 roles/bindings 取服务和客户端，启动参数来自 adapter，移除 portal/console 实例名及固定端口推断。固定示例名字仅存在 case 输入数据；新增独立 CLI 参与安装、检查和构建，不被当 HTTP 服务探测。Builder 也消费声明解析结果。
+
+验收：68 项生成器测试、58 项 Web/CLI 测试通过；类型检查、定向 lint 通过。新增 control-room 类型和 custom-router adapter 仅靠 manifest、adapter 及实际模板接入；缺失 overlay 明确拒绝。其生成项目安装/类型/构建/schema、启动、真实注册/验证/admin SSR/API 通过。split-renamed-cli（全部改名并加独立 CLI）及 Next 全栈安装/构建/迁移和完整 C2 HTTP 验收通过。旧无 apps 模式、框架专用底层生成器和部署处理器仍有技术分支，不能据此宣称新增任意协议/框架完全不需实现代码；新增既有职责的 app 类型和复用 adapter 不需改中央调度器。

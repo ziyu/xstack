@@ -1,0 +1,16 @@
+import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration, useRouteError } from "react-router";
+import { ThemeProvider } from "./components/theme-provider";
+import { Toaster } from "@{{projectName}}/ui/components/sonner";
+import "./index.css";
+
+export function Layout({ children }: { children: React.ReactNode }) {
+  return <html lang="en" suppressHydrationWarning><head><meta charSet="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><Meta /><Links /></head><body>{children}<ScrollRestoration /><Scripts /></body></html>;
+}
+export default function App() {
+  return <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange><Outlet /><Toaster richColors /></ThemeProvider>;
+}
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const status = isRouteErrorResponse(error) ? error.status : 500;
+  return <main className="mx-auto max-w-3xl space-y-4 px-6 py-16"><h1 className="font-serif text-4xl">{status === 403 ? "Access denied" : status === 404 ? "Page not found" : "Unable to load this page"}</h1><p>{status === 403 ? "An administrator account is required." : "Please return to the home page and try again."}</p><a className="underline" href="/">Home</a>{{#if (includes product.features "auth")}}<a className="ml-4 underline" href="/en/login">Sign in</a>{{/if}}</main>;
+}

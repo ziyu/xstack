@@ -98,7 +98,7 @@ export const APPLICATION_TEMPLATES: Map<string, string> = new Map([
   ],
   [
     "backend/server/hono/adapter.json",
-    "{\n  \"id\": \"hono\",\n  \"apps\": {\n    \"backend\": {\n      \"stack\": {\n        \"backend\": \"hono\",\n        \"runtime\": \"bun\",\n        \"api\": \"orpc\"\n      }\n    }\n  }\n}\n"
+    "{\n  \"id\": \"hono\",\n  \"apps\": {\n    \"backend\": {\n      \"devArgs\": [],\n      \"productContribution\": {\n        \"mode\": \"server\",\n        \"protocol\": \"product-http-v1\",\n        \"modules\": [\"core\", \"i18n\", \"auth\", \"admin\", \"email\", \"sms\", \"captcha\"],\n        \"constraints\": {\n          \"runtime\": [\"bun\", \"node\"],\n          \"api\": [\"none\"],\n          \"orm\": [\"drizzle\"],\n          \"database\": [\"sqlite\", \"postgres\"],\n          \"webDeploy\": [\"none\"]\n        },\n        \"frameworks\": [\n          { \"id\": \"http-server\", \"modules\": [\"core\", \"auth\", \"admin\", \"captcha\"] },\n          { \"id\": \"hono\", \"modules\": [\"core\"] }\n        ]\n      },\n      \"stack\": {\n        \"backend\": \"hono\",\n        \"runtime\": \"bun\",\n        \"api\": \"orpc\"\n      }\n    }\n  }\n}\n"
   ],
   [
     "backend/server/hono/apps/backend/src/index.ts.hbs",
@@ -134,7 +134,7 @@ export const APPLICATION_TEMPLATES: Map<string, string> = new Map([
   ],
   [
     "frontend/astro/adapter.json",
-    "{\n  \"id\": \"astro\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"stack\": {\n        \"frontend\": [\"astro\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"orpc\"\n      }\n    },\n    \"web-frontend\": {\n      \"stack\": {\n        \"frontend\": [\"astro\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
+    "{\n  \"id\": \"astro\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"stack\": {\n        \"frontend\": [\"astro\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"orpc\"\n      }\n    },\n    \"web-frontend\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"stack\": {\n        \"frontend\": [\"astro\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
   ],
   [
     "frontend/astro/apps/fullstack-web/astro.config.mjs.hbs",
@@ -482,7 +482,7 @@ export const APPLICATION_TEMPLATES: Map<string, string> = new Map([
   ],
   [
     "frontend/nuxt/adapter.json",
-    "{\n  \"id\": \"nuxt\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"stack\": {\n        \"frontend\": [\"nuxt\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    },\n    \"web-frontend\": {\n      \"stack\": {\n        \"frontend\": [\"nuxt\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
+    "{\n  \"id\": \"nuxt\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"stack\": {\n        \"frontend\": [\"nuxt\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    },\n    \"web-frontend\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"stack\": {\n        \"frontend\": [\"nuxt\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
   ],
   [
     "frontend/nuxt/apps/fullstack-web/app/app.config.ts.hbs",
@@ -570,7 +570,7 @@ export const APPLICATION_TEMPLATES: Map<string, string> = new Map([
   ],
   [
     "frontend/react/next/adapter.json",
-    "{\n  \"id\": \"next\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"stack\": {\n        \"frontend\": [\"next\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    },\n    \"web-frontend\": {\n      \"stack\": {\n        \"frontend\": [\"next\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
+    "{\n  \"id\": \"next\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"devArgs\": [\"--hostname\", \"127.0.0.1\"],\n      \"sharedPackages\": [\"ui\"],\n      \"stack\": {\n        \"frontend\": [\"next\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    },\n    \"web-frontend\": {\n      \"devArgs\": [\"--hostname\", \"127.0.0.1\"],\n      \"sharedPackages\": [\"ui\"],\n      \"stack\": {\n        \"frontend\": [\"next\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
   ],
   [
     "frontend/react/next/apps/fullstack-web/AGENTS.md.hbs",
@@ -654,7 +654,7 @@ export const APPLICATION_TEMPLATES: Map<string, string> = new Map([
   ],
   [
     "frontend/react/react-router/adapter.json",
-    "{\n  \"id\": \"react-router\",\n  \"apps\": {\n    \"web-frontend\": {\n      \"stack\": {\n        \"frontend\": [\"react-router\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    },\n    \"admin\": {\n      \"stack\": {\n        \"frontend\": [\"react-router\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
+    "{\n  \"id\": \"react-router\",\n  \"apps\": {\n    \"web-frontend\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"sharedPackages\": [\"ui\"],\n      \"productContribution\": {\n        \"mode\": \"client\",\n        \"protocol\": \"product-http-v1\",\n        \"modules\": [\"core\", \"i18n\", \"auth\", \"admin\", \"email\", \"sms\", \"captcha\"],\n        \"constraints\": {\n          \"runtime\": [\"bun\", \"node\"],\n          \"api\": [\"none\"],\n          \"orm\": [\"drizzle\"],\n          \"database\": [\"sqlite\", \"postgres\"],\n          \"webDeploy\": [\"none\"]\n        },\n        \"frameworks\": [{ \"id\": \"react-router\", \"modules\": [\"core\"] }],\n        \"client\": {\n          \"framework\": \"react-router\",\n          \"modules\": [\"core\", \"i18n\", \"auth\", \"admin\", \"captcha\"],\n          \"integrations\": [\"email\", \"sms\"]\n        }\n      },\n      \"stack\": {\n        \"frontend\": [\"react-router\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    },\n    \"admin\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"sharedPackages\": [\"ui\"],\n      \"productContribution\": {\n        \"mode\": \"client\",\n        \"protocol\": \"product-http-v1\",\n        \"modules\": [\"core\", \"i18n\", \"auth\", \"admin\", \"email\", \"sms\", \"captcha\"],\n        \"constraints\": {\n          \"runtime\": [\"bun\", \"node\"],\n          \"api\": [\"none\"],\n          \"orm\": [\"drizzle\"],\n          \"database\": [\"sqlite\", \"postgres\"],\n          \"webDeploy\": [\"none\"]\n        },\n        \"frameworks\": [{ \"id\": \"react-router\", \"modules\": [\"core\"] }],\n        \"client\": {\n          \"framework\": \"react-router\",\n          \"modules\": [\"core\", \"i18n\", \"auth\", \"admin\", \"captcha\"],\n          \"integrations\": [\"email\", \"sms\"]\n        }\n      },\n      \"stack\": {\n        \"frontend\": [\"react-router\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
   ],
   [
     "frontend/react/react-router/apps/admin/package.json.hbs",
@@ -746,7 +746,7 @@ export const APPLICATION_TEMPLATES: Map<string, string> = new Map([
   ],
   [
     "frontend/react/tanstack-router/adapter.json",
-    "{\n  \"id\": \"tanstack-router\",\n  \"apps\": {\n    \"web-frontend\": {\n      \"stack\": {\n        \"frontend\": [\"tanstack-router\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
+    "{\n  \"id\": \"tanstack-router\",\n  \"apps\": {\n    \"web-frontend\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"sharedPackages\": [\"ui\"],\n      \"stack\": {\n        \"frontend\": [\"tanstack-router\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
   ],
   [
     "frontend/react/tanstack-router/apps/web-frontend/index.html.hbs",
@@ -786,7 +786,7 @@ export const APPLICATION_TEMPLATES: Map<string, string> = new Map([
   ],
   [
     "frontend/react/tanstack-start/adapter.json",
-    "{\n  \"id\": \"tanstack-start\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"stack\": {\n        \"frontend\": [\"tanstack-start\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    },\n    \"web-frontend\": {\n      \"stack\": {\n        \"frontend\": [\"tanstack-start\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
+    "{\n  \"id\": \"tanstack-start\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"sharedPackages\": [\"ui\"],\n      \"stack\": {\n        \"frontend\": [\"tanstack-start\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    },\n    \"web-frontend\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"sharedPackages\": [\"ui\"],\n      \"stack\": {\n        \"frontend\": [\"tanstack-start\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
   ],
   [
     "frontend/react/tanstack-start/apps/fullstack-web/package.json.hbs",
@@ -842,7 +842,7 @@ export const APPLICATION_TEMPLATES: Map<string, string> = new Map([
   ],
   [
     "frontend/solid/adapter.json",
-    "{\n  \"id\": \"solid\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"stack\": {\n        \"frontend\": [\"solid\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"orpc\"\n      }\n    },\n    \"web-frontend\": {\n      \"stack\": {\n        \"frontend\": [\"solid\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
+    "{\n  \"id\": \"solid\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"stack\": {\n        \"frontend\": [\"solid\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"orpc\"\n      }\n    },\n    \"web-frontend\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"stack\": {\n        \"frontend\": [\"solid\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
   ],
   [
     "frontend/solid/apps/fullstack-web/package.json.hbs",
@@ -946,7 +946,7 @@ export const APPLICATION_TEMPLATES: Map<string, string> = new Map([
   ],
   [
     "frontend/svelte/adapter.json",
-    "{\n  \"id\": \"svelte\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"stack\": {\n        \"frontend\": [\"svelte\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"orpc\"\n      }\n    },\n    \"web-frontend\": {\n      \"stack\": {\n        \"frontend\": [\"svelte\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
+    "{\n  \"id\": \"svelte\",\n  \"apps\": {\n    \"fullstack-web\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"stack\": {\n        \"frontend\": [\"svelte\"],\n        \"backend\": \"self\",\n        \"runtime\": \"none\",\n        \"api\": \"orpc\"\n      }\n    },\n    \"web-frontend\": {\n      \"devArgs\": [\"--host\", \"127.0.0.1\"],\n      \"stack\": {\n        \"frontend\": [\"svelte\"],\n        \"runtime\": \"none\",\n        \"api\": \"none\"\n      }\n    }\n  }\n}\n"
   ],
   [
     "frontend/svelte/apps/fullstack-web/package.json.hbs",

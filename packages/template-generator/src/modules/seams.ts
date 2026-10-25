@@ -70,7 +70,11 @@ export function addAppDependencies(
   dependencies: Record<string, string>,
   config: ApplicationConfig,
 ) {
-  const path = appOutputPath(config, "web", "package.json");
+  const path = appOutputPath(
+    config,
+    config.application?.roles.includes("backend") ? "server" : "web",
+    "package.json",
+  );
   stackFile(vfs, path, "app dependencies");
   addPackageDependency({
     vfs,

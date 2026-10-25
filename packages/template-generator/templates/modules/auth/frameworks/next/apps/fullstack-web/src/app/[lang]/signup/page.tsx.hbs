@@ -31,7 +31,7 @@ export default async function SignUpPage({ params, searchParams }: Props) {
         <>
           {t("auth.signUp.hasAccount")}&nbsp;
           <Link
-            href={localePath(locale, "/login")}
+            href={ { pathname: localePath(locale, "/login"), query: { next: safeNext(next, localePath(locale, "/dashboard")) } } }
             className="text-foreground underline-offset-4 hover:underline"
           >
             {t("auth.signUp.signInLink")}

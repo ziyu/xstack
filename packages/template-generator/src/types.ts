@@ -1,6 +1,8 @@
 import type { Auth, ProjectConfig } from "@xstack/types";
 import { TaggedError } from "better-result";
 
+import type { ProductContribution } from "./modules/types";
+
 /**
  * The config stack templates and processors render with: the project config plus the
  * auth engine derived from the module plan.
@@ -8,11 +10,18 @@ import { TaggedError } from "better-result";
 export type ApplicationRenderContext = {
   id: string;
   type: string;
+  roles: string[];
+  contribution?: ProductContribution;
+  directory: string;
+  origin: string;
+  devArgs: string[];
   port: number;
   clientOrigins: string[];
   paths: Record<string, string>;
   /** Bound backend owner, or this app's root when it owns the backend role. */
   backendRoot?: string;
+  nativeSplit?: boolean;
+  backendOrigin?: string;
   workspaceRuntime: ProjectConfig["runtime"];
   ownsPath: (path: string) => boolean;
   inheritedFiles?: ReadonlyMap<string, string>;

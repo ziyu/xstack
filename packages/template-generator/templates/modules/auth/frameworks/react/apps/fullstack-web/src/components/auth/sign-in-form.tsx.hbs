@@ -38,17 +38,16 @@ export default function SignInForm({
 {{/if}}
     const form = new FormData(event.currentTarget);
     setPending(true);
-    const { error } = await authClient.signIn.email({
-      email: formValue(form, "email"),
-      password: formValue(form, "password"),
-      callbackURL: next,
-    }{{#if (includes product.features "captcha")}}, { headers: captcha.headers, onResponse: captcha.reset, onError: captcha.reset }{{/if}});
-    setPending(false);
-    if (error) {
-      toast.error(error.message ?? t("auth.errors.generic"));
-      return;
-    }
-    window.location.assign(next);
+    try {
+      const { error } = await authClient.signIn.email({
+        email: formValue(form, "email"),
+        password: formValue(form, "password"),
+        callbackURL: next,
+      }{{#if (includes product.features "captcha")}}, { headers: captcha.headers }{{/if}});
+      if (error) { toast.error(error.message ?? t("auth.errors.generic")); return; }
+      window.location.assign(next);
+    } catch { toast.error(t("auth.errors.generic")); }
+    finally { setPending(false); {{#if (includes product.features "captcha")}}captcha.reset();{{/if}} }
   }
 
   return (
@@ -78,6 +77,9 @@ export default function SignInForm({
           {t("auth.signIn.submit")}
         </Button>
       </form>
+{{#if (includes product.features "email")}}
+      <a href={`${localePath(locale, "/verify-email")}?next=${encodeURIComponent(next.startsWith("/") ? next : new URL(next).pathname + new URL(next).search + new URL(next).hash)}`} className="text-center text-sm underline">{t("auth.verification.submit")}</a>
+{{/if}}
     </>
   );
 }

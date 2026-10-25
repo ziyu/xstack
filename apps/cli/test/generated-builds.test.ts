@@ -10,6 +10,7 @@ import { z } from "zod";
 import type { CreateInput } from "../src";
 import { create } from "../src";
 import { SMOKE_DIR } from "./setup";
+import { c2Cases, c2Input } from "../live-tests/c2-cases";
 
 type PackageManager = NonNullable<CreateInput["packageManager"]>;
 
@@ -65,6 +66,11 @@ const baseConfig = {
 } satisfies Partial<CreateInput>;
 
 const buildSamples: BuildSample[] = [
+  ...c2Cases.map((test): BuildSample => ({
+    name: `product-c2-${test.id}`,
+    packageManagers: ["bun"],
+    config: c2Input(test, `c2-${test.id}`),
+  })),
   ...(["next", "tanstack-start", "nuxt"] as const).flatMap((framework) =>
     (["sqlite", "postgres"] as const).map((database): BuildSample => ({
       name: `product-p5-full-${framework}-${database}`,

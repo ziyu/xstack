@@ -10,7 +10,7 @@ import { enabledSocialProviders } from "@/lib/social-providers.server";
 
 type Props = {
   params: Promise<{ lang: string }>;
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function LoginPage({ params, searchParams }: Props) {
   const locale = resolveLocale((await params).lang);
   const t = getTranslator(locale);
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
   const target = safeNext(next, localePath(locale, "/dashboard"));
 
   return (
@@ -40,6 +40,7 @@ export default async function LoginPage({ params, searchParams }: Props) {
         </>
       }
     >
+      {error && <p role="alert" className="text-sm text-destructive">{t("auth.errors.generic")}</p>}
       <SignInForm
         next={target}
         providers={enabledSocialProviders()}

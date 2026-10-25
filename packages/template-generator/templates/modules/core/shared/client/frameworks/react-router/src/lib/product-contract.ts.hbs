@@ -1,0 +1,35 @@
+import { z } from "zod";
+
+export const userSchema = z.object({
+  id: z.string(), name: z.string(), email: z.string(), emailVerified: z.boolean(),
+  role: z.string().nullish(), banned: z.boolean().nullish(), createdAt: z.string().optional(),
+});
+export type ProductUser = z.infer<typeof userSchema>;
+export const sessionSchema = z.object({ user: userSchema }).nullable();
+export const configSchema = z.object({
+  socialProviders: z.array(z.enum(["google", "github", "wechat"])),
+  verifyEmail: z.boolean(), canResetPassword: z.boolean(),
+});
+export const overviewSchema = z.object({ users: z.number(), admins: z.number(), recent: z.array(userSchema) });
+export const usersSchema = z.object({ users: z.array(userSchema), total: z.number() });
+export type UserMutation =
+  | { action: "role"; userId: string; role: "admin" | "user" }
+  | { action: "ban"; userId: string; reason?: string }
+  | { action: "unban"; userId: string };
+export function isAdministrator(user: ProductUser | null | undefined) {
+  return user?.role?.split(",").includes("admin") ?? false;
+}
+export function safeNext(value: string | null, fallback: string, origin: string) {
+  if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\") || /[\u0000-\u001f\u007f]/.test(value)) return fallback;
+  try {
+    const target = new URL(value, origin);
+    return target.origin === origin ? `${target.pathname}${target.search}${target.hash}` : fallback;
+  } catch { return fallback; }
+}
+export async function mutateUser(input: UserMutation): Promise<void> {
+  const response = await fetch("/api/product/users", {
+    method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(`Account update failed (${response.status})`);
+  z.object({ success: z.literal(true) }).parse(await response.json());
+}

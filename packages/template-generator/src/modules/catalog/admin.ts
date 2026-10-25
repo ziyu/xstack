@@ -11,6 +11,7 @@ export default defineModule({
   category: "operations",
   requires: ["auth"],
   supports: NATIVE_SHELL,
+  nativeSplit: true,
   packages: [{ dir: "permissions", dependencies: { "@casl/ability": "^7.0.1" } }],
   nav: [
     { area: "main", href: "/admin", labelKey: "nav.admin", order: 95, role: "admin" },

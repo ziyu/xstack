@@ -1,0 +1,14 @@
+import { appendResponseHeader } from "h3";
+
+type ProductSession = { user: { id: string; name: string; email: string; role?: string | null; emailVerified: boolean } } | null;
+
+/** Preserve renewed auth cookies when Nuxt fetches the session during SSR. */
+export function useProductSession() {
+  const event = import.meta.server ? useRequestEvent() : undefined;
+  return useFetch<ProductSession>("/api/product/session", {
+    key: "product-session",
+    onResponse({ response }) {
+      if (event) for (const cookie of response.headers.getSetCookie()) appendResponseHeader(event, "set-cookie", cookie);
+    },
+  });
+}

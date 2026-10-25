@@ -1,0 +1,58 @@
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router";
+import { useTheme } from "next-themes";
+import { LOCALE_COOKIE, locales, localeNames } from "@{{projectName}}/i18n";
+import { canSee, navigation } from "@/config/navigation";
+import { useLocale, useT } from "./i18n-provider";
+import type { ProductUser } from "@/lib/product-contract";
+{{#if (includes product.features "auth")}}
+import { authClient } from "@/lib/auth-client";
+{{/if}}
+
+export function ProductShell({ user, children }: { user: ProductUser | null; children: React.ReactNode }) {
+  const locale = useLocale();
+  const t = useT();
+  const location = useLocation();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const area = location.pathname.split("/")[2];
+  const sideNavigation = area === "admin" || area === "dashboard" ? navigation[area].filter((item) => canSee(item, user)) : [];
+  useEffect(() => { document.documentElement.lang = locale; }, [locale]);
+{{#if (includes product.features "auth")}}
+  async function signOut() {
+    setPending(true); setError("");
+    try {
+      const result = await authClient.signOut();
+      if (result.error) throw result.error;
+      window.location.assign(`/${locale}/login`);
+    } catch { setError(t("auth.errors.generic")); setPending(false); }
+  }
+{{/if}}
+  return <div className="min-h-screen bg-background text-foreground">
+    <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-4">Skip to content</a>
+    <header className="border-b"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-6 px-6 py-5">
+      <a href={`/${locale}`} className="mr-auto font-serif text-2xl font-semibold tracking-tight">{{projectName}}</a>
+      <nav aria-label="Main" className="flex gap-5 text-sm">
+        {navigation.main.filter((item) => canSee(item, user)).map((item) => <a key={item.href} href={`/${locale}${item.href === "/" ? "" : item.href}`} aria-current={location.pathname === `/${locale}${item.href === "/" ? "" : item.href}` ? "page" : undefined}>{t(item.labelKey)}</a>)}
+{{#if (includes product.features "auth")}}
+        {!user && <><a href={`/${locale}/login`}>{t("auth.user.signIn")}</a><a href={`/${locale}/signup`}>{t("auth.signUp.submit")}</a></>}
+{{/if}}
+      </nav>
+      <label className="sr-only" htmlFor="locale-select">{t("i18n.switcher.label")}</label><select id="locale-select" value={locale} className="border bg-background p-2 text-sm" onChange={(event) => {
+        document.cookie = `${LOCALE_COOKIE}=${event.target.value}; path=/; max-age=31536000; SameSite=Lax`;
+        window.location.assign(`/${event.target.value}${location.pathname.slice(locale.length + 1)}${location.search}${location.hash}`);
+      }}>{locales.map((value) => <option key={value} value={value}>{localeNames[value]}</option>)}</select>
+      <button type="button" className="text-sm underline" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>Theme</button>
+{{#if (includes product.features "auth")}}
+      {user && <button type="button" className="text-sm underline" disabled={pending} onClick={() => void signOut()}>{t("auth.user.signOut")}</button>}
+{{/if}}
+    </div></header>
+    {error && <p role="alert" className="mx-auto max-w-7xl px-6 pt-4 text-destructive">{error}</p>}
+    <div className={`mx-auto max-w-7xl gap-10 px-6 py-10 ${sideNavigation.length ? "grid md:grid-cols-[180px_1fr]" : ""}`}>
+      {sideNavigation.length > 0 && <aside><nav aria-label={area} className="flex flex-wrap gap-4 md:flex-col">{sideNavigation.map((item) => <a key={item.href} href={`/${locale}${item.href}`} aria-current={location.pathname === `/${locale}${item.href}` ? "page" : undefined} className={location.pathname === `/${locale}${item.href}` ? "font-semibold" : "text-muted-foreground"}>{t(item.labelKey)}</a>)}</nav></aside>}
+      <main id="main-content" className="min-w-0">{children}</main>
+    </div>
+    <footer className="mx-auto max-w-7xl border-t px-6 py-8 text-xs text-muted-foreground">{t("core.footer.rights", { year: new Date().getFullYear(), name: "{{projectName}}" })}</footer>
+  </div>;
+}

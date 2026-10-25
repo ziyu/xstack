@@ -11,6 +11,7 @@ export default defineModule({
   category: "foundation",
   hidden: true,
   supports: NATIVE_SHELL,
+  nativeSplit: true,
   options: {
     locales: {
       type: "enum",

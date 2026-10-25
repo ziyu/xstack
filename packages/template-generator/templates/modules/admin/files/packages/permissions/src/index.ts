@@ -26,6 +26,6 @@ export type Actor = { id: string; role?: string | null };
 /** Rules per role. Admins manage everything; extend this for finer-grained roles. */
 export function defineAbilityFor(actor: Actor | null | undefined): AppAbility {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
-  if (actor?.role === "admin") can("manage", "all");
+  if (actor?.role?.split(",").includes("admin")) can("manage", "all");
   return build();
 }

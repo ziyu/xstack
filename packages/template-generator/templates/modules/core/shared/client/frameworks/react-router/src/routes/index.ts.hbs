@@ -1,0 +1,7 @@
+import { localeFromHeaders } from "@{{projectName}}/i18n";
+import { redirect, type LoaderFunctionArgs } from "react-router";
+
+export function loader({ request }: LoaderFunctionArgs) {
+  return redirect(`/${localeFromHeaders(request.headers)}`, { headers: { "Cache-Control": "no-store" } });
+}
+export default function Index() { return null; }

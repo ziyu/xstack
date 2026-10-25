@@ -9,11 +9,12 @@ const captchaToken = ref(""); const captchaGeneration = ref(0);
 const token = computed(() => typeof route.query.token === "string" ? route.query.token : "");
 const next = computed(() => {
   const value = route.query.next;
-  return typeof value === "string" && value.startsWith(path("dashboard")) && !value.includes("\\") && !/[\u0000-\u001f]/.test(value) ? value : path("dashboard");
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") && !/[\u0000-\u001f\u007f]/.test(value) ? value : path("dashboard");
 });
 const title = computed(() => ({ login: label("Welcome back", "欢迎回来"), signup: label("Create your account", "创建账户"), "forgot-password": label("Reset your password", "重设密码"), "reset-password": label("Choose a new password", "设置新密码"), "verify-email": label("Verify your email", "验证邮箱") })[props.mode]);
 const action = computed(() => ({ login: "login", signup: "signup", "forgot-password": "password_reset_request", "reset-password": "password_reset", "verify-email": "email_verification" })[props.mode] ?? "login");
 const { data: config } = await useFetch<{ socialProviders: string[] }>("/api/product/config");
+if (route.query.error) error.value = label("The authentication link is invalid or expired. Please try again.", "认证链接无效或已过期，请重试。");
 async function submit() {
   await run(async () => {
     const endpoint = props.mode === "signup" ? "sign-up/email" : props.mode === "login" ? "sign-in/email" : props.mode === "forgot-password" ? "request-password-reset" : props.mode === "reset-password" ? "reset-password" : "send-verification-email";
@@ -81,12 +82,12 @@ async function verifyPhone() {
       <label v-if="mode === 'signup'">\{{ label('Name', '姓名') }}<input v-model="name" autocomplete="name" maxlength="100" required /></label>
       <label v-if="mode !== 'reset-password'">\{{ label('Email', '邮箱') }}<input v-model="email" type="email" autocomplete="email" maxlength="254" required /></label>
       <label v-if="['login', 'signup', 'reset-password'].includes(mode)">\{{ label('Password', '密码') }}<input v-model="password" type="password" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" minlength="8" maxlength="128" required /></label>
-      <p v-if="mode === 'reset-password' && !token" role="alert" class="error">\{{ label('The reset link is missing its token. Request a new link.', '重置链接缺少令牌，请重新申请。') }}</p>
+      <p v-if="mode === 'reset-password' && (!token || route.query.error)" role="alert" class="error">\{{ label('The reset link is invalid or expired. Request a new link.', '重置链接无效或已过期，请重新申请。') }}</p>
       {{#if (includes product.features "captcha")}}<ProductCaptcha :key="captchaGeneration" v-model="captchaToken" :action="action" />{{/if}}
-      <button :disabled="pending || (mode === 'reset-password' && !token){{#if (includes product.features "captcha")}} || !captchaToken{{/if}}">\{{ pending ? label('Please wait…', '请稍候…') : title }}</button>
+      <button :disabled="pending || (mode === 'reset-password' && (!token || !!route.query.error)){{#if (includes product.features "captcha")}} || !captchaToken{{/if}}">\{{ pending ? label('Please wait…', '请稍候…') : title }}</button>
     </form>
     <div v-if="['login', 'signup'].includes(mode)" class="stack"><button v-for="provider in config?.socialProviders ?? []" :key="provider" class="text-button" :disabled="pending" @click="social(provider)">\{{ label('Continue with', '使用以下方式继续') }} \{{ provider }}</button></div>
-    <div class="actions"><NuxtLink :to="path(mode === 'login' ? 'signup' : 'login')">\{{ mode === 'login' ? label('Create an account', '创建账户') : label('Sign in', '登录') }}</NuxtLink>
+    <div class="actions"><NuxtLink :to="{ path: path(mode === 'login' ? 'signup' : 'login'), query: { next } }">\{{ mode === 'login' ? label('Create an account', '创建账户') : label('Sign in', '登录') }}</NuxtLink>
       {{#if (includes product.features "email")}}<NuxtLink :to="path('forgot-password')">\{{ label('Forgot password?', '忘记密码？') }}</NuxtLink><NuxtLink :to="path('verify-email')">\{{ label('Resend verification', '重新发送验证邮件') }}</NuxtLink>{{/if}}
     </div>
   </section>

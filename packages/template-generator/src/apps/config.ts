@@ -1,6 +1,7 @@
 import type { ProjectConfig } from "@xstack/types";
 
 import { APPLICATION_TEMPLATES } from "../applications.generated";
+import type { StackContext } from "../modules/types";
 import { GeneratorError } from "../types";
 import { resolveApplications, type ApplicationPlan } from "./plan";
 
@@ -22,7 +23,7 @@ export function requireApplicationPlan(
 export function resolveApplicationConfig(
   config: ProjectConfig,
   templates = APPLICATION_TEMPLATES,
-): ProjectConfig {
+): ProjectConfig & Pick<StackContext, "productContributions" | "productRuntime"> {
   if (!config.apps) return config;
   const plan = requireApplicationPlan(config, templates);
   if (!plan.apps.length)
@@ -48,13 +49,23 @@ export function resolveApplicationConfig(
   const independentRuntime = plan.apps.find(
     (app) => app.manifest.scope === "independent" && app.adapter.stack.runtime !== undefined,
   )?.adapter.stack.runtime;
-  const resolved: ProjectConfig = {
+  const resolved: ProjectConfig & Pick<StackContext, "productContributions" | "productRuntime"> = {
     ...config,
     frontend: frontends.length ? frontends : ["none"],
     backend: backendStack?.backend ?? "none",
     runtime: backendStack?.runtime ?? independentRuntime ?? "none",
     api: backendStack?.api ?? "none",
     product: config.product ?? { features: [] },
+    productContributions: plan.apps
+      .filter((app) => app.manifest.scope === "product")
+      .every((app) => app.adapter.productContribution)
+      ? plan.apps.flatMap((app) =>
+          app.manifest.scope === "product" && app.adapter.productContribution
+            ? [app.adapter.productContribution]
+            : [],
+        )
+      : undefined,
+    productRuntime: backendStack?.runtime ?? "none",
   };
   if (!backend) {
     resolved.database = "none";

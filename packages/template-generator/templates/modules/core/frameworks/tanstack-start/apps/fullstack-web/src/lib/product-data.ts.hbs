@@ -12,6 +12,8 @@ export const productResponse = createServerFn({ method: "GET" })
     setResponseHeader("Cache-Control", "no-store");
     const incoming = getRequest();
     const response = await handleProductRequest(new Request(new URL(data.path, incoming.url), { headers: incoming.headers }));
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length) setResponseHeader("Set-Cookie", cookies);
     if (response.status === 401) throw redirect({ href: `/${data.locale}/login` });
     if (response.status === 403 || response.status === 404) throw notFound();
     if (!response.ok) throw new Error(`Request failed (${response.status})`);

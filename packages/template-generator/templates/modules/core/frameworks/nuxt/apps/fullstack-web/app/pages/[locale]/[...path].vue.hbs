@@ -10,10 +10,11 @@ const allowed = [""{{#if (includes product.features "auth")}}, "login", "signup"
 if (!allowed.includes(section)) throw createError({ statusCode: 404, statusMessage: "Page not found" });
 const depth = section === "admin" && segments[1] === "blog" ? 3 : ["dashboard", "admin", "blog", "payment", "ref"].includes(section) ? 2 : {{#if (includes product.features "sms")}}section === "login" && segments[1] === "phone" ? 2 : {{/if}}1;
 if (segments.length > depth || (["payment", "ref"].includes(section) && !segments[1])) throw createError({ statusCode: 404, statusMessage: "Page not found" });
+if (section === "login" && segments.length > 1 && {{#if (includes product.features "sms")}}segments[1] !== "phone"{{else}}true{{/if}}) throw createError({ statusCode: 404, statusMessage: "Page not found" });
 {{#if (includes product.features "auth")}}
-const { data: session } = await useFetch<{ user: { id: string; name: string; email: string; role?: string | null; emailVerified: boolean } } | null>("/api/product/session", { key: "product-session" });
+const { data: session } = await useProductSession();
 if (["dashboard", "admin", "payment"].includes(section) && !session.value) await navigateTo(`${path("login")}?next=${encodeURIComponent(route.fullPath)}`, { replace: true });
-if (section === "admin" && session.value && session.value.user.role !== "admin") throw createError({ statusCode: 403, statusMessage: "Forbidden" });
+if (section === "admin" && session.value && !session.value.user.role?.split(",").includes("admin")) throw createError({ statusCode: 403, statusMessage: "Forbidden" });
 {{/if}}
 const privatePage = ["dashboard", "admin", "payment", "login", "signup", "forgot-password", "reset-password", "verify-email", "ref"].includes(section);
 useSeoMeta({ title: `${section ? section.charAt(0).toUpperCase() + section.slice(1) : "{{projectName}}"} · {{projectName}}`, robots: privatePage ? "noindex, nofollow" : "index, follow" });

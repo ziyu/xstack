@@ -4,7 +4,7 @@ const { label, path } = useProductLocale();
 const { pending, error, notice, run } = useProductAction();
 const name = ref(props.user.name); const currentPassword = ref(""); const newPassword = ref("");
 async function saveProfile() { await run(async () => { await productRequest("/api/auth/update-user", productJson({ name: name.value.trim() })); await refreshNuxtData("product-session"); notice.value = label("Profile updated.", "资料已更新。"); }); }
-async function changePassword() { await run(async () => { await productRequest("/api/auth/change-password", productJson({ currentPassword: currentPassword.value, newPassword: newPassword.value, revokeOtherSessions: true })); currentPassword.value = ""; newPassword.value = ""; notice.value = label("Password updated and other sessions revoked.", "密码已更新，其他会话已退出。"); }); }
+async function changePassword() { await run(async () => { await productRequest("/api/auth/change-password", productJson({ currentPassword: currentPassword.value, newPassword: newPassword.value, revokeOtherSessions: true })); currentPassword.value = ""; newPassword.value = ""; await refreshNuxtData("product-session"); notice.value = label("Password updated and other sessions revoked.", "密码已更新，其他会话已退出。"); }); }
 </script>
 <template>
   <p v-if="error" class="error" role="alert">\{{ error }}</p><p v-if="notice" class="notice" role="status">\{{ notice }}</p>

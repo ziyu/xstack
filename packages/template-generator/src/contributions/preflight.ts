@@ -1,15 +1,13 @@
 import type { ProjectConfig } from "@xstack/types";
 
-import { resolveApplicationConfig } from "../apps/config";
-import { resolveApplications } from "../apps/plan";
 import { toRenderConfig, getModulePlan } from "../modules/pipeline";
 import { planAuthContributions } from "../modules/stack/auth";
 import { planApiContributions } from "../template-handlers/api";
 import { GeneratorError, type RenderConfig } from "../types";
-import { resolveApplicationContext } from "./context";
 import { assertContributionInventory } from "./inventory";
 import { requiredModuleContributions } from "./requirements";
 import type { StackContribution } from "./stack";
+import { buildWorkspacePlan } from "./workspace";
 
 export interface PlannedStackContribution extends StackContribution {
   app?: string;
@@ -20,28 +18,14 @@ export function planStackContributions(
   input: ProjectConfig,
   templates: Map<string, string>,
 ): PlannedStackContribution[] {
-  const config = resolveApplicationConfig(input, templates);
-  const apps = config.apps ? resolveApplications(config.apps, templates).apps : [];
-  const contexts: { app?: string; config: RenderConfig; root?: string }[] = [];
-  if (!apps.length) contexts.push({ config: toRenderConfig(config) });
-  for (const app of apps) {
-    const local = toRenderConfig(resolveApplicationContext(config, app));
-    local.application = {
-      id: app.selection.id,
-      type: app.selection.type,
-      port: 3000,
-      clientOrigins: [],
-      paths: {},
-      workspaceRuntime: config.runtime,
-      backendRoot: app.manifest.roles.includes("backend")
-        ? `apps/${app.selection.id}`
-        : app.bindings.backend
-          ? `apps/${app.bindings.backend}`
-          : undefined,
-      ownsPath: () => true,
-    };
-    contexts.push({ app: app.selection.id, config: local, root: `apps/${app.selection.id}` });
-  }
+  const workspace = input.apps ? buildWorkspacePlan(input, templates) : undefined;
+  const contexts: { app?: string; config: RenderConfig; root?: string }[] = workspace
+    ? workspace.applications.map((entry) => ({
+        app: entry.app.selection.id,
+        config: { ...toRenderConfig(entry.config), application: entry.context },
+        root: entry.context.directory,
+      }))
+    : [{ config: toRenderConfig(input) }];
   const contributions: PlannedStackContribution[] = [];
   for (const context of contexts) {
     assertContributionInventory(

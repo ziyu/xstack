@@ -4,15 +4,21 @@ The shell every feature module plugs into.
 
 ## Layout
 
-{{#if (includes frontend "next")}}
+{{#if application.nativeSplit}}
+- React Router clients own `src/routes/product.tsx`, typed client data contracts and the same-origin `src/routes/api.ts` proxy. Their `src/config/navigation.ts` describes role-scoped navigation.
+- `{{appPath "backend"}}/src/services.ts` owns domain factories; `src/lib/native-request.ts` validates declared client origins before the shared WHATWG handler.
+- Client applications never import database, auth-service, email or SMS packages. Only the backend runs domain integrations. Use `bun run dev:<id>` for each named application; assigned ports are in `applications.json`.
+{{else if (includes frontend "next")}}
 - Product pages live in `{{appPath "fullstack-web"}}/src/app/[lang]/`.
 {{else if (includes frontend "tanstack-start")}}
 - Product routes live in `{{appPath "fullstack-web"}}/src/routes/`, with locale-prefixed URLs and server loaders for protected pages.
 {{else}}
 - Product pages live in `{{appPath "fullstack-web"}}/app/pages/`; server adapters live in `{{appPath "fullstack-web"}}/server/`. Nuxt's `~/` alias points to the app and `@/` points to the shared `src/` directory.
 {{/if}}
+{{#unless application.nativeSplit}}
 - `{{appPath "fullstack-web"}}/src/config/navigation.ts` is generated from the modules you picked. Edit it freely; it is plain data.
 - `{{appPath "fullstack-web"}}/src/services.ts` is the composition root: every package exports a factory, and this file wires them with environment variables and each other.
+{{/unless}}
 
 {{#if (includes frontend "tanstack-start")}}
 ## TanStack Start workflow
@@ -43,7 +49,7 @@ Use `{{packageManager}} run build` for the workspace production build and `{{pac
    ```
 
 2. It emits them: `await events.emit("order.paid", { orderId, userId })`.
-3. Code that connects two modules lives in `{{appPath "fullstack-web"}}/src/integrations/*.ts` and subscribes with `events.on(...)`.
+3. Code that connects two modules lives in `{{#if application.nativeSplit}}{{appPath "backend"}}{{else}}{{appPath "fullstack-web"}}{{/if}}/src/integrations/*.ts` and subscribes with `events.on(...)`.
 
 Handlers run in order and an error rejects `emit`, so a failed side effect surfaces to the caller. Replace `createEventBus` with a queue-backed implementation if you need retries; the interface stays the same.
 

@@ -2,6 +2,26 @@
   "id": "react-router",
   "apps": {
     "web-frontend": {
+      "devArgs": ["--host", "127.0.0.1"],
+      "sharedPackages": ["ui"],
+      "productContribution": {
+        "mode": "client",
+        "protocol": "product-http-v1",
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "constraints": {
+          "runtime": ["bun", "node"],
+          "api": ["none"],
+          "orm": ["drizzle"],
+          "database": ["sqlite", "postgres"],
+          "webDeploy": ["none"]
+        },
+        "frameworks": [{ "id": "react-router", "modules": ["core"] }],
+        "client": {
+          "framework": "react-router",
+          "modules": ["core", "i18n", "auth", "admin", "captcha"],
+          "integrations": ["email", "sms"]
+        }
+      },
       "stack": {
         "frontend": ["react-router"],
         "runtime": "none",
@@ -9,6 +29,26 @@
       }
     },
     "admin": {
+      "devArgs": ["--host", "127.0.0.1"],
+      "sharedPackages": ["ui"],
+      "productContribution": {
+        "mode": "client",
+        "protocol": "product-http-v1",
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha"],
+        "constraints": {
+          "runtime": ["bun", "node"],
+          "api": ["none"],
+          "orm": ["drizzle"],
+          "database": ["sqlite", "postgres"],
+          "webDeploy": ["none"]
+        },
+        "frameworks": [{ "id": "react-router", "modules": ["core"] }],
+        "client": {
+          "framework": "react-router",
+          "modules": ["core", "i18n", "auth", "admin", "captcha"],
+          "integrations": ["email", "sms"]
+        }
+      },
       "stack": {
         "frontend": ["react-router"],
         "runtime": "none",
