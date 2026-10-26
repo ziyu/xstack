@@ -22,10 +22,10 @@ export function planStackContributions(
   const contexts: { app?: string; config: RenderConfig; root?: string }[] = workspace
     ? workspace.applications.map((entry) => ({
         app: entry.app.selection.id,
-        config: { ...toRenderConfig(entry.config), application: entry.context },
+        config: { ...toRenderConfig(entry.config, templates), application: entry.context },
         root: entry.context.directory,
       }))
-    : [{ config: toRenderConfig(input) }];
+    : [{ config: toRenderConfig(input, templates) }];
   const contributions: PlannedStackContribution[] = [];
   for (const context of contexts) {
     assertContributionInventory(

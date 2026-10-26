@@ -101,6 +101,8 @@ function schema(keys: Set<string>, config: RenderConfig, envFile: string, app: s
     let type = "string(minLength=1)";
     if (key === "BETTER_AUTH_SECRET") type = "string(minLength=32)";
     else if ((key.endsWith("URL") && key !== "DATABASE_URL") || key === "CORS_ORIGIN") type = "url";
+    if (key === "CORS_ORIGIN" && config.application) type = "string(minLength=1)";
+    if (key === "PORT") type = "number";
     if (
       key.endsWith("SERVER_URL") &&
       config.webDeploy === "vercel" &&
@@ -128,19 +130,31 @@ function schema(keys: Set<string>, config: RenderConfig, envFile: string, app: s
   return lines.join("\n");
 }
 
-function processAlchemySchema(vfs: VirtualFileSystem, config: RenderConfig): void {
+export function processAlchemySchema(vfs: VirtualFileSystem): void {
+  if (!vfs.ownsPath("packages/infra/.env.schema")) return;
   const source = vfs.readFile("packages/infra/alchemy.run.ts");
   if (!source) return;
   // Import only actual deployment inputs. Resource URLs and managed database
   // credentials are Alchemy outputs, so validating them here blocks provisioning.
   const inputs = new Set([
     "NODE_ENV",
-    ...Array.from(source.matchAll(/Config\.(?:String|Redacted)\("([A-Z_]+)"\)/g), (m) => m[1]!),
+    ...Array.from(
+      source.matchAll(/Config\.(?:String|Redacted)\("([A-Z_][A-Z0-9_]*)"\)/g),
+      (m) => m[1]!,
+    ),
   ]);
   const imports: string[] = [];
-  for (const app of new Set([appOutputPath(config, "server"), appOutputPath(config, "web")])) {
-    if (!vfs.exists(`${app}/.env.schema`)) continue;
-    const keys = new Set(["NODE_ENV", ...schemaKeys(vfs, app, config)]);
+  const schemas = vfs
+    .getAllFiles()
+    .filter((path) => path.startsWith("apps/") && path.endsWith("/.env.schema"));
+  for (const path of schemas) {
+    const app = dirname(path);
+    const keys = new Set(
+      Array.from(
+        (vfs.readFile(path) ?? "").matchAll(/^([A-Z][A-Z0-9_]*)=/gm),
+        (match) => match[1]!,
+      ),
+    );
     const pick = [...inputs].filter((key) => keys.has(key));
     if (!pick.length) continue;
     imports.push(`# @import(../../${app}/, pick=[${pick.join(", ")}])`);
@@ -161,6 +175,7 @@ function processAlchemySchema(vfs: VirtualFileSystem, config: RenderConfig): voi
 }
 
 function processCloudflarePublicEnv(vfs: VirtualFileSystem, config: RenderConfig): void {
+  if (!vfs.ownsPath(appOutputPath(config, "web"))) return;
   if (config.webDeploy !== "cloudflare") return;
   if (
     !vfs
@@ -216,6 +231,7 @@ export function processVarlock(
   config: RenderConfig,
 ): void {
   const server = appOutputPath(config, "server");
+  const ownsBackend = !config.application || config.application.roles.includes("backend");
   const commands: string[] = [];
   const allKeys = new Set([
     "NODE_ENV",
@@ -227,7 +243,9 @@ export function processVarlock(
     "_VARLOCK_ENV_KEY",
   ]);
   const appRoots = new Set(
-    (["web", "server", "native"] as const).map((kind) => appOutputPath(config, kind)),
+    config.application
+      ? [config.application.directory]
+      : (["web", "server", "native"] as const).map((kind) => appOutputPath(config, kind)),
   );
   for (const app of appRoots) {
     if (!vfs.ownsPath(app) || !vfs.exists(`${app}/package.json`)) continue;
@@ -261,7 +279,7 @@ export function processVarlock(
     const ignore = "packages/db/.gitignore";
     vfs.writeFile(ignore, `${vfs.readFile(ignore) ?? ""}\n!.env.schema\n/src/env.ts\n`);
   }
-  processAlchemySchema(vfs, config);
+  processAlchemySchema(vfs);
   processCloudflarePublicEnv(vfs, config);
   if (vfs.ownsPath("bunfig.toml")) {
     vfs.writeFile("bunfig.toml", `env = false\n${vfs.readFile("bunfig.toml") ?? ""}`);
@@ -273,6 +291,7 @@ export function processVarlock(
     root.scripts.postinstall = [root.scripts.postinstall, ...commands].filter(Boolean).join(" && ");
   }
   if (
+    ownsBackend &&
     config.auth === "better-auth" &&
     config.backend !== "convex" &&
     vfs.exists("packages/db/package.json") &&
@@ -293,12 +312,13 @@ export function processVarlock(
     const app = vfs.readJson<Package>(`${server}/package.json`)!;
     app.scripts ??= {};
     app.scripts["auth:generate"] =
-      `varlock run -- ${execute} auth@latest generate --config src/services.ts --output ../../packages/db/${output} --yes`;
+      `varlock run -- ${execute} auth@latest generate --config src/services.ts --output ${relative(server, `packages/db/${output}`)} --yes`;
     vfs.writeJson(`${server}/package.json`, app);
     root.scripts["auth:generate"] = `cd ${server} && ${config.packageManager} run auth:generate`;
   }
   if (vfs.ownsPath("package.json")) vfs.writeJson("package.json", root);
   if (
+    ownsBackend &&
     vfs.ownsPath(server) &&
     ["express", "fastify"].includes(config.backend) &&
     config.auth === "better-auth"
@@ -310,11 +330,15 @@ export function processVarlock(
     });
   }
   if (
+    ownsBackend &&
     config.backend !== "none" &&
     config.backend !== "convex" &&
     vfs.ownsPath(server) &&
     vfs.exists(`${server}/package.json`)
   ) {
+    if (!templates.has("env/env.server.ts.hbs")) {
+      throw new Error(`Missing environment runtime contribution for ${server}`);
+    }
     processSingleTemplate(
       vfs,
       templates,
@@ -323,18 +347,30 @@ export function processVarlock(
       config,
     );
     if (config.database !== "none" || config.auth === "better-auth") {
+      if (!templates.has("env/services.ts.hbs")) {
+        throw new Error(`Missing service composition contribution for ${server}`);
+      }
       processSingleTemplate(vfs, templates, "env/services.ts", `${server}/src/services.ts`, config);
     }
   }
   // Imports of app-owned modules are relative, so packages never depend on application source.
   for (const file of vfs.getAllFiles()) {
-    if (!file.startsWith("apps/") || !/\.(ts|tsx|vue|svelte|astro)$/.test(file)) continue;
-    const app = file.split("/").slice(0, 2).join("/");
+    if (
+      !vfs.ownsPath(file) ||
+      !file.startsWith("apps/") ||
+      !/\.(ts|tsx|vue|svelte|astro)$/.test(file)
+    )
+      continue;
+    const app = config.application?.directory ?? file.split("/").slice(0, 2).join("/");
     let content = vfs.readFile(file)!;
-    content = content.replaceAll(
-      `@${config.projectName}/app-services`,
-      importPath(file, `${server}/src/services`),
-    );
+    if (content.includes(`@${config.projectName}/app-services`)) {
+      if (app !== server)
+        throw new Error(`Client ${app} cannot import backend runtime services from ${server}`);
+      content = content.replaceAll(
+        `@${config.projectName}/app-services`,
+        importPath(file, `${server}/src/services`),
+      );
+    }
     if (file !== appOutputPath(config, "web", "src/client.ts")) {
       content = content.replaceAll(
         `@${config.projectName}/auth/client`,
@@ -371,7 +407,7 @@ export function processVarlock(
     });
   }
   const turbo = vfs.readJson<{ globalEnv?: string[]; globalDependencies?: string[] }>("turbo.json");
-  if (turbo) {
+  if (turbo && vfs.ownsPath("turbo.json")) {
     turbo.globalEnv = [...new Set([...(turbo.globalEnv ?? []), ...allKeys])].sort();
     turbo.globalDependencies = [
       ...new Set([

@@ -1,5 +1,6 @@
 import type { ProjectConfig } from "@xstack/types";
 
+import { appOutputPath } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { addPackageDependency } from "../utils/add-deps";
 
@@ -17,8 +18,8 @@ export function processFrontendDeps(vfs: VirtualFileSystem, config: ProjectConfi
     return;
   }
 
-  const webPackagePath = "apps/web/package.json";
-  if (!vfs.exists(webPackagePath)) return;
+  const webPackagePath = appOutputPath(config, "web", "package.json");
+  if (!vfs.ownsPath(webPackagePath) || !vfs.exists(webPackagePath)) return;
 
   addPackageDependency({
     vfs,

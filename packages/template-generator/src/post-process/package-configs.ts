@@ -6,6 +6,7 @@
 import { getLocalD1Owner, webFrontends, type ProjectConfig } from "@xstack/types";
 import { parse, stringify } from "yaml";
 
+import { appOutputPath } from "../contributions/context";
 import type { JsonValue } from "../core/json-types";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { RenderConfig } from "../types";
@@ -117,15 +118,15 @@ export function updateRootPackageJson(vfs: VirtualFileSystem, config: RenderConf
     }
   }
 
-  if (hasNativeApp) {
-    scripts["dev:native"] = pmConfig.filter(config.application?.id ?? "native", "dev");
+  if (hasNativeApp && !config.application) {
+    scripts["dev:native"] = pmConfig.filter("native", "dev");
   }
 
-  if (hasWebApp) {
-    scripts["dev:web"] = pmConfig.filter(config.application?.id ?? "web", "dev");
+  if (hasWebApp && !config.application) {
+    scripts["dev:web"] = pmConfig.filter("web", "dev");
   }
 
-  if (addons.includes("electrobun")) {
+  if (addons.includes("electrobun") && !config.application) {
     // Root `dev` stays the standard aggregate; the desktop has no `dev` script so
     // it's skipped. Root `build` runs the non-desktop workspaces, then the desktop
     // (which self-builds its web app, mirroring `vite build && electrobun build`) —
@@ -144,7 +145,7 @@ export function updateRootPackageJson(vfs: VirtualFileSystem, config: RenderConf
     scripts["dev:tui"] = pmConfig.filter("tui", "dev");
   }
 
-  if (backend !== "self" && backend !== "none") {
+  if (!config.application && backend !== "self" && backend !== "none") {
     scripts["dev:server"] = pmConfig.filter(backendPackageName, "dev");
   }
 
@@ -262,18 +263,26 @@ export function updateRootPackageJson(vfs: VirtualFileSystem, config: RenderConf
   pkgJson.packageManager ||= `${packageManager}@latest`;
 
   if (packageManager === "npm") {
-    const nativeDeps = vfs.readJson<PackageJson>("apps/native/package.json")?.dependencies;
-    if (nativeDeps) {
+    const nativeApplications = config.application?.workspaceApplications.filter((application) =>
+      application.frontend.some((frontend) => frontend.startsWith("native-")),
+    );
+    const nativePackages = nativeApplications?.map((application) => ({
+      path: `${application.directory}/package.json`,
+      frontend: application.frontend,
+    })) ?? [{ path: appOutputPath(config, "native", "package.json"), frontend: config.frontend }];
+    for (const nativePackage of nativePackages) {
+      const nativeDeps = vfs.readJson<PackageJson>(nativePackage.path)?.dependencies;
+      if (!nativeDeps) continue;
       // These published peer ranges lag SDK 58. Keep overrides scoped to the
       // validated integrations; do not disable peer validation for the project.
-      if (config.auth === "clerk" && nativeDeps.expo) {
+      if (nativeDeps["@clerk/expo"] && nativeDeps.expo) {
         pkgJson.overrides = {
           ...pkgJson.overrides,
           "@clerk/expo": { expo: nativeDeps.expo },
         };
       }
       if (
-        config.frontend.includes("native-uniwind") &&
+        nativePackage.frontend.includes("native-uniwind") &&
         nativeDeps["react-native-gesture-handler"]
       ) {
         pkgJson.overrides = {
@@ -284,6 +293,16 @@ export function updateRootPackageJson(vfs: VirtualFileSystem, config: RenderConf
         };
       }
     }
+  }
+
+  if (config.frontend.includes("solid") && packageManager !== "pnpm") {
+    pkgJson.overrides = {
+      ...pkgJson.overrides,
+      "solid-js": "2.0.0-rc.14",
+      "@solidjs/signals": "2.0.0-rc.14",
+      "@solidjs/compiler": "2.0.0-rc.14",
+      "@solidjs/babel-plugin": "2.0.0-rc.14",
+    };
   }
 
   if (config.api === "orpc" && config.frontend.includes("nuxt")) {
@@ -332,6 +351,15 @@ export function updateRootPackageJson(vfs: VirtualFileSystem, config: RenderConf
     }
   }
 
+  for (const application of config.application?.workspaceApplications ?? []) {
+    const appPackage = vfs.readJson<PackageJson>(`${application.directory}/package.json`);
+    if (!appPackage?.name) continue;
+    for (const script of ["dev", "build", "check-types", "auth:generate"] as const) {
+      if (appPackage.scripts?.[script]) {
+        scripts[`${script}:${application.id}`] = pmConfig.filter(appPackage.name, script);
+      }
+    }
+  }
   pkgJson.workspaces = getUpdatedWorkspaces(existingWorkspaces, workspaces);
   vfs.writeJson("package.json", pkgJson);
 }
@@ -480,7 +508,6 @@ function compareWorkspacePackagePaths(a: string, b: string): number {
   const group = (workspacePath: string) => {
     if (workspacePath === "apps/desktop") return 3;
     if (workspacePath.startsWith("packages/")) return 0;
-    if (workspacePath === "apps/web") return 2;
     return 1;
   };
 
@@ -502,6 +529,7 @@ function updateDesktopPackageJson(vfs: VirtualFileSystem, config: RenderConfig):
     packageManager,
     { hasTurborepo, hasNx, hasVitePlus },
     desktopBuildScript,
+    vfs.readJson<PackageJson>(appOutputPath(config, "web", "package.json"))?.name ?? "web",
   );
   const rootDevCommand = getDesktopRootDevCommand(packageManager, {
     hasTurborepo,
@@ -534,27 +562,28 @@ function getDesktopWebCommand(
   packageManager: ProjectConfig["packageManager"],
   options: { hasTurborepo: boolean; hasNx: boolean; hasVitePlus: boolean },
   script: DesktopWebScript,
+  workspace: string,
 ): string {
   if (options.hasTurborepo) {
-    return `turbo run ${script} -F web`;
+    return `turbo run ${script} -F ${workspace}`;
   }
 
   if (options.hasNx) {
-    return `nx run-many -t ${script} --projects=web`;
+    return `nx run-many -t ${script} --projects=${workspace}`;
   }
 
   if (options.hasVitePlus) {
-    return `vp run --filter web ${script}`;
+    return `vp run --filter ${workspace} ${script}`;
   }
 
   switch (packageManager) {
     case "npm":
-      return `npm run ${script} --workspace web`;
+      return `npm run ${script} --workspace ${workspace}`;
     case "pnpm":
-      return `pnpm -w --filter web ${script}`;
+      return `pnpm -w --filter ${workspace} ${script}`;
     case "bun":
     default:
-      return `bun run --filter web ${script}`;
+      return `bun run --filter ${workspace} ${script}`;
   }
 }
 
@@ -720,35 +749,37 @@ export function finalizeAlchemyDevScripts(vfs: VirtualFileSystem, config: Render
     (["cloudflare", "prisma"].includes(serverDeploy) || hasAxiomServerRuntime) &&
     backend !== "self"
   ) {
-    const serverPkgPath = "apps/server/package.json";
-    const serverPkg = vfs.readJson<PackageJson>(serverPkgPath);
+    const serverPkgPath = appOutputPath(config, "server", "package.json");
+    const serverPkg = vfs.ownsPath(serverPkgPath)
+      ? vfs.readJson<PackageJson>(serverPkgPath)
+      : undefined;
     if (serverPkg?.scripts?.dev) {
       serverPkg.scripts["dev:bare"] = serverPkg.scripts.dev;
-      delete serverPkg.scripts.dev;
+      if (!config.application) delete serverPkg.scripts.dev;
       vfs.writeJson(serverPkgPath, serverPkg);
     }
     if (rootPkg?.scripts?.["dev:server"]) {
       if (hasAxiomServerRuntime) {
         delete rootPkg.scripts["dev:server"];
       } else {
-        rootPkg.scripts["dev:server"] = pmConfig.filter(backend, "dev:bare");
+        rootPkg.scripts["dev:server"] = pmConfig.filter(serverPkg?.name ?? backend, "dev:bare");
       }
     }
   }
 
   if (["cloudflare", "prisma"].includes(webDeploy) || hasAxiomWebRuntime) {
-    const webPkgPath = "apps/web/package.json";
-    const webPkg = vfs.readJson<PackageJson>(webPkgPath);
+    const webPkgPath = appOutputPath(config, "web", "package.json");
+    const webPkg = vfs.ownsPath(webPkgPath) ? vfs.readJson<PackageJson>(webPkgPath) : undefined;
     if (webPkg?.scripts?.dev) {
       webPkg.scripts["dev:bare"] = webPkg.scripts.dev;
-      delete webPkg.scripts.dev;
+      if (!config.application) delete webPkg.scripts.dev;
       vfs.writeJson(webPkgPath, webPkg);
     }
     if (rootPkg?.scripts?.["dev:web"]) {
       if (hasAxiomWebRuntime) {
         delete rootPkg.scripts["dev:web"];
       } else {
-        rootPkg.scripts["dev:web"] = pmConfig.filter("web", "dev:bare");
+        rootPkg.scripts["dev:web"] = pmConfig.filter(webPkg?.name ?? "web", "dev:bare");
       }
     }
   }
@@ -763,8 +794,8 @@ function updateVitePlusPackages(vfs: VirtualFileSystem, config: RenderConfig): v
     return;
   }
 
-  const webPkgPath = "apps/web/package.json";
-  const webPkg = vfs.readJson<PackageJson>(webPkgPath);
+  const webPkgPath = appOutputPath(config, "web", "package.json");
+  const webPkg = vfs.ownsPath(webPkgPath) ? vfs.readJson<PackageJson>(webPkgPath) : undefined;
 
   const coreAlias = `npm:@voidzero-dev/vite-plus-core@${VITE_PLUS_VERSION}`;
   const rootPkg = vfs.readJson<PackageJson>("package.json");
@@ -790,7 +821,7 @@ function updateVitePlusPackages(vfs: VirtualFileSystem, config: RenderConfig): v
       }
     }
   };
-  if (config.packageManager === "pnpm") {
+  if (config.packageManager === "pnpm" && vfs.ownsPath("pnpm-workspace.yaml")) {
     const workspace = parse(vfs.readFile("pnpm-workspace.yaml") ?? "") ?? {};
     updateCatalogs(workspace);
     vfs.writeFile("pnpm-workspace.yaml", stringify(workspace));
@@ -800,7 +831,7 @@ function updateVitePlusPackages(vfs: VirtualFileSystem, config: RenderConfig): v
       updateCatalogs(rootPkg.workspaces);
     }
   }
-  if (rootPkg) vfs.writeJson("package.json", rootPkg);
+  if (rootPkg && vfs.ownsPath("package.json")) vfs.writeJson("package.json", rootPkg);
 
   if (!webPkg?.scripts) return;
 

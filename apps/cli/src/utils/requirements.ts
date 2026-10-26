@@ -257,8 +257,7 @@ export function validateLocalToolVersions(
 }
 
 const STACK_REQUIREMENTS_HEADLINE = "Your local toolchain does not meet this stack's requirements:";
-const BASELINE_REQUIREMENTS_HEADLINE =
-  "Your local toolchain does not meet xstack's requirements:";
+const BASELINE_REQUIREMENTS_HEADLINE = "Your local toolchain does not meet xstack's requirements:";
 
 export function validateRequirements(
   requirements: VersionRequirement[],

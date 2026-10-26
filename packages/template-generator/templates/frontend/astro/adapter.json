@@ -1,8 +1,19 @@
 {
   "id": "astro",
+  "name": "Astro",
+  "description": "The web framework for content-driven websites",
+  "icon": "/icons/astro.svg",
   "apps": {
     "fullstack-web": {
-      "devArgs": ["--host", "127.0.0.1"],
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["orpc", "none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
+      "clientContributions": { "framework": "astro", "family": "astro" },
+      "serverContributions": { "apiPrefix": "" },
+      "devArgs": ["--host", "127.0.0.1", "--ignore-lock"],
       "stack": {
         "frontend": ["astro"],
         "backend": "self",
@@ -11,7 +22,14 @@
       }
     },
     "web-frontend": {
-      "devArgs": ["--host", "127.0.0.1"],
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
+      "clientContributions": { "framework": "astro", "family": "astro" },
+      "devArgs": ["--host", "127.0.0.1", "--ignore-lock"],
       "stack": {
         "frontend": ["astro"],
         "runtime": "none",

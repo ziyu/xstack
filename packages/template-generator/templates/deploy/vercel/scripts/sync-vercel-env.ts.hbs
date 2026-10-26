@@ -4,36 +4,49 @@ import { dirname, join } from "node:path";
 import { parseEnv } from "node:util";
 
 const DEFAULT_ENVIRONMENT = "preview";
-const VALID_ENVIRONMENTS = new Set(["development", "preview", "production"]);
+const VALID_ENVIRONMENTS: Record<string, true> = { development: true, preview: true, production: true };
 const VERCEL_COMMAND = [{{#if (eq packageManager "npm")}}"npx", "--yes", "vercel"{{else if (eq packageManager "pnpm")}}"pnpm", "dlx", "vercel"{{else}}"bunx", "vercel"{{/if}}] as const;
+const APPLICATION_FILES: Record<string, string> = {
+{{#each deploymentApplications}}
+	"{{id}}": "{{directory}}/.env",
+{{/each}}
+};
 const DEFAULT_FILES = [
+{{#unless deploymentApplications}}
 {{#if (eq webDeploy "vercel")}}
-	"apps/web/.env",
+	"{{appPath 'web'}}/.env",
 {{/if}}
 {{#if (and (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex"))}}
-	"apps/server/.env",
+	"{{appPath 'server'}}/.env",
 {{/if}}
+{{/unless}}
 ];
-const SKIP_KEYS = new Set([
+const SKIP_KEYS: Record<string, true> = {
+{{#if deploymentApplications}}
+	NODE_ENV: true,
+{{else}}
 {{#if (or (and (eq webDeploy "vercel") (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex")) (and (eq webDeploy "vercel") (eq backend "self")))}}
-	"BETTER_AUTH_URL",
-	"CORS_ORIGIN",
-	"NODE_ENV",
+	BETTER_AUTH_URL: true,
+	CORS_ORIGIN: true,
+	NODE_ENV: true,
 {{else if (and (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex"))}}
 	// BETTER_AUTH_URL derives from the deployment's own origin at runtime;
 	// CORS_ORIGIN stays synced because the web app (if any) lives on another host
-	"BETTER_AUTH_URL",
-	"NODE_ENV",
+	BETTER_AUTH_URL: true,
+	NODE_ENV: true,
 {{/if}}
-]);
-const OVERRIDE_KEYS = new Map([
+{{/if}}
+};
+const OVERRIDE_KEYS: Record<string, string> = {
+{{#unless deploymentApplications}}
 {{#if (and (eq webDeploy "vercel") (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex"))}}
-	["NEXT_PUBLIC_SERVER_URL", "/api"],
-	["NUXT_PUBLIC_SERVER_URL", "/api"],
-	["PUBLIC_SERVER_URL", "/api"],
-	["VITE_SERVER_URL", "/api"],
+	NEXT_PUBLIC_SERVER_URL: "/api",
+	NUXT_PUBLIC_SERVER_URL: "/api",
+	PUBLIC_SERVER_URL: "/api",
+	VITE_SERVER_URL: "/api",
 {{/if}}
-]);
+{{/unless}}
+};
 
 const args = process.argv.slice(2);
 const separatorIndex = args.indexOf("--");
@@ -41,8 +54,14 @@ const scriptArgs = separatorIndex === -1 ? args : args.slice(0, separatorIndex);
 const forwardedArgs = separatorIndex === -1 ? [] : args.slice(separatorIndex + 1);
 
 const environment =
-	scriptArgs[0] && VALID_ENVIRONMENTS.has(scriptArgs[0]) ? scriptArgs[0] : DEFAULT_ENVIRONMENT;
-const remainingArgs = scriptArgs.slice(VALID_ENVIRONMENTS.has(scriptArgs[0] ?? "") ? 1 : 0);
+	scriptArgs[0] && VALID_ENVIRONMENTS[scriptArgs[0]] ? scriptArgs[0] : DEFAULT_ENVIRONMENT;
+const remainingArgs = scriptArgs.slice(VALID_ENVIRONMENTS[scriptArgs[0] ?? ""] ? 1 : 0);
+const appIndex = remainingArgs.indexOf("--app");
+const app = appIndex === -1 ? undefined : remainingArgs[appIndex + 1];
+if (Object.keys(APPLICATION_FILES).length && (!app || !Object.hasOwn(APPLICATION_FILES, app))) {
+	throw new Error(`Select a Vercel application with --app (${Object.keys(APPLICATION_FILES).join(", ")})`);
+}
+if (appIndex !== -1) remainingArgs.splice(appIndex, 2);
 // Split remaining args into env-file paths and passthrough Vercel CLI flags.
 // A bare token counts as a file only when it exists on disk, so flags and their
 // values (e.g. `--scope my-team`) forward correctly regardless of argument order.
@@ -55,8 +74,8 @@ for (const arg of remainingArgs) {
 		passthroughArgs.push(arg);
 	}
 }
-const vercelArgs = [...passthroughArgs, ...forwardedArgs];
-const envFiles = files.length > 0 ? files : DEFAULT_FILES;
+const vercelArgs = [...(app ? ["--local-config", `vercel.${app}.json`] : []), ...passthroughArgs, ...forwardedArgs];
+const envFiles = files.length > 0 ? files : app ? [APPLICATION_FILES[app]!] : DEFAULT_FILES;
 
 const env = new Map<string, string>();
 const undeclaredKeys: string[] = [];
@@ -76,12 +95,12 @@ for (const file of envFiles) {
 		: undefined;
 
 	for (const [key, value] of Object.entries(parseEnv(readFileSync(file, "utf8")))) {
-		if (SKIP_KEYS.has(key)) continue;
+		if (Object.hasOwn(SKIP_KEYS, key)) continue;
 		if (declaredKeys && !declaredKeys.has(key)) {
 			undeclaredKeys.push(key);
 			continue;
 		}
-		const syncedValue = OVERRIDE_KEYS.get(key) ?? value;
+		const syncedValue = Object.hasOwn(OVERRIDE_KEYS, key) ? OVERRIDE_KEYS[key]! : value;
 		if (!syncedValue) {
 			emptyKeys.push(key);
 			continue;

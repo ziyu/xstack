@@ -267,11 +267,12 @@ export function ProductOptions({
                   {providerSpec.max === 1
                     ? "Choose one provider."
                     : `Choose at least ${providerSpec.min ?? 0}${providerSpec.max === undefined ? "" : ` and at most ${providerSpec.max}`} providers.`}
-                  {manifest.id === "auth" &&
-                    " Uncheck all providers to disable OAuth; email/password authentication remains available with the native engine."}
-                  {manifest.id === "auth" &&
-                    providers.includes("wechat") &&
-                    " WeChat requires an approved Open Platform website application and a public callback domain. Set its AppID/AppSecret only in the generated server environment."}
+                  {providerSpec.help && ` ${providerSpec.help}`}
+                  {providers
+                    .map((provider) => providerSpec.options[provider]?.help)
+                    .filter(Boolean)
+                    .map((help) => ` ${help}`)
+                    .join("")}
                 </p>
                 <p className="text-[11px] text-fd-muted-foreground">
                   {explicitProviders ? "Explicit configuration" : "Catalog default for this target"}
@@ -399,20 +400,14 @@ export function ProductOptions({
                 )}
               </div>
             ))}
-            {(manifest.id === "email" || manifest.id === "payment") && (
-              <p className="border-l-2 border-amber-500/50 pl-2 text-[11px] leading-relaxed text-fd-muted-foreground">
-                {manifest.id === "email"
-                  ? "Production email delivery requires configured provider credentials and a valid sender. Configure them in the generated environment, never here."
-                  : "Mock payments are development-only. Production payments require a real provider, its credentials, webhook configuration and product/price setup. Polar defaults to sandbox; switch its environment to production before launch."}
+            {(manifest.notices ?? []).map((notice) => (
+              <p
+                key={notice}
+                className="border-l-2 border-amber-500/50 pl-2 text-[11px] leading-relaxed text-fd-muted-foreground"
+              >
+                {notice}
               </p>
-            )}
-            {manifest.id === "sms" && (
-              <p className="border-l-2 border-amber-500/50 pl-2 text-[11px] leading-relaxed text-fd-muted-foreground">
-                Select Authentication as well to enable phone-number signup and login. Real SMS
-                delivery needs provider credentials and approved sender/template settings. Console
-                delivery is explicitly development-only; never enter credentials here.
-              </p>
-            )}
+            ))}
             {uniqueEnvironment.length > 0 && (
               <details className="border-t border-fd-border pt-3">
                 <summary className="builder-focus-ring cursor-pointer text-xs text-fd-muted-foreground">

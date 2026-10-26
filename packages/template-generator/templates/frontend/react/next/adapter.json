@@ -1,7 +1,18 @@
 {
   "id": "next",
+  "name": "Next.js",
+  "description": "React framework with hybrid rendering",
+  "icon": "/icons/nextjs.svg",
   "apps": {
     "fullstack-web": {
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["trpc", "orpc", "none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
+      "clientContributions": { "framework": "next", "family": "react", "serverAuth": true },
+      "serverContributions": { "apiPrefix": "/api" },
       "devArgs": ["--hostname", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {
@@ -12,6 +23,13 @@
       }
     },
     "web-frontend": {
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
+      "clientContributions": { "framework": "next", "family": "react", "serverAuth": true },
       "devArgs": ["--hostname", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {

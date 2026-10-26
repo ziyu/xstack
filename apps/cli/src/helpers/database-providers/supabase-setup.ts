@@ -20,6 +20,7 @@ import {
   type DbSetupMode,
   resolveDbSetupMode,
 } from "../core/db-setup-options";
+import { resolveDatabaseApplication } from "../workspace-applications";
 
 type SupabaseSetupResult = Result<void, DatabaseSetupError | UserCancelledError>;
 
@@ -32,14 +33,12 @@ const statusSchema = z.object({
 
 /** Save a verified database URL in the app that consumes the database. */
 async function writeSupabaseEnvFile(
-  projectDir: string,
-  backend: ProjectConfig["backend"],
+  targetDir: string,
   databaseUrl: string,
 ): Promise<Result<void, DatabaseSetupError>> {
   return Result.tryPromise({
     try: async () => {
-      const targetApp = backend === "self" ? "apps/web" : "apps/server";
-      const envPath = path.join(projectDir, targetApp, ".env");
+      const envPath = path.join(targetDir, ".env");
       const variables: EnvVariable[] = [
         {
           key: "DATABASE_URL",
@@ -183,7 +182,7 @@ async function startSupabase(
 
 /** Print pinned setup commands without changing configuration or credentials. */
 function displayManualSupabaseInstructions(
-  targetApp: "apps/web" | "apps/server",
+  targetApp: string,
   packageManager: PackageManager,
   output?: string | null,
 ) {
@@ -211,14 +210,17 @@ export async function setupSupabase(
   config: ProjectConfig,
   cliInput?: DatabaseSetupCliOptions,
 ): Promise<SupabaseSetupResult> {
-  const { projectDir, packageManager, backend } = config;
-  const targetApp: "apps/web" | "apps/server" = backend === "self" ? "apps/web" : "apps/server";
+  const { projectDir, packageManager } = config;
+  const application = await resolveDatabaseApplication(config, "supabase");
+  if (application.isErr()) return Result.err(application.error);
+  const targetApp = application.value.directory;
   const setupMode = resolveDbSetupMode("supabase", {
     manualDb: cliInput?.manualDb,
     dbSetupOptions: cliInput?.dbSetupOptions ?? config.dbSetupOptions,
   });
 
   const serverDir = path.join(projectDir, "packages", "db");
+  const targetDir = path.join(projectDir, targetApp);
 
   const ensureDirResult = await Result.tryPromise({
     try: () => fs.ensureDir(serverDir),
@@ -293,7 +295,7 @@ export async function setupSupabase(
   const statusResult = await readSupabaseStatus(serverDir, packageManager);
 
   if (statusResult.isOk()) {
-    const envResult = await writeSupabaseEnvFile(projectDir, backend, statusResult.value);
+    const envResult = await writeSupabaseEnvFile(targetDir, statusResult.value);
     if (envResult.isOk()) {
       cliLog.success(pc.green("Supabase local development setup ready!"));
     } else {

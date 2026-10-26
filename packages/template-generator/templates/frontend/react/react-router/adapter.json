@@ -1,13 +1,34 @@
 {
   "id": "react-router",
+  "name": "React Router",
+  "description": "Declarative routing for React",
+  "icon": "/icons/react-router.svg",
   "apps": {
     "web-frontend": {
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
+      "clientContributions": { "framework": "react-router", "family": "react", "serverAuth": true },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "productContribution": {
         "mode": "client",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "modules": [
+          "core",
+          "i18n",
+          "auth",
+          "admin",
+          "email",
+          "sms",
+          "captcha",
+          "payment",
+          "credits",
+          "affiliate"
+        ],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -18,7 +39,16 @@
         "frameworks": [{ "id": "react-router", "modules": ["core"] }],
         "client": {
           "framework": "react-router",
-          "modules": ["core", "i18n", "auth", "admin", "captcha", "payment", "credits", "affiliate"],
+          "modules": [
+            "core",
+            "i18n",
+            "auth",
+            "admin",
+            "captcha",
+            "payment",
+            "credits",
+            "affiliate"
+          ],
           "integrations": ["email", "sms", "admin", "payment"]
         }
       },
@@ -29,12 +59,30 @@
       }
     },
     "admin": {
+      "legacy": false,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
+      "clientContributions": { "framework": "react-router", "family": "react", "serverAuth": true },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "productContribution": {
         "mode": "client",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "modules": [
+          "core",
+          "i18n",
+          "auth",
+          "admin",
+          "email",
+          "sms",
+          "captcha",
+          "payment",
+          "credits",
+          "affiliate"
+        ],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -45,7 +93,16 @@
         "frameworks": [{ "id": "react-router", "modules": ["core"] }],
         "client": {
           "framework": "react-router",
-          "modules": ["core", "i18n", "auth", "admin", "captcha", "payment", "credits", "affiliate"],
+          "modules": [
+            "core",
+            "i18n",
+            "auth",
+            "admin",
+            "captcha",
+            "payment",
+            "credits",
+            "affiliate"
+          ],
           "integrations": ["email", "sms", "admin", "payment"]
         }
       },

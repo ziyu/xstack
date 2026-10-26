@@ -2,15 +2,17 @@ import { describe, expect, it } from "bun:test";
 
 import type { ProductConfig, ProjectConfig } from "@xstack/types";
 
+import { resolveWorkspaceCapabilities } from "../src/contributions/capabilities";
 import { VirtualFileSystem } from "../src/core/virtual-fs";
 import { generate } from "../src/generator";
-import { MODULE_CATALOG } from "../src/modules/catalog";
+import { MODULE_CATALOG, readModuleCatalog } from "../src/modules/catalog";
 import { toRenderConfig } from "../src/modules/pipeline";
 import { PRODUCT_PRESETS } from "../src/modules/presets";
 import { hasErrors, resolveModules, toSelection } from "../src/modules/resolver";
 import { replaceStackFiles } from "../src/modules/seams";
 import type { StackContext } from "../src/modules/types";
 import { EMBEDDED_TEMPLATES } from "../src/templates.generated";
+import { dependencyVersionMap } from "../src/utils/add-deps";
 
 const NEXT_STACK: StackContext = {
   projectName: "app",
@@ -237,5 +239,127 @@ describe("module seams", () => {
       config({ features: ["auth"] }, { frontend: ["svelte"], api: "orpc" }),
     );
     expect(render.auth).toBe("better-auth");
+  });
+});
+
+describe("template-owned module declarations", () => {
+  const declaration = {
+    id: "audit-journal",
+    name: { en: "Audit journal", "zh-CN": "审计日志" },
+    description: { en: "Custom audit journal", "zh-CN": "自定义审计日志" },
+    category: "operations",
+    providers: {
+      min: 1,
+      max: 1,
+      default: { global: ["local"], cn: ["local"] },
+      options: { local: { name: "Local journal", market: "any" } },
+    },
+    options: { retention: { type: "number", default: 30, min: 1, integer: true } },
+    packages: [{ dir: "audit-journal", dependencies: { zod: "$dependency:zod" } }],
+    sources: {
+      providers: { mode: "inline", source: "files/packages/audit-journal/src/index.ts.hbs" },
+    },
+  };
+
+  it("discovers, validates and generates a new module entirely from supplied templates", async () => {
+    const templates = new Map(EMBEDDED_TEMPLATES);
+    templates.set("modules/audit-journal/module.json", JSON.stringify(declaration));
+    templates.set(
+      "modules/audit-journal/files/packages/audit-journal/src/index.ts.hbs",
+      'export const retention = {{module.options.retention}}; export const provider = "{{module.providers.[0]}}";',
+    );
+    const product = {
+      features: ["audit-journal"],
+      providers: { "audit-journal": ["local"] },
+      options: { "audit-journal": { retention: 90 } },
+    };
+    const catalog = readModuleCatalog(templates);
+    expect(MODULE_CATALOG.has("audit-journal")).toBe(false);
+    expect(catalog.get("audit-journal")?.packages?.[0]?.dependencies?.zod).toBe(
+      dependencyVersionMap.zod,
+    );
+    expect(resolveWorkspaceCapabilities(config(product), templates).issues).toEqual([]);
+    const selected = resolveModules(toSelection(product), NEXT_STACK, catalog);
+    expect(selected.issues).toEqual([]);
+    const result = await generate({ config: config(product), templates });
+    if (result.isErr()) throw result.error;
+    const pending = [...result.value.root.children];
+    const files = new Map<string, string>();
+    while (pending.length) {
+      const node = pending.pop()!;
+      if (node.type === "file") files.set(node.path, node.content);
+      else pending.push(...node.children);
+    }
+    expect(files.get("packages/audit-journal/src/index.ts")).toContain("retention = 90");
+    expect(files.get("packages/audit-journal/src/index.ts")).toContain('provider = "local"');
+    const invalid = await generate({
+      config: config({ ...product, providers: { "audit-journal": ["missing"] } }),
+      templates,
+    });
+    expect(invalid.isErr() && invalid.error.message).toContain('Unknown provider "missing"');
+    const invalidOption = await generate({
+      config: config({ ...product, options: { "audit-journal": { retention: 0 } } }),
+      templates,
+    });
+    expect(invalidOption.isErr() && invalidOption.error.message).toContain(
+      'Option "audit-journal.retention"',
+    );
+    templates.delete("modules/audit-journal/files/packages/audit-journal/src/index.ts.hbs");
+    const absentSource = await generate({ config: config(product), templates });
+    expect(absentSource.isErr() && absentSource.error.message).toContain("missing-contribution");
+  });
+
+  it("uses supplied declarations rather than silently restoring the built-in catalog", () => {
+    const templates = new Map([["modules/audit-journal/module.json", JSON.stringify(declaration)]]);
+    const catalog = readModuleCatalog(templates);
+    expect([...catalog.keys()]).toEqual(["audit-journal"]);
+    expect(
+      resolveModules(toSelection({ features: ["auth"] }), NEXT_STACK, catalog).issues,
+    ).toContainEqual(expect.objectContaining({ message: 'Unknown feature module "auth"' }));
+  });
+
+  it("enforces template-owned foundation support without a canonical module name", () => {
+    const metadata = {
+      ...declaration,
+      hidden: true,
+      providers: undefined,
+      requiredWhen: { frameworks: ["next"], backends: ["self"], apis: ["none"] },
+      supports: { orms: ["drizzle"], dialects: ["postgres"] },
+    };
+    const templates = new Map([["modules/audit-journal/module.json", JSON.stringify(metadata)]]);
+    const invalid = resolveWorkspaceCapabilities(config({ features: [] }), templates);
+    expect(invalid.issues).toContain(
+      'web: Module "audit-journal" requires one of these databases: postgres',
+    );
+    expect(
+      resolveWorkspaceCapabilities(config({ features: [] }, { database: "postgres" }), templates)
+        .issues,
+    ).toEqual([]);
+    expect(
+      resolveWorkspaceCapabilities(config({ features: [] }, { frontend: ["svelte"] }), templates)
+        .issues,
+    ).toEqual([]);
+  });
+
+  it("does not impose native foundation requirements on a stack fallback", () => {
+    const fallback = plan(PRODUCT_PRESETS.starter, { database: "mongodb", orm: "mongoose" });
+    expect(fallback.issues.filter((issue) => issue.level === "error")).toEqual([]);
+    expect(fallback.modules.map((module) => [module.manifest.id, module.variant])).toEqual([
+      ["auth", "stack"],
+    ]);
+  });
+
+  it("reports malformed declarations and unknown version references with their metadata path", () => {
+    const path = "modules/audit-journal/module.json";
+    for (const manifest of [
+      { ...declaration, options: { retention: { type: "number", default: "invalid" } } },
+      {
+        ...declaration,
+        packages: [{ dir: "audit-journal", dependencies: { zod: "$dependency:unknown-package" } }],
+      },
+      { ...declaration, id: "different-directory" },
+    ]) {
+      expect(() => readModuleCatalog(new Map([[path, JSON.stringify(manifest)]]))).toThrow(path);
+    }
   });
 });

@@ -1,6 +1,7 @@
 {
   "id": "backend",
   "name": "Backend service",
+  "technologyLabel": "Backend framework",
   "defaultDirectoryName": "backend",
   "roles": ["backend"],
   "scope": "product",

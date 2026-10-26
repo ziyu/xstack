@@ -1,0 +1,24 @@
+import { ENV } from "../env.server";
+import { handleProductRequest, json } from "./product-api";
+
+const backendOrigin = {{#if (includes product.features "auth")}}new URL(ENV.BETTER_AUTH_URL).origin{{else}}"{{application.backendOrigin}}"{{/if}};
+const clientOrigins = new Set<string>([...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean), {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]);
+
+/** Only declared BFF origins may select the public auth URL; forwarded headers never do. */
+export async function handleNativeRequest(request: Request): Promise<Response> {
+  const clientOrigin = request.headers.get("x-xstack-client-origin");
+  const origin = request.headers.get("origin");
+  if ((clientOrigin !== null && !clientOrigins.has(clientOrigin)) ||
+      (origin !== null && origin !== backendOrigin && !clientOrigins.has(origin))) {
+    return json({ error: "forbidden" }, 403);
+  }
+  const publicOrigin = clientOrigin ?? backendOrigin;
+  const url = new URL(request.url);
+  const selected = new URL(publicOrigin);
+  url.protocol = selected.protocol;
+  url.host = selected.host;
+  const headers = new Headers(request.headers);
+  headers.set("host", selected.host);
+  for (const name of ["forwarded", "x-forwarded-host", "x-forwarded-proto", "x-forwarded-port", "x-xstack-client-origin"]) headers.delete(name);
+  return handleProductRequest(new Request(url.href, new Request(request, { headers })));
+}

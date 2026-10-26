@@ -6,6 +6,15 @@ import { addPackageDependency } from "../utils/add-deps";
 export function processInfraDeps(vfs: VirtualFileSystem, config: RenderConfig): void {
   const infraPath = "packages/infra/package.json";
   if (!vfs.exists(infraPath)) return;
+  addPackageDependency({
+    vfs,
+    packagePath: infraPath,
+    dependencies: ["zod"],
+    devDependencies: ["typescript"],
+    customDevDependencies: {
+      [`@${config.projectName}/config`]: config.packageManager === "npm" ? "*" : "workspace:*",
+    },
+  });
 
   const { serverDeploy, webDeploy } = config;
   if (getPrismaWebsiteFramework(config)) {

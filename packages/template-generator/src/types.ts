@@ -1,7 +1,24 @@
-import type { Auth, ProjectConfig } from "@xstack/types";
+import type { ApplicationAdapter, Auth, ProjectConfig } from "@xstack/types";
 import { TaggedError } from "better-result";
 
 import type { ProductContribution } from "./modules/types";
+
+export interface WorkspaceApplicationContext {
+  id: string;
+  type: string;
+  roles: string[];
+  directory: string;
+  port: number;
+  origin: string;
+  bindings: Record<string, string>;
+  backendRoot?: string;
+  frontend: ProjectConfig["frontend"];
+  backend: ProjectConfig["backend"];
+  runtime: ProjectConfig["runtime"];
+  api: ProjectConfig["api"];
+  webDeploy: ProjectConfig["webDeploy"];
+  serverDeploy: ProjectConfig["serverDeploy"];
+}
 
 /**
  * The config stack templates and processors render with: the project config plus the
@@ -12,6 +29,9 @@ export type ApplicationRenderContext = {
   type: string;
   roles: string[];
   contribution?: ProductContribution;
+  clientContributions?: ApplicationAdapter["clientContributions"];
+  backendApiPrefix: string;
+  workspaceApplications: WorkspaceApplicationContext[];
   directory: string;
   origin: string;
   devArgs: string[];

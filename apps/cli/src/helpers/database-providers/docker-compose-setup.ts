@@ -5,19 +5,24 @@ import { Result } from "better-result";
 import type { Database, ProjectConfig } from "../../types";
 import { addEnvVariablesToFile, type EnvVariable } from "../../utils/env-utils";
 import { DatabaseSetupError } from "../../utils/errors";
+import { resolveDatabaseApplication } from "../workspace-applications";
 
 export async function setupDockerCompose(
   config: ProjectConfig,
 ): Promise<Result<void, DatabaseSetupError>> {
-  const { database, projectDir, projectName, backend } = config;
+  const { database, projectDir, projectName } = config;
 
   if (database === "none" || database === "sqlite") {
     return Result.ok(undefined);
   }
 
+  const application = await resolveDatabaseApplication(config, "docker-compose");
+  if (application.isErr()) return Result.err(application.error);
+  const targetDir = path.join(projectDir, application.value.directory);
+
   const result = await Result.tryPromise({
     try: async () => {
-      await writeEnvFile(projectDir, database, projectName, backend);
+      await writeEnvFile(targetDir, database, projectName);
     },
     catch: (e) =>
       new DatabaseSetupError({
@@ -30,14 +35,8 @@ export async function setupDockerCompose(
   return result.isErr() ? result : Result.ok(undefined);
 }
 
-async function writeEnvFile(
-  projectDir: string,
-  database: Database,
-  projectName: string,
-  backend?: string,
-) {
-  const targetApp = backend === "self" ? "apps/web" : "apps/server";
-  const envPath = path.join(projectDir, targetApp, ".env");
+async function writeEnvFile(targetDir: string, database: Database, projectName: string) {
+  const envPath = path.join(targetDir, ".env");
   const variables: EnvVariable[] = [
     {
       key: "DATABASE_URL",

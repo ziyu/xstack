@@ -22,7 +22,17 @@ const clerkClient = createClerkClient({
 
 async function authenticateClerkRequest(request: Request): Promise<ClerkContextAuth> {
 	const requestState = await clerkClient.authenticateRequest(request, {
-		authorizedParties: [ENV.CORS_ORIGIN],
+    authorizedParties: [
+{{#if (eq backend "self")}}
+      new URL(request.url).origin,
+{{/if}}
+{{#if (ne backend "self")}}
+      ...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean),
+{{/if}}
+{{#each application.clientOrigins}}
+      "{{this}}",
+{{/each}}
+    ],
 	});
 	return toClerkContextAuth(requestState.toAuth());
 }

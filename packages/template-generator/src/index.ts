@@ -19,7 +19,7 @@ export { generateReproducibleCommand } from "./utils/reproducible-command";
 export { processNpmScriptApprovals } from "./post-process/package-configs";
 
 export * from "./modules/types";
-export { MODULE_CATALOG } from "./modules/catalog";
+export { MODULE_CATALOG, readModuleCatalog } from "./modules/catalog";
 export { resolveModules, toSelection, hasErrors, toDeployTarget } from "./modules/resolver";
 export { PRODUCT_PRESETS } from "./modules/presets";
 export { getModulePlan, toRenderConfig } from "./modules/pipeline";

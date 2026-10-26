@@ -20,10 +20,12 @@ if (!resolve(projectDirectory).startsWith(disposableRoot))
 const database = new Database(`${projectDirectory}/local.db`, { create: false, readwrite: true });
 const cookies: string[] = [];
 
-async function request(endpoint: string, body: Record<string, unknown>, cookie?: string) {
+async function request(endpoint: string, body: Record<string, string | boolean>, cookie?: string) {
+  const headers = new Headers({ "content-type": "application/json", origin });
+  if (cookie) headers.set("cookie", cookie);
   return fetch(`${origin}/api/auth/${endpoint}`, {
     method: "POST",
-    headers: { "content-type": "application/json", origin, ...(cookie ? { cookie } : {}) },
+    headers,
     body: JSON.stringify(body),
   });
 }

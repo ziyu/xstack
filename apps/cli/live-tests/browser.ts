@@ -1,13 +1,13 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { RenderConfig } from "@xstack/template-generator";
 import {
   chromium,
   expect as baseExpect,
   type APIRequestContext,
   type Browser,
 } from "@playwright/test";
+import type { RenderConfig } from "@xstack/template-generator";
 import { z } from "zod";
 
 import { Blocked } from "./command";

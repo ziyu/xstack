@@ -15,6 +15,8 @@ export function resolveApplicationContext(
   app: ResolvedApplication,
 ): ApplicationConfig {
   const independent = app.manifest.scope === "independent";
+  const server = app.manifest.roles.includes("backend");
+  const web = app.manifest.roles.some((role) => role === "web-frontend" || role === "admin");
   return {
     ...config,
     ...app.adapter.stack,
@@ -39,6 +41,23 @@ export function resolveApplicationContext(
         : config.api,
     database: independent ? "none" : config.database,
     orm: independent ? "none" : config.orm,
+    dbSetup: server ? config.dbSetup : "none",
+    dbSetupOptions: server ? config.dbSetupOptions : undefined,
+    webDeploy: web ? config.webDeploy : "none",
+    serverDeploy: server ? config.serverDeploy : "none",
+    addons: independent
+      ? []
+      : config.addons.filter((addon) => {
+          if (addon === "pwa") return web;
+          if (addon === "tauri" || addon === "electrobun")
+            return app.manifest.roles.includes("web-frontend");
+          if (addon === "axiom" || addon === "evlog") return server || web;
+          return true;
+        }),
+    productContributions: independent
+      ? undefined
+      : (config as ApplicationConfig).productContributions,
+    productRuntime: independent ? "none" : (config as ApplicationConfig).productRuntime,
     product: independent ? { features: [] } : config.product,
   };
 }

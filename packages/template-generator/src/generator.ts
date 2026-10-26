@@ -111,7 +111,7 @@ async function generateApplication(
       phase: "initialization",
     });
   }
-  const config: RenderConfig = toRenderConfig(options.config);
+  const config: RenderConfig = toRenderConfig(options.config, templates);
   config.application = context;
   const vfs = new VirtualFileSystem(
     context?.paths ?? {

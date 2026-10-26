@@ -1,9 +1,17 @@
-import { FULLSTACK_FRONTENDS, type Backend, type Frontend } from "@xstack/types";
+import { APPLICATION_TEMPLATES, readFrameworkCatalog } from "@xstack/template-generator/apps";
+import type { Backend, Frontend, FullstackFrontend } from "@xstack/types";
 
 import type { StackState } from "./constant";
 
+const fullstackFrontends = [...readFrameworkCatalog(APPLICATION_TEMPLATES).values()]
+  .flatMap((framework) => Object.values(framework.apps))
+  .filter((adapter) => adapter.stack.backend === "self")
+  .flatMap((adapter) => adapter.stack.frontend ?? []);
+
 export function getSelfBackendFrontend(backend: StackState["backend"]) {
-  return FULLSTACK_FRONTENDS.find((frontend) => backend === `self-${frontend}`);
+  return fullstackFrontends.find((frontend) => backend === `self-${frontend}`) as
+    | FullstackFrontend
+    | undefined;
 }
 
 export function isSelfHostedFullstackBackend(

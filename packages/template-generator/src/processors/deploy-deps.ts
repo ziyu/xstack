@@ -1,9 +1,10 @@
-import { getLocalD1Owner, type ProjectConfig } from "@xstack/types";
+import { getLocalD1Owner } from "@xstack/types";
 
+import { appOutputPath, type ApplicationConfig } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { addPackageDependency } from "../utils/add-deps";
 
-export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig): void {
+export function processDeployDeps(vfs: VirtualFileSystem, config: ApplicationConfig): void {
   const { webDeploy, serverDeploy, frontend, backend, addons, orm } = config;
 
   const isCloudflareWeb = webDeploy === "cloudflare";
@@ -18,7 +19,7 @@ export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   if (isPrismaWeb) {
     addPackageDependency({
       vfs,
-      packagePath: "apps/web/package.json",
+      packagePath: appOutputPath(config, "web", "package.json"),
       devDependencies: ["@alchemy.run/frontend-frameworks"],
     });
   }
@@ -38,7 +39,7 @@ export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   if (isPrismaWeb && frontend.includes("solid")) {
     addPackageDependency({
       vfs,
-      packagePath: "apps/web/package.json",
+      packagePath: appOutputPath(config, "web", "package.json"),
       dependencies: ["nitro"],
     });
   }
@@ -46,14 +47,14 @@ export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   if (isPrismaWeb && frontend.includes("react-router")) {
     addPackageDependency({
       vfs,
-      packagePath: "apps/web/package.json",
+      packagePath: appOutputPath(config, "web", "package.json"),
       dependencies: ["@react-router/express", "express"],
       devDependencies: ["@types/express"],
     });
   } else if (isPrismaWeb && frontend.includes("svelte")) {
     addPackageDependency({
       vfs,
-      packagePath: "apps/web/package.json",
+      packagePath: appOutputPath(config, "web", "package.json"),
       devDependencies: ["@sveltejs/adapter-node"],
     });
   }
@@ -68,7 +69,7 @@ export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   ) {
     addPackageDependency({
       vfs,
-      packagePath: "apps/web/package.json",
+      packagePath: appOutputPath(config, "web", "package.json"),
       devDependencies: ["unwasm"],
     });
   }
@@ -84,7 +85,7 @@ export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig)
 
   if ((isVercelWeb || (isPrismaWeb && backend !== "none")) && frontend.includes("tanstack-start")) {
     // Nitro emits the standalone server artifact consumed by Compute and Vercel.
-    const webPkgPath = "apps/web/package.json";
+    const webPkgPath = appOutputPath(config, "web", "package.json");
     if (vfs.exists(webPkgPath)) {
       addPackageDependency({ vfs, packagePath: webPkgPath, dependencies: ["nitro"] });
     }
@@ -98,7 +99,7 @@ export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   ) {
     // Astro needs the Vercel adapter for SSR; the default @astrojs/node
     // standalone output is not served by Vercel's astro framework preset.
-    const webPkgPath = "apps/web/package.json";
+    const webPkgPath = appOutputPath(config, "web", "package.json");
     if (vfs.exists(webPkgPath)) {
       addPackageDependency({
         vfs,
@@ -115,7 +116,7 @@ export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig)
     !addons.includes("tauri")
   ) {
     // Vercel docs recommend the explicit adapter over adapter-auto resolving it at build time
-    const webPkgPath = "apps/web/package.json";
+    const webPkgPath = appOutputPath(config, "web", "package.json");
     if (vfs.exists(webPkgPath)) {
       addPackageDependency({
         vfs,
@@ -126,7 +127,7 @@ export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   }
 
   if (isDockerWeb) {
-    const webPkgPath = "apps/web/package.json";
+    const webPkgPath = appOutputPath(config, "web", "package.json");
     if (vfs.exists(webPkgPath)) {
       if (frontend.includes("svelte")) {
         addPackageDependency({
@@ -154,7 +155,7 @@ export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   }
 
   if (isCloudflareServer && !isBackendSelf) {
-    const serverPkgPath = "apps/server/package.json";
+    const serverPkgPath = appOutputPath(config, "server", "package.json");
     if (vfs.exists(serverPkgPath)) {
       addPackageDependency({
         vfs,
@@ -165,7 +166,7 @@ export function processDeployDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   }
 
   if (isCloudflareWeb) {
-    const webPkgPath = "apps/web/package.json";
+    const webPkgPath = appOutputPath(config, "web", "package.json");
     if (!vfs.exists(webPkgPath)) return;
 
     const needsWranglerLocalD1 = getLocalD1Owner(config) === "wrangler";

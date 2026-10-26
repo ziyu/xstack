@@ -4,10 +4,7 @@ import { fileURLToPath } from "node:url";
 import { getUserPkgManager } from "./utils/get-package-manager";
 
 // Re-export from template-generator (single source of truth)
-export {
-  dependencyVersionMap,
-  type AvailableDependencies,
-} from "@xstack/template-generator";
+export { dependencyVersionMap, type AvailableDependencies } from "@xstack/template-generator";
 
 const __filename = fileURLToPath(import.meta.url);
 const distPath = path.dirname(__filename);

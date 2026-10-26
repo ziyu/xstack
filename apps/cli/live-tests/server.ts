@@ -1,5 +1,5 @@
-import type { RenderConfig } from "@xstack/template-generator";
 import { expect, request } from "@playwright/test";
+import type { RenderConfig } from "@xstack/template-generator";
 import { z } from "zod";
 
 import type { DatabaseAssertions } from "./database";

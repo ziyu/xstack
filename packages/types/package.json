@@ -3,11 +3,11 @@
   "version": "3.47.0",
   "description": "TypeScript types and schemas for xstack CLI",
   "keywords": [
-    "xstack",
     "cli",
     "schemas",
     "types",
-    "typescript"
+    "typescript",
+    "xstack"
   ],
   "homepage": "https://xstack.dev/",
   "license": "MIT",

@@ -48,7 +48,7 @@ describe("SMS project generation through the CLI", () => {
 
   test("rejects SMS on a stack fallback and multiple SMS vendors", async () => {
     for (const options of [
-      { frontend: ["nuxt"], product: { features: ["sms"], providers: { sms: ["aliyun"] } } },
+      { frontend: ["svelte"], product: { features: ["sms"], providers: { sms: ["aliyun"] } } },
       { product: { features: ["sms"], providers: { sms: ["aliyun", "twilio"] } } },
     ]) {
       const result = await execa(

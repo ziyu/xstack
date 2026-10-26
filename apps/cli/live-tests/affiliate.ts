@@ -23,7 +23,9 @@ const { createAffiliate } = await load("packages/affiliate/src/index.ts");
 const { createCredits } = await load("packages/credits/src/index.ts");
 const { createPayment, plans } = await load("packages/payment/src/index.ts");
 const { default: registerSignup } = await load(`${backend}/src/integrations/affiliate-signup.ts`);
-const { default: registerAffiliate } = await load(`${backend}/src/integrations/affiliate-payment.ts`);
+const { default: registerAffiliate } = await load(
+  `${backend}/src/integrations/affiliate-payment.ts`,
+);
 const { default: registerCredits } = await load(`${backend}/src/integrations/payment-credits.ts`);
 const db = createDb({ DATABASE_URL: `file:${project}/local.db` });
 const sqlite = new Database(`${project}/local.db`, { create: false, readwrite: true });

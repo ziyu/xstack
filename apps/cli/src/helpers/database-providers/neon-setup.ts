@@ -25,6 +25,7 @@ import {
   type DbSetupMode,
   resolveDbSetupMode,
 } from "../core/db-setup-options";
+import { resolveDatabaseApplication } from "../workspace-applications";
 
 type NeonConfig = {
   connectionString: string;
@@ -143,14 +144,12 @@ async function createNeonProject(
 }
 
 async function writeEnvFile(
-  projectDir: string,
-  backend: ProjectConfig["backend"],
+  targetDir: string,
   config?: NeonConfig,
 ): Promise<Result<void, DatabaseSetupError>> {
   return Result.tryPromise({
     try: async () => {
-      const targetApp = backend === "self" ? "apps/web" : "apps/server";
-      const envPath = path.join(projectDir, targetApp, ".env");
+      const envPath = path.join(targetDir, ".env");
       const variables: EnvVariable[] = [
         {
           key: "DATABASE_URL",
@@ -172,15 +171,11 @@ async function writeEnvFile(
 }
 
 async function setupWithNeonDb(
-  projectDir: string,
+  targetDir: string,
   packageManager: PackageManager,
-  backend: ProjectConfig["backend"],
 ): Promise<Result<void, DatabaseSetupError>> {
   const s = createSpinner();
   s.start("Creating Neon database using neon-new...");
-
-  const targetApp = backend === "self" ? "apps/web" : "apps/server";
-  const targetDir = path.join(projectDir, targetApp);
 
   const ensureDirResult = await Result.tryPromise({
     try: () => fs.ensureDir(targetDir),
@@ -218,7 +213,7 @@ async function setupWithNeonDb(
   });
 }
 
-function displayManualSetupInstructions(target: "apps/web" | "apps/server") {
+function displayManualSetupInstructions(target: string) {
   cliLog.info(`Manual Neon PostgreSQL Setup Instructions:
 
 1. Get Neon with xstack referral: https://get.neon.com/sbA3tIe
@@ -233,15 +228,18 @@ export async function setupNeonPostgres(
   config: ProjectConfig,
   cliInput?: DatabaseSetupCliOptions,
 ): Promise<NeonSetupResult> {
-  const { packageManager, projectDir, backend } = config;
+  const { packageManager, projectDir } = config;
   const setupMode = resolveDbSetupMode("neon", {
     manualDb: cliInput?.manualDb,
     dbSetupOptions: cliInput?.dbSetupOptions ?? config.dbSetupOptions,
   });
-  const target: "apps/web" | "apps/server" = backend === "self" ? "apps/web" : "apps/server";
+  const application = await resolveDatabaseApplication(config, "neon");
+  if (application.isErr()) return Result.err(application.error);
+  const target = application.value.directory;
+  const targetDir = path.join(projectDir, target);
 
   if (shouldSkipExternalCommands()) {
-    const envResult = await writeEnvFile(projectDir, backend);
+    const envResult = await writeEnvFile(targetDir);
     if (envResult.isErr()) {
       return envResult;
     }
@@ -250,7 +248,7 @@ export async function setupNeonPostgres(
   }
 
   if (setupMode === "manual") {
-    const envResult = await writeEnvFile(projectDir, backend);
+    const envResult = await writeEnvFile(targetDir);
     if (envResult.isErr()) {
       return envResult;
     }
@@ -290,7 +288,7 @@ export async function setupNeonPostgres(
   }
 
   if (selectedMode === "manual") {
-    const envResult = await writeEnvFile(projectDir, backend);
+    const envResult = await writeEnvFile(targetDir);
     if (envResult.isErr()) {
       return envResult;
     }
@@ -331,10 +329,10 @@ export async function setupNeonPostgres(
   }
 
   if (setupMethod === "neon-new" || setupMethod === "neondb") {
-    const neonDbResult = await setupWithNeonDb(projectDir, packageManager, backend);
+    const neonDbResult = await setupWithNeonDb(targetDir, packageManager);
     if (neonDbResult.isErr()) {
       cliLog.error(pc.red(neonDbResult.error.message));
-      const envResult = await writeEnvFile(projectDir, backend);
+      const envResult = await writeEnvFile(targetDir);
       if (envResult.isErr()) {
         return envResult;
       }
@@ -342,9 +340,7 @@ export async function setupNeonPostgres(
       return Result.ok(undefined);
     }
 
-    cliLog.info(
-      `Get Neon with xstack referral: ${pc.cyan("https://get.neon.com/sbA3tIe")}`,
-    );
+    cliLog.info(`Get Neon with xstack referral: ${pc.cyan("https://get.neon.com/sbA3tIe")}`);
     return Result.ok(undefined);
   }
 
@@ -394,7 +390,7 @@ export async function setupNeonPostgres(
 
   if (neonConfigResult.isErr()) {
     cliLog.error(pc.red(neonConfigResult.error.message));
-    const envResult = await writeEnvFile(projectDir, backend);
+    const envResult = await writeEnvFile(targetDir);
     if (envResult.isErr()) {
       return envResult;
     }
@@ -405,7 +401,7 @@ export async function setupNeonPostgres(
   const finalSpinner = createSpinner();
   finalSpinner.start("Configuring database connection");
 
-  const envResult = await writeEnvFile(projectDir, backend, neonConfigResult.value);
+  const envResult = await writeEnvFile(targetDir, neonConfigResult.value);
   if (envResult.isErr()) {
     finalSpinner.stop(pc.red("Failed to configure database connection"));
     return envResult;

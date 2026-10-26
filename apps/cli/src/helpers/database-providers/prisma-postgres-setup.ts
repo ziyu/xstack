@@ -19,6 +19,7 @@ import {
   type DbSetupMode,
   resolveDbSetupMode,
 } from "../core/db-setup-options";
+import { resolveDatabaseApplication } from "../workspace-applications";
 
 type PrismaConfig = {
   databaseUrl: string;
@@ -132,14 +133,12 @@ async function setupWithCreateDb(
 }
 
 async function writeEnvFile(
-  projectDir: string,
-  backend: ProjectConfig["backend"],
+  targetDir: string,
   config?: PrismaConfig,
 ): Promise<Result<void, DatabaseSetupError>> {
   return Result.tryPromise({
     try: async () => {
-      const targetApp = backend === "self" ? "apps/web" : "apps/server";
-      const envPath = path.join(projectDir, targetApp, ".env");
+      const envPath = path.join(targetDir, ".env");
       const variables: EnvVariable[] = [
         {
           key: "DATABASE_URL",
@@ -169,7 +168,7 @@ async function writeEnvFile(
   });
 }
 
-function displayManualSetupInstructions(target: "apps/web" | "apps/server") {
+function displayManualSetupInstructions(target: string) {
   cliLog.info(`Manual Prisma PostgreSQL Setup Instructions:
 
 1. Visit https://console.prisma.io and create an account
@@ -184,13 +183,16 @@ export async function setupPrismaPostgres(
   config: ProjectConfig,
   cliInput?: DatabaseSetupCliOptions,
 ): Promise<PrismaSetupResult> {
-  const { packageManager, projectDir, backend } = config;
+  const { packageManager, projectDir } = config;
   const setupMode = resolveDbSetupMode("prisma-postgres", {
     manualDb: cliInput?.manualDb,
     dbSetupOptions: cliInput?.dbSetupOptions ?? config.dbSetupOptions,
   });
+  const application = await resolveDatabaseApplication(config, "prisma-postgres");
+  if (application.isErr()) return Result.err(application.error);
+  const target = application.value.directory;
+  const targetDir = path.join(projectDir, target);
   const dbDir = path.join(projectDir, "packages/db");
-  const target: "apps/web" | "apps/server" = backend === "self" ? "apps/web" : "apps/server";
 
   const ensureDirResult = await Result.tryPromise({
     try: () => fs.ensureDir(dbDir),
@@ -207,7 +209,7 @@ export async function setupPrismaPostgres(
   }
 
   if (setupMode === "manual") {
-    const envResult = await writeEnvFile(projectDir, backend);
+    const envResult = await writeEnvFile(targetDir);
     if (envResult.isErr()) {
       return envResult;
     }
@@ -247,7 +249,7 @@ export async function setupPrismaPostgres(
   }
 
   if (selectedSetupMode === "manual") {
-    const envResult = await writeEnvFile(projectDir, backend);
+    const envResult = await writeEnvFile(targetDir);
     if (envResult.isErr()) {
       return envResult;
     }
@@ -269,7 +271,7 @@ export async function setupPrismaPostgres(
     }
 
     cliLog.error(pc.red(prismaConfigResult.error.message));
-    const envResult = await writeEnvFile(projectDir, backend);
+    const envResult = await writeEnvFile(targetDir);
     if (envResult.isErr()) {
       return envResult;
     }
@@ -278,7 +280,7 @@ export async function setupPrismaPostgres(
     return Result.ok(undefined);
   }
 
-  const envResult = await writeEnvFile(projectDir, backend, prismaConfigResult.value);
+  const envResult = await writeEnvFile(targetDir, prismaConfigResult.value);
   if (envResult.isErr()) {
     return envResult;
   }

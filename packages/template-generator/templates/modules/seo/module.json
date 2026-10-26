@@ -1,0 +1,68 @@
+{
+  "id": "seo",
+  "name": {
+    "en": "Search metadata",
+    "zh-CN": "搜索引擎优化"
+  },
+  "description": {
+    "en": "Localized canonical metadata, social cards, robots and a live public sitemap",
+    "zh-CN": "本地化规范链接、社交卡片、robots 与动态站点地图"
+  },
+  "category": "content",
+  "requires": ["core", "i18n"],
+  "enhances": ["core", "payment"],
+  "supports": {
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"]
+  },
+  "frameworkReplaces": {
+    "tanstack-start": ["apps/web/public/robots.txt"],
+    "nuxt": ["apps/web/public/robots.txt"]
+  },
+  "env": [
+    {
+      "key": "SITE_URL",
+      "type": "url",
+      "example": "http://localhost:3001",
+      "sensitive": false,
+      "comment": "Public canonical origin; set your HTTPS production URL before launch"
+    }
+  ],
+  "packages": [
+    {
+      "dir": "seo"
+    }
+  ],
+  "services": [
+    {
+      "name": "seo",
+      "imports": [
+        {
+          "from": "@app/seo",
+          "names": ["createSeo"]
+        },
+        {
+          "from": "@app/i18n",
+          "names": ["locales", "defaultLocale"]
+        }
+      ],
+      "init": "createSeo({ origin: ENV.SITE_URL, locales, defaultLocale })"
+    }
+  ],
+  "sources": {
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start"],
+    "integrations": {
+      "core": {
+        "frameworks": {
+          "next": "integrations/core/frameworks/next",
+          "nuxt": "frameworks/nuxt",
+          "tanstack-start": "frameworks/tanstack-start"
+        }
+      },
+      "payment": {
+        "base": "integrations/payment/apps/fullstack-web"
+      }
+    }
+  }
+}

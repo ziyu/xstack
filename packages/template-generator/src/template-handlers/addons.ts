@@ -1,12 +1,11 @@
-import type { ProjectConfig } from "@xstack/types";
-
+import { appOutputPath, type ApplicationConfig } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { type TemplateData, processTemplatesFromPrefix } from "./utils";
 
 export async function processAddonTemplates(
   vfs: VirtualFileSystem,
   templates: TemplateData,
-  config: ProjectConfig,
+  config: ApplicationConfig,
 ): Promise<void> {
   if (!config.addons || config.addons.length === 0) return;
 
@@ -15,6 +14,7 @@ export async function processAddonTemplates(
 
     // Task runners are handled programmatically by generators.
     if (addon === "turborepo" || addon === "nx" || addon === "vite-plus") continue;
+    if (config.application && addon === "electrobun") continue; // Workspace finalizer owns the desktop package.
 
     if (addon === "pwa") {
       if (
@@ -24,7 +24,7 @@ export async function processAddonTemplates(
           vfs,
           templates,
           "addons/pwa/apps/fullstack-web/ssr",
-          "apps/web",
+          appOutputPath(config, "web"),
           config,
         );
       }
@@ -33,7 +33,7 @@ export async function processAddonTemplates(
           vfs,
           templates,
           "addons/pwa/apps/fullstack-web/next",
-          "apps/web",
+          appOutputPath(config, "web"),
           config,
         );
       } else if (
@@ -43,7 +43,7 @@ export async function processAddonTemplates(
           vfs,
           templates,
           "addons/pwa/apps/fullstack-web/vite",
-          "apps/web",
+          appOutputPath(config, "web"),
           config,
         );
       }

@@ -7,7 +7,7 @@ import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { TemplateData } from "../template-handlers/utils";
 import { GeneratorError, type RenderConfig } from "../types";
 import { dependencyVersionMap } from "../utils/add-deps";
-import { MODULE_CATALOG } from "./catalog";
+import { MODULE_CATALOG, readModuleCatalog } from "./catalog";
 import { finalizeCloudflareModules } from "./cloudflare";
 import { nativeSplitApplication, supportsNativeSplit } from "./native-split";
 import { hasErrors, resolveModules, toSelection } from "./resolver";
@@ -35,6 +35,7 @@ type PackageJson = {
 };
 
 const planCache = new WeakMap<ProjectConfig, ResolvedPlan>();
+const resolvedModules = Symbol("resolvedModules");
 
 const AUTH_VALUES = AuthSchema.options;
 
@@ -46,11 +47,22 @@ function domainValue<T extends string>(values: readonly T[], value = "none"): T 
   return match;
 }
 
-export function getModulePlan(config: ProjectConfig): ResolvedPlan {
-  let plan = planCache.get(config);
+export function getModulePlan(
+  config: ProjectConfig,
+  templates?: ReadonlyMap<string, string>,
+): ResolvedPlan {
+  const inherited = (config as ProjectConfig & { [resolvedModules]?: ResolvedPlan })[
+    resolvedModules
+  ];
+  if (!templates && inherited) return inherited;
+  let plan = templates ? undefined : planCache.get(config);
   if (!plan) {
-    plan = resolveModules(toSelection(config.product), config, MODULE_CATALOG);
-    planCache.set(config, plan);
+    plan = resolveModules(
+      toSelection(config.product),
+      config,
+      templates ? readModuleCatalog(templates) : MODULE_CATALOG,
+    );
+    if (!templates) planCache.set(config, plan);
   }
   return plan;
 }
@@ -60,10 +72,14 @@ Handlebars.registerHelper("hasNativeModules", (config: ProjectConfig) =>
 );
 
 /** The config the stack templates render with, carrying the auth engine the module plan picked. */
-export function toRenderConfig(config: ProjectConfig): RenderConfig {
-  const plan = getModulePlan(config);
+export function toRenderConfig(
+  config: ProjectConfig,
+  templates?: ReadonlyMap<string, string>,
+): RenderConfig {
+  const plan = getModulePlan(config, templates);
   const render = {
     ...config,
+    [resolvedModules]: plan,
     auth: domainValue(AUTH_VALUES, plan.domains.auth),
   };
   planCache.set(render, plan);
@@ -76,7 +92,7 @@ export async function processStackModules(
   templates: TemplateData,
   config: RenderConfig,
 ): Promise<void> {
-  for (const module of getModulePlan(config).modules) {
+  for (const module of getModulePlan(config, templates).modules) {
     if (module.variant === "stack") {
       const renderer = module.manifest.domain?.stack?.renderer;
       if (renderer !== "auth") {
@@ -93,8 +109,9 @@ export async function processStackModules(
 /** The plan restricted to natively rendered modules; `undefined` when there are none. */
 function requirePlan(
   config: ProjectConfig & Pick<RenderConfig, "application">,
+  templates?: ReadonlyMap<string, string>,
 ): ResolvedPlan | undefined {
-  const plan = getModulePlan(config);
+  const plan = getModulePlan(config, templates);
   if (hasErrors(plan)) {
     throw new GeneratorError({
       message: plan.issues
@@ -235,7 +252,7 @@ export function processModuleTemplates(
   templates: TemplateData,
   config: ApplicationConfig,
 ): void {
-  const plan = requirePlan(config);
+  const plan = requirePlan(config, templates);
   if (!plan) return;
   const contribution = supportsNativeSplit(config) ? nativeSplitApplication(config) : undefined;
   const splitClient = contribution?.mode === "client";

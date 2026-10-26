@@ -1,0 +1,22 @@
+import { getRequestEvent } from "$app/server";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{else}}.generated{{/if}}";
+
+{{> getServerUrl}}
+
+const link = new RPCLink({
+  url: {{#if application}}`${getServerUrl(ENV.PUBLIC_SERVER_URL)}{{application.backendApiPrefix}}/rpc`{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}`${getServerUrl(ENV.PUBLIC_SERVER_URL)}/rpc`{{else}}`${ENV.PUBLIC_SERVER_URL.replace(/\/$/, "")}/rpc`{{/if}},
+  headers: () => {
+    const { request } = getRequestEvent();
+    return {
+      cookie: request.headers.get("cookie") ?? "",
+      authorization: request.headers.get("authorization") ?? "",
+    };
+  },
+  fetch: (request, init) => getRequestEvent().fetch(request, init),
+});
+
+// The client is stateless; request headers and fetch are resolved per operation.
+globalThis.$client = createORPCClient<AppRouterClient>(link);

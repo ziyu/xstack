@@ -1,5 +1,4 @@
-import type { ProjectConfig } from "@xstack/types";
-
+import { appOutputPath, type ApplicationConfig } from "../contributions/context";
 import type { JsonValue } from "../core/json-types";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { addPackageDependency } from "../utils/add-deps";
@@ -13,7 +12,7 @@ type PackageJson = {
   [key: string]: JsonValue | undefined;
 };
 
-export function processAddonsDeps(vfs: VirtualFileSystem, config: ProjectConfig): void {
+export function processAddonsDeps(vfs: VirtualFileSystem, config: ApplicationConfig): void {
   if (!config.addons || config.addons.length === 0) return;
 
   const hasViteReactFrontend =
@@ -41,13 +40,18 @@ export function processAddonsDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   }
 
   if (config.addons.includes("evlog") || config.addons.includes("axiom")) {
-    const serverPkgPath = "apps/server/package.json";
-    if (vfs.exists(serverPkgPath) && config.backend !== "self" && config.backend !== "none") {
+    const serverPkgPath = appOutputPath(config, "server", "package.json");
+    if (
+      vfs.ownsPath(serverPkgPath) &&
+      vfs.exists(serverPkgPath) &&
+      config.backend !== "self" &&
+      config.backend !== "none"
+    ) {
       addPackageDependency({ vfs, packagePath: serverPkgPath, dependencies: ["evlog"] });
     }
 
-    const webPkgPath = "apps/web/package.json";
-    if (vfs.exists(webPkgPath) && hasEvlogWebServer) {
+    const webPkgPath = appOutputPath(config, "web", "package.json");
+    if (vfs.ownsPath(webPkgPath) && vfs.exists(webPkgPath) && hasEvlogWebServer) {
       addPackageDependency({
         vfs,
         packagePath: webPkgPath,
@@ -57,8 +61,8 @@ export function processAddonsDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   }
 
   if (config.addons.includes("pwa") && hasPwaCompatibleFrontend) {
-    const webPkgPath = "apps/web/package.json";
-    if (vfs.exists(webPkgPath)) {
+    const webPkgPath = appOutputPath(config, "web", "package.json");
+    if (vfs.ownsPath(webPkgPath) && vfs.exists(webPkgPath)) {
       addPackageDependency({
         vfs,
         packagePath: webPkgPath,
@@ -74,8 +78,8 @@ export function processAddonsDeps(vfs: VirtualFileSystem, config: ProjectConfig)
   }
 
   if (config.addons.includes("tauri")) {
-    const webPkgPath = "apps/web/package.json";
-    if (vfs.exists(webPkgPath)) {
+    const webPkgPath = appOutputPath(config, "web", "package.json");
+    if (vfs.ownsPath(webPkgPath) && vfs.exists(webPkgPath)) {
       addPackageDependency({ vfs, packagePath: webPkgPath, devDependencies: ["@tauri-apps/cli"] });
       const webPkg = vfs.readJson<PackageJson>(webPkgPath);
       if (webPkg) {

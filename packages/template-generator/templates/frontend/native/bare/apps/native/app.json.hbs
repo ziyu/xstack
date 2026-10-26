@@ -1,15 +1,15 @@
 {
 	"expo": {
-		"name": "{{projectName}}",
-		"slug": "{{projectName}}",
+		"name": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
+		"slug": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
 		"version": "1.0.0",
 		"orientation": "portrait",
 		"icon": "./assets/images/icon.png",
-		"scheme": "{{projectName}}",
+		"scheme": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
 		"userInterfaceStyle": "automatic",
 		"ios": {
 			"supportsTablet": true,
-			"bundleIdentifier": "{{appId projectName "ios"}}"
+			"bundleIdentifier": "{{appId projectName "ios" application.id}}"
 		},
 		"android": {
 			"adaptiveIcon": {
@@ -19,7 +19,7 @@
 				"monochromeImage": "./assets/images/android-icon-monochrome.png"
 			},
 			"predictiveBackGestureEnabled": false,
-			"package": "{{appId projectName "android"}}"
+			"package": "{{appId projectName "android" application.id}}"
 		},
 		"web": {
 			"output": "static",

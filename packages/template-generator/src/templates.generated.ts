@@ -107,7 +107,7 @@ export const EMBEDDED_TEMPLATES: Map<string, string> = new Map([
   ["addons/electrobun/apps/desktop/electrobun.config.ts.hbs", `import type { ElectrobunConfig } from "electrobun";
 
 const webBuildDir =
-  "{{#if (includes frontend "react-router")}}../web/build/client{{else if (includes frontend "tanstack-start")}}../web/dist/client{{else if (includes frontend "next")}}../web/out{{else if (includes frontend "nuxt")}}../web/.output/public{{else if (includes frontend "svelte")}}../web/build{{else}}../web/dist{{/if}}";
+  "{{#if application}}../../{{application.directory}}{{else}}../web{{/if}}/{{#if (includes frontend "react-router")}}build/client{{else if (includes frontend "tanstack-start")}}dist/client{{else if (includes frontend "next")}}out{{else if (includes frontend "nuxt")}}.output/public{{else if (includes frontend "svelte")}}build{{else}}dist{{/if}}";
 
 export default {
   app: {
@@ -157,7 +157,7 @@ export default {
 `],
   ["addons/electrobun/apps/desktop/src/bun/index.ts.hbs", `import { BrowserWindow, Updater } from "electrobun/main";
 
-const DEV_SERVER_PORT = {{#if (or (includes frontend "react-router") (includes frontend "svelte"))}}5173{{else if (includes frontend "astro")}}4321{{else}}3001{{/if}};
+const DEV_SERVER_PORT = {{#if application.port}}{{application.port}}{{else}}{{#if (or (includes frontend "react-router") (includes frontend "svelte"))}}5173{{else if (includes frontend "astro")}}4321{{else}}3001{{/if}}{{/if}};
 const DEV_SERVER_URL = \`http://localhost:\${DEV_SERVER_PORT}\`;
 
 async function getMainViewUrl(): Promise<string> {
@@ -906,7 +906,9 @@ async function expoFetch(request: Request, init?: RequestInit) {
 }
 
 export const link = new RPCLink({
-{{#if (eq backend "self")}}
+{{#if application}}
+	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL.replace(/\\/$/, "")}{{application.backendApiPrefix}}/rpc\`,
+{{else if (eq backend "self")}}
 {{#if (or (includes frontend "next") (includes frontend "tanstack-start"))}}
 	url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/api/rpc\`,
 {{else}}
@@ -975,7 +977,17 @@ const clerkClient = createClerkClient({
 
 async function authenticateClerkRequest(request: Request): Promise<ClerkContextAuth> {
 	const requestState = await clerkClient.authenticateRequest(request, {
-		authorizedParties: [ENV.CORS_ORIGIN],
+    authorizedParties: [
+{{#if (eq backend "self")}}
+      new URL(request.url).origin,
+{{/if}}
+{{#if (ne backend "self")}}
+      ...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean),
+{{/if}}
+{{#each application.clientOrigins}}
+      "{{this}}",
+{{/each}}
+    ],
 	});
 	return toClerkContextAuth(requestState.toAuth());
 }
@@ -1580,7 +1592,9 @@ import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
 {{> getServerUrlSpaces}}
 
 export const link = new RPCLink({
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+  url: \`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}{{application.backendApiPrefix}}/rpc\`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
   url: \`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}/rpc\`,
 {{else}}
   url: \`\${ENV.PUBLIC_SERVER_URL.replace(/\\/$/, "")}/rpc\`,
@@ -1611,12 +1625,12 @@ export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig();
   const serverUrl =
     (import.meta.server && config.serverUrl) || config.public.serverUrl;
-  const resolvedServerUrl = {{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}getServerUrl(serverUrl){{else}}serverUrl.replace(/\\/$/, ""){{/if}};
-  const rpcUrl = new URL(\`\${resolvedServerUrl}/rpc\`, requestURL.origin).href;
+  const resolvedServerUrl = {{#if application}}serverUrl.replace(/\\/$/, ""){{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}getServerUrl(serverUrl){{else}}serverUrl.replace(/\\/$/, ""){{/if}};
+  const rpcUrl = new URL(\`\${resolvedServerUrl}{{#if application}}{{application.backendApiPrefix}}{{/if}}/rpc\`, requestURL.origin).href;
 
   const rpcLink = new RPCLink({
     url: rpcUrl,
-    headers: import.meta.server ? useRequestHeaders(["cookie"]) : {},
+    headers: import.meta.server ? useRequestHeaders(["cookie", "authorization"]) : {},
     {{#if (eq auth "better-auth")}}
     fetch(url, options) {
         return fetch(url, {
@@ -1704,6 +1718,8 @@ import { getRequest } from "@tanstack/react-start/server";
 import { appRouter } from "@{{projectName}}/api/routers/index";
 import { createContext } from "@{{projectName}}/api/context";
 {{else if (includes frontend "tanstack-start")}}
+import { createIsomorphicFn } from "@tanstack/react-start";
+import { getRequestHeaders } from "@tanstack/react-start/server";
 import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
 import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
 {{#if (eq auth "clerk")}}
@@ -1774,18 +1790,30 @@ const getORPCClient = createIsomorphicFn()
 
 export const client: RouterClient<typeof appRouter> = getORPCClient();
 {{else if (includes frontend "tanstack-start")}}
+const requestHeaders = createIsomorphicFn()
+  .server(() => {
+    const incoming = getRequestHeaders();
+    return { cookie: incoming.get("cookie") ?? "", authorization: incoming.get("authorization") ?? "" };
+  })
+  .client(() => ({}));
+
 const link = new RPCLink({
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+	url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/rpc\`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 	url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/rpc\`,
 {{else}}
 	url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/rpc\`,
 {{/if}}
+  headers: async () => {
+    const headers = requestHeaders();
 {{#if (eq auth "clerk")}}
-	headers: async () => {
-		const token = await getClerkAuthToken();
-		return token ? { Authorization: \`Bearer \${token}\` } : {};
-	},
+    const token = await getClerkAuthToken();
+    return token ? { ...headers, Authorization: \`Bearer \${token}\` } : headers;
+{{else}}
+    return headers;
 {{/if}}
+  },
 {{#if (eq auth "better-auth")}}
 	fetch(url, options) {
 		return fetch(url, {
@@ -1800,15 +1828,19 @@ export const client: AppRouterClient = createORPCClient(link);
 {{else}}
 export const link = new RPCLink({
 {{#if (and (eq backend "self") (includes frontend "next"))}}
-	url: \`\${typeof window !== "undefined" ? window.location.origin : "http://localhost:3001"}/api/rpc\`,
+	url: \`\${typeof window !== "undefined" ? window.location.origin : (process.env.BETTER_AUTH_URL ?? {{#if application}}"{{application.origin}}"{{else}}"http://localhost:3001"{{/if}})}/api/rpc\`,
 {{else if (includes frontend "next")}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+	url: \`\${getServerUrl(process.env.NEXT_PUBLIC_SERVER_URL!)}{{application.backendApiPrefix}}/rpc\`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 	url: \`\${getServerUrl(process.env.NEXT_PUBLIC_SERVER_URL!)}/rpc\`,
 {{else}}
 	url: \`\${process.env.NEXT_PUBLIC_SERVER_URL!.replace(/\\/$/, "")}/rpc\`,
 {{/if}}
 {{else}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+	url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/rpc\`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 	url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/rpc\`,
 {{else}}
 	url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/rpc\`,
@@ -1900,7 +1932,9 @@ const link = new RPCLink({
 {{> getServerUrl}}
 
 const link = new RPCLink({
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+	url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/rpc\`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 	url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/rpc\`,
 {{else}}
 	url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/rpc\`,
@@ -1940,13 +1974,13 @@ import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/svelte-query";
 import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
 
-export const queryClient = new QueryClient({
-	queryCache: new QueryCache({
-		onError: (error) => {
-			console.error(\`Error: \${error.message}\`);
-		},
-	}),
-});
+export function createQueryClient() {
+  return new QueryClient({
+    queryCache: new QueryCache({
+      onError: (error) => console.error(\`Error: \${error.message}\`),
+    }),
+  });
+}
 
 {{#unless (eq backend "self")}}
 {{> getServerUrl}}
@@ -1962,7 +1996,9 @@ export const link = new RPCLink({
 		return \`\${window.location.origin}/rpc\`;
 	},
 	{{else}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+	url: \`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}{{application.backendApiPrefix}}/rpc\`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 	url: \`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}/rpc\`,
 {{else}}
 	url: \`\${ENV.PUBLIC_SERVER_URL.replace(/\\/$/, "")}/rpc\`,
@@ -1978,15 +2014,34 @@ export const link = new RPCLink({
 	{{/if}}
 });
 
-{{#if (eq backend "self")}}
 export const client: AppRouterClient = globalThis.$client ?? createORPCClient(link);
-{{else}}
-export const client: AppRouterClient = createORPCClient(link);
-{{/if}}
 
 export const orpc = createTanstackQueryUtils(client);
 `],
   ["api/orpc/shared/server/svelte/hooks.server.ts.hbs", `import "./lib/orpc.server";
+`],
+  ["api/orpc/shared/server/svelte/orpc.remote.server.ts.hbs", `import { getRequestEvent } from "$app/server";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
+import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{else}}.generated{{/if}}";
+
+{{> getServerUrl}}
+
+const link = new RPCLink({
+  url: {{#if application}}\`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}{{application.backendApiPrefix}}/rpc\`{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}\`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}/rpc\`{{else}}\`\${ENV.PUBLIC_SERVER_URL.replace(/\\/$/, "")}/rpc\`{{/if}},
+  headers: () => {
+    const { request } = getRequestEvent();
+    return {
+      cookie: request.headers.get("cookie") ?? "",
+      authorization: request.headers.get("authorization") ?? "",
+    };
+  },
+  fetch: (request, init) => getRequestEvent().fetch(request, init),
+});
+
+// The client is stateless; request headers and fetch are resolved per operation.
+globalThis.$client = createORPCClient<AppRouterClient>(link);
 `],
   ["api/trpc/apps/fullstack-web/frameworks/next/src/app/api/trpc/[trpc]/route.ts.hbs", `import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "@{{projectName}}/api/routers/index";
@@ -2043,7 +2098,9 @@ export const queryClient = new QueryClient();
 const trpcClient = createTRPCClient<AppRouter>({
 	links: [
 		httpBatchLink({
-{{#if (eq backend "self")}}
+{{#if application}}
+			url: \`\${ENV.EXPO_PUBLIC_SERVER_URL.replace(/\\/$/, "")}{{application.backendApiPrefix}}/trpc\`,
+{{else if (eq backend "self")}}
 			url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}/api/trpc\`,
 {{else}}
 			url: \`\${ENV.EXPO_PUBLIC_SERVER_URL}{{apiPrefix webDeploy serverDeploy}}/trpc\`,
@@ -2107,7 +2164,17 @@ const clerkClient = createClerkClient({
 
 async function authenticateClerkRequest(request: Request): Promise<ClerkContextAuth> {
 	const requestState = await clerkClient.authenticateRequest(request, {
-		authorizedParties: [ENV.CORS_ORIGIN],
+    authorizedParties: [
+{{#if (eq backend "self")}}
+      new URL(request.url).origin,
+{{/if}}
+{{#if (ne backend "self")}}
+      ...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean),
+{{/if}}
+{{#each application.clientOrigins}}
+      "{{this}}",
+{{/each}}
+    ],
 	});
 	return toClerkContextAuth(requestState.toAuth());
 }
@@ -2573,9 +2640,11 @@ const trpcClient = createTRPCClient<AppRouter>({
 	links: [
 		httpBatchLink({
 {{#if (eq backend "self")}}
-			url: "/api/trpc",
+			url: \`\${typeof window !== "undefined" ? window.location.origin : (process.env.BETTER_AUTH_URL ?? {{#if application}}"{{application.origin}}"{{else}}"http://localhost:3001"{{/if}})}/api/trpc\`,
 {{else}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+			url: \`\${getServerUrl(process.env.NEXT_PUBLIC_SERVER_URL!)}{{application.backendApiPrefix}}/trpc\`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 			url: \`\${getServerUrl(process.env.NEXT_PUBLIC_SERVER_URL!)}/trpc\`,
 {{else}}
 			url: \`\${process.env.NEXT_PUBLIC_SERVER_URL!.replace(/\\/$/, "")}/trpc\`,
@@ -2596,6 +2665,12 @@ const trpcClient = createTRPCClient<AppRouter>({
 			},
 {{/if}}
 {{#if (eq auth "better-auth")}}
+			headers: async () => {
+				if (typeof window !== "undefined") return {};
+				const { headers } = await import("next/headers");
+				const incoming = await headers();
+				return { cookie: incoming.get("cookie") ?? "" };
+			},
 			fetch(url, options) {
 				return fetch(url, {
 					...options,
@@ -2650,7 +2725,9 @@ export const queryClient = new QueryClient({
 export const trpcClient = createTRPCClient<AppRouter>({
 	links: [
 		httpBatchLink({
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+			url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/trpc\`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 			url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/trpc\`,
 {{else}}
 			url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/trpc\`,
@@ -2682,6 +2759,7 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
   ["apps/admin/app.json", `{
   "id": "admin",
   "name": "Administration application",
+  "technologyLabel": "Administration framework",
   "defaultDirectoryName": "admin",
   "roles": ["admin"],
   "scope": "product",
@@ -2691,6 +2769,7 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
   ["apps/backend/app.json", `{
   "id": "backend",
   "name": "Backend service",
+  "technologyLabel": "Backend framework",
   "defaultDirectoryName": "backend",
   "roles": ["backend"],
   "scope": "product",
@@ -2700,6 +2779,7 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
   ["apps/cli/app.json", `{
   "id": "cli",
   "name": "Command-line application",
+  "technologyLabel": "CLI implementation",
   "defaultDirectoryName": "cli",
   "roles": [],
   "scope": "independent",
@@ -2709,6 +2789,7 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
   ["apps/fullstack-web/app.json", `{
   "id": "fullstack-web",
   "name": "Fullstack web app",
+  "technologyLabel": "Fullstack framework",
   "defaultDirectoryName": "web",
   "roles": ["web-frontend", "backend", "admin"],
   "scope": "product",
@@ -2718,6 +2799,7 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
   ["apps/native/app.json", `{
   "id": "native",
   "name": "Native application",
+  "technologyLabel": "Native framework",
   "defaultDirectoryName": "native",
   "roles": [],
   "scope": "independent",
@@ -2727,6 +2809,7 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
   ["apps/web-frontend/app.json", `{
   "id": "web-frontend",
   "name": "Web frontend application",
+  "technologyLabel": "Frontend framework",
   "defaultDirectoryName": "frontend",
   "roles": ["web-frontend"],
   "scope": "product",
@@ -2974,8 +3057,30 @@ export default defineSchema({
 `],
   ["backend/server/elysia/adapter.json", `{
   "id": "elysia",
+  "name": "Elysia",
+  "description": "TypeScript web framework",
+  "icon": "/icons/elysia.svg",
   "apps": {
     "backend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["bun","node"],"visibility":"visible"},"api":{"values":["trpc","orpc","none"],"visibility":"advanced"}},
+      "devArgs": [],
+      "serverContributions": { "apiPrefix": "" },
+      "productContribution": {
+        "mode": "server",
+        "protocol": "product-http-v1",
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "constraints": {
+          "runtime": ["bun", "node"],
+          "api": ["none"],
+          "orm": ["drizzle"],
+          "database": ["sqlite", "postgres"],
+          "webDeploy": ["none"]
+        },
+        "frameworks": [
+          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] }
+        ]
+      },
       "stack": {
         "backend": "elysia",
         "runtime": "bun",
@@ -2986,6 +3091,9 @@ export default defineSchema({
 }
 `],
   ["backend/server/elysia/apps/backend/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+{{#if application.nativeSplit}}
+import { handleNativeRequest } from "./lib/native-request";
+{{/if}}
 {{#if (eq runtime "node")}}
 import { node } from "@elysiajs/node";
 {{/if}}
@@ -3005,9 +3113,11 @@ import { onError } from "@orpc/server";
 import { appRouter } from "@{{projectName}}/api/routers/index";
 import { createContext } from "@{{projectName}}/api/context";
 {{/if}}
+{{#unless application.nativeSplit}}
 {{#if (eq auth "better-auth")}}
 import { auth } from "@{{projectName}}/auth";
 {{/if}}
+{{/unless}}
 
 {{#if (eq api "orpc")}}
 const rpcHandler = new RPCHandler(appRouter, {
@@ -3034,16 +3144,19 @@ const apiHandler = new OpenAPIHandler(appRouter, {
 {{#if (eq serverDeploy "vercel")}}const app = {{/if}}{{#if (eq runtime "node")}}new Elysia({ adapter: node() }){{else}}new Elysia(){{/if}}
 	.use(
 		cors({
-            origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
-			methods: ["GET", "POST", "OPTIONS"],
+            origin: [...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean), {{#each application.clientOrigins}}"{{this}}", {{/each}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}...desktopOrigins{{/if}}],
+			methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
-			allowedHeaders: ["Content-Type", "Authorization"],
+			allowedHeaders: ["Content-Type", "Authorization", "X-Captcha-Token", "Accept-Language"],
 {{/if}}
 {{#if (eq auth "better-auth")}}
 			credentials: true,
 {{/if}}
 		}),
 	)
+{{#if application.nativeSplit}}
+	.all("/api/*", ({ request }) => handleNativeRequest(request), { parse: "none" })
+{{else}}
 {{#if (eq auth "better-auth")}}
 	.all("/api/auth/*", async (context) => {
 		const { request, status } = context;
@@ -3051,7 +3164,8 @@ const apiHandler = new OpenAPIHandler(appRouter, {
 			return auth.handler(request);
 		}
 		return status(405)
-	})
+	}, { parse: "none" })
+{{/if}}
 {{/if}}
 {{#if (eq api "orpc")}}
 	.all(
@@ -3090,7 +3204,7 @@ const apiHandler = new OpenAPIHandler(appRouter, {
 			createContext: () => createContext({ context }),
 		});
 		return res;
-	})
+	}, { parse: "none" })
 {{/if}}
 	.get("/", () => "OK")
 {{#if (eq serverDeploy "vercel")}};
@@ -3100,20 +3214,44 @@ export default app;
 // Elysia's default export is not auto-served by Bun or Node, so start a local
 // server outside Vercel while still exporting the app for Vercel functions.
 if (!process.env.VERCEL) {
-	app.listen(3000, () => {
-		console.log("Server is running on http://localhost:3000");
+	app.listen(Number(process.env.PORT ?? {{#if application.port}}{{application.port}}{{else}}3000{{/if}}), ({ hostname, port }) => {
+		console.log(\`Server is running on http://\${hostname}:\${port}\`);
 	});
 }
 {{else}}
-	.listen(3000, () => {
-		console.log("Server is running on http://localhost:3000");
+	.listen(Number(process.env.PORT ?? {{#if application.port}}{{application.port}}{{else}}3000{{/if}}), ({ hostname, port }) => {
+		console.log(\`Server is running on http://\${hostname}:\${port}\`);
 	});
 {{/if}}
 `],
   ["backend/server/express/adapter.json", `{
   "id": "express",
+  "name": "Express",
+  "description": "Popular Node.js framework",
+  "icon": "/icons/express.svg",
   "apps": {
     "backend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["bun","node"],"visibility":"visible"},"api":{"values":["trpc","orpc","none"],"visibility":"advanced"}},
+      "devArgs": [],
+      "serverContributions": { "apiPrefix": "" },
+      "productContribution": {
+        "mode": "server",
+        "protocol": "product-http-v1",
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "constraints": {
+          "runtime": ["bun", "node"],
+          "api": ["none"],
+          "orm": ["drizzle"],
+          "database": ["sqlite", "postgres"],
+          "webDeploy": ["none"]
+        },
+        "frameworks": [
+          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] },
+          { "id": "node-http", "modules": ["core"] },
+          { "id": "express", "modules": ["core"] }
+        ]
+      },
       "stack": {
         "backend": "express",
         "runtime": "bun",
@@ -3124,6 +3262,9 @@ if (!process.env.VERCEL) {
 }
 `],
   ["backend/server/express/apps/backend/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+{{#if application.nativeSplit}}
+import { handleExpressProductRequest } from "./lib/express-product";
+{{/if}}
 {{#if (eq api "trpc")}}
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { createContext } from "@{{projectName}}/api/context";
@@ -3140,6 +3281,7 @@ import { createContext } from "@{{projectName}}/api/context";
 {{/if}}
 import cors from "cors";
 import express from "express";
+{{#unless application.nativeSplit}}
 {{#if (eq auth "better-auth")}}
 import { auth } from "@{{projectName}}/auth";
 import { toNodeHandler } from "better-auth/node";
@@ -3147,15 +3289,16 @@ import { toNodeHandler } from "better-auth/node";
 {{#if (eq auth "clerk")}}
 import { clerkMiddleware } from "@clerk/express";
 {{/if}}
+{{/unless}}
 
 const app = express();
 
 app.use(
 	cors({
-        origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
-		methods: ["GET", "POST", "OPTIONS"],
+        origin: [...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean), {{#each application.clientOrigins}}"{{this}}", {{/each}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}...desktopOrigins{{/if}}],
+		methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
-		allowedHeaders: ["Content-Type", "Authorization"],
+		allowedHeaders: ["Content-Type", "Authorization", "X-Captcha-Token", "Accept-Language"],
 {{/if}}
 {{#if (eq auth "better-auth")}}
 		credentials: true,
@@ -3163,12 +3306,16 @@ app.use(
 	})
 );
 
+{{#if application.nativeSplit}}
+app.all("/api{/*path}", handleExpressProductRequest);
+{{else}}
 {{#if (eq auth "clerk")}}
 app.use(clerkMiddleware());
 {{/if}}
 
 {{#if (eq auth "better-auth")}}
 app.all("/api/auth{/*path}", toNodeHandler(auth));
+{{/if}}
 {{/if}}
 
 {{#if (eq api "trpc")}}
@@ -3226,14 +3373,47 @@ app.get("/", (_req, res) => {
 	res.status(200).send("OK");
 });
 
-app.listen(3000, () => {
-	console.log("Server is running on http://localhost:3000");
+{{#if (eq serverDeploy "vercel")}}
+export default app;
+
+if (!process.env.VERCEL) {
+{{/if}}
+const port = Number(process.env.PORT ?? {{#if application.port}}{{application.port}}{{else}}3000{{/if}});
+app.listen(port, () => {
+	console.log(\`Server is running on http://localhost:\${port}\`);
 });
+{{#if (eq serverDeploy "vercel")}}
+}
+{{/if}}
 `],
   ["backend/server/fastify/adapter.json", `{
   "id": "fastify",
+  "name": "Fastify",
+  "description": "Fast, low-overhead web framework for Node.js",
+  "icon": "/icons/fastify.svg",
   "apps": {
     "backend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["bun","node"],"visibility":"visible"},"api":{"values":["trpc","orpc","none"],"visibility":"advanced"}},
+      "devArgs": [],
+      "serverContributions": { "apiPrefix": "" },
+      "productContribution": {
+        "mode": "server",
+        "protocol": "product-http-v1",
+        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "constraints": {
+          "runtime": ["bun", "node"],
+          "api": ["none"],
+          "orm": ["drizzle"],
+          "database": ["sqlite", "postgres"],
+          "webDeploy": ["none"]
+        },
+        "frameworks": [
+          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] },
+          { "id": "node-http", "modules": ["core"] },
+          { "id": "fastify", "modules": ["core"] }
+        ]
+      },
       "stack": {
         "backend": "fastify",
         "runtime": "bun",
@@ -3246,6 +3426,12 @@ app.listen(3000, () => {
   ["backend/server/fastify/apps/backend/src/index.ts.hbs", `{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
 import Fastify from "fastify";
 import fastifyCors from "@fastify/cors";
+{{#if (eq serverDeploy "vercel")}}
+import type { IncomingMessage, ServerResponse } from "node:http";
+{{/if}}
+{{#if application.nativeSplit}}
+import { registerProductRoutes } from "./lib/fastify-product";
+{{/if}}
 
 {{#if (eq api "trpc")}}
 import { fastifyTRPCPlugin, type FastifyTRPCPluginOptions } from "@trpc/server/adapters/fastify";
@@ -3264,6 +3450,7 @@ import { appRouter } from "@{{projectName}}/api/routers/index";
 {{/if}}
 
 
+{{#unless application.nativeSplit}}
 {{#if (eq auth "better-auth")}}
 import { auth } from "@{{projectName}}/auth";
 {{/if}}
@@ -3271,13 +3458,16 @@ import { auth } from "@{{projectName}}/auth";
 import { clerkPlugin } from "@clerk/fastify";
 {{/if}}
 
+{{/unless}}
 const baseCorsConfig = {
-    origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
-	methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    origin: [...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean), {{#each application.clientOrigins}}"{{this}}", {{/each}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}...desktopOrigins{{/if}}],
+	methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 	allowedHeaders: [
 		"Content-Type",
 		"Authorization",
-		"X-Requested-With"
+		"X-Requested-With",
+		"X-Captcha-Token",
+		"Accept-Language"
 	],
 	credentials: true,
 	maxAge: 86400,
@@ -3315,16 +3505,21 @@ const fastify = Fastify({
 {{/if}}
 
 fastify.register(fastifyCors, baseCorsConfig);
+{{#if application.nativeSplit}}
+fastify.register(registerProductRoutes);
+{{else}}
 {{#if (eq auth "clerk")}}
 fastify.register(clerkPlugin, {
 	publishableKey: ENV.CLERK_PUBLISHABLE_KEY,
 	secretKey: ENV.CLERK_SECRET_KEY,
 });
 {{/if}}
+{{/if}}
 
 {{#if (eq api "orpc")}}
 fastify.register(async (rpcApp) => {
 	// Fully utilize oRPC features by letting oRPC parse the request body.
+	rpcApp.removeAllContentTypeParsers();
 	rpcApp.addContentTypeParser("*", (_, _payload, done) => {
 		done(null, undefined);
 	});
@@ -3353,36 +3548,39 @@ fastify.register(async (rpcApp) => {
 });
 {{/if}}
 
+{{#unless application.nativeSplit}}
 {{#if (eq auth "better-auth")}}
-fastify.route({
-	method: ["GET", "POST"],
-	url: "/api/auth/*",
-	async handler(request, reply) {
-		try {
-			const url = new URL(request.url, \`http://\${request.headers.host}\`);
+fastify.register(async (authApp) => {
+	authApp.removeAllContentTypeParsers();
+	authApp.addContentTypeParser("*", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
+	authApp.route({
+		method: ["GET", "POST"],
+		url: "/api/auth/*",
+		async handler(request, reply) {
 			const headers = new Headers();
-			Object.entries(request.headers).forEach(([key, value]) => {
-				if (value) headers.append(key, value.toString());
-			});
-			const req = new Request(url.toString(), {
-				method: request.method,
-				headers,
-				body: request.body ? JSON.stringify(request.body) : undefined,
-			});
-			const response = await auth.handler(req);
+			for (let index = 0; index < request.raw.rawHeaders.length; index += 2) {
+				headers.append(request.raw.rawHeaders[index]!, request.raw.rawHeaders[index + 1]!);
+			}
+			const response = await auth.handler(new Request(
+				new URL(request.url, {{#if application.backendOrigin}}"{{application.backendOrigin}}"{{else}}ENV.BETTER_AUTH_URL{{/if}}),
+				{
+					method: request.method,
+					headers,
+					body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body as Uint8Array<ArrayBuffer>,
+				},
+			));
 			reply.status(response.status);
-			response.headers.forEach((value, key) => reply.header(key, value));
-			reply.send(response.body ? await response.text() : null);
-		} catch (error) {
-			fastify.log.error({ err: error }, "Authentication Error:");
-			reply.status(500).send({
-				error: "Internal authentication error",
-				code: "AUTH_FAILURE"
+			response.headers.forEach((value, name) => {
+				if (name !== "set-cookie") reply.header(name, value);
 			});
-		}
-	}
+			const cookies = response.headers.getSetCookie();
+			if (cookies.length) reply.header("set-cookie", cookies);
+			return reply.send(response.body ? Buffer.from(await response.arrayBuffer()) : null);
+		},
+	});
 });
 {{/if}}
+{{/unless}}
 
 {{#if (eq api "trpc")}}
 fastify.register(fastifyTRPCPlugin, {
@@ -3402,19 +3600,37 @@ fastify.get('/', async () => {
 	return 'OK';
 });
 
-fastify.listen({ port: 3000{{#if (or (eq serverDeploy "docker") (eq serverDeploy "prisma"))}}, host: "0.0.0.0"{{/if}} }, (err) => {
+{{#if (eq serverDeploy "vercel")}}
+export default async function handler(request: IncomingMessage, response: ServerResponse) {
+	await fastify.ready();
+	fastify.server.emit("request", request, response);
+}
+
+if (!process.env.VERCEL) {
+{{/if}}
+const port = Number(process.env.PORT ?? {{#if application.port}}{{application.port}}{{else}}3000{{/if}});
+fastify.listen({ port{{#if (or (eq serverDeploy "docker") (eq serverDeploy "prisma"))}}, host: "0.0.0.0"{{/if}} }, (err) => {
 	if (err) {
 		fastify.log.error(err);
 		process.exit(1);
 	}
-	console.log("Server running on port 3000");
+	console.log(\`Server running on port \${port}\`);
 });
+{{#if (eq serverDeploy "vercel")}}
+}
+{{/if}}
 `],
   ["backend/server/hono/adapter.json", `{
   "id": "hono",
+  "name": "Hono",
+  "description": "Ultrafast web framework",
+  "icon": "/icons/hono.svg",
   "apps": {
     "backend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["bun","node","workers"],"visibility":"visible"},"api":{"values":["trpc","orpc","none"],"visibility":"advanced"}},
       "devArgs": [],
+      "serverContributions": { "apiPrefix": "" },
       "productContribution": {
         "mode": "server",
         "protocol": "product-http-v1",
@@ -3427,8 +3643,7 @@ fastify.listen({ port: 3000{{#if (or (eq serverDeploy "docker") (eq serverDeploy
           "webDeploy": ["none"]
         },
         "frameworks": [
-          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] },
-          { "id": "hono", "modules": ["core"] }
+          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] }
         ]
       },
       "stack": {
@@ -3442,9 +3657,8 @@ fastify.listen({ port: 3000{{#if (or (eq serverDeploy "docker") (eq serverDeploy
 `],
   ["backend/server/hono/apps/backend/src/index.ts.hbs", `{{#if application.nativeSplit}}
 import { handleNativeRequest } from "./lib/native-request";
-{{else}}
-{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
 {{/if}}
+{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
 {{#if (eq api "orpc")}}
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -3478,8 +3692,8 @@ app.use(logger());
 app.use(
 	"/*",
 	cors({
-        origin: {{#if application.nativeSplit}}[{{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}}{{/if}},
-		allowMethods: ["GET", "POST", "OPTIONS"],
+        origin: [...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean), {{#each application.clientOrigins}}"{{this}}", {{/each}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}...desktopOrigins{{/if}}],
+		allowMethods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
 		allowHeaders: ["Content-Type", "Authorization"{{#if application.nativeSplit}}, "X-Captcha-Token", "Accept-Language"{{/if}}],
 {{/if}}
@@ -3583,7 +3797,7 @@ if (!process.env.VERCEL) {
 	serve(
 		{
 			fetch: app.fetch,
-			port: {{#if application.port}}{{application.port}}{{else}}3000{{/if}},
+			port: Number(process.env.PORT ?? {{#if application.port}}{{application.port}}{{else}}3000{{/if}}),
 		},
 		(info) => {
 			console.log(\`Server is running on http://localhost:\${info.port}\`);
@@ -3594,11 +3808,7 @@ if (!process.env.VERCEL) {
 {{/if}}
 {{else}}
 {{#if (eq runtime "bun")}}
-{{#if application.nativeSplit}}
-export default { port: {{application.port}}, fetch: app.fetch };
-{{else}}
-export default app;
-{{/if}}
+export default { port: Number(process.env.PORT ?? {{#if application.port}}{{application.port}}{{else}}3000{{/if}}), fetch: app.fetch };
 {{/if}}
 {{#if (eq runtime "workers")}}
 export default app;
@@ -3662,13 +3872,13 @@ lerna-debug.log*
 next-env.d.ts
 `],
   ["backend/server/shared/package.json.hbs", `{
-	"name": "server",
+	"name": "{{#if application.id}}{{application.id}}{{else}}server{{/if}}",
 	"main": "src/index.ts",
 	"type": "module",
 	"scripts": {
 		"build": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsdown",
 		"check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit",
-		"compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server"
+		"compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile {{#if application.id}}{{application.id}}{{else}}server{{/if}}"
 	},
 	"dependencies": {},
 	{{#if (eq dbSetup 'supabase')}}
@@ -3726,7 +3936,7 @@ build
 *.tsbuildinfo
 
 # Generated files
-apps/web/src/routeTree.gen.ts
+apps/*/src/routeTree.gen.ts
 local.db
 local.db-*
 
@@ -3782,14 +3992,6 @@ temp
     "apps/*",
     "packages/*"
   ],
-{{#if (and (includes frontend "solid") (ne packageManager "pnpm"))}}
-  "overrides": {
-    "solid-js": "2.0.0-rc.14",
-    "@solidjs/signals": "2.0.0-rc.14",
-    "@solidjs/compiler": "2.0.0-rc.14",
-    "@solidjs/babel-plugin": "2.0.0-rc.14"
-  },
-{{/if}}
   "scripts": {}
 }
 `],
@@ -3797,10 +3999,1058 @@ temp
   "extends": "@{{projectName}}/config/tsconfig.base.json",
 }
 `],
+  ["builder.json", `{
+  "options": {
+    "api": [
+      {
+        "id": "trpc",
+        "name": "tRPC",
+        "description": "End-to-end typesafe APIs",
+        "icon": "/icons/trpc.svg",
+        "color": "from-blue-500 to-blue-700",
+        "default": false
+      },
+      {
+        "id": "orpc",
+        "name": "oRPC",
+        "description": "Typesafe APIs Made Simple",
+        "icon": "/icons/orpc.svg",
+        "color": "from-indigo-400 to-indigo-600"
+      },
+      {
+        "id": "none",
+        "name": "No API",
+        "description": "No API layer (API routes disabled)",
+        "icon": "",
+        "color": "from-gray-400 to-gray-600",
+        "default": true
+      }
+    ],
+    "webFrontend": [
+      {
+        "id": "tanstack-router",
+        "name": "TanStack Router",
+        "description": "Modern type-safe router for React",
+        "icon": "/icons/tanstack.svg",
+        "color": "from-blue-400 to-blue-600",
+        "default": false
+      },
+      {
+        "id": "react-router",
+        "name": "React Router",
+        "description": "Declarative routing for React",
+        "icon": "/icons/react-router.svg",
+        "color": "from-cyan-400 to-cyan-600",
+        "default": false
+      },
+      {
+        "id": "tanstack-start",
+        "name": "TanStack Start",
+        "description": "Full-stack React framework powered by TanStack Router",
+        "icon": "/icons/tanstack.svg",
+        "color": "from-purple-400 to-purple-600",
+        "default": false
+      },
+      {
+        "id": "next",
+        "name": "Next.js",
+        "description": "React framework with hybrid rendering",
+        "icon": "/icons/nextjs.svg",
+        "color": "from-gray-700 to-black",
+        "default": true
+      },
+      {
+        "id": "nuxt",
+        "name": "Nuxt",
+        "description": "Vue full-stack framework (SSR, SSG, hybrid)",
+        "icon": "/icons/nuxt.svg",
+        "color": "from-green-400 to-green-700",
+        "default": false
+      },
+      {
+        "id": "svelte",
+        "name": "Svelte",
+        "description": "Cybernetically enhanced web apps",
+        "icon": "/icons/svelte.svg",
+        "color": "from-orange-500 to-orange-700",
+        "default": false
+      },
+      {
+        "id": "solid",
+        "name": "Solid",
+        "description": "Solid application with file-based routing and SSR",
+        "icon": "/icons/solid.svg",
+        "color": "from-blue-600 to-blue-800",
+        "default": false
+      },
+      {
+        "id": "astro",
+        "name": "Astro",
+        "description": "The web framework for content-driven websites",
+        "icon": "/icons/astro.svg",
+        "color": "from-purple-500 to-orange-500",
+        "default": false
+      },
+      {
+        "id": "none",
+        "name": "No Web Frontend",
+        "description": "No web-based frontend",
+        "icon": "",
+        "color": "from-gray-400 to-gray-600",
+        "default": false
+      }
+    ],
+    "nativeFrontend": [
+      {
+        "id": "native-bare",
+        "name": "Expo + Bare",
+        "description": "Expo with StyleSheet (no styling library)",
+        "icon": "/icons/expo.svg",
+        "color": "from-blue-400 to-blue-600",
+        "className": "invert-0 dark:invert",
+        "default": false
+      },
+      {
+        "id": "native-uniwind",
+        "name": "Expo + Uniwind",
+        "description": "Fastest Tailwind bindings for React Native with HeroUI Native",
+        "icon": "/icons/expo.svg",
+        "color": "from-purple-400 to-purple-600",
+        "className": "invert-0 dark:invert",
+        "default": false
+      },
+      {
+        "id": "native-unistyles",
+        "name": "Expo + Unistyles",
+        "description": "Expo with Unistyles (type-safe styling)",
+        "icon": "/icons/expo.svg",
+        "color": "from-pink-400 to-pink-600",
+        "className": "invert-0 dark:invert",
+        "default": false
+      },
+      {
+        "id": "none",
+        "name": "No Native Frontend",
+        "description": "No native mobile frontend",
+        "icon": "",
+        "color": "from-gray-400 to-gray-600",
+        "default": true
+      }
+    ],
+    "runtime": [
+      {
+        "id": "bun",
+        "name": "Bun",
+        "description": "Fast JavaScript runtime & toolkit",
+        "icon": "/icons/bun.svg",
+        "color": "from-amber-400 to-amber-600",
+        "default": false
+      },
+      {
+        "id": "node",
+        "name": "Node.js",
+        "description": "JavaScript runtime environment",
+        "icon": "/icons/node.svg",
+        "color": "from-green-400 to-green-600"
+      },
+      {
+        "id": "workers",
+        "name": "Cloudflare Workers",
+        "description": "Serverless runtime for the edge",
+        "icon": "/icons/workers.svg",
+        "color": "from-orange-400 to-orange-600"
+      },
+      {
+        "id": "none",
+        "name": "No Runtime",
+        "description": "No specific runtime",
+        "icon": "",
+        "color": "from-gray-400 to-gray-600",
+        "default": true
+      }
+    ],
+    "backend": [
+      {
+        "id": "hono",
+        "name": "Hono",
+        "description": "Ultrafast web framework",
+        "icon": "/icons/hono.svg",
+        "color": "from-blue-500 to-blue-700",
+        "default": false
+      },
+      {
+        "id": "elysia",
+        "name": "Elysia",
+        "description": "TypeScript web framework",
+        "icon": "/icons/elysia.svg",
+        "color": "from-purple-500 to-purple-700"
+      },
+      {
+        "id": "express",
+        "name": "Express",
+        "description": "Popular Node.js framework",
+        "icon": "/icons/express.svg",
+        "color": "from-gray-500 to-gray-700"
+      },
+      {
+        "id": "fastify",
+        "name": "Fastify",
+        "description": "Fast, low-overhead web framework for Node.js",
+        "icon": "/icons/fastify.svg",
+        "color": "from-gray-500 to-gray-700"
+      },
+      {
+        "id": "convex",
+        "name": "Convex",
+        "description": "Reactive backend-as-a-service",
+        "icon": "/icons/convex.svg",
+        "color": "from-pink-500 to-pink-700"
+      },
+      {
+        "id": "self-next",
+        "name": "Fullstack Next.js",
+        "description": "Use Next.js built-in API routes",
+        "icon": "/icons/nextjs.svg",
+        "color": "from-gray-700 to-black",
+        "default": true
+      },
+      {
+        "id": "self-tanstack-start",
+        "name": "Fullstack TanStack Start",
+        "description": "Use TanStack Start's built-in API routes",
+        "icon": "/icons/tanstack.svg",
+        "color": "from-purple-400 to-purple-600"
+      },
+      {
+        "id": "self-nuxt",
+        "name": "Fullstack Nuxt",
+        "description": "Use Nuxt's built-in server routes",
+        "icon": "/icons/nuxt.svg",
+        "color": "from-green-400 to-green-700"
+      },
+      {
+        "id": "self-svelte",
+        "name": "Fullstack SvelteKit",
+        "description": "Use SvelteKit's built-in server routes",
+        "icon": "/icons/svelte.svg",
+        "color": "from-orange-500 to-orange-700"
+      },
+      {
+        "id": "self-solid",
+        "name": "Fullstack Solid",
+        "description": "Use Solid file-based API routes",
+        "icon": "/icons/solid.svg",
+        "color": "from-blue-400 to-blue-700"
+      },
+      {
+        "id": "self-astro",
+        "name": "Fullstack Astro",
+        "description": "Use Astro's built-in API routes",
+        "icon": "/icons/astro.svg",
+        "color": "from-purple-500 to-orange-500"
+      },
+      {
+        "id": "none",
+        "name": "No Backend",
+        "description": "Skip backend integration (frontend only)",
+        "icon": "",
+        "color": "from-gray-400 to-gray-600"
+      }
+    ],
+    "database": [
+      {
+        "id": "sqlite",
+        "name": "SQLite",
+        "description": "File-based SQL database",
+        "icon": "/icons/sqlite.svg",
+        "color": "from-blue-400 to-cyan-500",
+        "default": true
+      },
+      {
+        "id": "postgres",
+        "name": "PostgreSQL",
+        "description": "Advanced SQL database",
+        "icon": "/icons/postgres.svg",
+        "color": "from-indigo-400 to-indigo-600"
+      },
+      {
+        "id": "mysql",
+        "name": "MySQL",
+        "description": "Popular relational database",
+        "icon": "/icons/mysql.svg",
+        "color": "from-blue-500 to-blue-700"
+      },
+      {
+        "id": "mongodb",
+        "name": "MongoDB",
+        "description": "NoSQL document database",
+        "icon": "/icons/mongodb.svg",
+        "color": "from-green-400 to-green-600"
+      },
+      {
+        "id": "none",
+        "name": "No Database",
+        "description": "Skip database integration",
+        "icon": "",
+        "color": "from-gray-400 to-gray-600"
+      }
+    ],
+    "orm": [
+      {
+        "id": "drizzle",
+        "name": "Drizzle",
+        "description": "TypeScript ORM",
+        "icon": "/icons/drizzle.svg",
+        "color": "from-cyan-400 to-cyan-600",
+        "default": true
+      },
+      {
+        "id": "prisma",
+        "name": "Prisma",
+        "description": "Next-gen ORM",
+        "icon": "/icons/prisma.svg",
+        "color": "from-purple-400 to-purple-600"
+      },
+      {
+        "id": "mongoose",
+        "name": "Mongoose",
+        "description": "Elegant object modeling tool",
+        "icon": "/icons/mongoose.svg",
+        "color": "from-blue-400 to-blue-600"
+      },
+      {
+        "id": "none",
+        "name": "No ORM",
+        "description": "Skip ORM integration",
+        "icon": "",
+        "color": "from-gray-400 to-gray-600"
+      }
+    ],
+    "dbSetup": [
+      {
+        "id": "turso",
+        "name": "Turso",
+        "description": "Distributed SQLite with edge replicas (libSQL)",
+        "icon": "/icons/turso.svg",
+        "color": "from-pink-400 to-pink-600"
+      },
+      {
+        "id": "d1",
+        "name": "Cloudflare D1",
+        "description": "Serverless SQLite-compatible database for Cloudflare Workers",
+        "icon": "/icons/workers.svg",
+        "color": "from-orange-400 to-orange-600"
+      },
+      {
+        "id": "neon",
+        "name": "Neon Postgres",
+        "description": "Serverless Postgres with autoscaling and branching",
+        "icon": "/icons/neon.svg",
+        "color": "from-blue-400 to-blue-600"
+      },
+      {
+        "id": "prisma-postgres",
+        "name": "Prisma PostgreSQL",
+        "description": "Managed Postgres via Prisma Data Platform",
+        "icon": "/icons/prisma.svg",
+        "color": "from-indigo-400 to-indigo-600"
+      },
+      {
+        "id": "mongodb-atlas",
+        "name": "MongoDB Atlas",
+        "description": "Managed MongoDB clusters in the cloud",
+        "icon": "/icons/mongodb.svg",
+        "color": "from-green-400 to-green-600"
+      },
+      {
+        "id": "supabase",
+        "name": "Supabase",
+        "description": "Local Postgres stack via Supabase (Docker required)",
+        "icon": "/icons/supabase.svg",
+        "color": "from-emerald-400 to-emerald-600"
+      },
+      {
+        "id": "planetscale",
+        "name": "PlanetScale",
+        "description": "Postgres & Vitess (MySQL) on NVMe",
+        "icon": "/icons/planetscale.svg",
+        "color": "from-orange-400 to-orange-600"
+      },
+      {
+        "id": "docker",
+        "name": "Docker",
+        "description": "Run Postgres/MySQL/MongoDB locally via Docker Compose",
+        "icon": "/icons/docker.svg",
+        "color": "from-blue-500 to-blue-700"
+      },
+      {
+        "id": "none",
+        "name": "Basic Setup",
+        "description": "No cloud DB integration",
+        "icon": "",
+        "color": "from-gray-400 to-gray-600",
+        "default": true
+      }
+    ],
+    "webDeploy": [
+      {
+        "id": "cloudflare",
+        "name": "Cloudflare",
+        "description": "Deploy to Cloudflare Workers using Alchemy",
+        "icon": "/icons/workers.svg",
+        "color": "from-orange-400 to-orange-600"
+      },
+      {
+        "id": "prisma",
+        "name": "Prisma",
+        "description": "Deploy with Prisma using Alchemy",
+        "icon": "/icons/prisma.svg",
+        "color": "from-indigo-400 to-indigo-600"
+      },
+      {
+        "id": "docker",
+        "name": "Docker",
+        "description": "Self-host with a Dockerfile and docker-compose.yml",
+        "icon": "/icons/docker.svg",
+        "color": "from-blue-400 to-blue-600"
+      },
+      {
+        "id": "vercel",
+        "name": "Vercel",
+        "description": "Deploy to Vercel with Services",
+        "icon": "/icons/vercel.svg",
+        "color": "from-gray-700 to-black",
+        "experimental": true
+      },
+      {
+        "id": "none",
+        "name": "None",
+        "description": "Skip deployment setup",
+        "icon": "",
+        "color": "from-gray-400 to-gray-600",
+        "default": true
+      }
+    ],
+    "serverDeploy": [
+      {
+        "id": "cloudflare",
+        "name": "Cloudflare",
+        "description": "Deploy to Cloudflare Workers using Alchemy",
+        "icon": "/icons/workers.svg",
+        "color": "from-orange-400 to-orange-600"
+      },
+      {
+        "id": "prisma",
+        "name": "Prisma",
+        "description": "Deploy with Prisma using Alchemy",
+        "icon": "/icons/prisma.svg",
+        "color": "from-indigo-400 to-indigo-600"
+      },
+      {
+        "id": "docker",
+        "name": "Docker",
+        "description": "Self-host with a Dockerfile and docker-compose.yml",
+        "icon": "/icons/docker.svg",
+        "color": "from-blue-400 to-blue-600"
+      },
+      {
+        "id": "vercel",
+        "name": "Vercel",
+        "description": "Deploy to Vercel with Services",
+        "icon": "/icons/vercel.svg",
+        "color": "from-gray-700 to-black",
+        "experimental": true
+      },
+      {
+        "id": "none",
+        "name": "None",
+        "description": "Skip deployment setup",
+        "icon": "",
+        "color": "from-gray-400 to-gray-600",
+        "default": true
+      }
+    ],
+    "packageManager": [
+      {
+        "id": "npm",
+        "name": "npm",
+        "description": "Default package manager",
+        "icon": "/icons/npm.svg",
+        "color": "from-red-500 to-red-700",
+        "className": "invert-0 dark:invert"
+      },
+      {
+        "id": "pnpm",
+        "name": "pnpm",
+        "description": "Fast, disk space efficient",
+        "icon": "/icons/pnpm.svg",
+        "color": "from-orange-500 to-orange-700"
+      },
+      {
+        "id": "bun",
+        "name": "bun",
+        "description": "All-in-one toolkit",
+        "icon": "/icons/bun.svg",
+        "color": "from-amber-500 to-amber-700",
+        "default": true
+      }
+    ],
+    "addons": [
+      {
+        "id": "pwa",
+        "name": "PWA (Progressive Web App)",
+        "description": "Make your app installable and work offline",
+        "icon": "",
+        "color": "from-blue-500 to-blue-700",
+        "default": false
+      },
+      {
+        "id": "tauri",
+        "name": "Tauri",
+        "description": "Package static web apps as native desktop apps",
+        "icon": "/icons/tauri.svg",
+        "color": "from-amber-500 to-amber-700",
+        "default": false
+      },
+      {
+        "id": "electrobun",
+        "name": "Electrobun",
+        "description": "Bundle static web apps in a lightweight desktop shell",
+        "icon": "",
+        "color": "from-orange-500 to-orange-700",
+        "default": false
+      },
+      {
+        "id": "starlight",
+        "name": "Starlight",
+        "description": "Build stellar docs with astro",
+        "icon": "/icons/starlight.svg",
+        "color": "from-teal-500 to-teal-700",
+        "default": false
+      },
+      {
+        "id": "fumadocs",
+        "name": "Fumadocs",
+        "description": "Build excellent documentation site",
+        "icon": "/icons/fumadocs.svg",
+        "color": "from-indigo-500 to-indigo-700",
+        "default": false
+      },
+      {
+        "id": "lefthook",
+        "name": "Lefthook",
+        "description": "Fast and powerful Git hooks manager",
+        "icon": "",
+        "color": "from-red-500 to-red-700",
+        "default": false
+      },
+      {
+        "id": "husky",
+        "name": "Husky",
+        "description": "Modern native Git hooks made easy",
+        "icon": "",
+        "color": "from-purple-500 to-purple-700",
+        "default": false
+      },
+      {
+        "id": "biome",
+        "name": "Biome",
+        "description": "Format, lint, and more",
+        "icon": "/icons/biome.svg",
+        "color": "from-green-500 to-green-700",
+        "default": false
+      },
+      {
+        "id": "oxlint",
+        "name": "Oxlint",
+        "description": "Oxlint + Oxfmt (linting & formatting)",
+        "icon": "/icons/oxc.svg",
+        "color": "from-orange-500 to-orange-700",
+        "default": false
+      },
+      {
+        "id": "turborepo",
+        "name": "Turborepo",
+        "description": "High-performance build system",
+        "icon": "/icons/turborepo.svg",
+        "color": "from-gray-400 to-gray-700",
+        "default": true
+      },
+      {
+        "id": "nx",
+        "name": "Nx",
+        "description": "Smart monorepo build system and task runner",
+        "icon": "/icons/nx.svg",
+        "color": "from-cyan-500 to-cyan-700",
+        "default": false
+      },
+      {
+        "id": "vite-plus",
+        "name": "Vite+",
+        "description": "Unified Vite toolchain, task runner, linting, formatting, and optional hooks",
+        "icon": "/icons/vite-plus.svg",
+        "color": "from-violet-500 to-cyan-600",
+        "default": false
+      },
+      {
+        "id": "ultracite",
+        "name": "Ultracite",
+        "description": "A zero-config preset for ESLint, Biome, and Oxlint that helps AI write better code",
+        "icon": "/icons/ultracite.svg",
+        "color": "from-blue-500 to-blue-700",
+        "className": "invert-0 dark:invert",
+        "default": false
+      },
+      {
+        "id": "opentui",
+        "name": "OpenTUI",
+        "description": "Build terminal user interfaces",
+        "icon": "",
+        "color": "from-cyan-500 to-cyan-700",
+        "default": false
+      },
+      {
+        "id": "wxt",
+        "name": "WXT",
+        "description": "Build browser extensions",
+        "icon": "",
+        "color": "from-emerald-500 to-emerald-700",
+        "default": false
+      },
+      {
+        "id": "skills",
+        "name": "Skills",
+        "description": "Install AI agent skills for coding assistants",
+        "icon": "",
+        "color": "from-pink-500 to-pink-700",
+        "default": false
+      },
+      {
+        "id": "mcp",
+        "name": "MCP",
+        "description": "Install MCP servers for your agents/editors",
+        "icon": "",
+        "color": "from-emerald-500 to-emerald-700",
+        "default": false
+      },
+      {
+        "id": "evlog",
+        "name": "evlog",
+        "description": "Structured request logging with Better Auth context",
+        "icon": "",
+        "color": "from-sky-500 to-slate-700",
+        "default": false
+      },
+      {
+        "id": "axiom",
+        "name": "Axiom",
+        "description": "Managed production observability through evlog and Alchemy",
+        "icon": "",
+        "color": "from-violet-500 to-indigo-700",
+        "default": false
+      }
+    ],
+    "git": [
+      {
+        "id": "true",
+        "name": "Git",
+        "description": "Initialize Git repository",
+        "icon": "/icons/git.svg",
+        "color": "from-gray-500 to-gray-700",
+        "default": true
+      },
+      {
+        "id": "false",
+        "name": "No Git",
+        "description": "Skip Git initialization",
+        "icon": "",
+        "color": "from-red-400 to-red-600"
+      }
+    ],
+    "install": [
+      {
+        "id": "true",
+        "name": "Install Dependencies",
+        "description": "Install packages automatically",
+        "icon": "",
+        "color": "from-green-400 to-green-600",
+        "default": true
+      },
+      {
+        "id": "false",
+        "name": "Skip Install",
+        "description": "Skip dependency installation",
+        "icon": "",
+        "color": "from-yellow-400 to-yellow-600"
+      }
+    ]
+  },
+  "defaults": {
+    "projectName": "my-xstack-app",
+    "apps": [
+      {
+        "id": "web",
+        "type": "fullstack-web",
+        "stack": {
+          "framework": "next"
+        }
+      }
+    ],
+    "webFrontend": [
+      "next"
+    ],
+    "nativeFrontend": [
+      "none"
+    ],
+    "runtime": "none",
+    "backend": "self-next",
+    "database": "sqlite",
+    "orm": "drizzle",
+    "dbSetup": "none",
+    "features": [
+      "none"
+    ],
+    "providers": {},
+    "moduleOptions": {
+      "i18n": {
+        "locales": "en,zh-CN"
+      }
+    },
+    "packageManager": "bun",
+    "addons": [
+      "turborepo"
+    ],
+    "git": "true",
+    "install": "true",
+    "api": "none",
+    "webDeploy": "none",
+    "serverDeploy": "none",
+    "yolo": "false"
+  },
+  "presets": [
+    {
+      "id": "shell",
+      "name": "Next.js · Shell · SQLite",
+      "description": "Product shell with Drizzle and internationalization; no optional features",
+      "group": "Next.js",
+      "stack": {}
+    },
+    {
+      "id": "starter",
+      "name": "Next.js · Starter · SQLite",
+      "description": "Product shell with authentication",
+      "group": "Next.js",
+      "productPreset": "starter",
+      "stack": {}
+    },
+    {
+      "id": "saas-global",
+      "name": "Next.js · Global SaaS · PostgreSQL",
+      "description": "Authentication, email, admin, payments and credits",
+      "group": "Next.js",
+      "productPreset": "saas-global",
+      "stack": {
+        "database": "postgres"
+      }
+    },
+    {
+      "id": "full",
+      "name": "Next.js · Full · PostgreSQL",
+      "description": "All modules: AI, private files, publishing, referrals and protected authentication",
+      "group": "Next.js",
+      "productPreset": "full",
+      "stack": {
+        "database": "postgres"
+      }
+    },
+    {
+      "id": "tanstack-start-shell",
+      "name": "TanStack Start · Shell · SQLite",
+      "description": "Product shell with Drizzle and internationalization; no optional features",
+      "group": "TanStack Start",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "tanstack-start"
+            }
+          }
+        ],
+        "webFrontend": [
+          "tanstack-start"
+        ],
+        "backend": "self-tanstack-start"
+      }
+    },
+    {
+      "id": "tanstack-start-starter",
+      "name": "TanStack Start · Starter · SQLite",
+      "description": "Product shell with authentication",
+      "group": "TanStack Start",
+      "productPreset": "starter",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "tanstack-start"
+            }
+          }
+        ],
+        "webFrontend": [
+          "tanstack-start"
+        ],
+        "backend": "self-tanstack-start"
+      }
+    },
+    {
+      "id": "tanstack-start-saas-global",
+      "name": "TanStack Start · Global SaaS · PostgreSQL",
+      "description": "Authentication, email, admin, payments and credits",
+      "group": "TanStack Start",
+      "productPreset": "saas-global",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "tanstack-start"
+            }
+          }
+        ],
+        "webFrontend": [
+          "tanstack-start"
+        ],
+        "backend": "self-tanstack-start",
+        "database": "postgres"
+      }
+    },
+    {
+      "id": "tanstack-start-full",
+      "name": "TanStack Start · Full · PostgreSQL",
+      "description": "All modules: AI, private files, publishing, referrals and protected authentication",
+      "group": "TanStack Start",
+      "productPreset": "full",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "tanstack-start"
+            }
+          }
+        ],
+        "webFrontend": [
+          "tanstack-start"
+        ],
+        "backend": "self-tanstack-start",
+        "database": "postgres"
+      }
+    },
+    {
+      "id": "nuxt-shell",
+      "name": "Nuxt · Shell · SQLite",
+      "description": "Product shell with Drizzle and internationalization; no optional features",
+      "group": "Nuxt",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "nuxt"
+            }
+          }
+        ],
+        "webFrontend": [
+          "nuxt"
+        ],
+        "backend": "self-nuxt"
+      }
+    },
+    {
+      "id": "nuxt-starter",
+      "name": "Nuxt · Starter · SQLite",
+      "description": "Product shell with authentication",
+      "group": "Nuxt",
+      "productPreset": "starter",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "nuxt"
+            }
+          }
+        ],
+        "webFrontend": [
+          "nuxt"
+        ],
+        "backend": "self-nuxt"
+      }
+    },
+    {
+      "id": "nuxt-saas-global",
+      "name": "Nuxt · Global SaaS · PostgreSQL",
+      "description": "Authentication, email, admin, payments and credits",
+      "group": "Nuxt",
+      "productPreset": "saas-global",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "nuxt"
+            }
+          }
+        ],
+        "webFrontend": [
+          "nuxt"
+        ],
+        "backend": "self-nuxt",
+        "database": "postgres"
+      }
+    },
+    {
+      "id": "nuxt-full",
+      "name": "Nuxt · Full · PostgreSQL",
+      "description": "All modules: AI, private files, publishing, referrals and protected authentication",
+      "group": "Nuxt",
+      "productPreset": "full",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "nuxt"
+            }
+          }
+        ],
+        "webFrontend": [
+          "nuxt"
+        ],
+        "backend": "self-nuxt",
+        "database": "postgres"
+      }
+    },
+    {
+      "id": "split-shell",
+      "name": "Split apps · React Router + Hono · Shell",
+      "description": "Separate web frontend, administration and backend shells; no native business modules",
+      "group": "Application layouts",
+      "stack": {
+        "apps": [
+          {
+            "id": "frontend",
+            "type": "web-frontend",
+            "stack": {
+              "framework": "react-router"
+            },
+            "bindings": {
+              "backend": "backend"
+            }
+          },
+          {
+            "id": "admin",
+            "type": "admin",
+            "stack": {
+              "framework": "react-router"
+            },
+            "bindings": {
+              "backend": "backend"
+            }
+          },
+          {
+            "id": "backend",
+            "type": "backend",
+            "stack": {
+              "framework": "hono",
+              "runtime": "bun",
+              "api": "orpc"
+            }
+          }
+        ],
+        "webFrontend": [
+          "react-router"
+        ],
+        "runtime": "bun",
+        "backend": "hono",
+        "database": "none",
+        "orm": "none",
+        "moduleOptions": {},
+        "api": "orpc"
+      }
+    },
+    {
+      "id": "cli-shell",
+      "name": "CLI only · Node.js · Shell",
+      "description": "Independent command-line application without product modules",
+      "group": "Application layouts",
+      "stack": {
+        "apps": [
+          {
+            "id": "cli",
+            "type": "cli",
+            "stack": {
+              "framework": "node"
+            }
+          }
+        ],
+        "webFrontend": [
+          "none"
+        ],
+        "runtime": "node",
+        "backend": "none",
+        "database": "none",
+        "orm": "none",
+        "moduleOptions": {}
+      }
+    }
+  ],
+  "defaultPreset": "shell",
+  "exclusiveAddonGroups": [
+    [
+      "turborepo",
+      "nx",
+      "vite-plus"
+    ],
+    [
+      "evlog",
+      "axiom"
+    ]
+  ],
+  "desktop": {
+    "addons": [
+      "tauri",
+      "electrobun"
+    ],
+    "frontends": [
+      "tanstack-start",
+      "next",
+      "nuxt",
+      "svelte",
+      "astro"
+    ]
+  }
+}
+`],
   ["cli/node/adapter.json", `{
   "id": "node",
+  "name": "Node.js",
+  "description": "JavaScript runtime environment",
+  "icon": "/icons/node.svg",
   "apps": {
     "cli": {
+      "legacy": false,
+      "options": {"runtime":{"values":["node"],"visibility":"visible"},"api":{"values":["none"],"visibility":"hidden"}},
       "stack": {
         "runtime": "node",
         "api": "none"
@@ -3810,7 +5060,7 @@ temp
 }
 `],
   ["cli/node/apps/cli/package.json.hbs", `{
-  "name": "cli",
+  "name": "{{application.id}}",
   "private": true,
   "type": "module",
   "bin": { "{{application.id}}": "./src/index.js" },
@@ -5055,15 +6305,15 @@ WORKDIR /app
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/server && {{packageManager}} run build
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "server"}} && {{packageManager}} run build
 
 {{#if (eq runtime "bun")}}
 FROM oven/bun:1 AS runner
@@ -5076,7 +6326,7 @@ COPY --from=builder /app /app
 
 EXPOSE 3000
 
-WORKDIR /app/apps/server
+WORKDIR /app/{{appPath "server"}}
 {{#if (eq runtime "bun")}}
 CMD ["bun", "dist/index.mjs"]
 {{else}}
@@ -5094,11 +6344,11 @@ WORKDIR /app
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
@@ -5110,7 +6360,7 @@ ARG PUBLIC_CONVEX_URL
 ENV PUBLIC_CONVEX_URL=\${PUBLIC_CONVEX_URL}
 {{/if}}
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "web"}} && {{packageManager}} run build
 {{#if (eq orm "prisma")}}
 ENV DATABASE_URL=
 {{/if}}
@@ -5119,7 +6369,7 @@ ENV HOST=0.0.0.0
 ENV PORT=3001
 EXPOSE 3001
 
-WORKDIR /app/apps/web
+WORKDIR /app/{{appPath "web"}}
 CMD ["node", "dist/server/entry.mjs"]
 `],
   ["deploy/docker/web/nuxt/Dockerfile.hbs", `FROM node:24-slim AS builder
@@ -5137,23 +6387,23 @@ ENV NUXT_PUBLIC_SERVER_URL=\${NUXT_PUBLIC_SERVER_URL}
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "web"}} && {{packageManager}} run build
 
 FROM node:24-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY --from=builder /app/apps/web/.output ./
+COPY --from=builder /app/{{appPath "web"}}/.output ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/web/.env.schema ./.env.schema
+COPY --from=builder /app/{{appPath "web"}}/.env.schema ./.env.schema
 
 ENV HOST=0.0.0.0
 ENV PORT=3001
@@ -5172,11 +6422,11 @@ WORKDIR /app
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
@@ -5192,26 +6442,26 @@ ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
 {{/if}}
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build && rm -f .next/standalone/.env* .next/standalone/apps/web/.env*
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "web"}} && {{packageManager}} run build && rm -f .next/standalone/.env* .next/standalone/{{appPath "web"}}/.env*
 # standalone output excludes public/; ensure it exists so the runner copy never fails
-RUN mkdir -p apps/web/public
+RUN mkdir -p {{appPath "web"}}/public
 
 FROM node:24-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder /app/{{appPath "web"}}/.next/standalone ./
+COPY --from=builder /app/{{appPath "web"}}/.next/static ./{{appPath "web"}}/.next/static
+COPY --from=builder /app/{{appPath "web"}}/public ./{{appPath "web"}}/public
 # auto-load needs the Varlock CLI and its installed dependencies.
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/web/.env.schema ./apps/web/.env.schema
+COPY --from=builder /app/{{appPath "web"}}/.env.schema ./{{appPath "web"}}/.env.schema
 
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3001
 EXPOSE 3001
 
-WORKDIR /app/apps/web
+WORKDIR /app/{{appPath "web"}}
 CMD ["node", "--import", "varlock/auto-load", "server.js"]
 `],
   ["deploy/docker/web/react/react-router/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
@@ -5225,11 +6475,11 @@ WORKDIR /app
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
@@ -5245,7 +6495,7 @@ ARG VITE_CLERK_PUBLISHABLE_KEY
 ENV VITE_CLERK_PUBLISHABLE_KEY=\${VITE_CLERK_PUBLISHABLE_KEY}
 {{/if}}
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "web"}} && {{packageManager}} run build
 
 FROM node:24-slim AS runner
 WORKDIR /app
@@ -5254,7 +6504,7 @@ ENV NODE_ENV=production
 ENV PORT=3001
 ENV HOST=0.0.0.0
 EXPOSE 3001
-CMD ["sh", "-c", "cd apps/web && npm run start"]
+CMD ["sh", "-c", "cd {{appPath "web"}} && npm run start"]
 `],
   ["deploy/docker/web/react/tanstack-router/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
 {{#if (eq packageManager "bun")}}
@@ -5267,11 +6517,11 @@ WORKDIR /app
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
@@ -5287,11 +6537,11 @@ ARG VITE_CLERK_PUBLISHABLE_KEY
 ENV VITE_CLERK_PUBLISHABLE_KEY=\${VITE_CLERK_PUBLISHABLE_KEY}
 {{/if}}
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "web"}} && {{packageManager}} run build
 
 FROM nginx:alpine AS runner
-COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/{{appPath "web"}}/dist /usr/share/nginx/html
+COPY {{appPath "web"}}/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 `],
@@ -5329,11 +6579,11 @@ WORKDIR /app
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
@@ -5349,7 +6599,7 @@ ARG VITE_CLERK_PUBLISHABLE_KEY
 ENV VITE_CLERK_PUBLISHABLE_KEY=\${VITE_CLERK_PUBLISHABLE_KEY}
 {{/if}}
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "web"}} && {{packageManager}} run build
 {{#if (eq orm "prisma")}}
 ENV DATABASE_URL=
 {{/if}}
@@ -5368,7 +6618,7 @@ ENV PORT=3001
 EXPOSE 3001
 
 # SSR chunks require workspace dependencies at runtime
-WORKDIR /app/apps/web
+WORKDIR /app/{{appPath "web"}}
 {{#if (eq runtime "bun")}}
 CMD ["bun", ".output/server/index.mjs"]
 {{else}}
@@ -5391,11 +6641,11 @@ WORKDIR /app
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
@@ -5407,7 +6657,7 @@ ARG VITE_CONVEX_URL
 ENV VITE_CONVEX_URL=\${VITE_CONVEX_URL}
 {{/if}}
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "web"}} && {{packageManager}} run build
 {{#if (eq orm "prisma")}}
 ENV DATABASE_URL=
 {{/if}}
@@ -5418,12 +6668,12 @@ RUN apt-get update -y \\
   && apt-get install -y --no-install-recommends openssl \\
   && rm -rf /var/lib/apt/lists/*
 {{/if}}
-WORKDIR /app/apps/web
+WORKDIR /app/{{appPath "web"}}
 ENV NODE_ENV=production
 
-COPY --from=builder /app/apps/web/.output ./.output
+COPY --from=builder /app/{{appPath "web"}}/.output ./.output
 COPY --from=builder /app/node_modules /app/node_modules
-COPY --from=builder /app/apps/web/.env.schema ./.env.schema
+COPY --from=builder /app/{{appPath "web"}}/.env.schema ./.env.schema
 
 ENV HOST=0.0.0.0
 ENV PORT=3001
@@ -5442,11 +6692,11 @@ WORKDIR /app
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
@@ -5458,7 +6708,7 @@ ARG PUBLIC_CONVEX_URL
 ENV PUBLIC_CONVEX_URL=\${PUBLIC_CONVEX_URL}
 {{/if}}
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "web"}} && {{packageManager}} run build
 {{#if (eq orm "prisma")}}
 ENV DATABASE_URL=
 {{/if}}
@@ -5467,7 +6717,7 @@ ENV HOST=0.0.0.0
 ENV PORT=3001
 EXPOSE 3001
 
-WORKDIR /app/apps/web
+WORKDIR /app/{{appPath "web"}}
 CMD ["node", "build/index.js"]
 `],
   ["deploy/prisma/web/react/react-router/prisma.server.ts", `import path from "node:path";
@@ -5518,36 +6768,49 @@ import { dirname, join } from "node:path";
 import { parseEnv } from "node:util";
 
 const DEFAULT_ENVIRONMENT = "preview";
-const VALID_ENVIRONMENTS = new Set(["development", "preview", "production"]);
+const VALID_ENVIRONMENTS: Record<string, true> = { development: true, preview: true, production: true };
 const VERCEL_COMMAND = [{{#if (eq packageManager "npm")}}"npx", "--yes", "vercel"{{else if (eq packageManager "pnpm")}}"pnpm", "dlx", "vercel"{{else}}"bunx", "vercel"{{/if}}] as const;
+const APPLICATION_FILES: Record<string, string> = {
+{{#each deploymentApplications}}
+	"{{id}}": "{{directory}}/.env",
+{{/each}}
+};
 const DEFAULT_FILES = [
+{{#unless deploymentApplications}}
 {{#if (eq webDeploy "vercel")}}
-	"apps/web/.env",
+	"{{appPath 'web'}}/.env",
 {{/if}}
 {{#if (and (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex"))}}
-	"apps/server/.env",
+	"{{appPath 'server'}}/.env",
 {{/if}}
+{{/unless}}
 ];
-const SKIP_KEYS = new Set([
+const SKIP_KEYS: Record<string, true> = {
+{{#if deploymentApplications}}
+	NODE_ENV: true,
+{{else}}
 {{#if (or (and (eq webDeploy "vercel") (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex")) (and (eq webDeploy "vercel") (eq backend "self")))}}
-	"BETTER_AUTH_URL",
-	"CORS_ORIGIN",
-	"NODE_ENV",
+	BETTER_AUTH_URL: true,
+	CORS_ORIGIN: true,
+	NODE_ENV: true,
 {{else if (and (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex"))}}
 	// BETTER_AUTH_URL derives from the deployment's own origin at runtime;
 	// CORS_ORIGIN stays synced because the web app (if any) lives on another host
-	"BETTER_AUTH_URL",
-	"NODE_ENV",
+	BETTER_AUTH_URL: true,
+	NODE_ENV: true,
 {{/if}}
-]);
-const OVERRIDE_KEYS = new Map([
+{{/if}}
+};
+const OVERRIDE_KEYS: Record<string, string> = {
+{{#unless deploymentApplications}}
 {{#if (and (eq webDeploy "vercel") (eq serverDeploy "vercel") (ne backend "self") (ne backend "none") (ne backend "convex"))}}
-	["NEXT_PUBLIC_SERVER_URL", "/api"],
-	["NUXT_PUBLIC_SERVER_URL", "/api"],
-	["PUBLIC_SERVER_URL", "/api"],
-	["VITE_SERVER_URL", "/api"],
+	NEXT_PUBLIC_SERVER_URL: "/api",
+	NUXT_PUBLIC_SERVER_URL: "/api",
+	PUBLIC_SERVER_URL: "/api",
+	VITE_SERVER_URL: "/api",
 {{/if}}
-]);
+{{/unless}}
+};
 
 const args = process.argv.slice(2);
 const separatorIndex = args.indexOf("--");
@@ -5555,8 +6818,14 @@ const scriptArgs = separatorIndex === -1 ? args : args.slice(0, separatorIndex);
 const forwardedArgs = separatorIndex === -1 ? [] : args.slice(separatorIndex + 1);
 
 const environment =
-	scriptArgs[0] && VALID_ENVIRONMENTS.has(scriptArgs[0]) ? scriptArgs[0] : DEFAULT_ENVIRONMENT;
-const remainingArgs = scriptArgs.slice(VALID_ENVIRONMENTS.has(scriptArgs[0] ?? "") ? 1 : 0);
+	scriptArgs[0] && VALID_ENVIRONMENTS[scriptArgs[0]] ? scriptArgs[0] : DEFAULT_ENVIRONMENT;
+const remainingArgs = scriptArgs.slice(VALID_ENVIRONMENTS[scriptArgs[0] ?? ""] ? 1 : 0);
+const appIndex = remainingArgs.indexOf("--app");
+const app = appIndex === -1 ? undefined : remainingArgs[appIndex + 1];
+if (Object.keys(APPLICATION_FILES).length && (!app || !Object.hasOwn(APPLICATION_FILES, app))) {
+	throw new Error(\`Select a Vercel application with --app (\${Object.keys(APPLICATION_FILES).join(", ")})\`);
+}
+if (appIndex !== -1) remainingArgs.splice(appIndex, 2);
 // Split remaining args into env-file paths and passthrough Vercel CLI flags.
 // A bare token counts as a file only when it exists on disk, so flags and their
 // values (e.g. \`--scope my-team\`) forward correctly regardless of argument order.
@@ -5569,8 +6838,8 @@ for (const arg of remainingArgs) {
 		passthroughArgs.push(arg);
 	}
 }
-const vercelArgs = [...passthroughArgs, ...forwardedArgs];
-const envFiles = files.length > 0 ? files : DEFAULT_FILES;
+const vercelArgs = [...(app ? ["--local-config", \`vercel.\${app}.json\`] : []), ...passthroughArgs, ...forwardedArgs];
+const envFiles = files.length > 0 ? files : app ? [APPLICATION_FILES[app]!] : DEFAULT_FILES;
 
 const env = new Map<string, string>();
 const undeclaredKeys: string[] = [];
@@ -5590,12 +6859,12 @@ for (const file of envFiles) {
 		: undefined;
 
 	for (const [key, value] of Object.entries(parseEnv(readFileSync(file, "utf8")))) {
-		if (SKIP_KEYS.has(key)) continue;
+		if (Object.hasOwn(SKIP_KEYS, key)) continue;
 		if (declaredKeys && !declaredKeys.has(key)) {
 			undeclaredKeys.push(key);
 			continue;
 		}
-		const syncedValue = OVERRIDE_KEYS.get(key) ?? value;
+		const syncedValue = Object.hasOwn(OVERRIDE_KEYS, key) ? OVERRIDE_KEYS[key]! : value;
 		if (!syncedValue) {
 			emptyKeys.push(key);
 			continue;
@@ -5671,6 +6940,41 @@ for (const [key, value] of env.entries()) {
 }
 
 console.log("Vercel env sync complete. Redeploy for changes to take effect.");
+`],
+  ["deploy/vercel/scripts/vercel-app.ts.hbs", `import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const applications: Record<string, string> = {
+{{#each deploymentApplications}}
+  "{{id}}": "{{directory}}",
+{{/each}}
+};
+const [id, command, ...args] = process.argv.slice(2);
+if (!id || !Object.hasOwn(applications, id) || !command) throw new Error(\`Usage: vercel-app <\${Object.keys(applications).join("|")}> <link|deploy|build|dev|env-sync>\`);
+const runner = [{{#if (eq packageManager "npm")}}"npx", "--yes"{{else if (eq packageManager "pnpm")}}"pnpm", "dlx"{{else}}"bunx"{{/if}}];
+let executable = runner[0]!;
+let argv: string[];
+const env = { ...process.env };
+if (command === "link") {
+  argv = [...runner.slice(1), "vercel", "link", "--cwd", applications[id]!, ...args];
+} else {
+  const projectPath = join(applications[id]!, ".vercel/project.json");
+  let project: { projectId: string; orgId: string };
+  try { project = JSON.parse(readFileSync(projectPath, "utf8")); }
+  catch { throw new Error(\`Link application \${id} first with {{packageManager}} run deploy:\${id}:setup (\${projectPath})\`); }
+  if (!project.projectId || !project.orgId) throw new Error(\`Invalid Vercel project link: \${projectPath}\`);
+  env.VERCEL_PROJECT_ID = project.projectId;
+  env.VERCEL_ORG_ID = project.orgId;
+  if (command === "env-sync") {
+    argv = [...runner.slice(1), "tsx", "scripts/sync-vercel-env.ts", ...args, "--app", id];
+  } else {
+    argv = [...runner.slice(1), "vercel", ...(command === "deploy" ? [] : [command]), "--local-config", \`vercel.\${id}.json\`, ...args];
+  }
+}
+const result = spawnSync(executable, argv, { stdio: "inherit", env });
+if (result.error) throw result.error;
+process.exit(result.status ?? 1);
 `],
   ["env/env.server.ts.hbs", `{{#if (and (eq serverDeploy "cloudflare") (or (ne backend "self") (ne webDeploy "cloudflare")))}}
 /// <reference types="@cloudflare/workers-types" />
@@ -5839,9 +7143,17 @@ declare module "cloudflare:workers" {
 `],
   ["frontend/astro/adapter.json", `{
   "id": "astro",
+  "name": "Astro",
+  "description": "The web framework for content-driven websites",
+  "icon": "/icons/astro.svg",
   "apps": {
     "fullstack-web": {
-      "devArgs": ["--host", "127.0.0.1"],
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["orpc","none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["orpc","none"],
+      "clientContributions": { "framework": "astro", "family": "astro" },
+      "serverContributions": { "apiPrefix": "" },
+      "devArgs": ["--host", "127.0.0.1", "--ignore-lock"],
       "stack": {
         "frontend": ["astro"],
         "backend": "self",
@@ -5850,7 +7162,11 @@ declare module "cloudflare:workers" {
       }
     },
     "web-frontend": {
-      "devArgs": ["--host", "127.0.0.1"],
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["orpc","none"],
+      "clientContributions": { "framework": "astro", "family": "astro" },
+      "devArgs": ["--host", "127.0.0.1", "--ignore-lock"],
       "stack": {
         "frontend": ["astro"],
         "runtime": "none",
@@ -6268,8 +7584,15 @@ const { title = "{{projectName}}" } = Astro.props;
 `],
   ["frontend/native/bare/adapter.json", `{
   "id": "native-bare",
+  "name": "Expo + Bare",
+  "description": "Expo with StyleSheet (no styling library)",
+  "icon": "/icons/expo.svg",
   "apps": {
     "native": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["trpc","orpc","none"],
+      "clientContributions": { "framework": "bare", "family": "native" },
       "stack": {
         "frontend": ["native-bare"],
         "runtime": "none",
@@ -6323,16 +7646,16 @@ yarn-error.*
 `],
   ["frontend/native/bare/apps/native/app.json.hbs", `{
 	"expo": {
-		"name": "{{projectName}}",
-		"slug": "{{projectName}}",
+		"name": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
+		"slug": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
 		"version": "1.0.0",
 		"orientation": "portrait",
 		"icon": "./assets/images/icon.png",
-		"scheme": "{{projectName}}",
+		"scheme": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
 		"userInterfaceStyle": "automatic",
 		"ios": {
 			"supportsTablet": true,
-			"bundleIdentifier": "{{appId projectName "ios"}}"
+			"bundleIdentifier": "{{appId projectName "ios" application.id}}"
 		},
 		"android": {
 			"adaptiveIcon": {
@@ -6342,7 +7665,7 @@ yarn-error.*
 				"monochromeImage": "./assets/images/android-icon-monochrome.png"
 			},
 			"predictiveBackGestureEnabled": false,
-			"package": "{{appId projectName "android"}}"
+			"package": "{{appId projectName "android" application.id}}"
 		},
 		"web": {
 			"output": "static",
@@ -7350,15 +8673,15 @@ config.resolver.blockList = [
 module.exports = withVarlockMetroConfig(config);
 `],
   ["frontend/native/bare/apps/native/package.json.hbs", `{
-  "name": "native",
+  "name": "{{#if application.id}}{{application.id}}{{else}}native{{/if}}",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
-    "dev": "expo start --clear",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
+    "dev": "expo start --clear{{#if application.port}} --port {{application.port}}{{/if}}",
+    "android": "expo run:android{{#if application.port}} --port {{application.port}}{{/if}}",
+    "ios": "expo run:ios{{#if application.port}} --port {{application.port}}{{/if}}",
     "prebuild": "expo prebuild",
-    "web": "expo start --web",
+    "web": "expo start --web{{#if application.port}} --port {{application.port}}{{/if}}",
     "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit"
   },
   "dependencies": {
@@ -7422,8 +8745,15 @@ module.exports = withVarlockMetroConfig(config);
   ["frontend/native/shared/assets/images/splash-icon.png", `[Binary file]`],
   ["frontend/native/unistyles/adapter.json", `{
   "id": "native-unistyles",
+  "name": "Expo + Unistyles",
+  "description": "Expo with Unistyles (type-safe styling)",
+  "icon": "/icons/expo.svg",
   "apps": {
     "native": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["trpc","orpc","none"],
+      "clientContributions": { "framework": "unistyles", "family": "native" },
       "stack": {
         "frontend": ["native-unistyles"],
         "runtime": "none",
@@ -7477,16 +8807,16 @@ yarn-error.*
 `],
   ["frontend/native/unistyles/apps/native/app.json.hbs", `{
   "expo": {
-    "name": "{{projectName}}",
-    "slug": "{{projectName}}",
+    "name": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
+    "slug": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "{{projectName}}",
+    "scheme": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "{{appId projectName "ios"}}"
+      "bundleIdentifier": "{{appId projectName "ios" application.id}}"
     },
     "android": {
       "adaptiveIcon": {
@@ -7496,7 +8826,7 @@ yarn-error.*
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "{{appId projectName "android"}}"
+      "package": "{{appId projectName "android" application.id}}"
     },
     "web": {
       "output": "static",
@@ -8583,15 +9913,15 @@ config.resolver.blockList = [
 module.exports = withVarlockMetroConfig(config);
 `],
   ["frontend/native/unistyles/apps/native/package.json.hbs", `{
-  "name": "native",
+  "name": "{{#if application.id}}{{application.id}}{{else}}native{{/if}}",
   "version": "1.0.0",
   "private": true,
   "main": "index.js",
   "scripts": {
-    "dev": "expo start --clear",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web",
+    "dev": "expo start --clear{{#if application.port}} --port {{application.port}}{{/if}}",
+    "android": "expo run:android{{#if application.port}} --port {{application.port}}{{/if}}",
+    "ios": "expo run:ios{{#if application.port}} --port {{application.port}}{{/if}}",
+    "web": "expo start --web{{#if application.port}} --port {{application.port}}{{/if}}",
     "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit"
   },
   "dependencies": {
@@ -8774,8 +10104,15 @@ StyleSheet.configure({
 `],
   ["frontend/native/uniwind/adapter.json", `{
   "id": "native-uniwind",
+  "name": "Expo + Uniwind",
+  "description": "Fastest Tailwind bindings for React Native with HeroUI Native",
+  "icon": "/icons/expo.svg",
   "apps": {
     "native": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["trpc","orpc","none"],
+      "clientContributions": { "framework": "uniwind", "family": "native" },
       "stack": {
         "frontend": ["native-uniwind"],
         "runtime": "none",
@@ -8832,16 +10169,16 @@ uniwind-types.d.ts
 `],
   ["frontend/native/uniwind/apps/native/app.json.hbs", `{
   "expo": {
-    "name": "{{projectName}}",
-    "slug": "{{projectName}}",
+    "name": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
+    "slug": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "{{projectName}}",
+    "scheme": "{{projectName}}{{#if application.id}}-{{application.id}}{{/if}}",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "{{appId projectName "ios"}}"
+      "bundleIdentifier": "{{appId projectName "ios" application.id}}"
     },
     "android": {
       "adaptiveIcon": {
@@ -8851,7 +10188,7 @@ uniwind-types.d.ts
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "{{appId projectName "android"}}"
+      "package": "{{appId projectName "android" application.id}}"
     },
     "web": {
       "bundler": "metro",
@@ -9683,17 +11020,17 @@ const uniwindConfig = withUniwindConfig(wrapWithReanimatedMetroConfig(config), {
 module.exports = withVarlockMetroConfig(uniwindConfig);
 `],
   ["frontend/native/uniwind/apps/native/package.json.hbs", `{
-  "name": "native",
+  "name": "{{#if application.id}}{{application.id}}{{else}}native{{/if}}",
   "version": "1.0.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start",
-    "dev": "expo start --clear",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
+    "start": "expo start{{#if application.port}} --port {{application.port}}{{/if}}",
+    "dev": "expo start --clear{{#if application.port}} --port {{application.port}}{{/if}}",
+    "android": "expo run:android{{#if application.port}} --port {{application.port}}{{/if}}",
+    "ios": "expo run:ios{{#if application.port}} --port {{application.port}}{{/if}}",
     "prebuild": "expo prebuild",
-    "web": "expo start --web",
+    "web": "expo start --web{{#if application.port}} --port {{application.port}}{{/if}}",
     "check-types": "{{#if (and (eq api "orpc") (ne backend "convex") (ne backend "none"))}}tsc -b ../../packages/api && {{/if}}tsc --noEmit"
   },
   "dependencies": {
@@ -9763,8 +11100,16 @@ declare module "*.css";
 `],
   ["frontend/nuxt/adapter.json", `{
   "id": "nuxt",
+  "name": "Nuxt",
+  "description": "Vue full-stack framework (SSR, SSG, hybrid)",
+  "icon": "/icons/nuxt.svg",
   "apps": {
     "fullstack-web": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["orpc","none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["orpc","none"],
+      "clientContributions": { "framework": "nuxt", "family": "nuxt" },
+      "serverContributions": { "apiPrefix": "" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["nuxt"],
@@ -9774,6 +11119,10 @@ declare module "*.css";
       }
     },
     "web-frontend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["orpc","none"],
+      "clientContributions": { "framework": "nuxt", "family": "nuxt" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["nuxt"],
@@ -10025,7 +11374,7 @@ export default defineNuxtConfig({
   },
 {{/if}}
   devServer: {
-    port: 3001
+    port: {{#if application}}{{application.port}}{{else}}3001{{/if}}
   },
   {{#if (or (and (eq api "orpc") (ne backend "convex") (ne backend "none")) (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma")) (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma"))))}}
   nitro: {
@@ -10357,7 +11706,7 @@ export default defineNuxtConfig({
   },
 {{/if}}
   devServer: {
-    port: 3001
+    port: {{#if application}}{{application.port}}{{else}}3001{{/if}}
   },
   {{#if (or (and (eq api "orpc") (ne backend "convex") (ne backend "none")) (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma")) (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma"))))}}
   nitro: {
@@ -10525,8 +11874,16 @@ Disallow:
 `],
   ["frontend/react/next/adapter.json", `{
   "id": "next",
+  "name": "Next.js",
+  "description": "React framework with hybrid rendering",
+  "icon": "/icons/nextjs.svg",
   "apps": {
     "fullstack-web": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["trpc","orpc","none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["trpc","orpc","none"],
+      "clientContributions": { "framework": "next", "family": "react", "serverAuth": true },
+      "serverContributions": { "apiPrefix": "/api" },
       "devArgs": ["--hostname", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {
@@ -10537,6 +11894,10 @@ Disallow:
       }
     },
     "web-frontend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["trpc","orpc","none"],
+      "clientContributions": { "framework": "next", "family": "react", "serverAuth": true },
       "devArgs": ["--hostname", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {
@@ -10819,9 +12180,6 @@ export default function Home() {
     ]{{/if}}
   },
   "include": [
-    {{#if (eq serverDeploy "cloudflare")}}
-    "../server/env.d.ts",
-    {{/if}}
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
@@ -11104,9 +12462,6 @@ export default function Home() {
     ]{{/if}}
   },
   "include": [
-    {{#if (eq serverDeploy "cloudflare")}}
-    "../server/env.d.ts",
-    {{/if}}
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
@@ -11286,8 +12641,15 @@ export function ThemeProvider({
 `],
   ["frontend/react/react-router/adapter.json", `{
   "id": "react-router",
+  "name": "React Router",
+  "description": "Declarative routing for React",
+  "icon": "/icons/react-router.svg",
   "apps": {
     "web-frontend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["trpc","orpc","none"],
+      "clientContributions": { "framework": "react-router", "family": "react", "serverAuth": true },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "productContribution": {
@@ -11315,6 +12677,10 @@ export function ThemeProvider({
       }
     },
     "admin": {
+      "legacy": false,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["trpc","orpc","none"],
+      "clientContributions": { "framework": "react-router", "family": "react", "serverAuth": true },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "productContribution": {
@@ -12612,8 +13978,15 @@ export default function Loader() {
 `],
   ["frontend/react/tanstack-router/adapter.json", `{
   "id": "tanstack-router",
+  "name": "TanStack Router",
+  "description": "Modern type-safe router for React",
+  "icon": "/icons/tanstack.svg",
   "apps": {
     "web-frontend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["trpc","orpc","none"],
+      "clientContributions": { "framework": "tanstack-router", "family": "react" },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {
@@ -13076,7 +14449,7 @@ import { defineConfig } from "{{#if (includes addons "vite-plus")}}vite-plus{{el
 
 export default defineConfig({
   server: {
-    port: 3001,
+    port: {{#if application}}{{application.port}}{{else}}3001{{/if}},
   },
   resolve: {
     tsconfigPaths: true,
@@ -13096,8 +14469,16 @@ export default defineConfig({
 `],
   ["frontend/react/tanstack-start/adapter.json", `{
   "id": "tanstack-start",
+  "name": "TanStack Start",
+  "description": "Full-stack React framework powered by TanStack Router",
+  "icon": "/icons/tanstack.svg",
   "apps": {
     "fullstack-web": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["trpc","orpc","none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["trpc","orpc","none"],
+      "clientContributions": { "framework": "tanstack-start", "family": "react", "serverAuth": true },
+      "serverContributions": { "apiPrefix": "/api" },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {
@@ -13108,6 +14489,10 @@ export default defineConfig({
       }
     },
     "web-frontend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["trpc","orpc","none"],
+      "clientContributions": { "framework": "tanstack-start", "family": "react", "serverAuth": true },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {
@@ -13168,6 +14553,8 @@ import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import Loader from "./components/loader";
 import { routeTree } from "./routeTree.gen";
 {{#if (eq api "trpc")}}
+import { createIsomorphicFn } from "@tanstack/react-start";
+import { getRequestHeaders, getRequestUrl } from "@tanstack/react-start/server";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
@@ -13245,22 +14632,44 @@ function createQueryClient() {
 	});
 }
 
+const requestHeaders = createIsomorphicFn()
+  .server(() => {
+    const incoming = getRequestHeaders();
+    return { cookie: incoming.get("cookie") ?? "", authorization: incoming.get("authorization") ?? "" };
+  })
+  .client(() => ({}));
+{{#if (eq backend "self")}}
+const requestOrigin = createIsomorphicFn()
+  .server(() => getRequestUrl().origin)
+  .client(() => window.location.origin);
+{{/if}}
+
+{{else if (eq api "orpc")}}
+{{/if}}
+
+export const getRouter = () => {
+{{#if (eq api "trpc")}}
 const trpcClient = createTRPCClient<AppRouter>({
 	links: [
 		httpBatchLink({
 {{#if (eq backend "self")}}
-			url: "/api/trpc",
+			url: \`\${requestOrigin()}/api/trpc\`,
+{{else if application}}
+			url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/trpc\`,
 {{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 			url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/trpc\`,
 {{else}}
 			url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/trpc\`,
 {{/if}}
-{{#if (eq auth "clerk")}}
 			headers: async () => {
+				const headers = requestHeaders();
+{{#if (eq auth "clerk")}}
 				const token = await getClerkAuthToken();
-				return token ? { Authorization: \`Bearer \${token}\` } : {};
-			},
+				return token ? { ...headers, Authorization: \`Bearer \${token}\` } : headers;
+{{else}}
+				return headers;
 {{/if}}
+			},
 {{#if (eq auth "better-auth")}}
 			fetch(url, options) {
 				return fetch(url, {
@@ -13272,11 +14681,6 @@ const trpcClient = createTRPCClient<AppRouter>({
 		}),
 	],
 });
-{{else if (eq api "orpc")}}
-{{/if}}
-
-export const getRouter = () => {
-{{#if (eq api "trpc")}}
 	const queryClient = createQueryClient();
 	const trpc = createTRPCOptionsProxy({
 		client: trpcClient,
@@ -13719,7 +15123,7 @@ const prismaWasm =
 
 export default defineConfig({
   server: {
-    port: 3001,
+    port: {{#if application}}{{application.port}}{{else}}3001{{/if}},
   },
 {{#if (and (eq webDeploy "cloudflare") (eq backend "self"))}}
   build: {
@@ -13813,6 +15217,8 @@ import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import Loader from "./components/loader";
 import { routeTree } from "./routeTree.gen";
 {{#if (eq api "trpc")}}
+import { createIsomorphicFn } from "@tanstack/react-start";
+import { getRequestHeaders, getRequestUrl } from "@tanstack/react-start/server";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
@@ -13890,22 +15296,44 @@ function createQueryClient() {
 	});
 }
 
+const requestHeaders = createIsomorphicFn()
+  .server(() => {
+    const incoming = getRequestHeaders();
+    return { cookie: incoming.get("cookie") ?? "", authorization: incoming.get("authorization") ?? "" };
+  })
+  .client(() => ({}));
+{{#if (eq backend "self")}}
+const requestOrigin = createIsomorphicFn()
+  .server(() => getRequestUrl().origin)
+  .client(() => window.location.origin);
+{{/if}}
+
+{{else if (eq api "orpc")}}
+{{/if}}
+
+export const getRouter = () => {
+{{#if (eq api "trpc")}}
 const trpcClient = createTRPCClient<AppRouter>({
 	links: [
 		httpBatchLink({
 {{#if (eq backend "self")}}
-			url: "/api/trpc",
+			url: \`\${requestOrigin()}/api/trpc\`,
+{{else if application}}
+			url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/trpc\`,
 {{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 			url: \`\${getServerUrl(ENV.VITE_SERVER_URL)}/trpc\`,
 {{else}}
 			url: \`\${ENV.VITE_SERVER_URL.replace(/\\/$/, "")}/trpc\`,
 {{/if}}
-{{#if (eq auth "clerk")}}
 			headers: async () => {
+				const headers = requestHeaders();
+{{#if (eq auth "clerk")}}
 				const token = await getClerkAuthToken();
-				return token ? { Authorization: \`Bearer \${token}\` } : {};
-			},
+				return token ? { ...headers, Authorization: \`Bearer \${token}\` } : headers;
+{{else}}
+				return headers;
 {{/if}}
+			},
 {{#if (eq auth "better-auth")}}
 			fetch(url, options) {
 				return fetch(url, {
@@ -13917,11 +15345,6 @@ const trpcClient = createTRPCClient<AppRouter>({
 		}),
 	],
 });
-{{else if (eq api "orpc")}}
-{{/if}}
-
-export const getRouter = () => {
-{{#if (eq api "trpc")}}
 	const queryClient = createQueryClient();
 	const trpc = createTRPCOptionsProxy({
 		client: trpcClient,
@@ -14364,7 +15787,7 @@ const prismaWasm =
 
 export default defineConfig({
   server: {
-    port: 3001,
+    port: {{#if application}}{{application.port}}{{else}}3001{{/if}},
   },
 {{#if (and (eq webDeploy "cloudflare") (eq backend "self"))}}
   build: {
@@ -14415,8 +15838,16 @@ Disallow:
 `],
   ["frontend/solid/adapter.json", `{
   "id": "solid",
+  "name": "Solid",
+  "description": "Solid application with file-based routing and SSR",
+  "icon": "/icons/solid.svg",
   "apps": {
     "fullstack-web": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["orpc","none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["orpc","none"],
+      "clientContributions": { "framework": "solid", "family": "solid" },
+      "serverContributions": { "apiPrefix": "" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["solid"],
@@ -14426,6 +15857,10 @@ Disallow:
       }
     },
     "web-frontend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["orpc","none"],
+      "clientContributions": { "framework": "solid", "family": "solid" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["solid"],
@@ -14695,7 +16130,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
-    port: 3001,
+    port: {{#if application}}{{application.port}}{{else}}3001{{/if}},
   },
 {{#if (eq webDeploy "cloudflare")}}
   build: {
@@ -14981,7 +16416,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
-    port: 3001,
+    port: {{#if application}}{{application.port}}{{else}}3001{{/if}},
   },
 {{#if (eq webDeploy "cloudflare")}}
   build: {
@@ -15075,8 +16510,16 @@ body {
 `],
   ["frontend/svelte/adapter.json", `{
   "id": "svelte",
+  "name": "Svelte",
+  "description": "Cybernetically enhanced web apps",
+  "icon": "/icons/svelte.svg",
   "apps": {
     "fullstack-web": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["orpc","none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["orpc","none"],
+      "clientContributions": { "framework": "svelte", "family": "svelte" },
+      "serverContributions": { "apiPrefix": "" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["svelte"],
@@ -15086,6 +16529,10 @@ body {
       }
     },
     "web-frontend": {
+      "legacy": true,
+      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
+      "acceptsBackendApis": ["orpc","none"],
+      "clientContributions": { "framework": "svelte", "family": "svelte" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["svelte"],
@@ -15130,16 +16577,16 @@ body {
 }
 `],
   ["frontend/svelte/apps/fullstack-web/src/app.d.ts.hbs", `{{#if (eq webDeploy "cloudflare")}}
-/// <reference path="../../../packages/env/env.d.ts" />
+import type { CloudflareEnv } from "../cloudflare-env";
 {{/if}}
-{{#if (and (eq backend "self") (eq api "orpc"))}}
+{{#if (eq api "orpc")}}
 import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
 
 {{/if}}
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
-{{#if (and (eq backend "self") (eq api "orpc"))}}
+{{#if (eq api "orpc")}}
 	var $client: AppRouterClient | undefined;
 
 {{/if}}
@@ -15150,7 +16597,7 @@ declare global {
 		// interface PageState {}
 {{#if (eq webDeploy "cloudflare")}}
 		interface Platform {
-			env: Env;
+			env: CloudflareEnv;
 			ctx: ExecutionContext;
 			caches: CacheStorage;
 			cf: IncomingRequestCfProperties;
@@ -15199,10 +16646,11 @@ export {};
     import { QueryClientProvider } from '@tanstack/svelte-query';
     import { SvelteQueryDevtools } from '@tanstack/svelte-query-devtools'
 	import '../app.css';
-    import { queryClient } from '$lib/orpc';
+    import { createQueryClient } from '$lib/orpc';
     import Header from '../components/Header.svelte';
 
 	const { children } = $props();
+    const queryClient = createQueryClient();
 </script>
 
 <QueryClientProvider client={queryClient}>
@@ -15460,16 +16908,16 @@ export default defineConfig({
 }
 `],
   ["frontend/svelte/apps/web-frontend/src/app.d.ts.hbs", `{{#if (eq webDeploy "cloudflare")}}
-/// <reference path="../../../packages/env/env.d.ts" />
+import type { CloudflareEnv } from "../cloudflare-env";
 {{/if}}
-{{#if (and (eq backend "self") (eq api "orpc"))}}
+{{#if (eq api "orpc")}}
 import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
 
 {{/if}}
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
-{{#if (and (eq backend "self") (eq api "orpc"))}}
+{{#if (eq api "orpc")}}
 	var $client: AppRouterClient | undefined;
 
 {{/if}}
@@ -15480,7 +16928,7 @@ declare global {
 		// interface PageState {}
 {{#if (eq webDeploy "cloudflare")}}
 		interface Platform {
-			env: Env;
+			env: CloudflareEnv;
 			ctx: ExecutionContext;
 			caches: CacheStorage;
 			cf: IncomingRequestCfProperties;
@@ -15529,10 +16977,11 @@ export {};
     import { QueryClientProvider } from '@tanstack/svelte-query';
     import { SvelteQueryDevtools } from '@tanstack/svelte-query-devtools'
 	import '../app.css';
-    import { queryClient } from '$lib/orpc';
+    import { createQueryClient } from '$lib/orpc';
     import Header from '../components/Header.svelte';
 
 	const { children } = $props();
+    const queryClient = createQueryClient();
 </script>
 
 <QueryClientProvider client={queryClient}>
@@ -16366,6 +17815,78 @@ function Users() { const data = Route.useLoaderData(); const search = Route.useS
   </section>;
 }
 `],
+  ["modules/admin/module.json", `{
+  "id": "admin",
+  "name": {
+    "en": "Admin console",
+    "zh-CN": "管理后台"
+  },
+  "description": {
+    "en": "Role-based admin area with user management; other modules add their pages",
+    "zh-CN": "基于角色的管理后台与用户管理，其他模块可挂载页面"
+  },
+  "category": "operations",
+  "requires": [
+    "auth"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ]
+  },
+  "nativeSplit": true,
+  "packages": [
+    {
+      "dir": "permissions",
+      "dependencies": {
+        "@casl/ability": "^7.0.1"
+      }
+    }
+  ],
+  "nav": [
+    {
+      "area": "main",
+      "href": "/admin",
+      "labelKey": "nav.admin",
+      "order": 95,
+      "role": "admin"
+    },
+    {
+      "area": "admin",
+      "href": "/admin",
+      "labelKey": "nav.overview",
+      "order": 0
+    },
+    {
+      "area": "admin",
+      "href": "/admin/users",
+      "labelKey": "nav.users",
+      "order": 10
+    }
+  ],
+  "sources": {
+    "frameworks": [
+      "http-server",
+      "next",
+      "nuxt",
+      "tanstack-start"
+    ],
+    "frameworkRequired": {
+      "http-server": [
+        "shared/partials/admin.hbs"
+      ]
+    }
+  }
+}
+`],
   ["modules/admin/shared/client/frameworks/react-router/src/components/admin/admin-pages.tsx.hbs", `import { useState } from "react";
 import { useRevalidator } from "react-router";
 import type { z } from "zod";
@@ -17056,6 +18577,138 @@ export const adminAffiliateSchema = z.object({ rows: z.array(commissionSchema), 
 export function AdminAffiliate({ data, page }: { data: z.infer<typeof adminAffiliateSchema>; page: number }) {
   const t = useT();
   return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("affiliate.admin.title")}</h1><p className="text-muted-foreground">{t("affiliate.admin.total", { total: data.total })}</p><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("affiliate.admin.title")}</caption><thead><tr>{(["order", "referrer", "customer", "credits", "status", "date"] as const).map((key) => <th scope="col" className="border-b p-3" key={key}>{t(\`affiliate.admin.\${key}\`)}</th>)}</tr></thead><tbody>{data.rows.map((entry) => <tr key={entry.orderId}><td className="border-b p-3">{entry.orderId}</td><td className="border-b p-3">{entry.referrerId}</td><td className="border-b p-3">{entry.userId}</td><td className="border-b p-3">{entry.credits}</td><td className="border-b p-3">{t(\`affiliate.status.\${entry.status}\`)}</td><td className="border-b p-3">{entry.createdAt.slice(0, 10)}</td></tr>)}{!data.rows.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{t("affiliate.admin.empty")}</td></tr>}</tbody></table></div><AdminPagination page={page} total={data.total} path="affiliate" /></section>;
+}
+`],
+  ["modules/affiliate/module.json", `{
+  "id": "affiliate",
+  "name": {
+    "en": "Referral credit rewards",
+    "zh-CN": "邀请积分奖励"
+  },
+  "description": {
+    "en": "Signed signup attribution and idempotent purchase commissions paid in app credits, not cash",
+    "zh-CN": "签名邀请归因与幂等购买奖励，仅发放应用积分，不提供现金提现"
+  },
+  "category": "monetization",
+  "requires": [
+    "payment",
+    "credits",
+    "auth"
+  ],
+  "enhances": [
+    "admin"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ],
+    "orms": [
+      "drizzle"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgres"
+    ]
+  },
+  "nativeSplit": true,
+  "options": {
+    "commissionPercent": {
+      "type": "number",
+      "default": 10,
+      "min": 0,
+      "max": 100,
+      "description": "Percentage of purchased plan credits rewarded to the inviter; renewals excluded"
+    },
+    "cookieDays": {
+      "type": "number",
+      "default": 30,
+      "min": 1,
+      "max": 90,
+      "integer": true,
+      "description": "First-touch referral cookie lifetime in days"
+    }
+  },
+  "packages": [
+    {
+      "dir": "affiliate",
+      "dependencies": {
+        "drizzle-orm": "$dependency:drizzle-orm",
+        "zod": "$dependency:zod"
+      },
+      "workspaceDependencies": [
+        "db"
+      ]
+    }
+  ],
+  "appDependencies": {
+    "zod": "$dependency:zod"
+  },
+  "services": [
+    {
+      "name": "affiliate",
+      "imports": [
+        {
+          "from": "@app/affiliate",
+          "names": [
+            "createAffiliate"
+          ]
+        }
+      ],
+      "init": "createAffiliate({ db, secret: ENV.BETTER_AUTH_SECRET })"
+    }
+  ],
+  "nav": [
+    {
+      "area": "dashboard",
+      "href": "/dashboard/affiliate",
+      "labelKey": "nav.affiliate",
+      "order": 65
+    },
+    {
+      "area": "admin",
+      "href": "/admin/affiliate",
+      "labelKey": "nav.affiliate",
+      "order": 45,
+      "when": "admin"
+    }
+  ],
+  "sources": {
+    "dialects": true,
+    "frameworks": [
+      "http-server",
+      "next",
+      "nuxt",
+      "tanstack-start"
+    ],
+    "integrations": {
+      "admin": {
+        "frameworks": {
+          "next": "integrations/admin/frameworks/next",
+          "tanstack-start": "integrations/admin/frameworks/tanstack-start",
+          "nuxt": "frameworks/nuxt"
+        }
+      }
+    },
+    "required": [
+      "files/apps/{application}/src/integrations/affiliate-signup.ts.hbs",
+      "shared/partials/affiliate-signup.hbs",
+      "files/apps/{application}/src/integrations/affiliate-payment.ts.hbs",
+      "shared/partials/affiliate-payment.hbs"
+    ],
+    "frameworkRequired": {
+      "http-server": [
+        "shared/partials/affiliate.hbs"
+      ]
+    }
+  }
 }
 `],
   ["modules/affiliate/shared/client/frameworks/react-router/src/components/affiliate/affiliate-pages.tsx.hbs", `import type { z } from "zod";
@@ -18138,6 +19791,215 @@ export default function registerAIStorage({ ai, storage }: Services) {
     read: (userId, id) => storage.readFile(userId, id),
     remove: (userId, id) => storage.deleteFile(userId, id),
   });
+}
+`],
+  ["modules/ai/module.json", `{
+  "id": "ai",
+  "name": {
+    "en": "AI studio",
+    "zh-CN": "AI 工作室"
+  },
+  "description": {
+    "en": "Private chat, image and video generation with persisted jobs",
+    "zh-CN": "私有对话、图片与视频生成及持久化任务"
+  },
+  "category": "ai",
+  "requires": [
+    "auth"
+  ],
+  "enhances": [
+    "credits",
+    "storage"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ],
+    "orms": [
+      "drizzle"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgres"
+    ]
+  },
+  "providers": {
+    "min": 1,
+    "default": {
+      "global": [
+        "openai"
+      ],
+      "cn": [
+        "openai-compatible"
+      ]
+    },
+    "options": {
+      "openai": {
+        "name": "OpenAI",
+        "market": "global",
+        "env": [
+          {
+            "key": "OPENAI_API_KEY",
+            "required": false
+          },
+          {
+            "key": "OPENAI_CHAT_MODEL",
+            "required": false,
+            "sensitive": false,
+            "default": "gpt-4.1-mini"
+          },
+          {
+            "key": "OPENAI_IMAGE_MODEL",
+            "required": false,
+            "sensitive": false,
+            "default": "gpt-image-2.5-flare"
+          }
+        ]
+      },
+      "google": {
+        "name": "Google Gemini",
+        "market": "global",
+        "env": [
+          {
+            "key": "GEMINI_API_KEY",
+            "required": false
+          },
+          {
+            "key": "GEMINI_CHAT_MODEL",
+            "required": false,
+            "sensitive": false,
+            "default": "gemini-4-argon"
+          },
+          {
+            "key": "GEMINI_IMAGE_MODEL",
+            "required": false,
+            "sensitive": false,
+            "default": "gemini-nano-banana-2.1"
+          },
+          {
+            "key": "GEMINI_VIDEO_MODEL",
+            "required": false,
+            "sensitive": false,
+            "default": "gemini-omni-1.1-flash"
+          }
+        ]
+      },
+      "openai-compatible": {
+        "name": "OpenAI-compatible / DeepSeek",
+        "market": "global",
+        "env": [
+          {
+            "key": "AI_COMPATIBLE_API_KEY",
+            "required": false
+          },
+          {
+            "key": "AI_COMPATIBLE_BASE_URL",
+            "required": false,
+            "sensitive": false,
+            "default": "https://api.deepseek.com"
+          },
+          {
+            "key": "AI_COMPATIBLE_CHAT_MODEL",
+            "required": false,
+            "sensitive": false,
+            "default": "deepseek-flash"
+          }
+        ]
+      }
+    }
+  },
+  "options": {
+    "chatCost": {
+      "type": "number",
+      "default": 1,
+      "min": 1,
+      "integer": true,
+      "max": 2147483647,
+      "description": "Credits per chat request"
+    },
+    "imageCost": {
+      "type": "number",
+      "default": 10,
+      "min": 1,
+      "integer": true,
+      "max": 2147483647,
+      "description": "Credits per image"
+    },
+    "videoCost": {
+      "type": "number",
+      "default": 50,
+      "min": 1,
+      "integer": true,
+      "max": 2147483647,
+      "description": "Credits per video"
+    }
+  },
+  "packages": [
+    {
+      "dir": "ai",
+      "dependencies": {
+        "drizzle-orm": "$dependency:drizzle-orm",
+        "zod": "$dependency:zod"
+      },
+      "workspaceDependencies": [
+        "db"
+      ]
+    }
+  ],
+  "appDependencies": {
+    "zod": "$dependency:zod"
+  },
+  "services": [
+    {
+      "name": "ai",
+      "imports": [
+        {
+          "from": "@app/ai",
+          "names": [
+            "createAI"
+          ]
+        }
+      ],
+      "init": "createAI({ db, env: ENV })"
+    }
+  ],
+  "nav": [
+    {
+      "area": "dashboard",
+      "href": "/dashboard/ai",
+      "labelKey": "nav.ai",
+      "order": 70
+    }
+  ],
+  "sources": {
+    "dialects": true,
+    "frameworks": [
+      "http-server",
+      "next",
+      "nuxt",
+      "tanstack-start",
+      "react"
+    ],
+    "providers": {
+      "mode": "separate"
+    },
+    "integrations": {
+      "credits": {
+        "base": "integrations/credits/apps/fullstack-web"
+      },
+      "storage": {
+        "base": "integrations/storage/apps/fullstack-web"
+      }
+    }
+  }
 }
 `],
   ["modules/ai/providers/google/packages/ai/src/providers/google.ts", `import { z } from "zod";
@@ -21091,6 +22953,233 @@ export default function PhoneSignInForm({ next }: { next: string }) {
   );
 }
 `],
+  ["modules/auth/module.json", `{
+  "id": "auth",
+  "name": {
+    "en": "Authentication",
+    "zh-CN": "用户认证"
+  },
+  "description": {
+    "en": "Email and password sign-in, OAuth, roles and account settings",
+    "zh-CN": "邮箱密码登录、第三方登录、角色与账户设置"
+  },
+  "category": "identity",
+  "requires": [
+    "core"
+  ],
+  "enhances": [
+    "email",
+    "sms"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ],
+    "orms": [
+      "drizzle"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgres"
+    ]
+  },
+  "nativeSplit": true,
+  "domain": {
+    "field": "auth",
+    "value": {
+      "option": "engine"
+    },
+    "native": {
+      "option": "engine",
+      "equals": "better-auth"
+    },
+    "stack": {
+      "providers": [],
+      "renderer": "auth"
+    }
+  },
+  "options": {
+    "engine": {
+      "type": "enum",
+      "values": [
+        "better-auth",
+        "clerk"
+      ],
+      "default": "better-auth",
+      "description": "Clerk is only available through the stack templates"
+    }
+  },
+  "providers": {
+    "min": 0,
+    "default": {
+      "global": [
+        "google",
+        "github"
+      ],
+      "cn": []
+    },
+    "options": {
+      "google": {
+        "name": "Google",
+        "market": "global",
+        "env": [
+          {
+            "key": "GOOGLE_CLIENT_ID",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "GOOGLE_CLIENT_SECRET",
+            "required": false
+          }
+        ]
+      },
+      "github": {
+        "name": "GitHub",
+        "market": "global",
+        "env": [
+          {
+            "key": "GITHUB_CLIENT_ID",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "GITHUB_CLIENT_SECRET",
+            "required": false
+          }
+        ]
+      },
+      "wechat": {
+        "name": "WeChat Website Login",
+        "market": "cn",
+        "env": [
+          {
+            "key": "WECHAT_CLIENT_ID",
+            "required": false,
+            "sensitive": false,
+            "comment": "AppID of an approved WeChat Open Platform website application"
+          },
+          {
+            "key": "WECHAT_CLIENT_SECRET",
+            "required": false,
+            "comment": "Website application AppSecret; server-only"
+          }
+        ],
+        "help": "WeChat requires an approved Open Platform website application and a public callback domain. Set its AppID/AppSecret only in the generated server environment."
+      }
+    },
+    "help": "Uncheck all providers to disable OAuth; email/password authentication remains available with the native engine."
+  },
+  "packages": [
+    {
+      "dir": "auth",
+      "workspaceDependencies": [
+        "db",
+        "events",
+        "i18n"
+      ]
+    }
+  ],
+  "env": [
+    {
+      "key": "ADMIN_EMAILS",
+      "required": false,
+      "sensitive": false,
+      "comment": "Comma-separated bootstrap emails; admin access requires verified email ownership"
+    }
+  ],
+  "services": [
+    {
+      "name": "auth",
+      "imports": [
+        {
+          "from": "@app/auth",
+          "names": [
+            "createAuth"
+          ]
+        }
+      ],
+      "init": "createAuth(ENV, db, events, {{{clientOrigins}}})"
+    }
+  ],
+  "proxy": [
+    {
+      "id": "auth-session",
+      "from": "./lib/auth-proxy",
+      "name": "authSessionStep",
+      "order": 90
+    }
+  ],
+  "nav": [
+    {
+      "area": "main",
+      "href": "/dashboard",
+      "labelKey": "nav.dashboard",
+      "order": 90,
+      "auth": true
+    },
+    {
+      "area": "dashboard",
+      "href": "/dashboard",
+      "labelKey": "nav.overview",
+      "order": 0
+    },
+    {
+      "area": "dashboard",
+      "href": "/dashboard/settings",
+      "labelKey": "nav.settings",
+      "order": 95
+    }
+  ],
+  "sources": {
+    "dialects": true,
+    "frameworks": [
+      "http-server",
+      "next",
+      "nuxt",
+      "tanstack-start",
+      "react"
+    ],
+    "providers": {
+      "mode": "inline",
+      "source": "files/packages/auth/src/index.ts.hbs"
+    },
+    "integrations": {
+      "email": {
+        "frameworks": {
+          "next": "integrations/email/frameworks/next",
+          "react": "integrations/email/frameworks/react",
+          "tanstack-start": "integrations/email/frameworks/tanstack-start",
+          "nuxt": "frameworks/nuxt/apps/fullstack-web/app/components/ProductAuth.vue.hbs"
+        }
+      },
+      "sms": {
+        "base": "integrations/sms/packages",
+        "frameworks": {
+          "next": "integrations/sms/frameworks/next",
+          "react": "integrations/sms/frameworks/react",
+          "tanstack-start": "integrations/sms/frameworks/tanstack-start",
+          "nuxt": "frameworks/nuxt/apps/fullstack-web/app/components/ProductAuth.vue.hbs"
+        }
+      }
+    },
+    "frameworkRequired": {
+      "http-server": [
+        "shared/partials/social-providers.hbs",
+        "shared/partials/social-providers.server.hbs"
+      ]
+    }
+  }
+}
+`],
   ["modules/auth/shared/client/frameworks/react-router/src/components/auth/account-forms.tsx.hbs", `"use client";
 
 import { Button } from "@{{projectName}}/ui/components/button";
@@ -23549,28 +25638,18 @@ export function SignUp() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/client/auth-client.ts.hbs", `import { createClient, type AuthClient } from "@{{projectName}}/auth/client";
+  ["modules/auth/stack/better-auth/client/auth-client.ts.hbs", `import { createAuthClient } from "better-auth/client";
 {{#unless (eq backend "self")}}
 import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
 
 {{> getServerUrl}}
 {{/unless}}
 
-export const authClient: AuthClient = createClient({{#unless (eq backend "self")}}{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}new URL("/api/auth", getServerUrl(ENV.VITE_SERVER_URL)).toString(){{else}}ENV.VITE_SERVER_URL{{/if}}{{/unless}});
-`],
-  ["modules/auth/stack/better-auth/client/solid/src/client.ts.hbs", `import { createAuthClient } from "better-auth/client";
-
-type ClientOptions = {
-  baseURL?: string;
-};
-
-export function createClient(baseURL?: string): ReturnType<typeof createAuthClient<ClientOptions>> {
-  return createAuthClient({
-    baseURL,
-  });
-}
-
-export type AuthClient = ReturnType<typeof createClient>;
+export const authClient = createAuthClient({
+{{#unless (eq backend "self")}}
+  baseURL: {{#if application}}getServerUrl(ENV.VITE_SERVER_URL){{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}{{#if (eq webDeploy "vercel")}}\`\${getServerUrl(ENV.VITE_SERVER_URL)}/auth\`{{else}}new URL("/api/auth", getServerUrl(ENV.VITE_SERVER_URL)).toString(){{/if}}{{else}}ENV.VITE_SERVER_URL{{/if}},
+{{/unless}}
+});
 `],
   ["modules/auth/stack/better-auth/convex/apps/native/bare/components/sign-in.tsx.hbs", `import { authClient } from "@/lib/auth-client";
 import { useForm } from "@tanstack/react-form";
@@ -26694,6 +28773,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
   "devDependencies": {}
 }`],
   ["modules/auth/stack/better-auth/server/base/src/index.ts.hbs", `import { betterAuth } from "better-auth";
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+import { expo } from "@better-auth/expo";
+{{/if}}
 {{#if (eq orm "prisma")}}
 import { prismaAdapter } from "better-auth/adapters/prisma";
 {{else if (eq orm "drizzle")}}
@@ -26729,8 +28811,14 @@ export function createAuth(env: AuthConfig{{#if (ne database "none")}}, database
     database: mongodbAdapter(database),
 {{/if}}
     trustedOrigins: [
-      {{#if (eq backend "self")}}env.BETTER_AUTH_URL{{else}}env.CORS_ORIGIN,
-      ...desktopOrigins{{/if}},
+      env.BETTER_AUTH_URL,
+{{#if (ne backend "self")}}
+      ...env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean),
+      ...desktopOrigins,
+{{/if}}
+{{#each application.clientOrigins}}
+      "{{this}}",
+{{/each}}
 {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
       "{{projectName}}://",
       "exp://",
@@ -26750,6 +28838,9 @@ export function createAuth(env: AuthConfig{{#if (ne database "none")}}, database
     },
 {{/if}}
     plugins: [
+      {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+      expo(),
+      {{/if}}
     ],
   });
 }
@@ -27637,14 +29728,16 @@ import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
 {{/if}}
 
 {{#if (ne backend "self")}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if (or application (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker"))))}}
 {{> getServerUrlSpaces}}
 {{/if}}
 
 {{/if}}
 export const authClient = createAuthClient({
 {{#if (ne backend "self")}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+  baseURL: getServerUrl(ENV.PUBLIC_SERVER_URL),
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
   baseURL: {{#if (eq webDeploy "vercel")}}\`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}/auth\`{{else}}new URL("/api/auth", getServerUrl(ENV.PUBLIC_SERVER_URL)).toString(){{/if}},
 {{else}}
   baseURL: ENV.PUBLIC_SERVER_URL,
@@ -28100,7 +30193,7 @@ export default defineNuxtPlugin(() => {
   const rawServerUrl = (import.meta.server && config.serverUrl) || config.public.serverUrl;
   // Same-origin paths like /api need an absolute base, and better-auth derives
   // its route matching from this URL's path, so it must be exactly /api/auth
-  const serverOrigin = {{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}getServerUrl(rawServerUrl);{{else}}rawServerUrl.startsWith("/")
+  const serverOrigin = {{#if application}}rawServerUrl;{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}getServerUrl(rawServerUrl);{{else}}rawServerUrl.startsWith("/")
     ? (import.meta.server ? useRequestURL() : window.location).origin + rawServerUrl
     : rawServerUrl;{{/if}}
   {{/if}}
@@ -28110,7 +30203,9 @@ export default defineNuxtPlugin(() => {
       headers: import.meta.server ? useRequestHeaders(["cookie"]) : undefined,
     },
     {{#if (ne backend "self")}}
-    baseURL: {{#if (and (eq webDeploy "vercel") (eq serverDeploy "vercel"))}}\`\${serverOrigin}/auth\`{{else}}new URL("/api/auth", serverOrigin).toString(){{/if}},
+    baseURL: {{#if application}}new URL("/api/auth", serverOrigin).toString(){{else if (and (eq webDeploy "vercel") (eq serverDeploy "vercel"))}}\`\${serverOrigin}/auth\`{{else}}new URL("/api/auth", serverOrigin).toString(){{/if}},
+    {{else}}
+    baseURL: new URL('/api/auth', useRequestURL()).toString(),
     {{/if}}
   });
 
@@ -28132,7 +30227,9 @@ import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
 
 export const authClient = createAuthClient({
 {{#unless (eq backend "self")}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+  baseURL: getServerUrl({{#if (includes frontend "next")}}process.env.NEXT_PUBLIC_SERVER_URL!{{else}}ENV.VITE_SERVER_URL{{/if}}),
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
   baseURL: {{#if (eq webDeploy "vercel")}}\`\${getServerUrl({{#if (includes frontend "next")}}process.env.NEXT_PUBLIC_SERVER_URL!{{else}}ENV.VITE_SERVER_URL{{/if}})}/auth\`{{else}}new URL("/api/auth", getServerUrl({{#if (includes frontend "next")}}process.env.NEXT_PUBLIC_SERVER_URL!{{else}}ENV.VITE_SERVER_URL{{/if}})).toString(){{/if}},
 {{else}}
   baseURL: {{#if (includes frontend "next")}}process.env.NEXT_PUBLIC_SERVER_URL!{{else}}ENV.VITE_SERVER_URL{{/if}},
@@ -30251,7 +32348,7 @@ export default function UserMenu() {
   );
 }
 `],
-  ["modules/auth/stack/better-auth/shared/client/frameworks/solid/src/lib/auth-client.ts.hbs", `import { authClient } from "@{{projectName}}/auth/client";
+  ["modules/auth/stack/better-auth/shared/client/frameworks/solid/src/lib/auth-client.ts.hbs", `import { authClient } from "~/client";
 import { createSignal, onSettled } from "solid-js";
 
 export { authClient };
@@ -30660,7 +32757,9 @@ import { createAuthClient } from "better-auth/svelte";
 {{/unless}}
 export const authClient = createAuthClient({
 {{#unless (eq backend "self")}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+  baseURL: getServerUrl(ENV.PUBLIC_SERVER_URL),
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
   baseURL: {{#if (eq webDeploy "vercel")}}\`\${getServerUrl(ENV.PUBLIC_SERVER_URL)}/auth\`{{else}}new URL("/api/auth", getServerUrl(ENV.PUBLIC_SERVER_URL)).toString(){{/if}},
 {{else}}
   baseURL: ENV.PUBLIC_SERVER_URL,
@@ -33132,6 +35231,114 @@ export default function registerBlogSeo({ blog, seo }: Services) {
   ["modules/blog/integrations/seo/apps/fullstack-web/src/lib/blog-origin.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 export function blogOrigin() { return seo.origin; }
 `],
+  ["modules/blog/module.json", `{
+  "id": "blog",
+  "name": {
+    "en": "Blog",
+    "zh-CN": "博客"
+  },
+  "description": {
+    "en": "Database-backed multilingual publishing with admin authoring and safe Markdown",
+    "zh-CN": "数据库驱动的多语言发布、后台编辑与安全 Markdown"
+  },
+  "category": "content",
+  "requires": [
+    "admin"
+  ],
+  "enhances": [
+    "seo"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ],
+    "orms": [
+      "drizzle"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgres"
+    ]
+  },
+  "packages": [
+    {
+      "dir": "blog",
+      "dependencies": {
+        "drizzle-orm": "$dependency:drizzle-orm",
+        "zod": "$dependency:zod"
+      },
+      "workspaceDependencies": [
+        "db",
+        "i18n",
+        "permissions"
+      ]
+    }
+  ],
+  "frameworkAppDependencies": {
+    "next": {
+      "react-markdown": "^10.1.0"
+    },
+    "tanstack-start": {
+      "react-markdown": "^10.1.0"
+    },
+    "nuxt": {
+      "markdown-it": "^14.1.0",
+      "@types/markdown-it": "^14.1.2"
+    }
+  },
+  "services": [
+    {
+      "name": "blog",
+      "imports": [
+        {
+          "from": "@app/blog",
+          "names": [
+            "createBlog"
+          ]
+        }
+      ],
+      "init": "createBlog(db)"
+    }
+  ],
+  "nav": [
+    {
+      "area": "main",
+      "href": "/blog",
+      "labelKey": "nav.blog",
+      "order": 30
+    },
+    {
+      "area": "admin",
+      "href": "/admin/blog",
+      "labelKey": "nav.blog",
+      "order": 40
+    }
+  ],
+  "sources": {
+    "dialects": true,
+    "frameworks": [
+      "http-server",
+      "next",
+      "nuxt",
+      "tanstack-start",
+      "react"
+    ],
+    "integrations": {
+      "seo": {
+        "base": "integrations/seo/apps/fullstack-web"
+      }
+    }
+  }
+}
+`],
   ["modules/captcha/files/docs/modules/captcha.md.hbs", `# Bot protection / 人机验证
 
 Cloudflare Turnstile protects the actual Better Auth **before** hook, not only forms. Selecting \`captcha\` automatically includes native \`auth\` and its database prerequisites. OAuth callbacks, session reads and payment webhooks remain unaffected.
@@ -33480,6 +35687,115 @@ export function Captcha({ action, challenge }: {
   );
 }
 `],
+  ["modules/captcha/module.json", `{
+  "id": "captcha",
+  "name": {
+    "en": "Bot protection",
+    "zh-CN": "人机验证"
+  },
+  "description": {
+    "en": "Turnstile challenges enforced before authentication mutations",
+    "zh-CN": "认证操作前强制执行 Turnstile 人机验证"
+  },
+  "category": "identity",
+  "requires": [
+    "auth"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ],
+    "orms": [
+      "drizzle"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgres"
+    ]
+  },
+  "nativeSplit": true,
+  "providers": {
+    "min": 1,
+    "max": 1,
+    "default": {
+      "global": [
+        "turnstile"
+      ],
+      "cn": [
+        "turnstile"
+      ]
+    },
+    "options": {
+      "turnstile": {
+        "name": "Cloudflare Turnstile",
+        "market": "any",
+        "env": [
+          {
+            "key": "TURNSTILE_SITE_KEY",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "TURNSTILE_SECRET_KEY",
+            "required": false
+          },
+          {
+            "key": "TURNSTILE_TEST_MODE",
+            "required": false,
+            "type": "boolean",
+            "default": "false",
+            "sensitive": false,
+            "comment": "Explicit public dummy keys; allowed only in NODE_ENV=development on loopback origins"
+          }
+        ]
+      }
+    }
+  },
+  "packages": [
+    {
+      "dir": "captcha",
+      "dependencies": {
+        "better-auth": "$dependency:better-auth",
+        "zod": "$dependency:zod"
+      }
+    },
+    {
+      "dir": "auth",
+      "workspaceDependencies": [
+        "captcha"
+      ]
+    }
+  ],
+  "appDependencies": {
+    "zod": "$dependency:zod"
+  },
+  "sources": {
+    "frameworks": [
+      "http-server",
+      "react",
+      "next",
+      "nuxt"
+    ],
+    "providers": {
+      "mode": "inline",
+      "source": "files/packages/captcha/src/index.ts.hbs"
+    },
+    "frameworkRequired": {
+      "http-server": [
+        "shared/partials/captcha.hbs"
+      ]
+    }
+  }
+}
+`],
   ["modules/captcha/shared/client/frameworks/react-router/src/components/auth/captcha.tsx.hbs", `"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -33782,13 +36098,39 @@ export function createEventBus(): EventBus {
   },
 };
 `],
-  ["modules/core/frameworks/hono/apps/backend/src/lib/native-request.ts.hbs", `{{#if (includes product.features "auth")}}
-import { ENV } from "../env.server";
-{{/if}}
+  ["modules/core/frameworks/express/apps/backend/src/lib/express-product.ts.hbs", `import type { RequestHandler } from "express";
+import { handleNativeRequest } from "./native-request";
+import { sendFetchResponse, toFetchRequest } from "./node-http";
+
+/** Register before express.json() so signed webhooks and auth bodies stay untouched. */
+export const handleExpressProductRequest: RequestHandler = async (request, response, next) => {
+  try {
+    await sendFetchResponse(await handleNativeRequest(toFetchRequest(request)), response);
+  } catch (error) {
+    next(error);
+  }
+};
+`],
+  ["modules/core/frameworks/fastify/apps/backend/src/lib/fastify-product.ts.hbs", `import type { FastifyInstance } from "fastify";
+import { handleNativeRequest } from "./native-request";
+import { responseBody, responseHeaders, toFetchRequest } from "./node-http";
+
+export async function registerProductRoutes(app: FastifyInstance): Promise<void> {
+  // Encapsulation confines the raw stream parser to product HTTP routes.
+  app.removeAllContentTypeParsers();
+  app.addContentTypeParser("*", (_request, payload, done) => done(null, payload));
+  app.all("/api/*", async (request, reply) => {
+    const response = await handleNativeRequest(toFetchRequest(request.raw));
+    reply.code(response.status).headers(responseHeaders(response));
+    return reply.send(responseBody(response));
+  });
+}
+`],
+  ["modules/core/frameworks/http-server/apps/backend/src/lib/native-request.ts.hbs", `import { ENV } from "../env.server";
 import { handleProductRequest, json } from "./product-api";
 
 const backendOrigin = {{#if (includes product.features "auth")}}new URL(ENV.BETTER_AUTH_URL).origin{{else}}"{{application.backendOrigin}}"{{/if}};
-const clientOrigins = new Set<string>([{{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]);
+const clientOrigins = new Set<string>([...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean), {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]);
 
 /** Only declared BFF origins may select the public auth URL; forwarded headers never do. */
 export async function handleNativeRequest(request: Request): Promise<Response> {
@@ -34082,6 +36424,51 @@ export function useProductNavigation() {
     navigate: (href: string) => window.location.assign(href),
     refresh: () => router.refresh(),
   };
+}
+`],
+  ["modules/core/frameworks/node-http/apps/backend/src/lib/node-http.ts.hbs", `import type { IncomingMessage, ServerResponse } from "node:http";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
+/** Keep original bytes and repeated headers; JSON parsing would break webhook signatures. */
+export function toFetchRequest(request: IncomingMessage): Request {
+  const headers = new Headers();
+  for (let index = 0; index < request.rawHeaders.length; index += 2) {
+    headers.append(request.rawHeaders[index]!, request.rawHeaders[index + 1]!);
+  }
+  const method = request.method ?? "GET";
+  const url = new URL(request.url ?? "/", "{{application.backendOrigin}}");
+  return new Request(url, {
+    method,
+    headers,
+    ...(method === "GET" || method === "HEAD" ? {} : {
+      body: Readable.toWeb(request) as ReadableStream<Uint8Array>,
+      duplex: "half",
+    }),
+  });
+}
+
+export function responseHeaders(response: Response): Record<string, string | string[]> {
+  const headers: Record<string, string | string[]> = {};
+  response.headers.forEach((value, name) => {
+    if (name !== "set-cookie") headers[name] = value;
+  });
+  const cookies = response.headers.getSetCookie();
+  if (cookies.length) headers["set-cookie"] = cookies;
+  return headers;
+}
+
+export function responseBody(response: Response) {
+  return response.body
+    ? Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0])
+    : null;
+}
+
+export async function sendFetchResponse(response: Response, target: ServerResponse): Promise<void> {
+  target.writeHead(response.status, responseHeaders(response));
+  const body = responseBody(response);
+  if (body) await pipeline(body, target);
+  else target.end();
 }
 `],
   ["modules/core/frameworks/nuxt/apps/fullstack-web/app/app.vue.hbs", `<template>
@@ -34452,6 +36839,119 @@ import { localeFromHeaders } from "@{{projectName}}/i18n";
 
 const preferredLocale = createServerFn({ method: "GET" }).handler(() => localeFromHeaders(getRequest().headers));
 export const Route = createFileRoute("/")({ beforeLoad: async () => { throw redirect({ href: \`/\${await preferredLocale()}\` }); } });
+`],
+  ["modules/core/module.json", `{
+  "id": "core",
+  "name": {
+    "en": "Product shell",
+    "zh-CN": "产品外壳"
+  },
+  "description": {
+    "en": "Landing page, site layout, dashboard shell, navigation and the domain event bus",
+    "zh-CN": "落地页、站点布局、仪表盘外壳、导航和领域事件总线"
+  },
+  "category": "foundation",
+  "hidden": true,
+  "requires": [
+    "i18n"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ],
+    "orms": [
+      "drizzle"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgres"
+    ]
+  },
+  "requiredWhen": {
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"]
+  },
+  "nativeSplit": true,
+  "packages": [
+    {
+      "dir": "events"
+    }
+  ],
+  "services": [
+    {
+      "name": "events",
+      "imports": [
+        {
+          "from": "@app/events",
+          "names": [
+            "createEventBus"
+          ]
+        }
+      ],
+      "init": "createEventBus()"
+    }
+  ],
+  "nav": [
+    {
+      "area": "main",
+      "href": "/",
+      "labelKey": "nav.home",
+      "order": 0
+    }
+  ],
+  "frameworkReplaces": {
+    "react-router": [
+      "apps/web/src/root.tsx",
+      "apps/web/src/routes.ts",
+      "apps/web/src/routes/_index.tsx",
+      "apps/web/src/components/header.tsx"
+    ],
+    "next": [
+      "apps/web/src/app/layout.tsx",
+      "apps/web/src/app/page.tsx",
+      "apps/web/src/components/header.tsx"
+    ],
+    "tanstack-start": [
+      "apps/web/src/routes/__root.tsx",
+      "apps/web/src/routes/index.tsx",
+      "apps/web/src/components/header.tsx"
+    ],
+    "nuxt": [
+      "apps/web/app/app.vue",
+      "apps/web/app/pages/index.vue",
+      "apps/web/app/layouts/default.vue",
+      "apps/web/app/components/Header.vue"
+    ]
+  },
+  "sources": {
+    "frameworks": [
+      "http-server",
+      "next",
+      "nuxt",
+      "tanstack-start"
+    ],
+    "required": [
+      "shared/partials/site.hbs"
+    ],
+    "serverRequired": [
+      "files/apps/{application}"
+    ],
+    "frameworkRequired": {
+      "http-server": [
+        "shared/partials/product-api.hbs"
+      ]
+    }
+  }
+}
 `],
   ["modules/core/shared/client/frameworks/react-router/src/components/product-pagination.tsx.hbs", `import { useLocale, useT } from "@/components/i18n-provider";
 
@@ -34843,7 +37343,7 @@ export function json<T>(data: T, status = 200) { return Response.json(data, { st
 export class HttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
 export function pageOf(request: Request) { return z.coerce.number().int().min(1).max(100000).parse(new URL(request.url).searchParams.get("page") ?? 1); }
 {{#if (includes product.features "auth")}}
-const trustedOrigins = new Set([new URL(ENV.BETTER_AUTH_URL).origin{{#if application.nativeSplit}}{{#each application.clientOrigins}}, "{{this}}"{{/each}}{{/if}}]);
+const trustedOrigins = new Set([new URL(ENV.BETTER_AUTH_URL).origin{{#if application.nativeSplit}}{{#each application.clientOrigins}}, "{{this}}"{{/each}}{{#if (includes application.roles "backend")}}, ...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean){{/if}}{{/if}}]);
 function privateResponse(response: Response) {
   const headers = new Headers(response.headers);
   for (const [name, value] of Object.entries(privateHeaders)) headers.set(name, value);
@@ -35661,6 +38161,132 @@ export function BuyCredits() {
   return <a className="inline-block underline" href={\`/\${locale}/pricing\`}>{t("credits.page.buyMore")}</a>;
 }
 `],
+  ["modules/credits/module.json", `{
+  "id": "credits",
+  "name": {
+    "en": "Credits",
+    "zh-CN": "积分"
+  },
+  "description": {
+    "en": "Usage credits with an auditable ledger; granted by purchases and sign-up bonuses",
+    "zh-CN": "可审计流水的积分体系，可由购买和注册赠送获得"
+  },
+  "category": "monetization",
+  "requires": [
+    "auth"
+  ],
+  "enhances": [
+    "payment",
+    "admin"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ],
+    "orms": [
+      "drizzle"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgres"
+    ]
+  },
+  "nativeSplit": true,
+  "options": {
+    "signupBonus": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "integer": true,
+      "max": 2147483647,
+      "description": "Credits granted to every new account"
+    }
+  },
+  "packages": [
+    {
+      "dir": "credits",
+      "dependencies": {
+        "drizzle-orm": "$dependency:drizzle-orm"
+      },
+      "workspaceDependencies": [
+        "db",
+        "events"
+      ]
+    }
+  ],
+  "services": [
+    {
+      "name": "credits",
+      "imports": [
+        {
+          "from": "@app/credits",
+          "names": [
+            "createCredits"
+          ]
+        }
+      ],
+      "init": "createCredits(db, events)"
+    }
+  ],
+  "nav": [
+    {
+      "area": "dashboard",
+      "href": "/dashboard/credits",
+      "labelKey": "nav.credits",
+      "order": 40
+    },
+    {
+      "area": "admin",
+      "href": "/admin/credits",
+      "labelKey": "nav.credits",
+      "order": 30,
+      "when": "admin"
+    }
+  ],
+  "sources": {
+    "dialects": true,
+    "frameworks": [
+      "http-server",
+      "next",
+      "nuxt",
+      "tanstack-start"
+    ],
+    "integrations": {
+      "admin": {
+        "frameworks": {
+          "next": "integrations/admin/frameworks/next",
+          "tanstack-start": "integrations/admin/frameworks/tanstack-start",
+          "nuxt": "frameworks/nuxt"
+        }
+      },
+      "payment": {
+        "base": "integrations/payment/apps/fullstack-web",
+        "required": [
+          "integrations/payment/apps/{application}/src/integrations/payment-credits.ts.hbs",
+          "shared/partials/payment-credits.hbs"
+        ]
+      }
+    },
+    "required": [
+      "files/apps/{application}/src/integrations/credits-signup.ts.hbs",
+      "shared/partials/credits-signup.hbs"
+    ],
+    "frameworkRequired": {
+      "http-server": [
+        "shared/partials/credits.hbs"
+      ]
+    }
+  }
+}
+`],
   ["modules/credits/shared/client/frameworks/react-router/src/components/credits/credits-page.tsx.hbs", `import type { z } from "zod";
 import { useT } from "@/components/i18n-provider";
 import type { creditsSchema } from "@/lib/credits-contract";
@@ -35885,6 +38511,163 @@ export type Transport = {
   ["modules/email/integrations/auth/apps/backend/src/integrations/auth-email.ts.hbs", `{{> email/auth-email}}
 `],
   ["modules/email/integrations/auth/apps/fullstack-web/src/integrations/auth-email.ts.hbs", `{{> email/auth-email}}
+`],
+  ["modules/email/module.json", `{
+  "id": "email",
+  "name": {
+    "en": "Email",
+    "zh-CN": "邮件"
+  },
+  "description": {
+    "en": "Transactional email with swappable providers; sends auth emails",
+    "zh-CN": "可切换服务商的事务邮件，负责发送认证相关邮件"
+  },
+  "category": "communication",
+  "requires": [
+    "core"
+  ],
+  "enhances": [
+    "auth"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ]
+  },
+  "nativeSplit": true,
+  "providers": {
+    "min": 1,
+    "max": 1,
+    "default": {
+      "global": [
+        "resend"
+      ],
+      "cn": [
+        "smtp"
+      ]
+    },
+    "targetDefaults": {
+      "cloudflare": [
+        "resend"
+      ]
+    },
+    "options": {
+      "resend": {
+        "name": "Resend",
+        "market": "global",
+        "dependencies": {
+          "resend": "^6.32.0"
+        },
+        "env": [
+          {
+            "key": "RESEND_API_KEY",
+            "required": false
+          }
+        ]
+      },
+      "smtp": {
+        "name": "SMTP",
+        "market": "any",
+        "supports": {
+          "targets": [
+            "none",
+            "node",
+            "vercel",
+            "docker"
+          ]
+        },
+        "dependencies": {
+          "nodemailer": "^10.0.13"
+        },
+        "devDependencies": {
+          "@types/nodemailer": "^8.0.2"
+        },
+        "env": [
+          {
+            "key": "SMTP_HOST",
+            "required": false,
+            "sensitive": false,
+            "example": "smtp.example.com"
+          },
+          {
+            "key": "SMTP_PORT",
+            "required": false,
+            "sensitive": false,
+            "type": "number",
+            "default": "587"
+          },
+          {
+            "key": "SMTP_SECURE",
+            "required": false,
+            "sensitive": false,
+            "type": "boolean",
+            "default": "false"
+          },
+          {
+            "key": "SMTP_USER",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "SMTP_PASSWORD",
+            "required": false
+          }
+        ]
+      }
+    }
+  },
+  "packages": [
+    {
+      "dir": "email"
+    }
+  ],
+  "env": [
+    {
+      "key": "EMAIL_FROM",
+      "sensitive": false,
+      "example": "\\"Acme <onboarding@resend.dev>\\"",
+      "comment": "Sender shown in outgoing emails"
+    }
+  ],
+  "services": [
+    {
+      "name": "mailer",
+      "imports": [
+        {
+          "from": "@app/email",
+          "names": [
+            "createMailer"
+          ]
+        }
+      ],
+      "init": "createMailer(ENV)"
+    }
+  ],
+  "notices": [
+    "Production email delivery requires configured provider credentials and a valid sender. Configure them in the generated environment, never here."
+  ],
+  "sources": {
+    "providers": {
+      "mode": "separate"
+    },
+    "integrations": {
+      "auth": {
+        "base": "integrations/auth/apps/fullstack-web",
+        "required": [
+          "shared/partials/auth-email.hbs"
+        ]
+      }
+    }
+  }
+}
 `],
   ["modules/email/providers/resend/packages/email/src/providers/resend.ts", `import { Resend } from "resend";
 
@@ -36215,6 +38998,67 @@ export function useT(): Translator {
 `],
   ["modules/i18n/frameworks/tanstack-start/apps/fullstack-web/src/lib/i18n/paths.ts.hbs", `import type { Locale } from "@{{projectName}}/i18n";
 export function localePath(locale: Locale, href: \`/\${string}\`): string { return \`/\${locale}\${href === "/" ? "" : href}\`; }
+`],
+  ["modules/i18n/module.json", `{
+  "id": "i18n",
+  "name": {
+    "en": "Internationalization",
+    "zh-CN": "国际化"
+  },
+  "description": {
+    "en": "Locale-prefixed routing, typed messages and a language switcher",
+    "zh-CN": "带语言前缀的路由、类型安全的文案和语言切换"
+  },
+  "category": "foundation",
+  "hidden": true,
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ]
+  },
+  "nativeSplit": true,
+  "options": {
+    "locales": {
+      "type": "enum",
+      "values": [
+        "en,zh-CN",
+        "zh-CN,en",
+        "en",
+        "zh-CN"
+      ],
+      "default": "en,zh-CN",
+      "description": "Enabled locales; the first one is the default"
+    }
+  },
+  "packages": [
+    {
+      "dir": "i18n"
+    }
+  ],
+  "proxy": [
+    {
+      "id": "locale",
+      "from": "./lib/i18n/proxy",
+      "name": "localeStep",
+      "order": 10
+    }
+  ],
+  "sources": {
+    "frameworks": [
+      "react",
+      "next",
+      "tanstack-start"
+    ]
+  }
+}
 `],
   ["modules/i18n/shared/client/frameworks/react-router/src/components/i18n-provider.tsx.hbs", `"use client";
 
@@ -37798,6 +40642,277 @@ export function AdminOrders({ data, page }: { data: z.infer<typeof ordersSchema>
   return <section className="space-y-6"><h1 className="font-serif text-4xl">{t("payment.admin.title")}</h1><div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("payment.admin.title")}</caption><thead><tr>{(["date", "customer", "plan", "provider", "status", "amount"] as const).map((key) => <th key={key} scope="col" className="border-b p-3">{t(\`payment.admin.columns.\${key}\`)}</th>)}</tr></thead><tbody>{data.rows.map(({ order, email }) => <tr key={order.id}><td className="border-b p-3">{order.createdAt.slice(0, 10)}</td><td className="border-b p-3">{email}<span className="block text-xs text-muted-foreground">{order.id}</span></td><td className="border-b p-3">{planLabel(t, order.planId)}</td><td className="border-b p-3">{providerLabel(t, order.provider)}</td><td className="border-b p-3">{t(\`payment.admin.status.\${order.status}\`)}</td><td className="border-b p-3">{formatMoney(order.amount, order.currency, locale)}</td></tr>)}{!data.rows.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{t("payment.admin.empty")}</td></tr>}</tbody></table></div><AdminPagination page={page} total={data.total} path="orders" /></section>;
 }
 `],
+  ["modules/payment/module.json", `{
+  "id": "payment",
+  "name": {
+    "en": "Payments",
+    "zh-CN": "支付"
+  },
+  "description": {
+    "en": "Pricing page, one-time payments and subscriptions with provider webhooks",
+    "zh-CN": "定价页、一次性支付与订阅，处理服务商 webhook"
+  },
+  "category": "monetization",
+  "requires": [
+    "auth"
+  ],
+  "enhances": [
+    "admin"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ],
+    "orms": [
+      "drizzle"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgres"
+    ]
+  },
+  "nativeSplit": true,
+  "providers": {
+    "min": 1,
+    "default": {
+      "global": [
+        "stripe"
+      ],
+      "cn": [
+        "wechat",
+        "alipay"
+      ]
+    },
+    "options": {
+      "wechat": {
+        "name": "WeChat Pay",
+        "market": "cn",
+        "dependencies": {
+          "zod": "$dependency:zod"
+        },
+        "appDependencies": {
+          "qrcode": "^1.5.4",
+          "@types/qrcode": "^1.5.5"
+        },
+        "env": [
+          {
+            "key": "WECHAT_PAY_APP_ID",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "WECHAT_PAY_MCH_ID",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "WECHAT_PAY_SERIAL_NO",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "WECHAT_PAY_PRIVATE_KEY",
+            "required": false
+          },
+          {
+            "key": "WECHAT_PAY_API_V3_KEY",
+            "required": false
+          },
+          {
+            "key": "WECHAT_PAY_PUBLIC_KEY_ID",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "WECHAT_PAY_PUBLIC_KEY",
+            "required": false
+          }
+        ]
+      },
+      "alipay": {
+        "name": "Alipay",
+        "market": "cn",
+        "supports": {
+          "targets": [
+            "none",
+            "node",
+            "vercel",
+            "docker"
+          ]
+        },
+        "dependencies": {
+          "alipay-sdk": "^4.14.0"
+        },
+        "env": [
+          {
+            "key": "ALIPAY_APP_ID",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "ALIPAY_PRIVATE_KEY",
+            "required": false
+          },
+          {
+            "key": "ALIPAY_PUBLIC_KEY",
+            "required": false
+          },
+          {
+            "key": "ALIPAY_SELLER_ID",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "ALIPAY_SANDBOX",
+            "required": false,
+            "sensitive": false,
+            "type": "boolean",
+            "default": "false"
+          }
+        ]
+      },
+      "stripe": {
+        "name": "Stripe",
+        "market": "global",
+        "dependencies": {
+          "stripe": "^23.0.0"
+        },
+        "env": [
+          {
+            "key": "STRIPE_SECRET_KEY",
+            "required": false
+          },
+          {
+            "key": "STRIPE_WEBHOOK_SECRET",
+            "required": false
+          }
+        ]
+      },
+      "mock": {
+        "name": "Mock (development only)",
+        "market": "any"
+      },
+      "polar": {
+        "name": "Polar",
+        "market": "global",
+        "dependencies": {
+          "@polar-sh/sdk": "^1.0.2"
+        },
+        "env": [
+          {
+            "key": "POLAR_ACCESS_TOKEN",
+            "required": false
+          },
+          {
+            "key": "POLAR_WEBHOOK_SECRET",
+            "required": false
+          },
+          {
+            "key": "POLAR_SERVER",
+            "required": false,
+            "sensitive": false,
+            "type": "enum",
+            "values": [
+              "sandbox",
+              "production"
+            ],
+            "default": "sandbox"
+          }
+        ]
+      }
+    }
+  },
+  "packages": [
+    {
+      "dir": "payment",
+      "dependencies": {
+        "drizzle-orm": "$dependency:drizzle-orm"
+      },
+      "workspaceDependencies": [
+        "db",
+        "events"
+      ]
+    }
+  ],
+  "services": [
+    {
+      "name": "payment",
+      "imports": [
+        {
+          "from": "@app/payment",
+          "names": [
+            "createPayment"
+          ]
+        }
+      ],
+      "init": "createPayment({ env: ENV, db, events, baseUrl: ENV.BETTER_AUTH_URL, clientOrigins: {{{clientOrigins}}} })"
+    }
+  ],
+  "nav": [
+    {
+      "area": "main",
+      "href": "/pricing",
+      "labelKey": "nav.pricing",
+      "order": 20
+    },
+    {
+      "area": "dashboard",
+      "href": "/dashboard/billing",
+      "labelKey": "nav.billing",
+      "order": 50
+    },
+    {
+      "area": "admin",
+      "href": "/admin/orders",
+      "labelKey": "nav.orders",
+      "order": 20,
+      "when": "admin"
+    }
+  ],
+  "notices": [
+    "Mock payments are development-only. Production payments require a real provider, its credentials, webhook configuration and product/price setup. Polar defaults to sandbox; switch its environment to production before launch."
+  ],
+  "sources": {
+    "dialects": true,
+    "frameworks": [
+      "http-server",
+      "next",
+      "nuxt",
+      "tanstack-start"
+    ],
+    "providers": {
+      "mode": "separate",
+      "frameworks": {
+        "mock": {
+          "next": "providers/mock/frameworks/next"
+        }
+      }
+    },
+    "integrations": {
+      "admin": {
+        "frameworks": {
+          "next": "integrations/admin/frameworks/next",
+          "tanstack-start": "integrations/admin/frameworks/tanstack-start",
+          "nuxt": "frameworks/nuxt"
+        }
+      }
+    },
+    "frameworkRequired": {
+      "http-server": [
+        "shared/partials/payment.hbs"
+      ]
+    }
+  }
+}
+`],
   ["modules/payment/providers/alipay/packages/payment/src/providers/alipay.ts", `import { createPrivateKey, createPublicKey } from "node:crypto";
 
 import { AlipaySdk } from "alipay-sdk";
@@ -38759,6 +41874,77 @@ export async function handle(request: Request, path: string): Promise<Response |
   } catch (error) { if (error instanceof PaymentError) return json({ error: error.code }, 400); throw error; }
 }
 `],
+  ["modules/presets.json", `{
+  "starter": {
+    "features": [
+      "auth"
+    ]
+  },
+  "saas-global": {
+    "features": [
+      "auth",
+      "email",
+      "admin",
+      "payment",
+      "credits"
+    ],
+    "providers": {
+      "auth": [
+        "google",
+        "github"
+      ],
+      "email": [
+        "resend"
+      ],
+      "payment": [
+        "stripe"
+      ]
+    }
+  },
+  "full": {
+    "features": [
+      "auth",
+      "email",
+      "sms",
+      "admin",
+      "payment",
+      "credits",
+      "storage",
+      "ai",
+      "seo",
+      "blog",
+      "affiliate",
+      "captcha"
+    ],
+    "providers": {
+      "auth": [
+        "google",
+        "github"
+      ],
+      "email": [
+        "resend"
+      ],
+      "sms": [
+        "twilio"
+      ],
+      "payment": [
+        "stripe"
+      ],
+      "storage": [
+        "s3"
+      ],
+      "ai": [
+        "openai",
+        "google",
+        "openai-compatible"
+      ],
+      "captcha": [
+        "turnstile"
+      ]
+    }
+  }
+}
+`],
   ["modules/seo/files/docs/modules/seo.md", `# Search metadata
 
 Set \`SITE_URL\` to the public HTTPS origin before deployment. Do not use preview URLs as canonical production URLs. \`pageMetadata\` supplies homepage and payment pricing page canonical, configured-locale hreflang, Open Graph and Twitter metadata; use it on additional translated public pages. For content that is not available in every configured locale, pass only actual translations to \`seo.metadata\` instead of accepting its same-path defaults. Optional \`image\` must identify a real public image; absolute HTTP(S) URLs and relative public paths are supported, while unsafe schemes and credential-bearing URLs are rejected. Metadata helpers do not fetch image URLs.
@@ -38925,6 +42111,103 @@ export default function registerSeoPayment({ seo }: Services) {
     languages["x-default"] = seo.url(\`/\${defaultLocale}/pricing\`);
     return locales.map((locale) => ({ url: seo.url(\`/\${locale}/pricing\`), alternates: { languages } }));
   });
+}
+`],
+  ["modules/seo/module.json", `{
+  "id": "seo",
+  "name": {
+    "en": "Search metadata",
+    "zh-CN": "搜索引擎优化"
+  },
+  "description": {
+    "en": "Localized canonical metadata, social cards, robots and a live public sitemap",
+    "zh-CN": "本地化规范链接、社交卡片、robots 与动态站点地图"
+  },
+  "category": "content",
+  "requires": [
+    "core",
+    "i18n"
+  ],
+  "enhances": [
+    "core",
+    "payment"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ]
+  },
+  "frameworkReplaces": {
+    "tanstack-start": [
+      "apps/web/public/robots.txt"
+    ],
+    "nuxt": [
+      "apps/web/public/robots.txt"
+    ]
+  },
+  "env": [
+    {
+      "key": "SITE_URL",
+      "type": "url",
+      "example": "http://localhost:3001",
+      "sensitive": false,
+      "comment": "Public canonical origin; set your HTTPS production URL before launch"
+    }
+  ],
+  "packages": [
+    {
+      "dir": "seo"
+    }
+  ],
+  "services": [
+    {
+      "name": "seo",
+      "imports": [
+        {
+          "from": "@app/seo",
+          "names": [
+            "createSeo"
+          ]
+        },
+        {
+          "from": "@app/i18n",
+          "names": [
+            "locales",
+            "defaultLocale"
+          ]
+        }
+      ],
+      "init": "createSeo({ origin: ENV.SITE_URL, locales, defaultLocale })"
+    }
+  ],
+  "sources": {
+    "frameworks": [
+      "http-server",
+      "next",
+      "nuxt",
+      "tanstack-start"
+    ],
+    "integrations": {
+      "core": {
+        "frameworks": {
+          "next": "integrations/core/frameworks/next",
+          "nuxt": "frameworks/nuxt",
+          "tanstack-start": "frameworks/tanstack-start"
+        }
+      },
+      "payment": {
+        "base": "integrations/payment/apps/fullstack-web"
+      }
+    }
+  }
 }
 `],
   ["modules/sms/files/docs/modules/sms.md.hbs", `# SMS
@@ -39097,6 +42380,224 @@ export type Sms = {
   ["modules/sms/integrations/auth/apps/backend/src/integrations/auth-sms.ts.hbs", `{{> sms/auth-sms}}
 `],
   ["modules/sms/integrations/auth/apps/fullstack-web/src/integrations/auth-sms.ts.hbs", `{{> sms/auth-sms}}
+`],
+  ["modules/sms/module.json", `{
+  "id": "sms",
+  "name": {
+    "en": "SMS",
+    "zh-CN": "短信"
+  },
+  "description": {
+    "en": "Verification SMS with Alibaba Cloud, Tencent Cloud, or Twilio",
+    "zh-CN": "通过阿里云、腾讯云或 Twilio 发送短信验证码"
+  },
+  "category": "communication",
+  "requires": [
+    "core"
+  ],
+  "enhances": [
+    "auth"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ],
+    "orms": [
+      "drizzle"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgres"
+    ]
+  },
+  "nativeSplit": true,
+  "providers": {
+    "min": 1,
+    "max": 1,
+    "default": {
+      "global": [
+        "aliyun"
+      ],
+      "cn": [
+        "aliyun"
+      ]
+    },
+    "targetDefaults": {
+      "cloudflare": [
+        "twilio"
+      ]
+    },
+    "options": {
+      "aliyun": {
+        "name": "Alibaba Cloud SMS",
+        "market": "cn",
+        "supports": {
+          "targets": [
+            "none",
+            "node",
+            "vercel",
+            "docker"
+          ]
+        },
+        "dependencies": {
+          "@alicloud/dysmsapi20170525": "4.6.0",
+          "@alicloud/openapi-core": "1.0.8",
+          "@darabonba/typescript": "1.0.5"
+        },
+        "env": [
+          {
+            "key": "ALIYUN_SMS_ACCESS_KEY_ID",
+            "required": false
+          },
+          {
+            "key": "ALIYUN_SMS_ACCESS_KEY_SECRET",
+            "required": false
+          },
+          {
+            "key": "ALIYUN_SMS_REGION_ID",
+            "required": false,
+            "sensitive": false,
+            "default": "cn-hangzhou"
+          },
+          {
+            "key": "ALIYUN_SMS_SIGN_NAME",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "ALIYUN_SMS_TEMPLATE_CODE",
+            "required": false,
+            "sensitive": false
+          }
+        ]
+      },
+      "tencent": {
+        "name": "Tencent Cloud SMS",
+        "market": "cn",
+        "supports": {
+          "targets": [
+            "none",
+            "node",
+            "vercel",
+            "docker"
+          ]
+        },
+        "dependencies": {
+          "tencentcloud-sdk-nodejs-sms": "4.1.306"
+        },
+        "env": [
+          {
+            "key": "TENCENT_SMS_SECRET_ID",
+            "required": false
+          },
+          {
+            "key": "TENCENT_SMS_SECRET_KEY",
+            "required": false
+          },
+          {
+            "key": "TENCENT_SMS_REGION",
+            "required": false,
+            "sensitive": false,
+            "default": "ap-guangzhou"
+          },
+          {
+            "key": "TENCENT_SMS_SDK_APP_ID",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "TENCENT_SMS_SIGN_NAME",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "TENCENT_SMS_TEMPLATE_ID",
+            "required": false,
+            "sensitive": false
+          }
+        ]
+      },
+      "twilio": {
+        "name": "Twilio",
+        "market": "global",
+        "dependencies": {
+          "zod": "$dependency:zod"
+        },
+        "env": [
+          {
+            "key": "TWILIO_ACCOUNT_SID",
+            "required": false
+          },
+          {
+            "key": "TWILIO_AUTH_TOKEN",
+            "required": false
+          },
+          {
+            "key": "TWILIO_FROM_NUMBER",
+            "required": false,
+            "sensitive": false
+          }
+        ]
+      }
+    }
+  },
+  "packages": [
+    {
+      "dir": "sms"
+    }
+  ],
+  "env": [
+    {
+      "key": "SMS_DELIVERY_MODE",
+      "type": "enum",
+      "values": [
+        "provider",
+        "console"
+      ],
+      "default": "provider",
+      "sensitive": false,
+      "comment": "console prints OTPs only when NODE_ENV=development; never a fallback"
+    }
+  ],
+  "services": [
+    {
+      "name": "sms",
+      "imports": [
+        {
+          "from": "@app/sms",
+          "names": [
+            "createSms"
+          ]
+        }
+      ],
+      "init": "createSms(ENV)"
+    }
+  ],
+  "notices": [
+    "Select Authentication as well to enable phone-number signup and login. Real SMS delivery needs provider credentials and approved sender/template settings. Console delivery is explicitly development-only; never enter credentials here."
+  ],
+  "sources": {
+    "providers": {
+      "mode": "separate"
+    },
+    "integrations": {
+      "auth": {
+        "base": "integrations/auth/apps/fullstack-web",
+        "required": [
+          "shared/partials/auth-sms.hbs"
+        ]
+      }
+    }
+  }
+}
 `],
   ["modules/sms/providers/aliyun/packages/sms/src/providers/aliyun.ts", `import Dysmsapi, { SendSmsRequest } from "@alicloud/dysmsapi20170525";
 import { $OpenApiUtil } from "@alicloud/openapi-core";
@@ -40541,6 +44042,293 @@ function Files() {
   const { files, configured } = Route.useLoaderData(); const locale = useLocale(); const t = useT();
   const labels: StorageLabels = { uploadTitle: t("storage.page.uploadTitle"), fileLabel: t("storage.page.fileLabel"), upload: t("storage.page.upload"), uploading: t("storage.page.uploading"), listTitle: t("storage.page.listTitle"), empty: t("storage.page.empty"), download: t("storage.page.download"), delete: t("storage.page.delete"), deleting: t("storage.page.deleting"), deleteConfirm: t("storage.page.deleteConfirm"), uploaded: t("storage.page.uploaded"), deleted: t("storage.page.deleted"), errors: { unauthorized: t("storage.errors.unauthorized"), forbidden: t("storage.errors.forbidden"), tooLarge: t("storage.errors.tooLarge"), invalidFile: t("storage.errors.invalidFile"), notFound: t("storage.errors.notFound"), unavailable: t("storage.errors.unavailable"), generic: t("storage.errors.generic") } };
   return <section className="space-y-8"><header><h1 className="font-serif text-4xl">{t("storage.page.title")}</h1><p className="mt-4 text-muted-foreground">{t("storage.page.description")}</p><p id="storage-limits" className="mt-2 text-xs">{t("storage.page.limits")}</p></header>{!configured && <p role="status">{t("storage.page.unavailable")}</p>}<FileManager configured={configured} labels={labels} files={files.map((file) => ({ id: file.id, name: file.name, size: \`\${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(file.size / 1024)} KiB\`, createdAt: new Date(file.createdAt).toLocaleString(locale) }))} /></section>;
+}
+`],
+  ["modules/storage/module.json", `{
+  "id": "storage",
+  "name": {
+    "en": "Private files",
+    "zh-CN": "私有文件"
+  },
+  "description": {
+    "en": "Private S3, R2, OSS or COS uploads and owned downloads",
+    "zh-CN": "S3、R2、OSS 或 COS 私有上传与个人文件下载"
+  },
+  "category": "content",
+  "requires": [
+    "auth"
+  ],
+  "supports": {
+    "frameworks": [
+      "next",
+      "tanstack-start",
+      "nuxt"
+    ],
+    "backends": [
+      "self"
+    ],
+    "apis": [
+      "none"
+    ],
+    "orms": [
+      "drizzle"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgres"
+    ]
+  },
+  "providers": {
+    "min": 1,
+    "max": 1,
+    "default": {
+      "global": [
+        "s3"
+      ],
+      "cn": [
+        "oss"
+      ]
+    },
+    "targetDefaults": {
+      "cloudflare": [
+        "r2-binding"
+      ]
+    },
+    "options": {
+      "s3": {
+        "name": "Amazon S3",
+        "market": "global",
+        "supports": {
+          "targets": [
+            "none",
+            "node",
+            "vercel",
+            "docker"
+          ]
+        },
+        "dependencies": {
+          "@aws-sdk/client-s3": "^3.1000.0",
+          "@aws-sdk/s3-request-presigner": "^3.1000.0"
+        },
+        "env": [
+          {
+            "key": "S3_REGION",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "S3_BUCKET",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "S3_ACCESS_KEY_ID",
+            "required": false
+          },
+          {
+            "key": "S3_SECRET_ACCESS_KEY",
+            "required": false
+          },
+          {
+            "key": "S3_SESSION_TOKEN",
+            "required": false
+          }
+        ]
+      },
+      "r2": {
+        "name": "Cloudflare R2 (S3 API)",
+        "market": "global",
+        "supports": {
+          "targets": [
+            "none",
+            "node",
+            "vercel",
+            "docker"
+          ]
+        },
+        "dependencies": {
+          "@aws-sdk/client-s3": "^3.1000.0",
+          "@aws-sdk/s3-request-presigner": "^3.1000.0"
+        },
+        "env": [
+          {
+            "key": "R2_ACCOUNT_ID",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "R2_BUCKET",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "R2_ACCESS_KEY_ID",
+            "required": false
+          },
+          {
+            "key": "R2_SECRET_ACCESS_KEY",
+            "required": false
+          }
+        ]
+      },
+      "r2-binding": {
+        "name": "Cloudflare R2 (Workers binding)",
+        "market": "global",
+        "supports": {
+          "frameworks": [
+            "next"
+          ],
+          "targets": [
+            "cloudflare"
+          ]
+        },
+        "dependencies": {
+          "@opennextjs/cloudflare": "$dependency:@opennextjs/cloudflare"
+        },
+        "devDependencies": {
+          "@cloudflare/workers-types": "$dependency:@cloudflare/workers-types"
+        }
+      },
+      "oss": {
+        "name": "Alibaba Cloud OSS",
+        "market": "cn",
+        "supports": {
+          "targets": [
+            "none",
+            "node",
+            "vercel",
+            "docker"
+          ]
+        },
+        "dependencies": {
+          "ali-oss": "^6.23.0"
+        },
+        "devDependencies": {
+          "@types/ali-oss": "^6.23.3"
+        },
+        "appDependencies": {
+          "ali-oss": "^6.23.0"
+        },
+        "serverExternalPackages": [
+          "ali-oss"
+        ],
+        "env": [
+          {
+            "key": "OSS_REGION",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "OSS_BUCKET",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "OSS_ACCESS_KEY_ID",
+            "required": false
+          },
+          {
+            "key": "OSS_ACCESS_KEY_SECRET",
+            "required": false
+          },
+          {
+            "key": "OSS_SECURITY_TOKEN",
+            "required": false
+          }
+        ]
+      },
+      "cos": {
+        "name": "Tencent Cloud COS",
+        "market": "cn",
+        "supports": {
+          "targets": [
+            "none",
+            "node",
+            "vercel",
+            "docker"
+          ]
+        },
+        "dependencies": {
+          "cos-nodejs-sdk-v5": "^3.0.0"
+        },
+        "env": [
+          {
+            "key": "COS_REGION",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "COS_BUCKET",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "COS_SECRET_ID",
+            "required": false
+          },
+          {
+            "key": "COS_SECRET_KEY",
+            "required": false
+          },
+          {
+            "key": "COS_SECURITY_TOKEN",
+            "required": false
+          }
+        ]
+      }
+    }
+  },
+  "packages": [
+    {
+      "dir": "storage",
+      "dependencies": {
+        "drizzle-orm": "$dependency:drizzle-orm",
+        "zod": "$dependency:zod"
+      },
+      "workspaceDependencies": [
+        "db"
+      ]
+    }
+  ],
+  "appDependencies": {
+    "zod": "$dependency:zod"
+  },
+  "services": [
+    {
+      "name": "storage",
+      "imports": [
+        {
+          "from": "@app/storage",
+          "names": [
+            "createStorage"
+          ]
+        }
+      ],
+      "init": "createStorage({ env: ENV, db })"
+    }
+  ],
+  "nav": [
+    {
+      "area": "dashboard",
+      "href": "/dashboard/files",
+      "labelKey": "nav.files",
+      "order": 60
+    }
+  ],
+  "sources": {
+    "dialects": true,
+    "frameworks": [
+      "http-server",
+      "next",
+      "nuxt",
+      "tanstack-start",
+      "react"
+    ],
+    "providers": {
+      "mode": "inline",
+      "source": "files/packages/storage/src/provider.ts.hbs"
+    }
+  }
 }
 `],
   ["packages/config/package.json.hbs", `{
@@ -42379,4 +46167,4 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 `]
 ]);
 
-export const TEMPLATE_COUNT = 909;
+export const TEMPLATE_COUNT = 929;

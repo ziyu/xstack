@@ -1,0 +1,14 @@
+import type { FastifyInstance } from "fastify";
+import { handleNativeRequest } from "./native-request";
+import { responseBody, responseHeaders, toFetchRequest } from "./node-http";
+
+export async function registerProductRoutes(app: FastifyInstance): Promise<void> {
+  // Encapsulation confines the raw stream parser to product HTTP routes.
+  app.removeAllContentTypeParsers();
+  app.addContentTypeParser("*", (_request, payload, done) => done(null, payload));
+  app.all("/api/*", async (request, reply) => {
+    const response = await handleNativeRequest(toFetchRequest(request.raw));
+    reply.code(response.status).headers(responseHeaders(response));
+    return reply.send(responseBody(response));
+  });
+}

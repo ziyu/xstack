@@ -1,22 +1,59 @@
 import { usesAlchemyManagedDatabase } from "@xstack/types";
 
+import { appOutputPath } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { RenderConfig } from "../types";
+import { addPackageDependency } from "../utils/add-deps";
 
 export function processAlchemyPlugins(vfs: VirtualFileSystem, config: RenderConfig): void {
   const { webDeploy, frontend, backend } = config;
 
   processManagedPrismaMigrations(vfs, config);
+  if (
+    config.application?.roles.includes("backend") &&
+    config.runtime === "workers" &&
+    config.serverDeploy === "cloudflare"
+  ) {
+    const root = appOutputPath(config, "server");
+    const port = config.application.port ?? 3000;
+    vfs.writeFile(
+      `${root}/wrangler.jsonc`,
+      `{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "${config.projectName}-${config.application.id}",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": { "port": ${port} }${d1DatabasesBlock(config)}
+}\n`,
+    );
+    addPackageDependency({
+      vfs,
+      packagePath: `${root}/package.json`,
+      devDependencies: ["wrangler"],
+    });
+    const pkg = vfs.readJson<{ scripts?: Record<string, string> }>(`${root}/package.json`);
+    if (!pkg) throw new Error(`Workers application package is missing: ${root}`);
+    pkg.scripts ??= {};
+    pkg.scripts.dev = `wrangler dev --local --port ${port}`;
+    pkg.scripts["dev:bare"] = pkg.scripts.dev;
+    if (config.dbSetup === "d1")
+      pkg.scripts["db:migrate:local"] = "wrangler d1 migrations apply DB --local";
+    vfs.writeJson(`${root}/package.json`, pkg);
+  }
 
   if (webDeploy !== "cloudflare") return;
 
   if (frontend.includes("next")) {
     processNextAlchemy(vfs, config);
   } else if (frontend.includes("react-router")) {
-    processReactRouterAlchemy(vfs);
+    processReactRouterAlchemy(vfs, config);
   } else if (frontend.includes("svelte")) {
     // keep the adapter's worker internals out of the public asset upload
-    vfs.writeFile("apps/web/static/.assetsignore", "_worker.js\n_routes.json\n");
+    vfs.writeFile(
+      appOutputPath(config, "web", "static/.assetsignore"),
+      "_worker.js\n_routes.json\n",
+    );
     if (backend === "self") {
       writeDevWranglerConfig(vfs, config);
     }
@@ -46,7 +83,7 @@ function processManagedPrismaMigrations(vfs: VirtualFileSystem, config: RenderCo
 }
 
 function writeSolidDevEnvProxy(vfs: VirtualFileSystem, config: RenderConfig) {
-  const proxyPath = "apps/web/cloudflare-workers.dev.ts";
+  const proxyPath = appOutputPath(config, "web", "cloudflare-workers.dev.ts");
 
   if (config.dbSetup !== "d1") {
     vfs.writeFile(
@@ -95,23 +132,23 @@ function d1DatabasesBlock(config: RenderConfig): string {
 }
 
 function writeDevWranglerConfig(vfs: VirtualFileSystem, config: RenderConfig) {
-  const wranglerConfigPath = "apps/web/wrangler.jsonc";
+  const wranglerConfigPath = appOutputPath(config, "web", "wrangler.jsonc");
   if (vfs.exists(wranglerConfigPath) || config.dbSetup !== "d1") return;
   vfs.writeFile(
     wranglerConfigPath,
     `{
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "${config.projectName}-web",
+  "name": "${config.projectName}-${config.application?.id ?? "web"}",
   "compatibility_date": "2025-05-05",
   "compatibility_flags": ["nodejs_compat"]${d1DatabasesBlock(config)}
 }
 `,
   );
-  addLocalD1MigrateScript(vfs);
+  addLocalD1MigrateScript(vfs, config);
 }
 
-function addLocalD1MigrateScript(vfs: VirtualFileSystem) {
-  const webPkgPath = "apps/web/package.json";
+function addLocalD1MigrateScript(vfs: VirtualFileSystem, config: RenderConfig) {
+  const webPkgPath = appOutputPath(config, "web", "package.json");
   if (!vfs.exists(webPkgPath)) return;
   const raw = vfs.readFile(webPkgPath);
   if (!raw) return;
@@ -126,8 +163,8 @@ function addLocalD1MigrateScript(vfs: VirtualFileSystem) {
 // React Router's ssr build is a manifest, not a worker; these two files wrap it
 // into a fetch handler (workers/app.ts, wired as the ssr rollup input by the
 // vite config template) and render with web streams instead of node streams.
-function processReactRouterAlchemy(vfs: VirtualFileSystem) {
-  const webAppDir = "apps/web";
+function processReactRouterAlchemy(vfs: VirtualFileSystem, config: RenderConfig) {
+  const webAppDir = appOutputPath(config, "web");
 
   const workerEntryPath = `${webAppDir}/workers/app.ts`;
   if (!vfs.exists(workerEntryPath)) {
@@ -213,7 +250,7 @@ export default async function handleRequest(
 }
 
 function processNextAlchemy(vfs: VirtualFileSystem, config: RenderConfig) {
-  const webAppDir = "apps/web";
+  const webAppDir = appOutputPath(config, "web");
 
   const openNextConfigPath = `${webAppDir}/open-next.config.ts`;
   if (!vfs.exists(openNextConfigPath)) {
@@ -228,7 +265,7 @@ export default defineCloudflareConfig({});
   if (!vfs.exists(wranglerConfigPath)) {
     const wranglerConfigContent = `{
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "${config.projectName}-web",
+  "name": "${config.projectName}-${config.application?.id ?? "web"}",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-05-05",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -243,7 +280,7 @@ export default defineCloudflareConfig({});
 `;
     vfs.writeFile(wranglerConfigPath, wranglerConfigContent);
     if (config.backend === "self" && config.dbSetup === "d1") {
-      addLocalD1MigrateScript(vfs);
+      addLocalD1MigrateScript(vfs, config);
     }
   }
 

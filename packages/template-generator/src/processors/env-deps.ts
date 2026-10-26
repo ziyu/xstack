@@ -1,12 +1,30 @@
-import type { ProjectConfig } from "@xstack/types";
 import { parse, stringify } from "yaml";
 
+import { appOutputPath, type ApplicationConfig } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { addPackageDependency, type AvailableDependencies } from "../utils/add-deps";
 
-export function processEnvDeps(vfs: VirtualFileSystem, config: ProjectConfig): void {
+export function processEnvDeps(vfs: VirtualFileSystem, config: ApplicationConfig): void {
   addPackageDependency({ vfs, packagePath: "package.json", devDependencies: ["varlock"] });
-  for (const app of ["web", "server", "native"]) {
+  for (const app of ["web", "server", "native"] as const) {
+    if (config.application) {
+      if (app === "server" && !config.application.roles.includes("backend")) continue;
+      if (
+        app === "web" &&
+        !config.frontend.some((frontend) => frontend !== "none" && !frontend.startsWith("native-"))
+      )
+        continue;
+      if (app === "native" && !config.frontend.some((frontend) => frontend.startsWith("native-")))
+        continue;
+    }
+    const packagePath = appOutputPath(config, app, "package.json");
+    if (!vfs.ownsPath(packagePath) || !vfs.exists(packagePath)) continue;
+    if (
+      app === "server" &&
+      config.frontend.some((frontend) => frontend !== "none" && !frontend.startsWith("native-")) &&
+      packagePath === appOutputPath(config, "web", "package.json")
+    )
+      continue;
     const dependencies: AvailableDependencies[] = ["varlock"];
     if (app === "web" && config.webDeploy !== "cloudflare") {
       dependencies.push(
@@ -25,11 +43,18 @@ export function processEnvDeps(vfs: VirtualFileSystem, config: ProjectConfig): v
       dependencies.push("@varlock/expo-integration");
       addPackageDependency({
         vfs,
-        packagePath: "apps/native/package.json",
+        packagePath,
         devDependencies: ["babel-preset-expo"],
       });
     }
-    addPackageDependency({ vfs, packagePath: `apps/${app}/package.json`, dependencies });
+    addPackageDependency({ vfs, packagePath, dependencies });
+  }
+  if (config.application?.type === "cli") {
+    addPackageDependency({
+      vfs,
+      packagePath: `${config.application.directory}/package.json`,
+      dependencies: ["varlock"],
+    });
   }
   if (
     vfs.ownsPath("package.json") &&

@@ -7,10 +7,10 @@ import { execa } from "execa";
 import fs from "fs-extra";
 import { z } from "zod";
 
+import { c2Cases, c2Input } from "../live-tests/c2-cases";
 import type { CreateInput } from "../src";
 import { create } from "../src";
 import { SMOKE_DIR } from "./setup";
-import { c2Cases, c2Input } from "../live-tests/c2-cases";
 
 type PackageManager = NonNullable<CreateInput["packageManager"]>;
 

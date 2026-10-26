@@ -3,6 +3,7 @@ import type { ProjectConfig } from "@xstack/types";
 import { appOutputPath } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { RenderConfig } from "../types";
+import { getBackendConsumerFrontends } from "../utils/add-deps";
 import { isDatabaseConsumedByDocker } from "../utils/docker-database";
 
 export interface EnvVariable {
@@ -36,14 +37,18 @@ function generateAuthSecret() {
   return generateRandomString(32, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
 }
 
-function getClientServerVar(frontend: string[], backend: ProjectConfig["backend"]) {
+function getClientServerVar(
+  frontend: string[],
+  backend: ProjectConfig["backend"],
+  remoteBackend: boolean,
+) {
   const hasNextJs = frontend.includes("next");
   const hasNuxt = frontend.includes("nuxt");
   const hasSvelte = frontend.includes("svelte");
   const hasAstro = frontend.includes("astro");
   const hasTanstackStart = frontend.includes("tanstack-start");
 
-  if (backend === "self" || backend === "none") {
+  if ((backend === "self" && !remoteBackend) || backend === "none") {
     return { key: "", value: "", write: false } as const;
   }
 
@@ -117,6 +122,7 @@ function writeEnvFile(
   variables: EnvVariable[],
   options: AddEnvVariablesOptions = {},
 ): void {
+  if (!vfs.ownsPath(envPath)) return;
   let currentContent = "";
   if (vfs.exists(envPath)) {
     currentContent = vfs.readFile(envPath) || "";
@@ -130,13 +136,14 @@ function buildClientVars(
   backend: ProjectConfig["backend"],
   auth: RenderConfig["auth"],
   apiPrefix: string,
+  remoteBackend = false,
 ): EnvVariable[] {
   const hasNextJs = frontend.includes("next");
   const hasReactRouter = frontend.includes("react-router");
   const hasTanStackRouter = frontend.includes("tanstack-router");
   const hasTanStackStart = frontend.includes("tanstack-start");
 
-  const baseVar = getClientServerVar(frontend, backend);
+  const baseVar = getClientServerVar(frontend, backend, remoteBackend);
   const envVarName = backend === "convex" ? getConvexVar(frontend) : baseVar.key;
   const serverUrl = backend === "convex" ? CONVEX_URL_PLACEHOLDER : `${baseVar.value}${apiPrefix}`;
 
@@ -226,7 +233,7 @@ function buildNativeVars(
     {
       key: envVarName,
       value: serverUrl,
-      condition: true,
+      condition: backend !== "none",
     },
   ];
 
@@ -497,11 +504,34 @@ export function processEnvVariables(vfs: VirtualFileSystem, config: RenderConfig
   // --- Client App .env ---
   if (hasWebFrontend) {
     const clientDir = appOutputPath(config, "web");
-    if (vfs.directoryExists(clientDir)) {
+    if (vfs.ownsPath(clientDir) && vfs.directoryExists(clientDir)) {
       const envPath = `${clientDir}/.env`;
       // Matches the /api base the Vercel build uses when web and server deploy together
-      const apiPrefix = webDeploy === "vercel" && serverDeploy === "vercel" ? "/api" : "";
-      const clientVars = buildClientVars(frontend, backend, auth, apiPrefix);
+      const apiPrefix =
+        !config.application && webDeploy === "vercel" && serverDeploy === "vercel" ? "/api" : "";
+      const clientVars = buildClientVars(
+        frontend,
+        backend,
+        auth,
+        apiPrefix,
+        Boolean(
+          config.application?.backendRoot &&
+          config.application.backendRoot !== config.application.directory,
+        ),
+      );
+      if (
+        config.application &&
+        !config.application.roles.includes("backend") &&
+        !config.application.clientContributions?.serverAuth
+      ) {
+        for (const variable of clientVars) {
+          if (variable.key === "CLERK_SECRET_KEY") variable.condition = false;
+        }
+      }
+      for (const variable of clientVars) {
+        if (variable.key.endsWith("SERVER_URL") && config.application?.backendOrigin)
+          variable.value = `${config.application.backendOrigin}${apiPrefix}`;
+      }
       writeEnvFile(vfs, envPath, clientVars);
     }
   }
@@ -546,9 +576,13 @@ export function processEnvVariables(vfs: VirtualFileSystem, config: RenderConfig
     frontend.includes("native-unistyles")
   ) {
     const nativeDir = appOutputPath(config, "native");
-    if (vfs.directoryExists(nativeDir)) {
+    if (vfs.ownsPath(nativeDir) && vfs.directoryExists(nativeDir)) {
       const envPath = `${nativeDir}/.env`;
       const nativeVars = buildNativeVars(frontend, backend, auth);
+      for (const variable of nativeVars) {
+        if (variable.key.endsWith("SERVER_URL") && config.application?.backendOrigin)
+          variable.value = config.application.backendOrigin;
+      }
       writeEnvFile(vfs, envPath, nativeVars);
     }
   }
@@ -556,11 +590,11 @@ export function processEnvVariables(vfs: VirtualFileSystem, config: RenderConfig
   // --- Convex Backend .env.local ---
   if (backend === "convex") {
     const convexBackendDir = "packages/backend";
-    if (vfs.directoryExists(convexBackendDir)) {
+    if (vfs.ownsPath(convexBackendDir) && vfs.directoryExists(convexBackendDir)) {
       const envLocalPath = `${convexBackendDir}/.env.local`;
 
       // Write comment blocks first
-      const commentBlocks = buildConvexCommentBlocks(frontend, auth);
+      const commentBlocks = buildConvexCommentBlocks(getBackendConsumerFrontends(config), auth);
       if (commentBlocks) {
         let currentContent = "";
         if (vfs.exists(envLocalPath)) {
@@ -570,7 +604,7 @@ export function processEnvVariables(vfs: VirtualFileSystem, config: RenderConfig
       }
 
       // Then add variables
-      const convexBackendVars = buildConvexBackendVars(frontend, auth);
+      const convexBackendVars = buildConvexBackendVars(getBackendConsumerFrontends(config), auth);
       if (convexBackendVars.length > 0) {
         let existingContent = "";
         if (vfs.exists(envLocalPath)) {
@@ -586,9 +620,14 @@ export function processEnvVariables(vfs: VirtualFileSystem, config: RenderConfig
   }
 
   // --- Server App .env ---
+  const serverDir = appOutputPath(config, "server");
+  const ownsBackend = config.application
+    ? config.application.roles.includes("backend")
+    : backend !== "none";
+  if (!ownsBackend || !vfs.ownsPath(serverDir) || !vfs.directoryExists(serverDir)) return;
   const serverVars = buildServerVars(
     backend,
-    frontend,
+    getBackendConsumerFrontends(config),
     projectName,
     auth,
     api,
@@ -599,8 +638,15 @@ export function processEnvVariables(vfs: VirtualFileSystem, config: RenderConfig
     serverDeploy,
   );
 
-  const serverDir = appOutputPath(config, "server");
-  if (vfs.ownsPath(serverDir) && vfs.directoryExists(serverDir)) {
-    writeEnvFile(vfs, `${serverDir}/.env`, serverVars);
+  for (const variable of serverVars) {
+    if (variable.key === "BETTER_AUTH_URL" && config.application)
+      variable.value = config.application.backendOrigin ?? config.application.origin;
+    if (variable.key === "CORS_ORIGIN" && config.application) {
+      variable.value = config.application.clientOrigins.join(",") || config.application.origin;
+    }
   }
+  if (config.application) {
+    serverVars.push({ key: "PORT", value: String(config.application.port), condition: true });
+  }
+  writeEnvFile(vfs, `${serverDir}/.env`, serverVars);
 }

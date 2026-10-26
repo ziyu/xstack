@@ -8,8 +8,13 @@ import { updateRootPackageJson, processNpmScriptApprovals } from "../post-proces
 import { processAddonsDeps } from "../processors/addons-deps";
 import { processAgentGuidance } from "../processors/agent-guidance";
 import { processEnvDeps } from "../processors/env-deps";
+import { processNxConfig } from "../processors/nx-generator";
+import { processReadme } from "../processors/readme-generator";
 import { processTurboConfig } from "../processors/turbo-generator";
+import { processVitePlusConfig } from "../processors/vite-plus-generator";
 import { processWorkspaceDeps } from "../processors/workspace-deps";
+import { processWorkspaceDeployTemplates } from "../template-handlers/deploy";
+import { processPnpmWorkspaceConfig } from "../template-handlers/extras";
 import {
   GeneratorError,
   type ApplicationRenderContext,
@@ -133,7 +138,7 @@ export async function generateApplications(
       const content = vfs.readFile(path);
       if (content !== undefined) rootView.withoutTracing(() => rootView.writeFile(path, content));
     }
-    const renderConfig = toRenderConfig(entry.config);
+    const renderConfig = toRenderConfig(entry.config, templates);
     renderConfig.application = entry.context;
     if (options.trace)
       rootView.importProvenance(
@@ -166,12 +171,24 @@ export async function generateApplications(
       (frontend) => frontend !== "none",
     ),
   };
-  const rootConfig = toRenderConfig(aggregateConfig);
+  const rootConfig = toRenderConfig(aggregateConfig, templates);
   rootConfig.application = plan.applications.find(
     (entry) => entry.app.selection.id === plan.rootOwner,
   )!.context;
   stage("workspace-package-config", () => updateRootPackageJson(vfs, rootConfig));
+  stage("workspace-pnpm-config", () => processPnpmWorkspaceConfig(vfs, aggregateConfig));
   stage("workspace-turbo", () => processTurboConfig(vfs, aggregateConfig));
+  stage("workspace-nx", () => processNxConfig(vfs, rootConfig));
+  stage("workspace-vite-plus", () => processVitePlusConfig(vfs, rootConfig));
+  stage("workspace-deployment", () =>
+    processWorkspaceDeployTemplates(
+      vfs,
+      templates,
+      plan.applications.map((entry) => ({
+        config: { ...toRenderConfig(entry.config, templates), application: entry.context },
+      })),
+    ),
+  );
   const root = vfs.readJson<PackageJson>("package.json");
   if (!root)
     throw new GeneratorError({ phase: "applications", message: "Missing workspace package.json" });
@@ -222,13 +239,8 @@ export async function generateApplications(
     stage("workspace-saved-config", () =>
       writeXStackConfigToVfs(vfs, config, options.version!, generateReproducibleCommand(config)),
     );
-  stage("workspace-readme", () =>
-    vfs.writeFile(
-      "README.md",
-      `# ${config.projectName}\n\n## Applications\n\n${plan.applications.map(({ app }) => `- \`apps/${app.selection.id}\`: ${app.manifest.name} (${app.manifest.roles.join(", ") || "independent"}). Run \`${config.packageManager} run dev:${app.selection.id}\`.`).join("\n")}\n\nApplication ownership and resolved connections: \`applications.json\`.\n`,
-    ),
-  );
-  stage("workspace-agent-guidance", () => processAgentGuidance(vfs, config));
+  stage("workspace-readme", () => processReadme(vfs, rootConfig));
+  stage("workspace-agent-guidance", () => processAgentGuidance(vfs, rootConfig));
   const tree: VirtualFileTree = {
     root: vfs.toTree(config.projectName),
     fileCount: vfs.getFileCount(),

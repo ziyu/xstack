@@ -1,7 +1,18 @@
 {
   "id": "nuxt",
+  "name": "Nuxt",
+  "description": "Vue full-stack framework (SSR, SSG, hybrid)",
+  "icon": "/icons/nuxt.svg",
   "apps": {
     "fullstack-web": {
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["orpc", "none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
+      "clientContributions": { "framework": "nuxt", "family": "nuxt" },
+      "serverContributions": { "apiPrefix": "" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["nuxt"],
@@ -11,6 +22,13 @@
       }
     },
     "web-frontend": {
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
+      "clientContributions": { "framework": "nuxt", "family": "nuxt" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
         "frontend": ["nuxt"],

@@ -1,4 +1,4 @@
-import { type ProjectConfig, usesAlchemyManagedDatabase } from "@xstack/types";
+import { ApplicationIdSchema, type ProjectConfig, usesAlchemyManagedDatabase } from "@xstack/types";
 import Handlebars from "handlebars";
 import isBinaryPath from "is-binary-path";
 
@@ -90,10 +90,14 @@ function sanitizeIosBundleIdentifier(value: string) {
   return value.replace(/(^[^a-zA-Z.-]|[^a-zA-Z0-9-.])/g, "-");
 }
 
-Handlebars.registerHelper("appId", (projectName: string, platform: "ios" | "android") => {
-  const id = `com.anonymous.${projectName}`;
-  return platform === "android" ? sanitizeAndroidPackage(id) : sanitizeIosBundleIdentifier(id);
-});
+Handlebars.registerHelper(
+  "appId",
+  (projectName: string, platform: "ios" | "android", instanceId?: string) => {
+    const instance = ApplicationIdSchema.safeParse(instanceId);
+    const id = `com.anonymous.${projectName}${instance.success ? `.${instance.data}` : ""}`;
+    return platform === "android" ? sanitizeAndroidPackage(id) : sanitizeIosBundleIdentifier(id);
+  },
+);
 Handlebars.registerHelper(
   "usesAlchemyDatabase",
   (backend, dbSetup, webDeploy, serverDeploy, dbSetupOptions) =>
@@ -101,8 +105,14 @@ Handlebars.registerHelper(
 );
 // Vercel Services pass the original request path to the server service, so a
 // server deployed alongside its web app serves the public /api paths directly
-Handlebars.registerHelper("apiPrefix", (webDeploy, serverDeploy) =>
-  webDeploy === "vercel" && serverDeploy === "vercel" ? "/api" : "",
+Handlebars.registerHelper(
+  "apiPrefix",
+  (webDeploy, serverDeploy, options: Handlebars.HelperOptions) =>
+    options.data?.root?.application
+      ? ""
+      : webDeploy === "vercel" && serverDeploy === "vercel"
+        ? "/api"
+        : "",
 );
 Handlebars.registerHelper(
   "usesRequestScopedCloudflareEnv",
@@ -113,7 +123,13 @@ Handlebars.registerHelper(
     (frontend.includes("nuxt") || frontend.includes("svelte")),
 );
 
-const getServerUrlSource = `{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+const getServerUrlSource = `{{#if application}}
+function getServerUrl(url: string) {
+  const serverUrl = typeof process === "undefined" ? undefined : process.env.SERVER_URL;
+  const value = typeof window === "undefined" && serverUrl ? serverUrl : url;
+  return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 function getServerUrl(url: string) {
 	const processEnv = typeof process === "undefined" ? undefined : process.env;
 	if (typeof window === "undefined" && processEnv?.SERVER_URL) {
@@ -146,7 +162,7 @@ function getServerUrl(url: string) {
 		return \`\${origin}\${normalized}\`;
 	}
 
-	return \`http://localhost:3000\${normalized}\`;
+\treturn \`{{#if application.backendOrigin}}{{application.backendOrigin}}{{else}}http://localhost:3000{{/if}}\${normalized}\`;
 {{else}}
 	return url.endsWith("/") ? url.slice(0, -1) : url;
 {{/if}}

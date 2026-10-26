@@ -1,0 +1,44 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
+/** Keep original bytes and repeated headers; JSON parsing would break webhook signatures. */
+export function toFetchRequest(request: IncomingMessage): Request {
+  const headers = new Headers();
+  for (let index = 0; index < request.rawHeaders.length; index += 2) {
+    headers.append(request.rawHeaders[index]!, request.rawHeaders[index + 1]!);
+  }
+  const method = request.method ?? "GET";
+  const url = new URL(request.url ?? "/", "{{application.backendOrigin}}");
+  return new Request(url, {
+    method,
+    headers,
+    ...(method === "GET" || method === "HEAD" ? {} : {
+      body: Readable.toWeb(request) as ReadableStream<Uint8Array>,
+      duplex: "half",
+    }),
+  });
+}
+
+export function responseHeaders(response: Response): Record<string, string | string[]> {
+  const headers: Record<string, string | string[]> = {};
+  response.headers.forEach((value, name) => {
+    if (name !== "set-cookie") headers[name] = value;
+  });
+  const cookies = response.headers.getSetCookie();
+  if (cookies.length) headers["set-cookie"] = cookies;
+  return headers;
+}
+
+export function responseBody(response: Response) {
+  return response.body
+    ? Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0])
+    : null;
+}
+
+export async function sendFetchResponse(response: Response, target: ServerResponse): Promise<void> {
+  target.writeHead(response.status, responseHeaders(response));
+  const body = responseBody(response);
+  if (body) await pipeline(body, target);
+  else target.end();
+}

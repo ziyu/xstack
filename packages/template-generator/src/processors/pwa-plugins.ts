@@ -1,4 +1,3 @@
-import type { ProjectConfig } from "@xstack/types";
 import {
   IndentationText,
   Node,
@@ -8,17 +7,18 @@ import {
   type ObjectLiteralExpression,
 } from "ts-morph";
 
+import { appOutputPath, type ApplicationConfig } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 
-export function processPwaPlugins(vfs: VirtualFileSystem, config: ProjectConfig): void {
+export function processPwaPlugins(vfs: VirtualFileSystem, config: ApplicationConfig): void {
   const { addons, projectName } = config;
 
   if (!addons.includes("pwa")) return;
 
   processPwaDocument(vfs, config);
-  if (config.frontend.includes("next")) processNextPwaConfig(vfs);
+  if (config.frontend.includes("next")) processNextPwaConfig(vfs, config);
 
-  const viteConfigPath = "apps/web/vite.config.ts";
+  const viteConfigPath = appOutputPath(config, "web", "vite.config.ts");
   if (!vfs.exists(viteConfigPath)) return;
 
   const content = vfs.readFile(viteConfigPath);
@@ -160,13 +160,13 @@ function getConfigObjects(node: Node): ObjectLiteralExpression[] {
 }
 
 // SSR frameworks render their own document and do not run transformIndexHtml.
-function processPwaDocument(vfs: VirtualFileSystem, config: ProjectConfig): void {
+function processPwaDocument(vfs: VirtualFileSystem, config: ApplicationConfig): void {
   const documentPath = config.frontend.includes("solid")
-    ? "apps/web/src/Document.tsx"
+    ? appOutputPath(config, "web", "src/Document.tsx")
     : config.frontend.includes("react-router")
-      ? "apps/web/src/root.tsx"
+      ? appOutputPath(config, "web", "src/root.tsx")
       : config.frontend.includes("next")
-        ? "apps/web/src/app/layout.tsx"
+        ? appOutputPath(config, "web", "src/app/layout.tsx")
         : undefined;
   if (!documentPath || !vfs.exists(documentPath)) return;
   const project = new Project({ useInMemoryFileSystem: true });
@@ -199,8 +199,8 @@ function processPwaDocument(vfs: VirtualFileSystem, config: ProjectConfig): void
   vfs.writeFile(documentPath, source.getFullText());
 }
 
-function processNextPwaConfig(vfs: VirtualFileSystem): void {
-  const configPath = "apps/web/next.config.ts";
+function processNextPwaConfig(vfs: VirtualFileSystem, config: ApplicationConfig): void {
+  const configPath = appOutputPath(config, "web", "next.config.ts");
   if (!vfs.exists(configPath)) return;
   const project = new Project({ useInMemoryFileSystem: true });
   const source = project.createSourceFile(configPath, vfs.readFile(configPath));

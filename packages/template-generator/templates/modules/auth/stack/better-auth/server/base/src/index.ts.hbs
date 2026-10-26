@@ -1,4 +1,7 @@
 import { betterAuth } from "better-auth";
+{{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+import { expo } from "@better-auth/expo";
+{{/if}}
 {{#if (eq orm "prisma")}}
 import { prismaAdapter } from "better-auth/adapters/prisma";
 {{else if (eq orm "drizzle")}}
@@ -34,8 +37,14 @@ export function createAuth(env: AuthConfig{{#if (ne database "none")}}, database
     database: mongodbAdapter(database),
 {{/if}}
     trustedOrigins: [
-      {{#if (eq backend "self")}}env.BETTER_AUTH_URL{{else}}env.CORS_ORIGIN,
-      ...desktopOrigins{{/if}},
+      env.BETTER_AUTH_URL,
+{{#if (ne backend "self")}}
+      ...env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean),
+      ...desktopOrigins,
+{{/if}}
+{{#each application.clientOrigins}}
+      "{{this}}",
+{{/each}}
 {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
       "{{projectName}}://",
       "exp://",
@@ -55,6 +64,9 @@ export function createAuth(env: AuthConfig{{#if (ne database "none")}}, database
     },
 {{/if}}
     plugins: [
+      {{#if (or (includes frontend "native-bare") (includes frontend "native-uniwind") (includes frontend "native-unistyles"))}}
+      expo(),
+      {{/if}}
     ],
   });
 }

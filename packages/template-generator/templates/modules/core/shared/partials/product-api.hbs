@@ -18,7 +18,7 @@ export function json<T>(data: T, status = 200) { return Response.json(data, { st
 export class HttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
 export function pageOf(request: Request) { return z.coerce.number().int().min(1).max(100000).parse(new URL(request.url).searchParams.get("page") ?? 1); }
 {{#if (includes product.features "auth")}}
-const trustedOrigins = new Set([new URL(ENV.BETTER_AUTH_URL).origin{{#if application.nativeSplit}}{{#each application.clientOrigins}}, "{{this}}"{{/each}}{{/if}}]);
+const trustedOrigins = new Set([new URL(ENV.BETTER_AUTH_URL).origin{{#if application.nativeSplit}}{{#each application.clientOrigins}}, "{{this}}"{{/each}}{{#if (includes application.roles "backend")}}, ...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean){{/if}}{{/if}}]);
 function privateResponse(response: Response) {
   const headers = new Headers(response.headers);
   for (const [name, value] of Object.entries(privateHeaders)) headers.set(name, value);

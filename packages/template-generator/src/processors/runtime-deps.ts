@@ -1,5 +1,6 @@
 import type { ProjectConfig } from "@xstack/types";
 
+import { appOutputPath } from "../contributions/context";
 import type { JsonValue } from "../core/json-types";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { addPackageDependency } from "../utils/add-deps";
@@ -12,10 +13,11 @@ type PackageJson = {
 export function processRuntimeDeps(vfs: VirtualFileSystem, config: ProjectConfig): void {
   const { runtime, backend } = config;
 
-  if (backend === "convex" || backend === "self" || runtime === "none") return;
+  if (backend === "convex" || backend === "self" || backend === "none" || runtime === "none")
+    return;
 
-  const serverPath = "apps/server/package.json";
-  if (!vfs.exists(serverPath)) return;
+  const serverPath = appOutputPath(config, "server", "package.json");
+  if (!vfs.ownsPath(serverPath) || !vfs.exists(serverPath)) return;
 
   const pkgJson = vfs.readJson<PackageJson>(serverPath);
   if (!pkgJson) return;
@@ -56,5 +58,7 @@ export function processRuntimeDeps(vfs: VirtualFileSystem, config: ProjectConfig
     }
   }
 
-  vfs.writeJson(serverPath, pkgJson);
+  const updatedPackage = vfs.readJson<PackageJson>(serverPath)!;
+  updatedPackage.scripts = pkgJson.scripts;
+  vfs.writeJson(serverPath, updatedPackage);
 }

@@ -7,6 +7,7 @@ import type { ProjectConfig } from "../../types";
 import { addPackageDependency } from "../../utils/add-package-deps";
 import { addEnvVariablesToFile, type EnvVariable } from "../../utils/env-utils";
 import { DatabaseSetupError } from "../../utils/errors";
+import { resolveDatabaseApplication } from "../workspace-applications";
 
 export async function setupCloudflareD1(
   config: ProjectConfig,
@@ -21,9 +22,13 @@ export async function setupCloudflareD1(
     return Result.ok(undefined);
   }
 
+  const application = await resolveDatabaseApplication(config, "d1");
+  if (application.isErr()) return Result.err(application.error);
+  const targetApp = application.value.directory;
+
   return Result.tryPromise({
     try: async () => {
-      const targetApp = backend === "self" ? "apps/web" : "apps/server";
+      const serverDir = path.join(projectDir, targetApp);
       const envPath = path.join(projectDir, targetApp, ".env");
       const variables: EnvVariable[] = [
         {
@@ -40,7 +45,6 @@ export async function setupCloudflareD1(
       // first `migrate dev` run. Keep it beside prisma.config.ts.
       await fs.ensureFile(path.join(projectDir, "packages/db/local.db"));
 
-      const serverDir = path.join(projectDir, backend === "self" ? "apps/web" : "apps/server");
       await addPackageDependency({
         dependencies: ["@prisma/adapter-d1"],
         projectDir: serverDir,

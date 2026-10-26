@@ -2,7 +2,7 @@ import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 
-const lightVariants: Record<string, string> = {
+const lightVariants = {
   "/icons/astro.svg": "/icons/astro-light.svg",
   "/icons/drizzle.svg": "/icons/drizzle-light.svg",
   "/icons/express.svg": "/icons/express-light.svg",
@@ -10,7 +10,7 @@ const lightVariants: Record<string, string> = {
   "/icons/planetscale.svg": "/icons/planetscale-light.svg",
   "/icons/prisma.svg": "/icons/prisma-light.svg",
   "/icons/vercel.svg": "/icons/vercel-light.svg",
-};
+} satisfies Record<string, string>;
 
 export function TechIcon({
   icon,
@@ -27,7 +27,7 @@ export function TechIcon({
     return <span className={cn("inline-flex items-center text-lg", className)}>{icon}</span>;
   }
 
-  const lightIcon = lightVariants[icon];
+  const lightIcon = Object.entries(lightVariants).find(([source]) => source === icon)?.[1];
   return (
     <>
       {lightIcon && (

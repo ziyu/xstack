@@ -11,6 +11,8 @@ import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import Loader from "./components/loader";
 import { routeTree } from "./routeTree.gen";
 {{#if (eq api "trpc")}}
+import { createIsomorphicFn } from "@tanstack/react-start";
+import { getRequestHeaders, getRequestUrl } from "@tanstack/react-start/server";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
@@ -88,22 +90,44 @@ function createQueryClient() {
 	});
 }
 
+const requestHeaders = createIsomorphicFn()
+  .server(() => {
+    const incoming = getRequestHeaders();
+    return { cookie: incoming.get("cookie") ?? "", authorization: incoming.get("authorization") ?? "" };
+  })
+  .client(() => ({}));
+{{#if (eq backend "self")}}
+const requestOrigin = createIsomorphicFn()
+  .server(() => getRequestUrl().origin)
+  .client(() => window.location.origin);
+{{/if}}
+
+{{else if (eq api "orpc")}}
+{{/if}}
+
+export const getRouter = () => {
+{{#if (eq api "trpc")}}
 const trpcClient = createTRPCClient<AppRouter>({
 	links: [
 		httpBatchLink({
 {{#if (eq backend "self")}}
-			url: "/api/trpc",
+			url: `${requestOrigin()}/api/trpc`,
+{{else if application}}
+			url: `${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/trpc`,
 {{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 			url: `${getServerUrl(ENV.VITE_SERVER_URL)}/trpc`,
 {{else}}
 			url: `${ENV.VITE_SERVER_URL.replace(/\/$/, "")}/trpc`,
 {{/if}}
-{{#if (eq auth "clerk")}}
 			headers: async () => {
+				const headers = requestHeaders();
+{{#if (eq auth "clerk")}}
 				const token = await getClerkAuthToken();
-				return token ? { Authorization: `Bearer ${token}` } : {};
-			},
+				return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
+{{else}}
+				return headers;
 {{/if}}
+			},
 {{#if (eq auth "better-auth")}}
 			fetch(url, options) {
 				return fetch(url, {
@@ -115,11 +139,6 @@ const trpcClient = createTRPCClient<AppRouter>({
 		}),
 	],
 });
-{{else if (eq api "orpc")}}
-{{/if}}
-
-export const getRouter = () => {
-{{#if (eq api "trpc")}}
 	const queryClient = createQueryClient();
 	const trpc = createTRPCOptionsProxy({
 		client: trpcClient,

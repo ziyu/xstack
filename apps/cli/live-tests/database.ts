@@ -2,8 +2,8 @@ import { Database } from "bun:sqlite";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { RenderConfig } from "@xstack/template-generator";
 import { expect } from "@playwright/test";
+import type { RenderConfig } from "@xstack/template-generator";
 import { SQL } from "bun";
 import { z } from "zod";
 

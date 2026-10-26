@@ -4,7 +4,11 @@ import { ApplicationIdSchema, type ApplicationSelection } from "@xstack/types";
 import { Plus, X } from "lucide-react";
 import { useId, useState } from "react";
 
-import { APPLICATION_FRAMEWORKS, APPLICATION_TYPES } from "@/lib/stack-applications";
+import {
+  APPLICATION_FRAMEWORKS,
+  APPLICATION_TYPES,
+  legacyApplications,
+} from "@/lib/stack-applications";
 import type { StackState } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -29,34 +33,6 @@ function occupiedReason(type: string, apps: ApplicationSelection[], product = "m
     );
   });
   return owners.length ? `Roles occupied by ${owners.map((app) => app.id).join(", ")}` : undefined;
-}
-
-function legacyApplications(stack: StackState): ApplicationSelection[] {
-  const apps: ApplicationSelection[] = [];
-  const append = (type: string, framework: string) => {
-    const manifest = APPLICATION_TYPES.find((entry) => entry.id === type);
-    if (!manifest || !frameworksFor(type).some((entry) => entry.id === framework)) return;
-    let id = manifest.defaultDirectoryName;
-    let suffix = 2;
-    while (apps.some((app) => app.id === id)) id = `${manifest.defaultDirectoryName}-${suffix++}`;
-    apps.push({ id, type, stack: { framework } });
-  };
-  if (stack.backend.startsWith("self-")) {
-    append("fullstack-web", stack.backend.slice(5));
-  } else {
-    for (const framework of stack.webFrontend.filter((id) => id !== "none")) {
-      append("web-frontend", framework);
-    }
-    if (stack.backend !== "none") append("backend", stack.backend);
-  }
-  for (const framework of stack.nativeFrontend.filter((id) => id !== "none")) {
-    append("native", framework);
-  }
-  return apps.map((app) =>
-    app.type === "fullstack-web" || app.type === "backend"
-      ? { ...app, stack: { ...app.stack, runtime: stack.runtime, api: stack.api } }
-      : app,
-  );
 }
 
 function ApplicationName({
@@ -131,14 +107,7 @@ export function ApplicationEditor({
   const apps = stack.apps;
   if (apps === undefined) {
     const converted = legacyApplications(stack);
-    const unsupported =
-      stack.backend === "convex" ||
-      stack.webFrontend.some(
-        (id) => id !== "none" && !APPLICATION_FRAMEWORKS.some((framework) => framework.id === id),
-      ) ||
-      stack.nativeFrontend.some(
-        (id) => id !== "none" && !APPLICATION_FRAMEWORKS.some((framework) => framework.id === id),
-      );
+    const unsupported = converted.issues.length > 0;
     return (
       <section
         aria-label="Applications"
@@ -149,18 +118,21 @@ export function ApplicationEditor({
           <p className="mt-1 text-xs text-fd-muted-foreground">
             This shared stack uses project-wide technology controls.
           </p>
-          {unsupported && (
-            <p className="mt-1 text-xs text-fd-muted-foreground">
-              This stack has no matching application adapter. Choose a complete preset to switch
-              layouts.
+          {converted.issues.map((issue) => (
+            <p
+              key={`${issue.code}:${issue.app ?? ""}`}
+              role="alert"
+              className="mt-1 text-xs text-destructive"
+            >
+              {issue.message}
             </p>
-          )}
+          ))}
         </div>
         <button
           type="button"
           className="builder-focus-ring rounded border px-3 py-1.5 text-xs disabled:opacity-50"
           disabled={unsupported}
-          onClick={() => onChange({ apps: converted })}
+          onClick={() => onChange({ apps: converted.apps })}
         >
           Use application layout
         </button>
@@ -266,27 +238,16 @@ export function ApplicationEditor({
                       const type = event.target.value;
                       const nextManifest = APPLICATION_TYPES.find((entry) => entry.id === type);
                       const available = frameworksFor(type);
-                      const framework =
-                        available.find((entry) => entry.id === app.stack.framework) ?? available[0];
-                      if (!framework || !nextManifest) return;
-                      const next: ApplicationSelection = {
-                        id: app.id,
-                        type,
-                        stack: { framework: framework.id },
-                      };
-                      if (nextManifest.scope === "product") {
-                        if (app.product) next.product = app.product;
-                        if (app.bindings) {
-                          next.bindings = Object.fromEntries(
-                            Object.entries(app.bindings).filter(([role]) =>
-                              nextManifest.requires.includes(role),
-                            ),
-                          );
-                        }
-                      }
-                      update(next);
+                      if (!nextManifest) return;
+                      const framework = app.stack.framework ?? available[0]?.id;
+                      update({ ...app, type, stack: { ...app.stack, framework } });
                     }}
                   >
+                    {!manifest && (
+                      <option value={app.type}>
+                        {app.type} (unknown type; restore its manifest or choose another)
+                      </option>
+                    )}
                     {APPLICATION_TYPES.map((type) => {
                       const reason = occupiedReason(
                         type.id,
@@ -303,6 +264,26 @@ export function ApplicationEditor({
                   </select>
                 </label>
               </div>
+              {manifest?.description && (
+                <p className="text-xs text-fd-muted-foreground">{manifest.description}</p>
+              )}
+              {manifest?.scope === "independent" &&
+                (app.product !== undefined || app.bindings !== undefined) && (
+                  <p role="alert" className="text-xs text-destructive">
+                    Independent applications cannot have product assignments or bindings. Your
+                    selections have been retained.{" "}
+                    <button
+                      type="button"
+                      className="builder-focus-ring rounded underline"
+                      onClick={() => {
+                        const { product: _product, bindings: _bindings, ...independent } = app;
+                        update(independent);
+                      }}
+                    >
+                      Remove product assignment and bindings
+                    </button>
+                  </p>
+                )}
               <div className="flex items-center justify-between gap-3 border-t pt-2">
                 <p className="min-w-0 break-all font-mono text-[10px] text-fd-muted-foreground">
                   apps/{app.id}
@@ -330,8 +311,8 @@ export function ApplicationEditor({
         </p>
       )}
       <p className="border-t px-3 py-2 text-[11px] text-fd-muted-foreground">
-        Fullstack Web owns web frontend, backend and admin roles. Use the Split apps preset for
-        separate shells; CLI apps can coexist.
+        Application roles and connections are defined by templates. Applications in the same product
+        must have unique role owners; independent applications can coexist.
       </p>
     </section>
   );

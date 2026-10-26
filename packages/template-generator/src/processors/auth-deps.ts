@@ -1,6 +1,11 @@
+import { appOutputPath } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { RenderConfig } from "../types";
-import { addPackageDependency, type AvailableDependencies } from "../utils/add-deps";
+import {
+  addPackageDependency,
+  getBackendConsumerFrontends,
+  type AvailableDependencies,
+} from "../utils/add-deps";
 
 // Intentional: @convex-dev/better-auth's AuthClient type rejects better-auth >=1.6.18
 // clients (get-convex/better-auth#420), so Convex projects pin the last compatible release.
@@ -19,16 +24,22 @@ export function processAuthDeps(vfs: VirtualFileSystem, config: RenderConfig): v
 
 function processConvexAuthDeps(vfs: VirtualFileSystem, config: RenderConfig): void {
   const { auth, frontend } = config;
-  const webPath = "apps/web/package.json";
-  const nativePath = "apps/native/package.json";
+  const webPath = appOutputPath(config, "web", "package.json");
+  const nativePath = appOutputPath(config, "native", "package.json");
   const backendPath = "packages/backend/package.json";
 
-  const webExists = vfs.exists(webPath);
-  const nativeExists = vfs.exists(nativePath);
-  const backendExists = vfs.exists(backendPath);
+  const webExists =
+    frontend.some((item) => item !== "none" && !item.startsWith("native-")) &&
+    vfs.ownsPath(webPath) &&
+    vfs.exists(webPath);
+  const nativeExists = vfs.ownsPath(nativePath) && vfs.exists(nativePath);
+  const backendExists = vfs.ownsPath(backendPath) && vfs.exists(backendPath);
 
   const hasNative = frontend.some((f) =>
     ["native-bare", "native-uniwind", "native-unistyles"].includes(f),
+  );
+  const backendHasNative = getBackendConsumerFrontends(config).some((frontend) =>
+    frontend.startsWith("native-"),
   );
   const hasNextJs = frontend.includes("next");
   const hasReactRouter = frontend.includes("react-router");
@@ -67,7 +78,7 @@ function processConvexAuthDeps(vfs: VirtualFileSystem, config: RenderConfig): vo
           "better-auth": CONVEX_BETTER_AUTH_VERSION,
         },
       });
-      if (hasNative) {
+      if (backendHasNative) {
         addPackageDependency({
           vfs,
           packagePath: backendPath,
@@ -123,19 +134,28 @@ function processConvexAuthDeps(vfs: VirtualFileSystem, config: RenderConfig): vo
 function processStandardAuthDeps(vfs: VirtualFileSystem, config: RenderConfig): void {
   const { auth, backend, frontend, orm } = config;
   const authPath = "packages/auth/package.json";
-  const apiPath = backend === "self" ? "apps/web/package.json" : "apps/server/package.json";
-  const webPath = "apps/web/package.json";
-  const nativePath = "apps/native/package.json";
-  const serverPath = "apps/server/package.json";
+  const apiPath = appOutputPath(config, "server", "package.json");
+  const webPath = appOutputPath(config, "web", "package.json");
+  const nativePath = appOutputPath(config, "native", "package.json");
+  const serverPath = appOutputPath(config, "server", "package.json");
 
-  const authExists = vfs.exists(authPath);
+  const authExists = vfs.ownsPath(authPath) && vfs.exists(authPath);
   const apiExists = vfs.exists("packages/api/package.json");
-  const webExists = vfs.exists(webPath);
-  const nativeExists = vfs.exists(nativePath);
-  const serverExists = vfs.exists(serverPath);
+  const webExists =
+    frontend.some((item) => item !== "none" && !item.startsWith("native-")) &&
+    vfs.ownsPath(webPath) &&
+    vfs.exists(webPath);
+  const nativeExists = vfs.ownsPath(nativePath) && vfs.exists(nativePath);
+  const serverExists =
+    (!config.application || config.application.roles.includes("backend")) &&
+    vfs.ownsPath(serverPath) &&
+    vfs.exists(serverPath);
 
   const hasNative = frontend.some((f) =>
     ["native-bare", "native-uniwind", "native-unistyles"].includes(f),
+  );
+  const backendHasNative = getBackendConsumerFrontends(config).some((frontend) =>
+    frontend.startsWith("native-"),
   );
   const hasWebFrontend = frontend.some((f) =>
     [
@@ -223,15 +243,13 @@ function processStandardAuthDeps(vfs: VirtualFileSystem, config: RenderConfig): 
           });
         }
       }
-      if (hasNative) {
+      if (backendHasNative) {
         addPackageDependency({ vfs, packagePath: authPath, dependencies: ["@better-auth/expo"] });
       }
     }
 
     if (hasWebFrontend && webExists) {
-      if (!frontend.includes("solid")) {
-        addPackageDependency({ vfs, packagePath: webPath, dependencies: ["better-auth"] });
-      }
+      addPackageDependency({ vfs, packagePath: webPath, dependencies: ["better-auth"] });
 
       if (hasReactWebAuthForms) {
         addPackageDependency({ vfs, packagePath: webPath, dependencies: ["@tanstack/react-form"] });

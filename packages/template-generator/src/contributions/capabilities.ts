@@ -3,10 +3,11 @@ import type { ProjectConfig } from "@xstack/types";
 import { APPLICATION_TEMPLATES } from "../applications.generated";
 import { resolveApplicationConfig } from "../apps/config";
 import { resolveApplications } from "../apps/plan";
-import { MODULE_CATALOG } from "../modules/catalog";
+import { MODULE_METADATA } from "../modules.generated";
+import { readModuleCatalog } from "../modules/metadata";
 import { supportsNativeSplit } from "../modules/native-split";
 import { resolveModules, toSelection } from "../modules/resolver";
-import type { ResolvedPlan } from "../modules/types";
+import type { ModuleManifest, ResolvedPlan } from "../modules/types";
 import { resolveApplicationContext } from "./context";
 
 export interface ModuleCapability {
@@ -21,15 +22,19 @@ export interface WorkspaceCapabilities {
   notes: string[];
 }
 
+const CAPABILITY_TEMPLATES = new Map([...APPLICATION_TEMPLATES, ...MODULE_METADATA]);
+
 /** One capability result for CLI, Builder and generation; stack auth is not native business parity. */
 export function resolveWorkspaceCapabilities(
   input: ProjectConfig,
-  templates = APPLICATION_TEMPLATES,
+  templates = CAPABILITY_TEMPLATES,
 ): WorkspaceCapabilities {
   const result: WorkspaceCapabilities = { modules: [], issues: [], notes: [] };
   let config: ProjectConfig;
+  let catalog: ReadonlyMap<string, ModuleManifest>;
   try {
     config = resolveApplicationConfig(input, templates);
+    catalog = readModuleCatalog(templates);
   } catch (error) {
     result.issues.push(error instanceof Error ? error.message : String(error));
     return result;
@@ -59,7 +64,7 @@ export function resolveWorkspaceCapabilities(
     const plan: ResolvedPlan = resolveModules(
       toSelection(context.config.product),
       context.config,
-      MODULE_CATALOG,
+      catalog,
     );
     for (const issue of plan.issues.filter((issue) => issue.level === "error"))
       result.issues.push(`${context.id}: ${issue.message}`);
@@ -99,22 +104,6 @@ export function resolveWorkspaceCapabilities(
           status: "not-applicable",
           reasons: ["Independent applications do not consume product modules"],
         });
-    // The current native shell wires database seams even if only its i18n foundation remains.
-    const core = MODULE_CATALOG.get("core")?.supports;
-    if (
-      context.roles.includes("backend") &&
-      context.roles.some((role) => role === "web-frontend" || role === "admin") &&
-      context.config.backend === "self" &&
-      context.config.api === "none" &&
-      context.config.frontend.some((f) => core?.frameworks?.includes(f))
-    ) {
-      if (core?.orms && !core.orms.includes(config.orm))
-        result.issues.push(`${context.id}: product shell requires ORM ${core.orms.join(" or ")}`);
-      if (core?.dialects && !core.dialects.some((d) => d === config.database))
-        result.issues.push(
-          `${context.id}: product shell requires database ${core.dialects.join(" or ")}`,
-        );
-    }
   }
   result.issues = [...new Set(result.issues)];
   result.notes = [...new Set(result.notes)];

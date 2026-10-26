@@ -1,12 +1,32 @@
 {
   "id": "hono",
+  "name": "Hono",
+  "description": "Ultrafast web framework",
+  "icon": "/icons/hono.svg",
   "apps": {
     "backend": {
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["bun", "node", "workers"], "visibility": "visible" },
+        "api": { "values": ["trpc", "orpc", "none"], "visibility": "advanced" }
+      },
       "devArgs": [],
+      "serverContributions": { "apiPrefix": "" },
       "productContribution": {
         "mode": "server",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "modules": [
+          "core",
+          "i18n",
+          "auth",
+          "admin",
+          "email",
+          "sms",
+          "captcha",
+          "payment",
+          "credits",
+          "affiliate"
+        ],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -15,8 +35,10 @@
           "webDeploy": ["none"]
         },
         "frameworks": [
-          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] },
-          { "id": "hono", "modules": ["core"] }
+          {
+            "id": "http-server",
+            "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"]
+          }
         ]
       },
       "stack": {

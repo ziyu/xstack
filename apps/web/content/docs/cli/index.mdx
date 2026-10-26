@@ -29,6 +29,7 @@ xstack [project-directory] [options]
 - `--install / --no-install`: Install dependencies after creation
 - `--open <target>`: Open the project in an installed editor, IDE, or coding agent
 - `--git / --no-git`: Initialize Git repository
+- `--apps <json>`: Explicit `{ id, type, stack, product?, bindings? }` application selections. IDs determine `apps/<id>` and `dev:<id>` commands; supported type/framework pairs come from the application catalog. One product may coexist with independent native/CLI applications. Compatible addon, deployment and database setup operations resolve the owning application instead of assuming `apps/web` or `apps/server`.
 - `--frontend <types...>`: Web and/or native frameworks (see [Options](/docs/cli/options#frontend))
 - `--backend <framework>`: `hono`, `express`, `fastify`, `elysia`, `convex`, `self`, `none`
 - `--runtime <runtime>`: `bun`, `node`, `workers` (`none` only with `--backend convex`, `--backend none`, or `--backend self`)
@@ -116,7 +117,6 @@ Fresh CLI-created projects store generated merge ancestry in `.xstack/baseline/m
 Older projects need explicit adoption: `xstack add --features none --initialize-baseline --dry-run`, followed by the same command without dry-run. Adoption accepts only matching clean generated files; keep local edits backed up and restore original scaffold portions before adopting, then reapply edits. The tool never treats modified live files as ancestry. Addon/deployment changes that diverge from the saved config require reconciliation before module additions; they are not silently reinterpreted.
 
 After applying modules, install dependencies, regenerate environment types and review/apply new database migrations. The add operation never provisions services or runs production migrations automatically.
-
 
 ## `create-json`
 

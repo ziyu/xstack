@@ -23,6 +23,7 @@ import {
   type DbSetupMode,
   resolveDbSetupMode,
 } from "../core/db-setup-options";
+import { resolveDatabaseApplication } from "../workspace-applications";
 
 type MongoDBConfig = {
   connectionString: string;
@@ -95,14 +96,12 @@ async function initMongoDBAtlas(
 }
 
 async function writeEnvFile(
-  projectDir: string,
-  backend: ProjectConfig["backend"],
+  targetDir: string,
   config?: MongoDBConfig,
 ): Promise<Result<void, DatabaseSetupError>> {
   return Result.tryPromise({
     try: async () => {
-      const targetApp = backend === "self" ? "apps/web" : "apps/server";
-      const envPath = path.join(projectDir, targetApp, ".env");
+      const envPath = path.join(targetDir, ".env");
       const variables: EnvVariable[] = [
         {
           key: "DATABASE_URL",
@@ -121,20 +120,20 @@ async function writeEnvFile(
   });
 }
 
-function displayManualSetupInstructions() {
+function displayManualSetupInstructions(target: string) {
   cliLog.info(`
 ${pc.green("MongoDB Atlas Manual Setup Instructions:")}
 
 1. Install Atlas CLI:
    ${pc.blue("https://www.mongodb.com/docs/atlas/cli/stable/install-atlas-cli/")}
 
-2. Run the following command and follow the prompts:
+2. From packages/db, run the following command and follow the prompts:
    ${pc.blue("atlas setup")}
 
 3. Get your connection string from the Atlas dashboard:
    Format: ${pc.dim("mongodb+srv://USERNAME:PASSWORD@CLUSTER.mongodb.net/DATABASE_NAME")}
 
-4. Add the connection string to your .env file:
+4. Add the connection string to ${target}/.env:
    ${pc.dim('DATABASE_URL="your_connection_string"')}
 `);
 }
@@ -143,12 +142,16 @@ export async function setupMongoDBAtlas(
   config: ProjectConfig,
   cliInput?: DatabaseSetupCliOptions,
 ): Promise<MongoDBSetupResult> {
-  const { projectDir, backend } = config;
+  const { projectDir } = config;
   const setupMode = resolveDbSetupMode("mongodb-atlas", {
     manualDb: cliInput?.manualDb,
     dbSetupOptions: cliInput?.dbSetupOptions ?? config.dbSetupOptions,
   });
 
+  const application = await resolveDatabaseApplication(config, "mongodb-atlas");
+  if (application.isErr()) return Result.err(application.error);
+  const target = application.value.directory;
+  const targetDir = path.join(projectDir, target);
   const serverDir = path.join(projectDir, "packages/db");
 
   const ensureDirResult = await Result.tryPromise({
@@ -167,11 +170,11 @@ export async function setupMongoDBAtlas(
 
   if (setupMode === "manual") {
     cliLog.info("MongoDB Atlas manual setup selected");
-    const envResult = await writeEnvFile(projectDir, backend);
+    const envResult = await writeEnvFile(targetDir);
     if (envResult.isErr()) {
       return envResult;
     }
-    displayManualSetupInstructions();
+    displayManualSetupInstructions(target);
     return Result.ok(undefined);
   }
 
@@ -184,11 +187,11 @@ export async function setupMongoDBAtlas(
           "MongoDB Atlas automatic setup requires interactive input. Falling back to manual setup.",
         ),
       );
-      const envResult = await writeEnvFile(projectDir, backend);
+      const envResult = await writeEnvFile(targetDir);
       if (envResult.isErr()) {
         return envResult;
       }
-      displayManualSetupInstructions();
+      displayManualSetupInstructions(target);
       return Result.ok(undefined);
     }
 
@@ -218,18 +221,18 @@ export async function setupMongoDBAtlas(
 
   if (mode === "manual") {
     cliLog.info("MongoDB Atlas manual setup selected");
-    const envResult = await writeEnvFile(projectDir, backend);
+    const envResult = await writeEnvFile(targetDir);
     if (envResult.isErr()) {
       return envResult;
     }
-    displayManualSetupInstructions();
+    displayManualSetupInstructions(target);
     return Result.ok(undefined);
   }
 
   const mongoConfigResult = await initMongoDBAtlas(serverDir);
 
   if (mongoConfigResult.isOk()) {
-    const envResult = await writeEnvFile(projectDir, backend, mongoConfigResult.value);
+    const envResult = await writeEnvFile(targetDir, mongoConfigResult.value);
     if (envResult.isErr()) {
       return envResult;
     }
@@ -243,10 +246,10 @@ export async function setupMongoDBAtlas(
   }
 
   cliLog.warn(pc.yellow("Falling back to local MongoDB configuration"));
-  const envResult = await writeEnvFile(projectDir, backend);
+  const envResult = await writeEnvFile(targetDir);
   if (envResult.isErr()) {
     return envResult;
   }
-  displayManualSetupInstructions();
+  displayManualSetupInstructions(target);
   return Result.ok(undefined);
 }

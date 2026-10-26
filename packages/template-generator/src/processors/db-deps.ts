@@ -1,5 +1,6 @@
 import type { ProjectConfig } from "@xstack/types";
 
+import { appOutputPath } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { addPackageDependency, type AvailableDependencies } from "../utils/add-deps";
 
@@ -9,11 +10,12 @@ export function processDatabaseDeps(vfs: VirtualFileSystem, config: ProjectConfi
   if (backend === "convex" || database === "none") return;
 
   const dbPkgPath = "packages/db/package.json";
-  const webPkgPath = "apps/web/package.json";
-  const serverPkgPath = "apps/server/package.json";
+  const webPkgPath = appOutputPath(config, "web", "package.json");
+  const serverPkgPath = appOutputPath(config, "server", "package.json");
 
   if (!vfs.exists(dbPkgPath)) return;
-  const webNeedsDbRuntime = backend === "self" && vfs.exists(webPkgPath);
+  const webNeedsDbRuntime =
+    backend === "self" && vfs.ownsPath(serverPkgPath) && vfs.exists(webPkgPath);
 
   if (orm === "prisma") {
     processPrismaDeps(vfs, config, dbPkgPath, webPkgPath, webNeedsDbRuntime);

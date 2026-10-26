@@ -1,8 +1,12 @@
-import { createClient, type AuthClient } from "@{{projectName}}/auth/client";
+import { createAuthClient } from "better-auth/client";
 {{#unless (eq backend "self")}}
 import { ENV } from "./env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
 
 {{> getServerUrl}}
 {{/unless}}
 
-export const authClient: AuthClient = createClient({{#unless (eq backend "self")}}{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}new URL("/api/auth", getServerUrl(ENV.VITE_SERVER_URL)).toString(){{else}}ENV.VITE_SERVER_URL{{/if}}{{/unless}});
+export const authClient = createAuthClient({
+{{#unless (eq backend "self")}}
+  baseURL: {{#if application}}getServerUrl(ENV.VITE_SERVER_URL){{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}{{#if (eq webDeploy "vercel")}}`${getServerUrl(ENV.VITE_SERVER_URL)}/auth`{{else}}new URL("/api/auth", getServerUrl(ENV.VITE_SERVER_URL)).toString(){{/if}}{{else}}ENV.VITE_SERVER_URL{{/if}},
+{{/unless}}
+});

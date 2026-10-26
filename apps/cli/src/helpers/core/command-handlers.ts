@@ -10,6 +10,7 @@ import { gatherConfig } from "../../prompts/config-prompts";
 import { completeProduct } from "../../prompts/product";
 import { getProjectName } from "../../prompts/project-name";
 import type { AnalyticsMode, CreateInput, DirectoryConflict, ProjectConfig } from "../../types";
+import { ProjectConfigSchema } from "../../types";
 import { trackProjectCreation } from "../../utils/analytics";
 import { getCliSubcommandCommand } from "../../utils/cli-invocation";
 import { isSilent, resolveInvocationMode, runWithContextAsync } from "../../utils/context";
@@ -502,7 +503,7 @@ async function createProjectHandlerInternal(
 
       return Result.ok({
         success: true,
-        projectConfig: config,
+        projectConfig: ProjectConfigSchema.parse(config),
         reproducibleCommand,
         timeScaffolded,
         elapsedTimeMs,
@@ -582,7 +583,7 @@ async function createProjectHandlerInternal(
 
     return Result.ok({
       success: true,
-      projectConfig: config,
+      projectConfig: ProjectConfigSchema.parse(config),
       reproducibleCommand,
       timeScaffolded,
       elapsedTimeMs,

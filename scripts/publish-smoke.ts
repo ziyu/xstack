@@ -100,7 +100,7 @@ async function installAndRun(
     name: `smoke-${pm}`,
     private: true,
     version: "0.0.0",
-    dependencies: { "xstack": `file:${tarballs["xstack"]}` },
+    dependencies: { xstack: `file:${tarballs["xstack"]}` },
   };
   if (pm === "pnpm") fixture.pnpm = { overrides };
   else fixture.overrides = overrides;

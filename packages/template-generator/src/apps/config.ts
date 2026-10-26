@@ -1,6 +1,13 @@
-import type { ProjectConfig } from "@xstack/types";
+import {
+  validateAddonCompatibility,
+  supportsServerDeployRuntime,
+  supportsPrismaWebDeploy,
+  getDesktopDeployConflict,
+  type ProjectConfig,
+} from "@xstack/types";
 
 import { APPLICATION_TEMPLATES } from "../applications.generated";
+import { resolveApplicationContext } from "../contributions/context";
 import type { StackContext } from "../modules/types";
 import { GeneratorError } from "../types";
 import { resolveApplications, type ApplicationPlan } from "./plan";
@@ -72,21 +79,41 @@ export function resolveApplicationConfig(
     resolved.orm = "none";
     resolved.dbSetup = "none";
   }
-  // These processors/provisioners still address canonical app paths. Refuse rather
-  // than generating deployment commands pointing at another app or leaking secrets.
-  if (config.webDeploy !== "none" || config.serverDeploy !== "none" || config.dbSetup !== "none") {
-    throw new GeneratorError({
-      phase: "applications",
-      message:
-        "Explicit application layouts currently require webDeploy/serverDeploy/dbSetup=none; app-scoped provisioning must be configured before using deployment adapters.",
-    });
-  }
-  const unsupported = config.addons.filter((addon) => !["turborepo", "none"].includes(addon));
-  if (unsupported.length) {
-    throw new GeneratorError({
-      phase: "applications",
-      message: `These addons do not yet declare application targets: ${unsupported.join(", ")}`,
-    });
+  for (const app of plan.apps) {
+    const local = resolveApplicationContext(resolved, app);
+    for (const addon of local.addons) {
+      const compatibility = validateAddonCompatibility(
+        addon,
+        local.frontend,
+        undefined,
+        local.backend,
+        local.runtime,
+      );
+      if (!compatibility.isCompatible)
+        throw new GeneratorError({
+          phase: "applications",
+          message: `${app.selection.id}: ${compatibility.reason}`,
+        });
+    }
+    if (
+      app.manifest.roles.includes("backend") &&
+      local.backend !== "self" &&
+      !supportsServerDeployRuntime(local.serverDeploy, local.runtime)
+    )
+      throw new GeneratorError({
+        phase: "applications",
+        message: `${app.selection.id}: deployment ${local.serverDeploy} does not support runtime ${local.runtime}`,
+      });
+    if (local.webDeploy === "prisma" && !supportsPrismaWebDeploy(local.frontend))
+      throw new GeneratorError({
+        phase: "applications",
+        message: `${app.selection.id}: Prisma Compute has no deployment adapter for ${local.frontend.join(", ")}`,
+      });
+    if (getDesktopDeployConflict(local.webDeploy, local.addons, local.frontend, local.backend))
+      throw new GeneratorError({
+        phase: "applications",
+        message: `${app.selection.id}: static desktop output conflicts with ${local.webDeploy} server deployment`,
+      });
   }
   return resolved;
 }

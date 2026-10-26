@@ -2,7 +2,8 @@
 import { resolve, sep } from "node:path";
 
 const endpoint = process.env.CAPTCHA_FIXTURE_ORIGIN;
-if (!endpoint) throw new Error("CAPTCHA_FIXTURE_ORIGIN is required for the captcha fixture preload");
+if (!endpoint)
+  throw new Error("CAPTCHA_FIXTURE_ORIGIN is required for the captcha fixture preload");
 const fixture = new URL(endpoint);
 if (fixture.protocol !== "http:" || !["localhost", "127.0.0.1"].includes(fixture.hostname)) {
   throw new Error("Captcha fixtures must use loopback HTTP");

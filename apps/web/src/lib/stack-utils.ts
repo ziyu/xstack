@@ -1,4 +1,4 @@
-import { type StackState, TECH_OPTIONS } from "@/lib/constant";
+import { BUILDER_DEFINITION, type StackState, TECH_OPTIONS } from "@/lib/constant";
 import { SITE_URL } from "@/lib/site";
 import { stackUrlKeys } from "@/lib/stack-url-keys";
 
@@ -24,21 +24,8 @@ const CATEGORY_ORDER: Array<keyof typeof TECH_OPTIONS> = [
   "install",
 ];
 
-const desktopAddonNames = {
-  tauri: "Tauri",
-  electrobun: "Electrobun",
-} as const;
-
-const staticDesktopFrontendNames = {
-  "tanstack-start": "TanStack Start",
-  next: "Next.js",
-  nuxt: "Nuxt",
-  svelte: "SvelteKit",
-  astro: "Astro",
-} as const;
-
 export function formatProjectName(name: string | null | undefined) {
-  return (name || "my-xstack-app").replace(/\s+/g, "-");
+  return (name || String(BUILDER_DEFINITION.defaults.projectName)).replace(/\s+/g, "-");
 }
 
 function quoteShellArgument(value: string) {
@@ -113,33 +100,19 @@ export function generateStackSummary(stack: StackState) {
 }
 
 export function getDesktopBuildNote(stack: Pick<StackState, "addons" | "backend" | "webFrontend">) {
-  const selectedDesktopAddons = stack.addons.filter(
-    (addon): addon is keyof typeof desktopAddonNames => addon in desktopAddonNames,
+  const selected = stack.addons.filter((id) => BUILDER_DEFINITION.desktop.addons.includes(id));
+  const frontend = stack.webFrontend.find((id) =>
+    BUILDER_DEFINITION.desktop.frontends.includes(id),
   );
-
-  if (selectedDesktopAddons.length === 0) {
-    return null;
-  }
-
-  const staticFrontend = stack.webFrontend.find(
-    (frontend): frontend is keyof typeof staticDesktopFrontendNames =>
-      frontend in staticDesktopFrontendNames,
-  );
-
-  if (!staticFrontend) {
-    return null;
-  }
-
-  const addonLabel =
-    selectedDesktopAddons.length === 2
-      ? "Tauri and Electrobun desktop builds"
-      : `${desktopAddonNames[selectedDesktopAddons[0]]} desktop builds`;
-
+  if (!selected.length || !frontend) return null;
+  const label = selected
+    .map((id) => TECH_OPTIONS.addons.find((option) => option.id === id)?.name ?? id)
+    .join(" and ");
   if (isSelfHostedFullstackBackend(stack.backend)) {
-    return `${addonLabel} package static web assets and require a separate backend or no backend. Fullstack self backends emit server routes inside the web app, so they cannot be bundled for desktop packaging.`;
+    return `${label} package static web assets and require a separate backend or no backend. Fullstack self backends emit server routes inside the web app, so they cannot be bundled for desktop packaging.`;
   }
-
-  return `${addonLabel} package static web assets. ${staticDesktopFrontendNames[staticFrontend]} needs a static/export build configuration before desktop packaging will work.`;
+  const name = TECH_OPTIONS.webFrontend.find((option) => option.id === frontend)?.name ?? frontend;
+  return `${label} package static web assets. ${name} needs a static/export build configuration before desktop packaging will work.`;
 }
 
 export function generateStackCommand(stack: StackState) {

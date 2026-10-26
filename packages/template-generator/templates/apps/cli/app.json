@@ -1,6 +1,7 @@
 {
   "id": "cli",
   "name": "Command-line application",
+  "technologyLabel": "CLI implementation",
   "defaultDirectoryName": "cli",
   "roles": [],
   "scope": "independent",

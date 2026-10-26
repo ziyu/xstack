@@ -7,6 +7,7 @@ import { ts } from "ts-morph";
 
 import type { Backend, Frontend } from "../../types";
 import { AddonSetupError } from "../../utils/errors";
+import { resolveWorkspaceApplications } from "../workspace-applications";
 
 type EvlogBackend = Extract<Backend, "hono" | "express" | "fastify" | "elysia">;
 type EvlogWebFrontend = Extract<Frontend, "next" | "nuxt" | "svelte" | "tanstack-start" | "astro">;
@@ -952,8 +953,7 @@ declare global {
 `;
 }
 
-async function setupNextEvlog(config: RenderConfig, serviceName: string) {
-  const webDir = path.join(config.projectDir, "apps/web");
+async function setupNextEvlog(config: RenderConfig, serviceName: string, webDir: string) {
   const fsDrain = shouldWireEvlogWebFsDrain(config);
   const axiom = usesAxiom(config);
 
@@ -1000,8 +1000,7 @@ async function setupNextEvlog(config: RenderConfig, serviceName: string) {
   );
 }
 
-async function setupNuxtEvlog(config: RenderConfig, serviceName: string) {
-  const webDir = path.join(config.projectDir, "apps/web");
+async function setupNuxtEvlog(config: RenderConfig, serviceName: string, webDir: string) {
   const fsDrain = shouldWireEvlogWebFsDrain(config);
   await updateFileIfExists(path.join(webDir, "nuxt.config.ts"), (content) =>
     addNuxtEvlogSetup(content, serviceName),
@@ -1033,8 +1032,7 @@ async function setupNuxtEvlog(config: RenderConfig, serviceName: string) {
   }
 }
 
-async function setupSvelteEvlog(config: RenderConfig, serviceName: string) {
-  const webDir = path.join(config.projectDir, "apps/web");
+async function setupSvelteEvlog(config: RenderConfig, serviceName: string, webDir: string) {
   const fsDrain = shouldWireEvlogWebFsDrain(config);
   const axiom = usesAxiom(config);
   await updateFileIfExists(path.join(webDir, "vite.config.ts"), (content) =>
@@ -1091,8 +1089,7 @@ ${
 `;
 }
 
-async function setupTanstackStartEvlog(config: RenderConfig, serviceName: string) {
-  const webDir = path.join(config.projectDir, "apps/web");
+async function setupTanstackStartEvlog(config: RenderConfig, serviceName: string, webDir: string) {
   const fsDrain = shouldWireEvlogWebFsDrain(config);
   if (usesAxiom(config) && config.webDeploy === "cloudflare") {
     await writeFileIfChanged(
@@ -1128,8 +1125,7 @@ async function setupTanstackStartEvlog(config: RenderConfig, serviceName: string
   }
 }
 
-async function setupAstroEvlog(config: RenderConfig, serviceName: string) {
-  const webDir = path.join(config.projectDir, "apps/web");
+async function setupAstroEvlog(config: RenderConfig, serviceName: string, webDir: string) {
   const fsDrain = shouldWireEvlogWebFsDrain(config);
   const axiom = usesAxiom(config);
   const middlewarePath = path.join(webDir, "src/middleware.ts");
@@ -1171,55 +1167,71 @@ async function setupAstroEvlog(config: RenderConfig, serviceName: string) {
   }
 }
 
-async function setupEvlogWeb(config: RenderConfig) {
+async function setupEvlogWeb(config: RenderConfig, webDir: string, serviceName: string) {
   const frontend = getEvlogWebFrontend(config.frontend);
   if (!frontend) return;
 
-  const serviceName = `${config.projectName}-web`;
-
   if (frontend === "next") {
-    await setupNextEvlog(config, serviceName);
+    await setupNextEvlog(config, serviceName, webDir);
   } else if (frontend === "nuxt") {
-    await setupNuxtEvlog(config, serviceName);
+    await setupNuxtEvlog(config, serviceName, webDir);
   } else if (frontend === "svelte") {
-    await setupSvelteEvlog(config, serviceName);
+    await setupSvelteEvlog(config, serviceName, webDir);
   } else if (frontend === "tanstack-start") {
-    await setupTanstackStartEvlog(config, serviceName);
+    await setupTanstackStartEvlog(config, serviceName, webDir);
   } else if (frontend === "astro") {
-    await setupAstroEvlog(config, serviceName);
+    await setupAstroEvlog(config, serviceName, webDir);
   }
 }
 
 export async function setupEvlog(config: RenderConfig): Promise<Result<void, AddonSetupError>> {
   return Result.tryPromise({
     try: async () => {
-      if (isEvlogBackend(config.backend)) {
-        const serverIndexPath = path.join(config.projectDir, "apps/server/src/index.ts");
-        if (await fs.pathExists(serverIndexPath)) {
-          const content = await fs.readFile(serverIndexPath, "utf-8");
-          let nextContent = addEvlogServerSetup(
-            content,
-            config.backend,
-            `${config.projectName}-server`,
-            shouldWireEvlogServerFsDrain(config),
-            usesAxiom(config),
-          );
-
-          if (config.auth === "better-auth") {
-            nextContent = addEvlogBetterAuthServerSetup(
-              nextContent,
-              config.backend,
-              getAuthExpression(config),
+      const applications = await resolveWorkspaceApplications(config);
+      if (applications.isErr()) throw applications.error;
+      for (const application of applications.value) {
+        if (application.scope === "independent") continue;
+        const appConfig: RenderConfig = {
+          ...config,
+          frontend: application.stack.frontend ?? [],
+          backend: application.roles.includes("backend")
+            ? (application.stack.backend ?? "none")
+            : "none",
+          runtime: application.stack.runtime ?? config.runtime,
+          api: application.stack.api ?? config.api,
+          webDeploy: application.roles.includes("web-frontend") ? config.webDeploy : "none",
+          serverDeploy: application.roles.includes("backend") ? config.serverDeploy : "none",
+        };
+        const appDir = path.join(config.projectDir, application.directory);
+        const serviceName = `${config.projectName}-${application.id}`;
+        if (isEvlogBackend(appConfig.backend)) {
+          const serverIndexPath = path.join(appDir, "src/index.ts");
+          if (await fs.pathExists(serverIndexPath)) {
+            const content = await fs.readFile(serverIndexPath, "utf-8");
+            let nextContent = addEvlogServerSetup(
+              content,
+              appConfig.backend,
+              serviceName,
+              shouldWireEvlogServerFsDrain(appConfig),
+              usesAxiom(appConfig),
             );
-          }
 
-          if (nextContent !== content) {
-            await fs.writeFile(serverIndexPath, nextContent);
+            if (appConfig.auth === "better-auth") {
+              nextContent = addEvlogBetterAuthServerSetup(
+                nextContent,
+                appConfig.backend,
+                getAuthExpression(appConfig),
+              );
+            }
+
+            if (nextContent !== content) {
+              await fs.writeFile(serverIndexPath, nextContent);
+            }
           }
         }
-      }
 
-      await setupEvlogWeb(config);
+        await setupEvlogWeb(appConfig, appDir, serviceName);
+      }
     },
     catch: (error) =>
       new AddonSetupError({

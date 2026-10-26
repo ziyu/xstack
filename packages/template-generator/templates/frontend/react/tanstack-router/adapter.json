@@ -1,7 +1,17 @@
 {
   "id": "tanstack-router",
+  "name": "TanStack Router",
+  "description": "Modern type-safe router for React",
+  "icon": "/icons/tanstack.svg",
   "apps": {
     "web-frontend": {
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
+      "clientContributions": { "framework": "tanstack-router", "family": "react" },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {

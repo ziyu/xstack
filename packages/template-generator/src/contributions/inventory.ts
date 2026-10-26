@@ -1,7 +1,9 @@
 import { FrameworkAdapterSchema } from "@xstack/types";
 
 import { readApplicationCatalog, readFrameworkCatalog } from "../apps/plan";
-import { MODULE_CATALOG } from "../modules/catalog";
+import { readBuilderDefinition } from "../builder";
+import { readModuleCatalog } from "../modules/catalog";
+import type { ModuleManifest } from "../modules/types";
 import { GeneratorError } from "../types";
 
 export type ContributionFamily =
@@ -44,6 +46,7 @@ export type ContributionIssueCode =
   | "unknown-dialect"
   | "invalid-application-catalog"
   | "invalid-framework-catalog"
+  | "invalid-module-catalog"
   | "missing-contribution";
 
 export interface ContributionIssue {
@@ -107,6 +110,16 @@ export function inventoryContributions(templates: Map<string, string>): Contribu
   const issue = (code: ContributionIssueCode, source: string, message: string) => {
     issues.push({ code, source, message });
   };
+  let modules: ReadonlyMap<string, ModuleManifest> = new Map();
+  try {
+    modules = readModuleCatalog(templates);
+  } catch (error) {
+    issue(
+      "invalid-module-catalog",
+      "modules",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
   const appTypes = new Set<string>();
   for (const [source, content] of templates) {
     if (!/^apps\/[^/]+\/app\.json$/.test(source)) continue;
@@ -124,7 +137,15 @@ export function inventoryContributions(templates: Map<string, string>): Contribu
 
   let frameworks = new Set<string>();
   try {
-    frameworks = new Set(readFrameworkCatalog(templates).keys());
+    const catalog = readFrameworkCatalog(templates);
+    frameworks = new Set([
+      ...catalog.keys(),
+      ...[...catalog.values()].flatMap((framework) =>
+        Object.values(framework.apps).flatMap(
+          (app) => app.productContribution?.frameworks.map((layer) => layer.id) ?? [],
+        ),
+      ),
+    ]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const source =
@@ -186,7 +207,20 @@ export function inventoryContributions(templates: Map<string, string>): Contribu
       if (variant) contribution.variant = variant;
       return contribution;
     };
-    if (root === "apps") {
+    if (source === "builder.json" || source === "modules/presets.json") {
+      entry = { ...create("workspace", "workspace:metadata", "metadata"), implementation: false };
+      if (source === "builder.json") {
+        try {
+          readBuilderDefinition(templates);
+        } catch (error) {
+          issue(
+            "unknown-contribution",
+            source,
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
+    } else if (root === "apps") {
       if (parts.length === 3 && parts[2] === "app.json") {
         entry = {
           ...create("application", `application:${parts[1]}`, "metadata"),
@@ -196,10 +230,13 @@ export function inventoryContributions(templates: Map<string, string>): Contribu
       }
     } else if (root === "modules") {
       const module = parts[1]!;
-      const manifest = MODULE_CATALOG.get(module);
+      const manifest = modules.get(module);
       entry = { ...create("module", `module:${module}`, "native"), module };
       if (!manifest) issue("unknown-module", source, `Unknown module ${module} at ${source}`);
-      if (parts[2] === "stack") {
+      if (parts.length === 3 && parts[2] === "module.json") {
+        entry.implementation = false;
+        entry.variant = "metadata";
+      } else if (parts[2] === "stack") {
         entry.variant = "stack";
         // Stack engines (better-auth/clerk) are not native module provider IDs.
         const engine = parts[3];
@@ -282,7 +319,7 @@ export function inventoryContributions(templates: Map<string, string>): Contribu
             }
           } else if (layer === "integrations") {
             entry.integration = value;
-            if (!MODULE_CATALOG.has(value) || !manifest?.enhances?.includes(value)) {
+            if (!modules.has(value) || !manifest?.enhances?.includes(value)) {
               issue(
                 "unknown-integration",
                 source,

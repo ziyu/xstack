@@ -1,7 +1,7 @@
 import type { ElectrobunConfig } from "electrobun";
 
 const webBuildDir =
-  "{{#if (includes frontend "react-router")}}../web/build/client{{else if (includes frontend "tanstack-start")}}../web/dist/client{{else if (includes frontend "next")}}../web/out{{else if (includes frontend "nuxt")}}../web/.output/public{{else if (includes frontend "svelte")}}../web/build{{else}}../web/dist{{/if}}";
+  "{{#if application}}../../{{application.directory}}{{else}}../web{{/if}}/{{#if (includes frontend "react-router")}}build/client{{else if (includes frontend "tanstack-start")}}dist/client{{else if (includes frontend "next")}}out{{else if (includes frontend "nuxt")}}.output/public{{else if (includes frontend "svelte")}}build{{else}}dist{{/if}}";
 
 export default {
   app: {

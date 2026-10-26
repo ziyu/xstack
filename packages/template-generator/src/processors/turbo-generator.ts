@@ -23,13 +23,18 @@ interface TurboConfig {
   $schema: string;
   ui: string;
   tasks: TurboTasks;
+  globalEnv?: string[];
+  globalDependencies?: string[];
 }
 
 export function processTurboConfig(vfs: VirtualFileSystem, config: ProjectConfig): void {
   if (!vfs.ownsPath("turbo.json")) return;
   if (!config.addons.includes("turborepo")) return;
 
+  const existing = vfs.readJson<TurboConfig>("turbo.json");
   const turboConfig = generateTurboConfig(config);
+  if (existing?.globalEnv) turboConfig.globalEnv = existing.globalEnv;
+  if (existing?.globalDependencies) turboConfig.globalDependencies = existing.globalDependencies;
   vfs.writeFile("turbo.json", JSON.stringify(turboConfig, null, "\t"));
 }
 

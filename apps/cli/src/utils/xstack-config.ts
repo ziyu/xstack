@@ -36,10 +36,7 @@ export async function readXStackConfig(projectDir: string): Promise<XStackConfig
 export async function updateXStackConfig(
   projectDir: string,
   updates: Partial<
-    Pick<
-      XStackConfig,
-      "addons" | "addonOptions" | "dbSetupOptions" | "webDeploy" | "serverDeploy"
-    >
+    Pick<XStackConfig, "addons" | "addonOptions" | "dbSetupOptions" | "webDeploy" | "serverDeploy">
   >,
 ): Promise<Result<void, CLIError>> {
   return Result.tryPromise({

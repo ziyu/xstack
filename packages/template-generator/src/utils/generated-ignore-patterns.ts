@@ -1,5 +1,6 @@
 import type { ProjectConfig } from "@xstack/types";
 
+import { appOutputPath } from "../contributions/context";
 import type { RenderConfig } from "../types";
 
 const NATIVE_GENERATED_PATTERNS = [
@@ -35,16 +36,34 @@ const SERVER_BUILD_BACKENDS = ["hono", "express", "fastify", "elysia"] as const;
 export function getStackGeneratedIgnorePatterns(config: RenderConfig): string[] {
   const patterns = new Set<string>();
 
-  for (const frontend of config.frontend) {
+  for (const application of config.application?.workspaceApplications ?? []) {
+    for (const frontend of application.frontend) {
+      const prefix = frontend.startsWith("native-") ? "apps/native/" : "apps/web/";
+      for (const pattern of FRONTEND_GENERATED_PATTERNS[frontend] ?? []) {
+        patterns.add(`${application.directory}/${pattern.slice(prefix.length)}`);
+      }
+    }
+    if (application.roles.includes("backend") || application.type === "cli") {
+      patterns.add(`${application.directory}/dist/**`);
+    }
+    if (application.frontend.includes("next") && application.webDeploy === "cloudflare") {
+      patterns.add(`${application.directory}/.open-next/**`);
+    }
+  }
+  for (const frontend of config.application ? [] : config.frontend) {
     const frontendPatterns = FRONTEND_GENERATED_PATTERNS[frontend];
     if (!frontendPatterns) continue;
     for (const pattern of frontendPatterns) {
-      patterns.add(pattern);
+      const kind = frontend.startsWith("native-") ? "native" : "web";
+      patterns.add(appOutputPath(config, kind, pattern.slice(`apps/${kind}/`.length)));
     }
   }
 
-  if ((SERVER_BUILD_BACKENDS as readonly string[]).includes(config.backend)) {
-    patterns.add("apps/server/dist/**");
+  if (
+    !config.application &&
+    (SERVER_BUILD_BACKENDS as readonly string[]).includes(config.backend)
+  ) {
+    patterns.add(appOutputPath(config, "server", "dist/**"));
   }
 
   if (config.database !== "none" && config.orm !== "none") {
@@ -86,8 +105,8 @@ export function getStackGeneratedIgnorePatterns(config: RenderConfig): string[] 
     patterns.add(".wrangler/**");
     patterns.add("**/.wrangler/**");
 
-    if (config.frontend.includes("next")) {
-      patterns.add("apps/web/.open-next/**");
+    if (!config.application && config.frontend.includes("next")) {
+      patterns.add(appOutputPath(config, "web", ".open-next/**"));
     }
   }
 

@@ -18,7 +18,13 @@ function previewNode(node: VirtualNode): VirtualNode {
 
 export const router = {
   preview: os.input(StackStateSchema).handler(async ({ input }) => {
-    const stack = resolveStackCompatibility(input).stack;
+    const compatibility = resolveStackCompatibility(input);
+    const stack = compatibility.stack;
+    const compatibilityIssues = Object.values(compatibility.notes).flatMap((entry) =>
+      entry.hasIssue ? entry.notes : [],
+    );
+    if (compatibilityIssues.length)
+      throw new ORPCError("BAD_REQUEST", { message: compatibilityIssues.join("\n") });
     const nameError = validateProjectName(formatProjectName(stack.projectName));
     if (nameError) throw new ORPCError("BAD_REQUEST", { message: nameError });
     const appIssues = applicationIssues(stack);

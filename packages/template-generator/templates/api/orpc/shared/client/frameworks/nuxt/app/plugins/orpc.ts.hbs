@@ -11,12 +11,12 @@ export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig();
   const serverUrl =
     (import.meta.server && config.serverUrl) || config.public.serverUrl;
-  const resolvedServerUrl = {{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}getServerUrl(serverUrl){{else}}serverUrl.replace(/\/$/, ""){{/if}};
-  const rpcUrl = new URL(`${resolvedServerUrl}/rpc`, requestURL.origin).href;
+  const resolvedServerUrl = {{#if application}}serverUrl.replace(/\/$/, ""){{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}getServerUrl(serverUrl){{else}}serverUrl.replace(/\/$/, ""){{/if}};
+  const rpcUrl = new URL(`${resolvedServerUrl}{{#if application}}{{application.backendApiPrefix}}{{/if}}/rpc`, requestURL.origin).href;
 
   const rpcLink = new RPCLink({
     url: rpcUrl,
-    headers: import.meta.server ? useRequestHeaders(["cookie"]) : {},
+    headers: import.meta.server ? useRequestHeaders(["cookie", "authorization"]) : {},
     {{#if (eq auth "better-auth")}}
     fetch(url, options) {
         return fetch(url, {

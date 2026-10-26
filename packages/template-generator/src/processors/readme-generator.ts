@@ -5,29 +5,25 @@ import {
   type ProjectConfig,
 } from "@xstack/types";
 
+import { appOutputPath } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { moduleReadmeSection } from "../modules/pipeline";
-import type { RenderConfig } from "../types";
+import type { RenderConfig, WorkspaceApplicationContext } from "../types";
 import { getDbScriptSupport } from "../utils/db-scripts";
 import { isDatabaseConsumedByDocker } from "../utils/docker-database";
 
 function getDesktopStaticBuildNote(frontend: ProjectConfig["frontend"]): string {
-  const staticBuildFrontends = new Map([
-    ["tanstack-start", "TanStack Start"],
-    ["next", "Next.js"],
-    ["nuxt", "Nuxt"],
-    ["svelte", "SvelteKit"],
-    ["astro", "Astro"],
-  ]);
-
-  const staticBuildFrontend = frontend.find((value) => staticBuildFrontends.has(value));
-  if (!staticBuildFrontend) {
-    return "";
-  }
-
-  return `Desktop builds package static web assets. ${staticBuildFrontends.get(
-    staticBuildFrontend,
-  )} needs a static/export build configuration before desktop packaging will work.`;
+  const labels = {
+    "tanstack-start": "TanStack Start",
+    next: "Next.js",
+    nuxt: "Nuxt",
+    svelte: "SvelteKit",
+    astro: "Astro",
+  } as const satisfies Partial<Record<ProjectConfig["frontend"][number], string>>;
+  const selected = frontend.flatMap((value) => (hasOwnKey(labels, value) ? [labels[value]] : []));
+  return selected.length
+    ? `Desktop builds package static web assets. ${selected.join(", ")} require a static/export build configuration before desktop packaging will work.`
+    : "";
 }
 
 function getClerkQuickstartUrl(frontend: ProjectConfig["frontend"]): string {
@@ -52,81 +48,94 @@ function getClerkQuickstartUrl(frontend: ProjectConfig["frontend"]): string {
   return "https://clerk.com/docs";
 }
 
-function getClerkFrontendEnvLines(frontend: ProjectConfig["frontend"]): string[] {
-  const lines: string[] = [];
-
-  if (frontend.includes("next")) {
-    lines.push("- Set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` in `apps/web/.env`");
-  }
-
-  if (
-    frontend.some((value) => ["react-router", "tanstack-router", "tanstack-start"].includes(value))
-  ) {
-    lines.push("- Set `VITE_CLERK_PUBLISHABLE_KEY` in `apps/web/.env`");
-  }
-
-  if (
-    frontend.some((value) => ["native-bare", "native-uniwind", "native-unistyles"].includes(value))
-  ) {
-    lines.push("- Set `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` in `apps/native/.env`");
-  }
-
-  return lines;
+function guidanceApplications(config: RenderConfig): WorkspaceApplicationContext[] {
+  if (config.application) return config.application.workspaceApplications;
+  const applications: WorkspaceApplicationContext[] = [];
+  const add = (
+    kind: "web" | "native" | "server",
+    frontend: ProjectConfig["frontend"],
+    roles: string[],
+  ) => {
+    const directory =
+      kind === "server" && config.backend === "convex"
+        ? "packages/backend"
+        : appOutputPath(config, kind);
+    const port =
+      kind === "native"
+        ? 8081
+        : kind === "server"
+          ? 3000
+          : frontend.includes("astro")
+            ? 4321
+            : frontend.some((value) => value === "svelte" || value === "react-router")
+              ? 5173
+              : 3001;
+    applications.push({
+      id: directory.split("/").at(-1)!,
+      type: frontend[0] ?? config.backend,
+      directory,
+      roles,
+      port,
+      origin: `http://localhost:${port}`,
+      bindings: {},
+      frontend,
+      backend: roles.includes("backend") ? config.backend : "none",
+      runtime: config.runtime,
+      api: config.api,
+      webDeploy: config.webDeploy,
+      serverDeploy: config.serverDeploy,
+    });
+  };
+  const web = config.frontend.filter((value) => value !== "none" && !value.startsWith("native-"));
+  const native = config.frontend.filter((value) => value.startsWith("native-"));
+  if (web.length)
+    add("web", web, config.backend === "self" ? ["web-frontend", "backend"] : ["web-frontend"]);
+  if (native.length) add("native", native, ["native"]);
+  if (config.backend !== "none" && config.backend !== "self") add("server", [], ["backend"]);
+  return applications;
 }
 
-function getClerkSetupLines(
-  frontend: ProjectConfig["frontend"],
-  backend: ProjectConfig["backend"],
-  api: ProjectConfig["api"],
-  isConvex: boolean,
-): string[] {
-  const lines = getClerkFrontendEnvLines(frontend);
-  const hasClerkServerFrontend = frontend.some((value) =>
-    ["next", "react-router", "tanstack-start"].includes(value),
-  );
-
-  if (isConvex) {
-    return [
-      "- Set `CLERK_JWT_ISSUER_DOMAIN` in Convex Dashboard",
-      ...lines,
-      ...(hasClerkServerFrontend
-        ? ["- Set `CLERK_SECRET_KEY` in `apps/web/.env` for Clerk server middleware"]
-        : []),
-    ];
-  }
-
-  const serverEnvPath = backend === "self" ? "apps/web/.env" : "apps/server/.env";
-  const needsServerSideClerkAuth = backend !== "none";
-  const needsClerkBackendPublishableKey = ["express", "fastify"].includes(backend);
-  const needsClerkRequestVerification =
-    api !== "none" && ["self", "hono", "elysia"].includes(backend);
-
-  if (hasClerkServerFrontend && backend === "self") {
-    lines.push(
-      "- Set `CLERK_SECRET_KEY` in `apps/web/.env` for Clerk server middleware and server-side Clerk auth",
-    );
-  } else {
-    if (hasClerkServerFrontend) {
-      lines.push("- Set `CLERK_SECRET_KEY` in `apps/web/.env` for Clerk server middleware");
+function getClerkSetupLines(config: RenderConfig): string[] {
+  const lines: string[] = [];
+  for (const app of guidanceApplications(config)) {
+    if (
+      config.application &&
+      !app.roles.some(
+        (role) => role === "backend" || role === "web-frontend" || role === "admin",
+      ) &&
+      !app.bindings.backend
+    )
+      continue;
+    const envPath = `${app.directory}/.env`;
+    const frontend = app.frontend;
+    const publicKey = frontend.includes("next")
+      ? "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+      : frontend.some((value) => value.startsWith("native-"))
+        ? "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"
+        : frontend.some((value) =>
+              ["react-router", "tanstack-router", "tanstack-start"].includes(value),
+            )
+          ? "VITE_CLERK_PUBLISHABLE_KEY"
+          : undefined;
+    if (publicKey) lines.push(`- Set \`${publicKey}\` in \`${envPath}\``);
+    if (frontend.some((value) => ["next", "react-router", "tanstack-start"].includes(value))) {
+      lines.push(`- Set \`CLERK_SECRET_KEY\` in \`${envPath}\` for Clerk server middleware`);
     }
-
-    if (needsServerSideClerkAuth) {
-      lines.push(`- Set \`CLERK_SECRET_KEY\` in \`${serverEnvPath}\` for server-side Clerk auth`);
+    if (!app.roles.includes("backend")) continue;
+    if (app.backend === "convex") {
+      lines.push("- Set `CLERK_JWT_ISSUER_DOMAIN` in Convex Dashboard");
+      continue;
+    }
+    lines.push(`- Set \`CLERK_SECRET_KEY\` in \`${envPath}\` for server-side Clerk auth`);
+    if (
+      ["express", "fastify"].includes(app.backend) ||
+      (app.api !== "none" && ["self", "hono", "elysia"].includes(app.backend))
+    ) {
+      lines.push(
+        `- Set \`CLERK_PUBLISHABLE_KEY\` in \`${envPath}\` for server-side Clerk request verification`,
+      );
     }
   }
-
-  if (needsClerkRequestVerification) {
-    lines.push(
-      `- Set \`CLERK_PUBLISHABLE_KEY\` in \`${serverEnvPath}\` for server-side Clerk request verification`,
-    );
-  }
-
-  if (needsClerkBackendPublishableKey) {
-    lines.push(
-      `- Set \`CLERK_PUBLISHABLE_KEY\` in \`${serverEnvPath}\` for Clerk backend middleware`,
-    );
-  }
-
   return lines;
 }
 
@@ -152,7 +161,9 @@ function hasWebFrontend(frontend: ProjectConfig["frontend"]): boolean {
 }
 
 export function processReadme(vfs: VirtualFileSystem, config: RenderConfig): void {
-  let content = generateReadmeContent(config) + moduleReadmeSection(config);
+  const applications = guidanceApplications(config);
+  const frontend = [...new Set(applications.flatMap((app) => app.frontend))];
+  let content = generateReadmeContent({ ...config, frontend }, vfs) + moduleReadmeSection(config);
   if (
     vfs.readJson<{ scripts?: Record<string, string> }>("package.json")?.scripts?.["auth:generate"]
   ) {
@@ -161,7 +172,7 @@ export function processReadme(vfs: VirtualFileSystem, config: RenderConfig): voi
   vfs.writeFile("README.md", content);
 }
 
-function generateReadmeContent(options: RenderConfig): string {
+function generateReadmeContent(options: RenderConfig, vfs: VirtualFileSystem): string {
   const {
     projectName,
     packageManager,
@@ -180,15 +191,10 @@ function generateReadmeContent(options: RenderConfig): string {
 
   const isConvex = backend === "convex";
   const hasReactRouter = frontend.includes("react-router");
-  const hasNative = hasNativeFrontend(frontend);
   const hasReactWeb = frontend.some((f) =>
     ["tanstack-router", "react-router", "tanstack-start", "next"].includes(f),
   );
-  const hasSvelte = frontend.includes("svelte");
-  const hasAstro = frontend.includes("astro");
   const packageManagerRunCmd = `${packageManager} run`;
-  // TanStack Router/Start, Next, Nuxt and Solid all dev on 3001; only React Router and SvelteKit use Vite's default 5173.
-  const webPort = hasReactRouter || hasSvelte ? "5173" : hasAstro ? "4321" : "3001";
 
   const stackDescription = generateStackDescription(frontend, backend, api, isConvex);
 
@@ -222,14 +228,14 @@ ${packageManagerRunCmd} dev:setup
 
 Follow the prompts to create a new Convex project and connect it to your application.
 
-Copy environment variables from \`packages/backend/.env.local\` to \`apps/*/.env\`.
+Copy the public Convex connection variables from \`${guidanceApplications(options).find((app) => app.roles.includes("backend"))?.directory}/.env.local\` to each client app's \`.env\`; never copy backend secrets to clients.
 ${
   auth === "clerk"
     ? `
 ### Clerk Authentication Setup
 
 - Follow the guide: [Convex + Clerk](https://docs.convex.dev/auth/clerk)
-${getClerkSetupLines(frontend, backend, api, true).join("\n")}`
+${getClerkSetupLines(options).join("\n")}`
     : ""
 }`
     : generateDatabaseSetup(options, packageManagerRunCmd)
@@ -239,8 +245,11 @@ ${
     ? `
 ## Clerk Authentication Setup
 
-- Follow the guide: [Clerk Quickstart](${getClerkQuickstartUrl(frontend)})
-${getClerkSetupLines(frontend, backend, api, false).join("\n")}`
+${guidanceApplications(options)
+  .filter((app) => app.frontend.length > 0)
+  .map((app) => `- ${app.id}: [Clerk Quickstart](${getClerkQuickstartUrl(app.frontend)})`)
+  .join("\n")}
+${getClerkSetupLines(options).join("\n")}`
     : ""
 }
 
@@ -250,8 +259,8 @@ Then, run the development server:
 ${packageManagerRunCmd} dev
 \`\`\`
 
-${generateRunningInstructions(frontend, backend, webPort, hasNative, isConvex)}
-${generateReactUiSection(hasReactWeb, projectName)}
+${generateRunningInstructions(options)}
+${generateReactUiSection(hasReactWeb, projectName, options)}
 ## Environment Configuration
 
 Each app owns its environment schema in \`.env.schema\`. Varlock generates \`src/env.ts\` during installation; run \`${packageManagerRunCmd} env:generate\` after changing a schema. Commit schemas, and keep secrets in ignored env files or your deployment platform.
@@ -269,17 +278,22 @@ ${
     ? "\n## PWA Support with React Router\n\nVerify PWA behavior with a production build on HTTPS or localhost. Offline navigation shows a precached fallback page; server-rendered pages require a connection. Authenticated HTML and API responses are not runtime-cached.\n"
     : ""
 }
-${generateDeploymentCommands(
-  packageManagerRunCmd,
-  webDeploy,
-  serverDeploy,
-  backend,
-  auth,
-  frontend,
-  database,
-  dbSetup,
-  addons,
-)}
+${
+  options.application
+    ? generateWorkspaceDeployment(options, vfs)
+    : generateDeploymentCommands(
+        packageManagerRunCmd,
+        webDeploy,
+        serverDeploy,
+        backend,
+        auth,
+        frontend,
+        database,
+        dbSetup,
+        addons,
+        appOutputPath(options, "server"),
+      )
+}
 ${generateGitHooksSection(packageManagerRunCmd, addons)}
 
 ## Project Structure
@@ -290,7 +304,7 @@ ${generateProjectStructure(options)}
 
 ## Available Scripts
 
-${generateScriptsList(packageManagerRunCmd, options, hasNative)}
+${generateScriptsList(packageManagerRunCmd, options, vfs)}
 `;
 }
 
@@ -323,7 +337,6 @@ function generateStackDescription(
   for (const fe of frontend) {
     if (hasOwnKey(frontendMap, fe)) {
       parts.push(frontendMap[fe]);
-      break;
     }
   }
 
@@ -338,42 +351,37 @@ function generateStackDescription(
   return parts.length > 0 ? `${parts.join(", ")}, and more` : "";
 }
 
-/** Describe the selected app servers and native development-build workflow. */
-function generateRunningInstructions(
-  frontend: ProjectConfig["frontend"],
-  backend: ProjectConfig["backend"],
-  webPort: string,
-  hasNative: boolean,
-  isConvex: boolean,
-): string {
-  const instructions: string[] = [];
-  const hasAppWebFrontend = hasWebFrontend(frontend);
-  const isBackendSelf = backend === "self";
-
-  if (hasAppWebFrontend) {
-    const desc = isBackendSelf ? "fullstack application" : "web application";
-    instructions.push(
-      `Open [http://localhost:${webPort}](http://localhost:${webPort}) in your browser to see the ${desc}.`,
-    );
-  }
-
-  if (hasNative) {
-    instructions.push(
-      "From `apps/native`, run the `ios` script for iOS or the `android` script for Android to build and launch the app. See [Expo development builds](https://docs.expo.dev/develop/development-builds/introduction/) for device setup.",
-    );
-  }
-
-  if (isConvex) {
-    instructions.push("Your app will connect to the Convex cloud backend automatically.");
-  } else if (backend !== "none" && !isBackendSelf) {
-    instructions.push("The API is running at [http://localhost:3000](http://localhost:3000).");
-  }
-
-  return instructions.join("\n");
+/** Describe every selected application, not a preferred client. */
+function generateRunningInstructions(config: RenderConfig): string {
+  return guidanceApplications(config)
+    .map((app) => {
+      if (hasNativeFrontend(app.frontend)) {
+        return `- **${app.id}**: from \`${app.directory}\`, run \`${config.packageManager} run ios\` or \`${config.packageManager} run android\` to build and launch the native app. See [Expo development builds](https://docs.expo.dev/develop/development-builds/introduction/).`;
+      }
+      if (app.backend === "convex")
+        return `- **${app.id}**: connects to your configured Convex deployment.`;
+      if (
+        !app.roles.some((role) => role === "backend" || role === "web-frontend" || role === "admin")
+      )
+        return `- **${app.id}**: source in \`${app.directory}\`. Use the app's commands in Available Scripts below.`;
+      return `- **${app.id}** (${app.roles.join(", ")}): [${app.origin}](${app.origin}), source in \`${app.directory}\`.`;
+    })
+    .join("\n");
 }
 
-function generateReactUiSection(hasReactWeb: boolean, projectName: string): string {
+function generateReactUiSection(
+  hasReactWeb: boolean,
+  projectName: string,
+  config: RenderConfig,
+): string {
   if (!hasReactWeb) return "";
+  const directories = guidanceApplications(config)
+    .filter((app) =>
+      app.frontend.some((frontend) =>
+        ["next", "tanstack-start", "tanstack-router", "react-router"].includes(frontend),
+      ),
+    )
+    .map((app) => app.directory);
 
   return `
 ## UI Customization
@@ -382,7 +390,7 @@ React web apps in this stack share shadcn/ui primitives through \`packages/ui\`.
 
 - Change design tokens and global styles in \`packages/ui/src/styles/globals.css\`
 - Update shared primitives in \`packages/ui/src/components/*\`
-- Adjust shadcn aliases or style config in \`packages/ui/components.json\` and \`apps/web/components.json\`
+- Adjust shadcn aliases or style config in \`packages/ui/components.json\` and ${directories.map((directory) => `\`${directory}/components.json\``).join(", ")}
 
 ### Add more shared components
 
@@ -400,91 +408,20 @@ import { Button } from "@${projectName}/ui/components/button"
 
 ### Add app-specific blocks
 
-If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from \`apps/web\`.
+If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from the target app directory: ${directories.map((directory) => `\`${directory}\``).join(", ")}.
 `;
 }
 
 function generateProjectStructure(config: RenderConfig): string {
-  const { projectName, frontend, backend, addons, api, auth, database, orm } = config;
-  const isConvex = backend === "convex";
-  const structure: string[] = [`${projectName}/`, "├── apps/"];
-  const hasAppWebFrontend = hasWebFrontend(frontend);
-  const isBackendSelf = backend === "self";
-  const hasReactWeb = frontend.some((f) =>
-    ["tanstack-router", "react-router", "tanstack-start", "next"].includes(f),
+  const applications = guidanceApplications(config);
+  const structure = [
+    `${config.projectName}/`,
+    ...applications.map((app) => `├── ${app.directory}/  # ${app.type}: ${app.roles.join(", ")}`),
+  ];
+  structure.push(
+    "├── applications.json  # Application roles, bindings, directories and local origins",
+    "└── packages/          # Shared UI, configuration and selected backend modules",
   );
-  const hasNative = hasNativeFrontend(frontend);
-  const hasDbPackage = !isConvex && database !== "none" && orm !== "none";
-
-  if (hasAppWebFrontend) {
-    const frontendTypes = {
-      "tanstack-router": "React + TanStack Router",
-      "react-router": "React + React Router",
-      next: "Next.js",
-      "tanstack-start": "React + TanStack Start",
-      svelte: "SvelteKit",
-      nuxt: "Nuxt",
-      solid: "Solid",
-      astro: "Astro",
-    } satisfies Record<string, string>;
-    let frontendType = "";
-    for (const selectedFrontend of frontend) {
-      if (hasOwnKey(frontendTypes, selectedFrontend)) {
-        frontendType = frontendTypes[selectedFrontend];
-        break;
-      }
-    }
-
-    const prefix = isBackendSelf ? "└──" : "├──";
-    const desc = isBackendSelf ? "Fullstack application" : "Frontend application";
-    structure.push(`│   ${prefix} web/         # ${desc} (${frontendType})`);
-  }
-
-  if (hasNative) {
-    structure.push("│   ├── native/      # Mobile application (React Native, Expo)");
-  }
-
-  if (addons.includes("starlight")) {
-    structure.push("│   ├── docs/        # Documentation site (Astro Starlight)");
-  }
-
-  if (!isBackendSelf && backend !== "none" && !isConvex) {
-    const backendName = (backend[0]?.toUpperCase() ?? "") + backend.slice(1);
-    const apiName = api !== "none" ? api.toUpperCase() : "";
-    const desc = apiName ? `${backendName}, ${apiName}` : backendName;
-    structure.push(`│   └── server/      # Backend API (${desc})`);
-  }
-
-  if (isConvex || backend !== "none" || hasReactWeb) {
-    structure.push("├── packages/");
-
-    if (hasReactWeb) {
-      structure.push("│   ├── ui/          # Shared shadcn/ui components and styles");
-    }
-
-    if (isConvex) {
-      structure.push("│   ├── backend/     # Convex backend functions and schema");
-      if (auth === "clerk") {
-        structure.push(
-          "│   │   ├── convex/    # Convex functions and schema",
-          "│   │   └── .env.local # Convex environment variables",
-        );
-      }
-    }
-
-    if (!isConvex) {
-      if (api !== "none") {
-        structure.push("│   ├── api/         # API layer / business logic");
-      }
-      if (auth === "better-auth") {
-        structure.push("│   ├── auth/        # Authentication configuration & logic");
-      }
-      if (hasDbPackage) {
-        structure.push("│   └── db/          # Database schema & queries");
-      }
-    }
-  }
-
   return structure.join("\n");
 }
 
@@ -523,7 +460,6 @@ function generateFeaturesList(
   for (const fe of frontend) {
     if (hasOwnKey(frontendFeatures, fe)) {
       features.push(frontendFeatures[fe]);
-      break;
     }
   }
 
@@ -611,11 +547,11 @@ function generateFeaturesList(
 }
 
 function generateDatabaseSetup(config: RenderConfig, packageManagerRunCmd: string): string {
-  const { database, orm, dbSetup, backend } = config;
+  const { database, orm, dbSetup } = config;
   if (database === "none") return "";
 
-  const isBackendSelf = backend === "self";
-  const envPath = isBackendSelf ? "apps/web/.env" : "apps/server/.env";
+  const backendRoot = appOutputPath(config, "server");
+  const envPath = `${backendRoot}/.env`;
   const ormLabels = {
     drizzle: "Drizzle ORM",
     prisma: "Prisma",
@@ -684,7 +620,7 @@ ${packageManagerRunCmd} db:migrate
 \`\`\`bash
 ${packageManagerRunCmd} db:migrate:local
 \`\`\`
-The framework dev server uses a local D1 database (via \`apps/web/wrangler.jsonc\`); the deployed database is migrated by Alchemy during \`deploy\`.`);
+The framework dev server uses a local D1 database (via \`${backendRoot}/wrangler.jsonc\`); the deployed database is migrated by Alchemy during \`deploy\`.`);
     }
 
     return `${setup}This project uses Cloudflare D1 (SQLite)${ormDesc}.
@@ -709,7 +645,7 @@ ${packageManagerRunCmd} db:local
 \`\`\``
 }
 
-2. Update your \`.env\` file in the \`${isBackendSelf ? "apps/web" : "apps/server"}\` directory with the appropriate connection details if needed.`,
+2. Update your \`${envPath}\` file with the appropriate connection details if needed.`,
 
     postgres: `This project uses PostgreSQL${ormDesc}.
 
@@ -742,136 +678,118 @@ ${packageManagerRunCmd} db:push
   return setup;
 }
 
-function generateScriptsList(
-  packageManagerRunCmd: string,
-  config: RenderConfig,
-  hasNative: boolean,
-): string {
-  const { database, addons, backend, dbSetup, frontend, webDeploy, serverDeploy } = config;
-  const isConvex = backend === "convex";
-  const isBackendSelf = backend === "self";
-  const hasWeb = frontend.some((f) =>
-    [
-      "tanstack-router",
-      "react-router",
-      "tanstack-start",
-      "next",
-      "nuxt",
-      "svelte",
-      "solid",
-      "astro",
-    ].includes(f),
+function generateScriptsList(runCmd: string, config: RenderConfig, vfs: VirtualFileSystem): string {
+  const sections: string[] = [];
+  const rootScripts =
+    vfs.readJson<{ scripts?: Record<string, string> }>("package.json")?.scripts ?? {};
+  sections.push(...Object.keys(rootScripts).map((name) => `- \`${runCmd} ${name}\``));
+  for (const app of guidanceApplications(config)) {
+    const scripts = vfs.readJson<{ scripts?: Record<string, string> }>(
+      `${app.directory}/package.json`,
+    )?.scripts;
+    if (!scripts) continue;
+    sections.push(
+      `\n### ${app.id}\n`,
+      `Run from \`${app.directory}\`:`,
+      ...Object.keys(scripts).map((name) => `- \`${runCmd} ${name}\``),
+    );
+    const note = getDesktopStaticBuildNote(app.frontend);
+    if (note && config.addons.some((addon) => addon === "tauri" || addon === "electrobun"))
+      sections.push(`\n${note}`);
+  }
+  return sections.join("\n");
+}
+
+function generateWorkspaceDeployment(config: RenderConfig, vfs: VirtualFileSystem): string {
+  const applications = guidanceApplications(config);
+  const scripts = vfs.readJson<{ scripts?: Record<string, string> }>("package.json")?.scripts ?? {};
+  const run = `${config.packageManager} run`;
+  const lines = [
+    "## Deployment",
+    "",
+    "Application directories, roles and backend bindings are recorded in `applications.json`. Deploy each selected target with its generated root scripts below.",
+  ];
+  const commands = Object.keys(scripts).filter((name) =>
+    /^(deploy(?::|$)|destroy(?::|$)|env:(?:.*:)?(?:preview|production)$|docker:|dev:.*:vercel$|dev:vercel$)/.test(
+      name,
+    ),
   );
-  const dbSupport = getDbScriptSupport(config);
-  const hasAxiom = addons.includes("axiom");
-  const hasAxiomWebRuntime =
-    hasAxiom &&
-    frontend.some((item) => ["next", "tanstack-start", "nuxt", "svelte", "astro"].includes(item));
-  const hasAxiomServerRuntime =
-    hasAxiom && ["hono", "express", "fastify", "elysia"].includes(backend);
-
-  let scripts = `- \`${packageManagerRunCmd} dev\`: Start all applications in development mode
-- \`${packageManagerRunCmd} build\`: Build all applications`;
-
-  if (hasWeb && !hasAxiomWebRuntime) {
-    scripts += `\n- \`${packageManagerRunCmd} dev:web\`: Start only the web application`;
-  }
-
-  if (isConvex) {
-    scripts += `\n- \`${packageManagerRunCmd} dev:setup\`: Setup and configure your Convex project`;
-  } else if (backend !== "none" && !isBackendSelf && !hasAxiomServerRuntime) {
-    scripts += `\n- \`${packageManagerRunCmd} dev:server\`: Start only the server`;
-  }
-
-  scripts += `\n- \`${packageManagerRunCmd} check-types\`: Check TypeScript types across all apps`;
-
-  if (hasNative) {
-    scripts += `\n- \`${packageManagerRunCmd} dev:native\`: Start the React Native/Expo development server`;
-  }
-
-  if (dbSupport.hasDbScripts) {
-    if (dbSupport.hasDbPush) {
-      scripts += `\n- \`${packageManagerRunCmd} db:push\`: Push schema changes to database`;
+  if (!commands.length) return "";
+  const alchemy =
+    applications.some(
+      (app) => isAlchemyDeployTarget(app.webDeploy) || isAlchemyDeployTarget(app.serverDeploy),
+    ) || config.addons.includes("axiom");
+  if (alchemy) {
+    const exec =
+      config.packageManager === "npm"
+        ? "npx"
+        : config.packageManager === "pnpm"
+          ? "pnpm exec"
+          : "bunx";
+    lines.push(
+      "",
+      "### Alchemy",
+      "",
+      `- Configure provider accounts: \`cd packages/infra && ${exec} alchemy profile edit\``,
+      "- The shared infrastructure stack owns deployment and destruction for all Alchemy applications and the shared database.",
+      "- Provider profiles are stored under `~/.alchemy`; no provider-specific setup command is required.",
+      `- Deploys default to a personal \`dev_<username>\` stage. For production: \`cd packages/infra && ${exec} alchemy deploy --stage production\`.`,
+    );
+    const owner = applications.find((app) => app.roles.includes("backend"));
+    if (owner && owner.backend !== "self" && isAlchemyDeployTarget(owner.serverDeploy)) {
+      lines.push(
+        `- After the first deploy, set \`CORS_ORIGIN\` in \`${owner.directory}/.env\` to the comma-separated deployed origins of every bound web client, then deploy again.`,
+      );
     }
-    if (dbSupport.hasDbGenerate) {
-      scripts += `\n- \`${packageManagerRunCmd} db:generate\`: Generate database client/types`;
+    if (
+      owner &&
+      config.auth === "better-auth" &&
+      (owner.webDeploy === "prisma" || owner.serverDeploy === "prisma")
+    ) {
+      lines.push(
+        `- After the first deploy, set \`BETTER_AUTH_URL\` in \`${owner.directory}/.env\` to the returned backend URL, then deploy again.`,
+      );
     }
-    if (dbSupport.hasDbMigrate) {
-      scripts += `\n- \`${packageManagerRunCmd} db:migrate\`: Run database migrations`;
-    }
-    if (dbSupport.hasDbStudio) {
-      scripts += `\n- \`${packageManagerRunCmd} db:studio\`: Open database studio UI`;
-    }
+    if (config.addons.includes("axiom"))
+      lines.push(
+        "- Alchemy creates a stage-specific Axiom dataset and least-privilege ingest token. Development injects credentials in memory. Link Vercel targets before deploying the matching `preview` or `production` stage; personal stages do not change shared credentials. For deployed Docker images, supply `AXIOM_API_KEY`, `AXIOM_DATASET`, and `AXIOM_EDGE_URL` through the platform secret manager.",
+      );
   }
-
-  if (database === "sqlite" && dbSetup !== "d1" && dbSupport.hasDbScripts) {
-    scripts += `\n- \`${packageManagerRunCmd} db:local\`: Start the local SQLite database`;
+  for (const app of applications) {
+    const target = app.webDeploy !== "none" ? app.webDeploy : app.serverDeploy;
+    if (target !== "vercel" && target !== "docker") continue;
+    lines.push(
+      "",
+      `### ${app.id}: ${target === "vercel" ? "Vercel" : "Docker"}`,
+      "",
+      `- Application: \`${app.directory}\``,
+    );
+    if (target === "vercel")
+      lines.push(
+        `- Config: \`vercel.${app.id}.json\``,
+        "- Link the target project before syncing preview/production environment variables. Deployment does not upload local `.env` files automatically; sync env before the first deployment.",
+        "- The target's `deploy:*:check` command builds locally without deployment upload; it requires a linked project and its environment configuration.",
+      );
+    else
+      lines.push(
+        "- Config: `docker-compose.yml`. Each app owns its Dockerfile and `.env`; Compose overrides container-networking values. Public web variables are baked into the build.",
+      );
   }
-
-  if (addons.includes("vite-plus")) {
-    const hasVitePlusNativeHooks = !addons.includes("husky") && !addons.includes("lefthook");
-
-    scripts += `\n- \`${packageManagerRunCmd} check\`: Run Vite+ format/lint checks and workspace TypeScript checks
-- \`${packageManagerRunCmd} lint\`: Run Vite+ lint checks
-- \`${packageManagerRunCmd} format\`: Run Vite+ formatting
-- \`${packageManagerRunCmd} staged\`: Run Vite+ checks against staged files`;
-
-    if (hasVitePlusNativeHooks) {
-      scripts += `\n- \`${packageManagerRunCmd} hooks:setup\`: Install Vite+ native Git hooks with \`vp config\``;
-    }
-  } else if (addons.includes("biome")) {
-    scripts += `\n- \`${packageManagerRunCmd} check\`: Run Biome formatting and linting`;
-  } else if (addons.includes("oxlint")) {
-    scripts += `\n- \`${packageManagerRunCmd} check\`: Run Oxlint and Oxfmt`;
-  }
-
-  if (addons.includes("pwa")) {
-    scripts += `\n- \`cd apps/web && ${packageManagerRunCmd} generate-pwa-assets\`: Generate PWA assets`;
-  }
-
-  if (addons.includes("tauri")) {
-    scripts += `\n- \`cd apps/web && ${packageManagerRunCmd} desktop:dev\`: Start Tauri desktop app in development
-- \`cd apps/web && ${packageManagerRunCmd} desktop:build\`: Build Tauri desktop app`;
-    const staticBuildNote = getDesktopStaticBuildNote(frontend);
-    if (staticBuildNote) {
-      scripts += `\n- Note: ${staticBuildNote}`;
-    }
-  }
-
-  if (addons.includes("electrobun")) {
-    scripts += `\n- \`${packageManagerRunCmd} dev:desktop\`: Start the Electrobun desktop app with HMR
-- \`${packageManagerRunCmd} build:desktop\`: Build the stable Electrobun desktop app
-- \`${packageManagerRunCmd} build:desktop:canary\`: Build the canary Electrobun desktop app`;
-    const staticBuildNote = getDesktopStaticBuildNote(frontend);
-    if (staticBuildNote) {
-      scripts += `\n- Note: ${staticBuildNote}`;
-    }
-  }
-
-  if (addons.includes("starlight")) {
-    scripts += `\n- \`cd apps/docs && ${packageManagerRunCmd} dev\`: Start documentation site
-- \`cd apps/docs && ${packageManagerRunCmd} build\`: Build documentation site`;
-  }
-
-  if (webDeploy === "docker" || serverDeploy === "docker") {
-    scripts += `\n- \`${packageManagerRunCmd} docker:build\`: Build the Docker Compose images
-- \`${packageManagerRunCmd} docker:up\`: Build and start the Docker Compose stack
-- \`${packageManagerRunCmd} docker:logs\`: Tail logs from the Docker Compose stack
-- \`${packageManagerRunCmd} docker:down\`: Stop the Docker Compose stack`;
-  }
-
-  if (webDeploy === "vercel" || serverDeploy === "vercel") {
-    const v = getVercelScriptNames(webDeploy, serverDeploy);
-    scripts += `\n- \`${packageManagerRunCmd} ${v.setup}\`: Link this repo to a Vercel project (first-time setup)
-- \`${packageManagerRunCmd} dev:vercel\`: Run the Vercel Services dev environment locally
-- \`${packageManagerRunCmd} ${v.envPreview}\`: Sync local env files to the Vercel preview environment
-- \`${packageManagerRunCmd} ${v.envProduction}\`: Sync local env files to the Vercel production environment
-- \`${packageManagerRunCmd} ${v.deploy}\`: Create a Vercel preview deployment
-- \`${packageManagerRunCmd} ${v.deployProd}\`: Deploy to Vercel production
-- \`${packageManagerRunCmd} ${v.deployCheck}\`: Dry-run a deploy to preview framework detection and included files without uploading`;
-  }
-
-  return scripts;
+  if (
+    applications.some((app) => app.webDeploy === "docker" || app.serverDeploy === "docker") &&
+    config.database === "sqlite" &&
+    config.dbSetup === "none"
+  )
+    lines.push(
+      `\nDocker Compose uses \`./.data/local.db\`. Run \`${run} db:push\` before starting the stack.`,
+    );
+  lines.push(
+    "",
+    "### Generated deployment commands",
+    "",
+    ...commands.map((name) => `- \`${run} ${name}\``),
+  );
+  return `${lines.join("\n")}\n`;
 }
 
 function generateDeploymentCommands(
@@ -884,6 +802,7 @@ function generateDeploymentCommands(
   database: ProjectConfig["database"],
   dbSetup: ProjectConfig["dbSetup"],
   addons: ProjectConfig["addons"],
+  backendRoot: string,
 ): string {
   const hasCloudflare = webDeploy === "cloudflare" || serverDeploy === "cloudflare";
   const hasPrismaCompute = webDeploy === "prisma" || serverDeploy === "prisma";
@@ -963,9 +882,9 @@ function generateDeploymentCommands(
     const needsCorsOrigin = backend !== "self" && isAlchemyDeployTarget(serverDeploy) && hasWeb;
     const prismaAuthTarget =
       auth === "better-auth" && backend === "self" && webDeploy === "prisma"
-        ? { envPath: "apps/web/.env", label: "web" }
+        ? { envPath: `${backendRoot}/.env`, label: "backend application" }
         : auth === "better-auth" && backend !== "self" && serverDeploy === "prisma"
-          ? { envPath: "apps/server/.env", label: "server" }
+          ? { envPath: `${backendRoot}/.env`, label: "backend application" }
           : undefined;
 
     if (needsCorsOrigin || prismaAuthTarget) {
@@ -973,7 +892,7 @@ function generateDeploymentCommands(
     }
     if (needsCorsOrigin) {
       lines.push(
-        "- Required after the first deploy: set `CORS_ORIGIN` in `apps/server/.env` to the exact deployed web origin, such as `https://app.example.com`, then deploy the server again.",
+        `- Required after the first deploy: set \`CORS_ORIGIN\` in \`${backendRoot}/.env\` to the comma-separated deployed origins of all bound web clients listed in \`applications.json\`, then deploy the backend again.`,
       );
     }
     if (prismaAuthTarget) {
@@ -996,7 +915,7 @@ function generateDeploymentCommands(
       "### Docker Compose",
       "",
       `- Target: ${targetLabel}`,
-      "- Config: `docker-compose.yml` (app Dockerfiles live in `apps/*/Dockerfile`)",
+      "- Config: `docker-compose.yml` (Dockerfiles live in the deployed application directories listed in `applications.json`)",
       `- Build images: ${packageManagerRunCmd} docker:build`,
       `- Start: ${packageManagerRunCmd} docker:up`,
       `- Logs: ${packageManagerRunCmd} docker:logs`,

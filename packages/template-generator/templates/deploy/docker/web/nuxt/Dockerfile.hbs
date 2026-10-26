@@ -13,23 +13,23 @@ ENV NUXT_PUBLIC_SERVER_URL=${NUXT_PUBLIC_SERVER_URL}
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "web"}} && {{packageManager}} run build
 
 FROM node:24-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY --from=builder /app/apps/web/.output ./
+COPY --from=builder /app/{{appPath "web"}}/.output ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/web/.env.schema ./.env.schema
+COPY --from=builder /app/{{appPath "web"}}/.env.schema ./.env.schema
 
 ENV HOST=0.0.0.0
 ENV PORT=3001

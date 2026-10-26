@@ -1,13 +1,12 @@
-import { TASK_RUNNER_ADDONS, OBSERVABILITY_ADDONS, type Addons } from "@xstack/types";
+import type { Addons } from "@xstack/types";
 
-import { DEFAULT_STACK, type StackState, TECH_OPTIONS } from "./constant";
+import { BUILDER_DEFINITION, DEFAULT_STACK, type StackState, TECH_OPTIONS } from "./constant";
 import { projectApplicationStack } from "./stack-applications";
 import { StackModuleOptionsSchema, StackProvidersSchema } from "./stack-schema";
 
 const validWebFrontendIds = TECH_OPTIONS.webFrontend.map((option) => option.id);
 const validNativeFrontendIds = TECH_OPTIONS.nativeFrontend.map((option) => option.id);
 const validAddonIds = ["none" as const, ...TECH_OPTIONS.addons.map((option) => option.id)];
-const validFeatureIds = ["none" as const, ...TECH_OPTIONS.features.map((option) => option.id)];
 
 function sanitizeSingleSelection<T extends string>(
   values: readonly string[] | null | undefined,
@@ -43,10 +42,9 @@ function sanitizeMultiSelection<T extends string>(
 
 function resolveAddonConflicts(addons: readonly Addons[]): Addons[] {
   const resolved: Addons[] = [];
-  const exclusiveGroups = [
-    new Set<Addons>(TASK_RUNNER_ADDONS),
-    new Set<Addons>(OBSERVABILITY_ADDONS),
-  ];
+  const exclusiveGroups = BUILDER_DEFINITION.exclusiveAddonGroups.map(
+    (group) => new Set<string>(group),
+  );
 
   for (const addon of addons) {
     const group = exclusiveGroups.find((values) => values.has(addon));
@@ -69,7 +67,8 @@ export function sanitizeAddons(addons: readonly string[] | null | undefined) {
 }
 
 export function sanitizeFeatures(features: readonly string[] | null | undefined) {
-  return sanitizeMultiSelection(features, validFeatureIds, DEFAULT_STACK.features);
+  const selected = [...new Set(features ?? DEFAULT_STACK.features)].filter((id) => id !== "none");
+  return selected.length ? selected : ["none"];
 }
 
 export function sanitizeWebFrontends(webFrontend: readonly string[] | null | undefined) {

@@ -88,11 +88,7 @@ export async function historyHandler(input: HistoryCommandInput): Promise<boolea
   intro(pc.magenta(`Project history · ${entries.length}`));
 
   if (entries.length === 0) {
-    outro(
-      `${pc.dim("No saved projects yet · create one with")} ${pc.cyan(
-        "xstack my-app",
-      )}`,
-    );
+    outro(`${pc.dim("No saved projects yet · create one with")} ${pc.cyan("xstack my-app")}`);
     return true;
   }
 

@@ -29,16 +29,14 @@ export default function AboutPage() {
     <TrustPage icon={Info} title="ABOUT.MD" description={description}>
       <TrustSection title="WHAT_IT_IS">
         <p>
-          xstack is a free, MIT-licensed command-line tool for scaffolding end-to-end
-          type-safe TypeScript applications. Developers choose the frontend, backend, runtime,
-          database, ORM, API layer, authentication, deployment targets, and optional addons that fit
-          their project. The generator then creates a focused codebase instead of forcing a fixed
-          starter stack.
+          xstack is a free, MIT-licensed command-line tool for scaffolding end-to-end type-safe
+          TypeScript applications. Developers choose the frontend, backend, runtime, database, ORM,
+          API layer, authentication, deployment targets, and optional addons that fit their project.
+          The generator then creates a focused codebase instead of forcing a fixed starter stack.
         </p>
         <p>
           Generated projects are ordinary source code under the developer's control. They do not
-          depend on a required xstack account, subscription, or hosted runtime after
-          generation.
+          depend on a required xstack account, subscription, or hosted runtime after generation.
         </p>
       </TrustSection>
 
@@ -84,9 +82,9 @@ export default function AboutPage() {
 
       <TrustSection title="PROJECT_VALUES">
         <p>
-          xstack favors explicit choices, minimal templates, reproducible commands, and
-          transparent compatibility rules. Its goal is to remove setup friction while leaving
-          architecture decisions and long-term ownership with the people building the application.
+          xstack favors explicit choices, minimal templates, reproducible commands, and transparent
+          compatibility rules. Its goal is to remove setup friction while leaving architecture
+          decisions and long-term ownership with the people building the application.
         </p>
         <p>
           The project does not claim that one stack fits every team. It provides composable options

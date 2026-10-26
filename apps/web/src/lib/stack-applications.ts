@@ -4,13 +4,9 @@ import {
   readFrameworkCatalog,
   resolveWorkspaceCapabilities,
   resolveApplications,
+  convertLegacyApplications,
 } from "@xstack/template-generator/apps";
-import {
-  FULLSTACK_FRONTENDS,
-  webFrontends,
-  type NativeFrontend,
-  type ProjectConfig,
-} from "@xstack/types";
+import { webFrontends, type NativeFrontend, type ProjectConfig } from "@xstack/types";
 
 import { getStackBackend, getStackFrontends } from "./stack-model";
 import type { StackState, TechCategory } from "./types";
@@ -24,6 +20,18 @@ export const APPLICATION_TECH_CATEGORIES: TechCategory[] = [
   "runtime",
   "api",
 ];
+
+export function legacyApplications(stack: StackState) {
+  return convertLegacyApplications(
+    {
+      frontend: getStackFrontends(stack),
+      backend: getStackBackend(stack.backend),
+      runtime: stack.runtime,
+      api: stack.api,
+    },
+    APPLICATION_TEMPLATES,
+  );
+}
 
 /** Compatibility controls read a projection; application selections remain authoritative. */
 export function projectApplicationStack(stack: StackState): StackState {
@@ -46,15 +54,17 @@ export function projectApplicationStack(stack: StackState): StackState {
       id !== "none" && !webFrontends.some((candidate) => candidate === id),
   );
   const backendKind = backend?.adapter.stack.backend ?? "none";
-  const selfFrontend = FULLSTACK_FRONTENDS.find((id) =>
-    backend?.adapter.stack.frontend?.includes(id),
-  );
+  const selfFrontend = backend?.adapter.stack.frontend?.find((id) => id !== "none");
   return {
     ...stack,
     webFrontend: web.length ? web : ["none"],
     nativeFrontend: native.length ? native : ["none"],
     backend:
-      backendKind === "self" ? (selfFrontend ? `self-${selfFrontend}` : "none") : backendKind,
+      backendKind === "self"
+        ? selfFrontend
+          ? (`self-${selfFrontend}` as StackState["backend"])
+          : "none"
+        : backendKind,
     runtime:
       backend?.adapter.stack.runtime ??
       independent.find((app) => app.adapter.stack.runtime !== undefined)?.adapter.stack.runtime ??

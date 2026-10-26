@@ -1,4 +1,7 @@
 {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+{{#if application.nativeSplit}}
+import { handleExpressProductRequest } from "./lib/express-product";
+{{/if}}
 {{#if (eq api "trpc")}}
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { createContext } from "@{{projectName}}/api/context";
@@ -15,6 +18,7 @@ import { createContext } from "@{{projectName}}/api/context";
 {{/if}}
 import cors from "cors";
 import express from "express";
+{{#unless application.nativeSplit}}
 {{#if (eq auth "better-auth")}}
 import { auth } from "@{{projectName}}/auth";
 import { toNodeHandler } from "better-auth/node";
@@ -22,15 +26,16 @@ import { toNodeHandler } from "better-auth/node";
 {{#if (eq auth "clerk")}}
 import { clerkMiddleware } from "@clerk/express";
 {{/if}}
+{{/unless}}
 
 const app = express();
 
 app.use(
 	cors({
-        origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
-		methods: ["GET", "POST", "OPTIONS"],
+        origin: [...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean), {{#each application.clientOrigins}}"{{this}}", {{/each}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}...desktopOrigins{{/if}}],
+		methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
-		allowedHeaders: ["Content-Type", "Authorization"],
+		allowedHeaders: ["Content-Type", "Authorization", "X-Captcha-Token", "Accept-Language"],
 {{/if}}
 {{#if (eq auth "better-auth")}}
 		credentials: true,
@@ -38,12 +43,16 @@ app.use(
 	})
 );
 
+{{#if application.nativeSplit}}
+app.all("/api{/*path}", handleExpressProductRequest);
+{{else}}
 {{#if (eq auth "clerk")}}
 app.use(clerkMiddleware());
 {{/if}}
 
 {{#if (eq auth "better-auth")}}
 app.all("/api/auth{/*path}", toNodeHandler(auth));
+{{/if}}
 {{/if}}
 
 {{#if (eq api "trpc")}}
@@ -101,6 +110,15 @@ app.get("/", (_req, res) => {
 	res.status(200).send("OK");
 });
 
-app.listen(3000, () => {
-	console.log("Server is running on http://localhost:3000");
+{{#if (eq serverDeploy "vercel")}}
+export default app;
+
+if (!process.env.VERCEL) {
+{{/if}}
+const port = Number(process.env.PORT ?? {{#if application.port}}{{application.port}}{{else}}3000{{/if}});
+app.listen(port, () => {
+	console.log(`Server is running on http://localhost:${port}`);
 });
+{{#if (eq serverDeploy "vercel")}}
+}
+{{/if}}

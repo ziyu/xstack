@@ -1,5 +1,6 @@
 import type { ProjectConfig } from "@xstack/types";
 
+import type { ApplicationConfig } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { getModulePlan } from "../modules/pipeline";
 import type { ResolvedModule } from "../modules/types";
@@ -48,13 +49,13 @@ function addCommand(config: ProjectConfig): string {
 }
 
 /** Render after all module, script, env, and config post-processing, before taking a baseline. */
-export function processAgentGuidance(vfs: VirtualFileSystem, config: ProjectConfig): void {
+export function processAgentGuidance(vfs: VirtualFileSystem, config: ApplicationConfig): void {
   const modules = getModulePlan(config).modules;
   const packages = workspaces(vfs);
-  const web = config.apps?.find(
-    (app) => app.type === "fullstack-web" || app.type === "web-frontend" || app.type === "admin",
-  );
-  const webRoot = web ? `apps/${web.id}` : vfs.resolvePath("apps/web");
+  const web =
+    config.application?.workspaceApplications.find((app) => app.roles.includes("web-frontend")) ??
+    config.application?.workspaceApplications.find((app) => app.roles.includes("admin"));
+  const webRoot = web?.directory ?? config.application?.directory ?? vfs.resolvePath("apps/web");
   const scripts = vfs.readJson<{ scripts?: Record<string, string> }>("package.json")?.scripts ?? {};
   const run = `${config.packageManager} run`;
   const hasConfig = vfs.fileExists("xstack.jsonc");

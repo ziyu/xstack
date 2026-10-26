@@ -110,6 +110,8 @@ export const ApplicationManifestSchema = z
   .strictObject({
     id: ApplicationIdSchema,
     name: z.string().min(1),
+    description: z.string().min(1).optional(),
+    technologyLabel: z.string().min(1).optional(),
     defaultDirectoryName: ApplicationIdSchema,
     roles: z.array(ApplicationRoleSchema),
     scope: z.enum(["product", "independent"]),
@@ -178,13 +180,42 @@ const ProductContributionSchema = z
 
 export const ApplicationAdapterSchema = z.strictObject({
   stack: ApplicationStackSchema,
+  options: z
+    .strictObject({
+      runtime: z.strictObject({
+        values: z.array(RuntimeSchema).min(1),
+        visibility: z.enum(["visible", "advanced", "hidden"]),
+      }),
+      api: z.strictObject({
+        values: z.array(APISchema).min(1),
+        visibility: z.enum(["visible", "advanced", "hidden"]),
+      }),
+    })
+    .optional(),
+  acceptsBackendApis: z.array(APISchema).min(1).optional(),
+  legacy: z.boolean().optional(),
   devArgs: z.array(z.string().min(1)).default([]),
   sharedPackages: z.array(ApplicationIdSchema).default([]),
+  clientContributions: z
+    .strictObject({
+      framework: ApplicationIdSchema,
+      family: ApplicationIdSchema,
+      serverAuth: z.boolean().optional(),
+    })
+    .optional(),
+  serverContributions: z
+    .strictObject({
+      apiPrefix: z.string().regex(/^(?:\/[a-zA-Z0-9_-]+)*$/),
+    })
+    .optional(),
   productContribution: ProductContributionSchema.optional(),
 });
 
 export const FrameworkAdapterSchema = z.strictObject({
   id: ApplicationIdSchema,
+  name: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  icon: z.string().min(1).optional(),
   apps: z.record(ApplicationIdSchema, ApplicationAdapterSchema),
 });
 

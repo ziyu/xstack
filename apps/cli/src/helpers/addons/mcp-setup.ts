@@ -89,10 +89,7 @@ function getAllMcpServers(config: RenderConfig): McpServerDef[] {
       key: "xstack",
       label: "xstack",
       name: "xstack",
-      target: getPackageExecutionCommand(
-        config.packageManager,
-        "xstack@latest mcp",
-      ),
+      target: getPackageExecutionCommand(config.packageManager, "xstack@latest mcp"),
     },
     {
       key: "context7",

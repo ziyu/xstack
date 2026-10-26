@@ -1,9 +1,10 @@
-import type { ProjectConfig } from "@xstack/types";
 import { Node, Project, SyntaxKind } from "ts-morph";
 
+import type { ApplicationConfig } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
+import { getBackendConsumerFrontends } from "../utils/add-deps";
 
-export function processAuthPlugins(vfs: VirtualFileSystem, config: ProjectConfig): void {
+export function processAuthPlugins(vfs: VirtualFileSystem, config: ApplicationConfig): void {
   const authIndexPath = "packages/auth/src/index.ts";
   if (!vfs.ownsPath(authIndexPath) || !vfs.exists(authIndexPath)) return;
 
@@ -36,7 +37,7 @@ export function processAuthPlugins(vfs: VirtualFileSystem, config: ProjectConfig
   }
 
   // Expo Plugin
-  const hasNative = config.frontend.some((f) =>
+  const hasNative = getBackendConsumerFrontends(config).some((f) =>
     ["native-bare", "native-uniwind", "native-unistyles"].includes(f),
   );
   if (hasNative) {

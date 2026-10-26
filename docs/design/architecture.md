@@ -1,7 +1,6 @@
 # xstack 设计规划
 
 > 状态：草案 v0.1（2026-10-17）
-> 基线：fork 自 [xstack](https://github.com/ziyu/xstack)（下称 XSTACK）
 
 ## 1. 定位
 
@@ -421,12 +420,12 @@ docs/
 
 ## 14. 决策记录
 
-1.  **代码许可证**：已购买许可证。搬运代码前仍需确认许可是否允许在本仓库（MIT 开源）中再分发；若不允许，只参考设计、自行重写。
-2.  **与 XSTACK 上游的同步策略**：最小改动面 + 挑选性合并。改动集中在 `packages/template-generator/src/modules`、`templates/modules` 与少量挂钩点。
-3.  **API 层**：MVP 功能模块只用 Route Handlers + Server Actions，不依赖 oRPC。
-4.  **UI 组件来源**：shadcn 风格，组件落在 `packages/ui`，用户可继续 `shadcn add`。
-5.  **后台权限模型**：沿用 CASL。
-6.  **多租户/组织**、**`cbt diff`**：推迟到 P4 之后。
+1. **代码许可证**：已购买许可证。搬运代码前仍需确认许可是否允许在本仓库（MIT 开源）中再分发；若不允许，只参考设计、自行重写。
+2. **与 XSTACK 上游的同步策略**：最小改动面 + 挑选性合并。改动集中在 `packages/template-generator/src/modules`、`templates/modules` 与少量挂钩点。
+3. **API 层**：MVP 功能模块只用 Route Handlers + Server Actions，不依赖 oRPC。
+4. **UI 组件来源**：shadcn 风格，组件落在 `packages/ui`，用户可继续 `shadcn add`。
+5. **后台权限模型**：沿用 CASL。
+6. **多租户/组织**、**`cbt diff`**：推迟到 P4 之后。
 
 ## 15. P0 实现现状（与上文设计的偏差）
 
@@ -619,7 +618,7 @@ Builder 验收补充：预设改为紧凑下拉框，按 Next.js/TanStack Start/
 
 应用类型与技术栈分离：稳定类型为 fullstack-web/web-frontend/backend/admin/cli（另保留 native），`templates/apps/<type>/app.json` 声明 id、name、必填 defaultDirectoryName、scope、roles、requires。实例为 `{ id, type, stack: { framework?, runtime?, api? }, product?, bindings? }`；当前求解要求显式 framework。id 决定 workspace/目录，不编码框架。defaultDirectoryName 仅用于新增或 legacy 转换时建议目录名：fullstack-web → web、web-frontend → frontend，其余 backend/admin/cli/native 各自同名；重名自动追加数字后缀，切换类型保留用户已选实例名。实现留在原技术栈目录：例如 `frontend/astro/apps/web-frontend`、`frontend/react/next/apps/fullstack-web`、`backend/server/hono/apps/backend`、`cli/node/apps/cli`。就地 adapter.json 只声明支持的 app 类型及 stack 默认值，不含 source/target/layers；按祖先 shared、本地 shared、选中的 apps/<type> 目录顺序合成，files 贡献工作区文件。没有顶层 frameworks 目录或跨目录映射清单。声明 app 必须有自己的实现文件，只有 shared 不算支持。fullstack-web 无论 Next 或 Nuxt 都拥有 web-frontend/backend/admin；拆分类型各拥有对应角色。产品组默认 main，同组每个角色只有一个 owner；独立 CLI/native 无产品角色。旧 web/site 类型 ID、site 角色、template 字段及框架限定应用类型不保留；无 apps 的 legacy 配置仍保留物理 apps/web 输出。重复 ID、危险路径、缺依赖、错误/跨产品绑定和循环均拒绝；当前生成器只支持一个产品组。
 
-生成器写入前求解布局；复用 `frameworks/<framework>/apps/<appType>` 模块贡献目录，按选中类型直接写到 `apps/<id>`，不做全局字符串路径替换。领域服务包归 backend owner；共享文件冲突拒绝。依赖 catalog 在组合后计算，环境 codegen、开发脚本、数据库环境导入按实际 owner 路径生成。CLI --apps JSON、create/createVirtual、MCP、保存配置、复现命令和模块基线保留完整实例；没有新增 Builder 多应用界面。runtime/API 从 adapter 默认值及显式 stack 配置推导：原生全栈 web 为 none/none，Hono 默认 bun/orpc，Node CLI 使用 node。固定路径的部署、DB provisioning 和非 Turborepo addon 对显式布局报错。
+生成器写入前求解布局；复用 `frameworks/<framework>/apps/<appType>` 模块贡献目录，按选中类型直接写到 `apps/<id>`，不做全局字符串路径替换。领域服务包归 backend owner；共享文件冲突拒绝。依赖 catalog 在组合后计算，环境 codegen、开发脚本、数据库环境导入按实际 owner 路径生成。CLI --apps JSON、create/createVirtual、MCP、保存配置、复现命令和模块基线保留完整实例。runtime/API 从 adapter 默认值及显式 stack 配置推导：原生全栈 web 为 none/none，Hono 默认 bun/orpc，Node CLI 使用 node。当前兼容 addon、部署产物和 DB provisioning 均按实际应用 owner 定位；外部服务仍需各自凭据和独立 live 验收，不把生成产物计作部署成功。
 
 边界：拆分 web-frontend/backend/admin 提供应用壳与 oRPC 连接，不代表所有原生业务模块已经远程化；各模块仍受已有兼容性限制。本轮稳定类型与适配器切换、角色冲突、未知组合、独立 CLI、真实输出目录及贡献内容保留由测试覆盖；本节不将旧模型的安装/构建记录当作新模型验收结果。
 
@@ -729,3 +728,29 @@ C2 与应用声明驱动改动已提交 `fb26ce4`。C3 通过 adapter 声明扩�
 六组生成项目（Next/Start/Nuxt SQLite、split SQLite/Postgres、改名 split+CLI）安装/类型/构建/迁移及 C3 runtime 全部通过。五 provider 的本地签名回调：伪造/金额/币种不匹配拒绝，并发重复履约只产生一个购买积分及邀请佣金；并发扣减不透支、退款唯一、跨用户订单/账本/邀请隔离通过。SQLite 追加原支付与邀请协议测试，覆盖签名 Native checkout、Alipay form、失败后恢复、renewal 不奖励邀请。HTTP/SSR 管理授权、return origin、mock 字段篡改及重放通过；Next 保留现有服务端 action 架构，未为测试虚构 product API。
 
 浏览器完成定价→开发 mock 结账→账单→积分到账，以及 admin 余额调整与佣金列表。仓库回归 128 项通过、相关类型及定向 lint 通过。持久命令 `bun apps/cli/live-tests/c3.ts plan|prepare|check|runtime|report|cleanup` 复用应用元数据执行；旧 fixtures 不再固定 apps/web。真实云端支付、Polar product checkout/portal、微信扫码、商户资质与服务商通知送达仍需独立 staging 凭据，不用本地协议结果替代。未新增现金分佣、退款/拒付自动逆转或 C4–C6 功能。
+
+### 27.9 现有框架应用模型覆盖
+
+16 个 framework adapter、23 个 framework/type 实现通过声明发现生成 294 个兼容案例。覆盖改名实例、API/auth/数据库、部署产物、兼容 addon、独立 companion 及同框架 public/admin。应用上下文隔离本地 frontend/backend/runtime，根工作区聚合依赖与脚本；env、数据库 provider、Docker/Vercel/Alchemy 产物消费 owner 路径，不按实例名分支。支持 application 不等于全部 C4–C6 业务模块已扩展到该框架。
+
+真实验收发现并修复两个上下文问题：Solid web-frontend 的根 owner 为 backend，原 base 模板漏写 Solid 编译器/runtime 版本约束；约束迁入聚合后的根 package 配置，并重算 pnpm workspace 配置。Astro 在 agent 环境自动转后台，监督启动参数声明 `--ignore-lock` 保持前台以便停止。另修复验收 runner 向所有前端写全部 URL 别名导致 Varlock 泄漏保护误触发：只覆盖各应用 schema 已声明键，不关闭保护。
+
+验收命令与限制见 `apps/cli/live-tests/README.md` 的 Application framework matrix。294 案例的生成/归属检查与具体安装、类型、构建、HTTP/浏览器、native export 结果分层记录；本地 export 不代替设备运行，部署产物不代替真实云部署。测试不再固定生成服务初始化的源码字符串，保留消费者可见产物和配置契约。
+
+补充包管理器边界：Bun/npm 的 Solid 编译器约束在聚合根配置生成；pnpm 在根 owner 写 workspace 配置，非 owner 不重复写根文件，最终使用全部应用的 frontend 集合补齐约束。三种包管理器的拆分生成均实际执行；只有报告明确列出的包管理器安装/构建结果才计入运行验收。
+
+### 27.10 模板声明与 Builder 解耦
+
+`templates` 是用户可修改的产品定义，不是生成器私有资源。Builder 不再按具体模块、应用类型或框架名称选择控件、默认栈和提示文案：
+
+- `templates/builder.json` 定义展示选项、完整默认配置、具名预设、addon 互斥分组和桌面打包提示范围。预设通过 `productPreset` 引用 `templates/modules/presets.json`，不复制模块组合到 Web 源码。
+- `templates/apps/<type>/app.json` 定义应用职责、默认目录和可选 `technologyLabel`；就地 `adapter.json` 定义展示名称/图标、`options.runtime` / `options.api` 的可选值和 visible/advanced/hidden 展示策略、`acceptsBackendApis` 及 `legacy` 转换资格。默认值仍来自 `stack`；控件与生成器使用同一声明校验。
+- `templates/modules/<id>/module.json` 定义依赖、支持范围、provider、options、环境说明、挂载点及 `sources` 必需贡献契约；无 TS 模块注册列表。`$dependency:<package>` 引用统一依赖版本。domain 值与原生条件使用声明式 option/provider 表达式，不在 JSON 中执行代码。`requiredWhen` 声明必须满足支持范围的基础模块场景。
+- `generate-templates` 生成独立、轻量的应用/模块/Builder 元数据。CLI、Web 和实际渲染消费同一模板声明；传入自定义模板集合时，不混入全局模块清单。修改模板后重新生成并构建 generator，Web 才会消费更新后的分发产物。
+- 切换框架保留显式 runtime/API 配置；不支持的值显示诊断并阻止生成。旧布局不再自动替换框架/API 或删掉模块。旧配置转应用布局按声明匹配，缺失或歧义必须由用户解决。
+
+扩展现有实现的 adapter ID、应用类型、模块、provider 或预设不需要新增 Builder 名称分支。新增全新运行协议/底层技术仍需要真实渲染器与对应模板，声明本身不代表实现。角色与 runtime/API 等配置协议字段是引擎契约，不是用户实例名称。
+
+本次浏览器实际验证模板预设切换、后端改名与绑定同步，以及生成预览出现 `apps/service-api`；扩展回归通过自定义声明和真实生成器验证，不以模板目录存在代替行为验收。
+
+验收结果：80 项生成器回归、33 项 Web 回归、48 项 CLI/MCP/产品回归通过；generator、Web、CLI 及 CLI 测试类型检查通过，定向 lint 通过，generator/CLI 构建通过。贡献审计 929 个来源、零分类问题，三个浏览器目录入口均可独立打包。自定义 `automation` 应用类型、`custom-engine` adapter、`custom-meter` 模块和默认预设由同一测试的模板集合提供；生成后的计量模块实际执行，配置倍率 7 时输入 6 返回 42，并保留所选 provider。未重跑全部框架安装/部署矩阵，也未宣称外部服务验收。

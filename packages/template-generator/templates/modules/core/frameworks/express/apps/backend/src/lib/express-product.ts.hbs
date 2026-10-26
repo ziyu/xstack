@@ -1,0 +1,12 @@
+import type { RequestHandler } from "express";
+import { handleNativeRequest } from "./native-request";
+import { sendFetchResponse, toFetchRequest } from "./node-http";
+
+/** Register before express.json() so signed webhooks and auth bodies stay untouched. */
+export const handleExpressProductRequest: RequestHandler = async (request, response, next) => {
+  try {
+    await sendFetchResponse(await handleNativeRequest(toFetchRequest(request)), response);
+  } catch (error) {
+    next(error);
+  }
+};

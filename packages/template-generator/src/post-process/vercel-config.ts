@@ -6,6 +6,7 @@
 import type { ServiceConfig, Services } from "@vercel/build-utils";
 import type { ProjectConfig } from "@xstack/types";
 
+import { appOutputPath, type ApplicationConfig } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 
 type VercelRewrite = NonNullable<ServiceConfig["rewrites"]>[number];
@@ -31,11 +32,11 @@ function getPublicServerUrlVar(frontend: ProjectConfig["frontend"]): string {
   return "VITE_SERVER_URL";
 }
 
-export function processVercelConfig(vfs: VirtualFileSystem, config: ProjectConfig): void {
+export function processVercelConfig(vfs: VirtualFileSystem, config: ApplicationConfig): void {
   const { webDeploy, serverDeploy, backend, runtime, frontend, addons, packageManager } = config;
 
   if (webDeploy !== "vercel" && serverDeploy !== "vercel") return;
-
+  if (config.application) return;
   const hasWeb = webDeploy === "vercel";
   const hasServer = serverDeploy === "vercel" && backend !== "self";
   const isDesktop = addons.includes("tauri") || addons.includes("electrobun");
@@ -47,7 +48,7 @@ export function processVercelConfig(vfs: VirtualFileSystem, config: ProjectConfi
 
   if (hasWeb) {
     const web: ServiceConfig = {
-      root: "apps/web",
+      root: appOutputPath(config, "web"),
       framework: getWebFramework(frontend, isDesktop),
       installCommand,
     };
@@ -71,7 +72,7 @@ export function processVercelConfig(vfs: VirtualFileSystem, config: ProjectConfi
 
   if (hasServer) {
     services.server = {
-      root: "apps/server",
+      root: appOutputPath(config, "server"),
       framework: backend,
       entrypoint: "src/index.ts",
       installCommand,
@@ -118,4 +119,79 @@ export function processVercelConfig(vfs: VirtualFileSystem, config: ProjectConfi
     rewrites,
   };
   vfs.writeFile("vercel.json", JSON.stringify(vercelConfig, null, 2));
+}
+
+/** Named applications are independent Vercel targets, never an implicit first web service. */
+export function processWorkspaceVercelConfig(
+  vfs: VirtualFileSystem,
+  configs: ApplicationConfig[],
+): void {
+  const root = vfs.readJson<{ scripts?: Record<string, string>; varlock?: { loadPath: string } }>(
+    "package.json",
+  );
+  if (!root) throw new Error("Missing workspace package.json");
+  root.scripts ??= {};
+  for (const config of configs) {
+    const application = config.application!;
+    const isWeb = config.webDeploy === "vercel";
+    const isServer =
+      config.serverDeploy === "vercel" &&
+      config.backend !== "self" &&
+      application.roles.includes("backend");
+    if (!isWeb && !isServer) continue;
+    const desktop = config.addons.includes("tauri") || config.addons.includes("electrobun");
+    const service: ServiceConfig = {
+      root: application.directory,
+      framework: isWeb ? getWebFramework(config.frontend, desktop) : config.backend,
+      installCommand: `cd ../.. && ${config.packageManager} install`,
+    };
+    if (isServer) {
+      service.entrypoint = "src/index.ts";
+      service.buildCommand = `${config.packageManager} run env:generate && ${config.packageManager} run check-types`;
+      service.functions = {
+        "src/index.ts": {
+          includeFiles: `{package.json,${application.directory}/.env.schema,node_modules/.bin/varlock,node_modules/varlock/**}`,
+        },
+      };
+      root.varlock = { loadPath: `./${application.directory}/` };
+    }
+    if (config.frontend.includes("react-router") && desktop)
+      service.outputDirectory = "build/client";
+    if (
+      config.frontend.includes("tanstack-router") ||
+      (config.frontend.includes("react-router") && desktop)
+    )
+      service.rewrites = [{ source: "/(.*)", destination: "/index.html" }];
+    if (config.orm === "prisma" && config.database !== "none")
+      service.buildCommand = `cd ../.. && ${config.packageManager} run db:generate && cd ${application.directory} && ${service.buildCommand ?? `${config.packageManager} run build`}`;
+    const path = `vercel.${application.id}.json`;
+    vfs.writeFile(
+      path,
+      JSON.stringify(
+        {
+          $schema: "https://openapi.vercel.sh/vercel.json",
+          bunVersion: config.runtime === "bun" ? "1.x" : undefined,
+          services: { [application.id]: service },
+          rewrites: [{ source: "/(.*)", destination: { service: application.id } }],
+        },
+        null,
+        2,
+      ),
+    );
+    const tsx =
+      config.packageManager === "npm"
+        ? "npx tsx"
+        : config.packageManager === "pnpm"
+          ? "pnpm exec tsx"
+          : "bunx tsx";
+    const run = `${tsx} scripts/vercel-app.ts ${application.id}`;
+    root.scripts[`deploy:${application.id}`] = `${run} deploy`;
+    root.scripts[`deploy:${application.id}:production`] = `${run} deploy --prod`;
+    root.scripts[`deploy:${application.id}:setup`] = `${run} link`;
+    root.scripts[`deploy:${application.id}:check`] = `${run} build`;
+    root.scripts[`dev:${application.id}:vercel`] = `${run} dev`;
+    root.scripts[`env:${application.id}:preview`] = `${run} env-sync preview`;
+    root.scripts[`env:${application.id}:production`] = `${run} env-sync production`;
+  }
+  vfs.writeJson("package.json", root);
 }

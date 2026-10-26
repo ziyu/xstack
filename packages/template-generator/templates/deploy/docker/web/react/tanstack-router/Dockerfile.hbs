@@ -9,11 +9,11 @@ WORKDIR /app
 
 COPY . .
 {{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.bun/install/cache bun install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
 {{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 {{else}}
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local --mount=type=cache,target=/root/.npm npm install
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
 {{/if}}
 
 {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}
@@ -29,10 +29,10 @@ ARG VITE_CLERK_PUBLISHABLE_KEY
 ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
 {{/if}}
 ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/apps/web/.env.local --mount=type=secret,id=server_env,target=/app/apps/server/.env.local cd apps/web && {{packageManager}} run build
+RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "web"}} && {{packageManager}} run build
 
 FROM nginx:alpine AS runner
-COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/{{appPath "web"}}/dist /usr/share/nginx/html
+COPY {{appPath "web"}}/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

@@ -15,12 +15,6 @@ function writeEnv(writer: AlchemyWriter, entries: readonly string[]): void {
   writeObject(writer, "env: {", () => writeLines(writer, entries), "},");
 }
 
-function webDevPort(framework: DeployedWebFramework): number {
-  if (framework === "react-router" || framework === "svelte") return 5173;
-  if (framework === "astro") return 4321;
-  return 3001;
-}
-
 function writeStaticSite(
   writer: AlchemyWriter,
   plan: AlchemyDeploymentPlan,
@@ -35,9 +29,9 @@ function writeStaticSite(
   }
   writeObject(
     writer,
-    `${declaration} Cloudflare.Website.StaticSite("web", {`,
+    `${declaration} Cloudflare.Website.StaticSite(${JSON.stringify(plan.resourceId)}, {`,
     () => {
-      writer.writeLine('cwd: "../../apps/web",');
+      writer.writeLine(`cwd: "../../${plan.webRoot}",`);
       writer.writeLine(
         `command: "${plan.config.packageManager} run ${framework === "next" ? "build:cloudflare" : "build"}",`,
       );
@@ -47,7 +41,7 @@ function writeStaticSite(
       writer.writeLine("memo: false,");
       if (framework === "next") {
         writer.writeLine('outdir: ".open-next/assets",');
-        writer.writeLine('main: "../../apps/web/.open-next/worker.js",');
+        writer.writeLine(`main: "../../${plan.webRoot}/.open-next/worker.js",`);
         writer.writeLine("bundle: true,");
         writeObject(
           writer,
@@ -59,7 +53,7 @@ function writeStaticSite(
         );
       } else {
         writer.writeLine('outdir: ".svelte-kit/cloudflare",');
-        writer.writeLine('main: "../../apps/web/.svelte-kit/cloudflare/_worker.js",');
+        writer.writeLine(`main: "../../${plan.webRoot}/.svelte-kit/cloudflare/_worker.js",`);
         writeObject(
           writer,
           "compatibility: {",
@@ -75,7 +69,7 @@ function writeStaticSite(
         "dev: {",
         () => {
           writer.writeLine(`command: "${plan.config.packageManager} run dev:bare",`);
-          writer.writeLine(`url: "http://localhost:${webDevPort(framework)}",`);
+          writer.writeLine(`url: "http://localhost:${plan.webPort}",`);
         },
         "},",
       );
@@ -84,27 +78,37 @@ function writeStaticSite(
   );
 }
 
-function writeNuxt(writer: AlchemyWriter, declaration: string, entries: readonly string[]): void {
+function writeNuxt(
+  writer: AlchemyWriter,
+  plan: AlchemyDeploymentPlan,
+  declaration: string,
+  entries: readonly string[],
+): void {
   writeObject(
     writer,
-    `${declaration} Cloudflare.Website.Nuxt("web", {`,
+    `${declaration} Cloudflare.Website.Nuxt(${JSON.stringify(plan.resourceId)}, {`,
     () => {
-      writer.writeLine('rootDir: "../../apps/web",');
+      writer.writeLine(`rootDir: "../../${plan.webRoot}",`);
       writeEnv(writer, entries);
-      writeObject(writer, "dev: {", () => writer.writeLine(`port: ${webDevPort("nuxt")},`), "},");
+      writeObject(writer, "dev: {", () => writer.writeLine(`port: ${plan.webPort},`), "},");
     },
     "});",
   );
 }
 
-function writeAstro(writer: AlchemyWriter, declaration: string, entries: readonly string[]): void {
+function writeAstro(
+  writer: AlchemyWriter,
+  plan: AlchemyDeploymentPlan,
+  declaration: string,
+  entries: readonly string[],
+): void {
   writeObject(
     writer,
-    `${declaration} Cloudflare.Website.Astro("web", {`,
+    `${declaration} Cloudflare.Website.Astro(${JSON.stringify(plan.resourceId)}, {`,
     () => {
-      writer.writeLine('rootDir: "../../apps/web",');
+      writer.writeLine(`rootDir: "../../${plan.webRoot}",`);
       writeEnv(writer, entries);
-      writeObject(writer, "dev: {", () => writer.writeLine(`port: ${webDevPort("astro")},`), "},");
+      writeObject(writer, "dev: {", () => writer.writeLine(`port: ${plan.webPort},`), "},");
     },
     "});",
   );
@@ -112,15 +116,16 @@ function writeAstro(writer: AlchemyWriter, declaration: string, entries: readonl
 
 function writeVite(
   writer: AlchemyWriter,
+  plan: AlchemyDeploymentPlan,
   declaration: string,
   framework: "tanstack-router" | "react-router" | "tanstack-start" | "solid",
   entries: readonly string[],
 ): void {
   writeObject(
     writer,
-    `${declaration} Cloudflare.Website.Vite("web", {`,
+    `${declaration} Cloudflare.Website.Vite(${JSON.stringify(plan.resourceId)}, {`,
     () => {
-      writer.writeLine('rootDir: "../../apps/web",');
+      writer.writeLine(`rootDir: "../../${plan.webRoot}",`);
       if (framework !== "tanstack-router") {
         writeObject(
           writer,
@@ -143,12 +148,7 @@ function writeVite(
         );
       }
       writeEnv(writer, entries);
-      writeObject(
-        writer,
-        "dev: {",
-        () => writer.writeLine(`port: ${webDevPort(framework)},`),
-        "},",
-      );
+      writeObject(writer, "dev: {", () => writer.writeLine(`port: ${plan.webPort},`), "},");
     },
     "});",
   );
@@ -172,16 +172,16 @@ function writeCloudflareWeb(
       writeStaticSite(writer, plan, framework, declaration, entries);
       break;
     case "nuxt":
-      writeNuxt(writer, declaration, entries);
+      writeNuxt(writer, plan, declaration, entries);
       break;
     case "astro":
-      writeAstro(writer, declaration, entries);
+      writeAstro(writer, plan, declaration, entries);
       break;
     case "tanstack-router":
     case "react-router":
     case "tanstack-start":
     case "solid":
-      writeVite(writer, declaration, framework, entries);
+      writeVite(writer, plan, declaration, framework, entries);
       break;
     default:
       assertNever(framework);
@@ -254,7 +254,7 @@ function writePrismaWeb(writer: AlchemyWriter, plan: AlchemyDeploymentPlan): voi
   writer.writeLine(
     websiteFramework
       ? "export const web = Effect.gen(function* () {"
-      : 'export const web = Prisma.Compute("web", Effect.gen(function* () {',
+      : `export const web = Prisma.Compute(${JSON.stringify(plan.resourceId)}, Effect.gen(function* () {`,
   );
   writer.indent(() => {
     writer.writeLine(
@@ -280,20 +280,22 @@ function writePrismaWeb(writer: AlchemyWriter, plan: AlchemyDeploymentPlan): voi
 
     writer.blankLine();
     if (websiteFramework) {
-      writer.writeLine(`return yield* Prisma.Website.${websiteFramework}("web", {`);
+      writer.writeLine(
+        `return yield* Prisma.Website.${websiteFramework}(${JSON.stringify(plan.resourceId)}, {`,
+      );
       writer.indent(() => {
         writer.writeLine("project,");
-        writer.writeLine('rootDir: "../../apps/web",');
+        writer.writeLine(`rootDir: "../../${plan.webRoot}",`);
         writer.writeLine("env: webEnv,");
         writer.writeLine('compute: { healthCheck: { path: "/" }, destroyOldDeployment: true },');
-        writer.writeLine(`dev: { port: ${webDevPort(framework)} },`);
+        writer.writeLine(`dev: { port: ${plan.webPort} },`);
       });
       writer.writeLine("});");
     } else {
       writer.writeLine("return {");
       writer.indent(() => {
         writer.writeLine("project,");
-        writer.writeLine('path: "../../apps/web",');
+        writer.writeLine(`path: "../../${plan.webRoot}",`);
         const frameworkName = prismaFramework(framework);
         if (frameworkName) {
           writer.writeLine(`build: { type: "auto", framework: "${frameworkName}", env: webEnv },`);
@@ -322,7 +324,7 @@ function writePrismaWeb(writer: AlchemyWriter, plan: AlchemyDeploymentPlan): voi
           "dev: {",
           () => {
             writer.writeLine(`command: "${plan.config.packageManager} run dev:bare",`);
-            writer.writeLine(`port: ${webDevPort(framework)},`);
+            writer.writeLine(`port: ${plan.webPort},`);
             writer.writeLine("env: webEnv,");
           },
           "},",
@@ -339,8 +341,19 @@ export function writeExportedWebResource(writer: AlchemyWriter, plan: AlchemyDep
     writePrismaWeb(writer, plan);
     return;
   }
-  if (plan.web.target === "cloudflare" && plan.web.topology === "self") {
-    writeCloudflareWeb(writer, plan, plan.web.framework, "self");
+  if (plan.web.target === "cloudflare") {
+    const framework = plan.web.framework;
+    if (plan.web.topology === "self") {
+      writeCloudflareWeb(writer, plan, plan.web.framework, "self");
+    } else {
+      writer.writeLine("export const web = Effect.gen(function* () {");
+      writer.indent(() => {
+        if (plan.server.target !== "none") writer.writeLine("const serverWorker = yield* server;");
+        writeCloudflareWeb(writer, plan, framework, "split");
+        writer.writeLine("return webWorker;");
+      });
+      writer.writeLine("});");
+    }
     writer.blankLine();
     writer.writeLine("export type WebEnv = Cloudflare.InferEnv<typeof web>;");
   }
@@ -348,9 +361,5 @@ export function writeExportedWebResource(writer: AlchemyWriter, plan: AlchemyDep
 
 export function writeStackWebResource(writer: AlchemyWriter, plan: AlchemyDeploymentPlan): void {
   if (plan.web.target === "none") return;
-  if (plan.web.target === "cloudflare" && plan.web.topology === "split") {
-    writeCloudflareWeb(writer, plan, plan.web.framework, "split");
-  } else {
-    writer.writeLine("const webWorker = yield* web;");
-  }
+  writer.writeLine("const webWorker = yield* web;");
 }

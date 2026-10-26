@@ -1,7 +1,15 @@
 {
   "id": "node",
+  "name": "Node.js",
+  "description": "JavaScript runtime environment",
+  "icon": "/icons/node.svg",
   "apps": {
     "cli": {
+      "legacy": false,
+      "options": {
+        "runtime": { "values": ["node"], "visibility": "visible" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
       "stack": {
         "runtime": "node",
         "api": "none"

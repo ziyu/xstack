@@ -1,5 +1,6 @@
 import type { ProjectConfig } from "@xstack/types";
 
+import { appOutputPath } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { RenderConfig } from "../types";
 import { addPackageDependency, type AvailableDependencies } from "../utils/add-deps";
@@ -9,6 +10,12 @@ export function processWorkspaceDeps(vfs: VirtualFileSystem, config: RenderConfi
     config;
 
   const workspaceVersion = packageManager === "npm" ? "*" : "workspace:*";
+  const serverPath = appOutputPath(config, "server", "package.json");
+  const webPath = appOutputPath(config, "web", "package.json");
+  const nativePath = appOutputPath(config, "native", "package.json");
+  const ownsBackend = config.application
+    ? config.application.roles.includes("backend")
+    : backend !== "none";
   const packages = {
     config: vfs.exists("packages/config/package.json"),
     infra: vfs.exists("packages/infra/package.json"),
@@ -17,9 +24,15 @@ export function processWorkspaceDeps(vfs: VirtualFileSystem, config: RenderConfi
     api: vfs.exists("packages/api/package.json"),
     ui: vfs.exists("packages/ui/package.json"),
     backend: vfs.exists("packages/backend/package.json"),
-    server: vfs.exists("apps/server/package.json"),
-    web: vfs.exists("apps/web/package.json"),
-    native: vfs.exists("apps/native/package.json"),
+    server: ownsBackend && backend !== "self" && vfs.ownsPath(serverPath) && vfs.exists(serverPath),
+    web:
+      frontend.some((item) => item !== "none" && !item.startsWith("native-")) &&
+      vfs.ownsPath(webPath) &&
+      vfs.exists(webPath),
+    native:
+      frontend.some((item) => item.startsWith("native-")) &&
+      vfs.ownsPath(nativePath) &&
+      vfs.exists(nativePath),
   };
 
   const configDep = packages.config ? { [`@${projectName}/config`]: workspaceVersion } : {};
@@ -116,7 +129,7 @@ export function processWorkspaceDeps(vfs: VirtualFileSystem, config: RenderConfi
     if (database !== "none" && packages.db) serverDeps[`@${projectName}/db`] = workspaceVersion;
     addPackageDependency({
       vfs,
-      packagePath: "apps/server/package.json",
+      packagePath: serverPath,
       dependencies: commonDeps,
       devDependencies: serverDevDependencies,
       customDependencies: serverDeps,
@@ -128,20 +141,17 @@ export function processWorkspaceDeps(vfs: VirtualFileSystem, config: RenderConfi
     const webPackageDeps = { ...uiDep } satisfies Record<string, string>;
 
     if (api !== "none" && packages.api) webPackageDeps[`@${projectName}/api`] = workspaceVersion;
-    if (
-      auth !== "none" &&
-      packages.auth &&
-      (backend === "self" || (auth === "better-auth" && frontend.includes("solid")))
-    ) {
+    if (auth !== "none" && packages.auth && ownsBackend && backend === "self") {
       webPackageDeps[`@${projectName}/auth`] = workspaceVersion;
     }
-    if (backend === "self" && packages.db) webPackageDeps[`@${projectName}/db`] = workspaceVersion;
+    if (ownsBackend && backend === "self" && packages.db)
+      webPackageDeps[`@${projectName}/db`] = workspaceVersion;
     if (backend === "convex" && packages.backend)
       webPackageDeps[`@${projectName}/backend`] = workspaceVersion;
 
     addPackageDependency({
       vfs,
-      packagePath: "apps/web/package.json",
+      packagePath: webPath,
       dependencies: commonDeps,
       devDependencies: ["typescript"],
       customDependencies: webPackageDeps,
@@ -165,9 +175,17 @@ export function processWorkspaceDeps(vfs: VirtualFileSystem, config: RenderConfi
       nativeDeps[`@${projectName}/backend`] = workspaceVersion;
     addPackageDependency({
       vfs,
-      packagePath: "apps/native/package.json",
+      packagePath: nativePath,
       dependencies: commonDeps,
       customDependencies: nativeDeps,
+      customDevDependencies: configDep,
+    });
+  }
+  if (config.application && !packages.web && !packages.native && !packages.server) {
+    addPackageDependency({
+      vfs,
+      packagePath: `${config.application.directory}/package.json`,
+      devDependencies: commonDevDeps,
       customDevDependencies: configDep,
     });
   }

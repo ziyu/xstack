@@ -1,0 +1,34 @@
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const applications: Record<string, string> = {
+{{#each deploymentApplications}}
+  "{{id}}": "{{directory}}",
+{{/each}}
+};
+const [id, command, ...args] = process.argv.slice(2);
+if (!id || !Object.hasOwn(applications, id) || !command) throw new Error(`Usage: vercel-app <${Object.keys(applications).join("|")}> <link|deploy|build|dev|env-sync>`);
+const runner = [{{#if (eq packageManager "npm")}}"npx", "--yes"{{else if (eq packageManager "pnpm")}}"pnpm", "dlx"{{else}}"bunx"{{/if}}];
+let executable = runner[0]!;
+let argv: string[];
+const env = { ...process.env };
+if (command === "link") {
+  argv = [...runner.slice(1), "vercel", "link", "--cwd", applications[id]!, ...args];
+} else {
+  const projectPath = join(applications[id]!, ".vercel/project.json");
+  let project: { projectId: string; orgId: string };
+  try { project = JSON.parse(readFileSync(projectPath, "utf8")); }
+  catch { throw new Error(`Link application ${id} first with {{packageManager}} run deploy:${id}:setup (${projectPath})`); }
+  if (!project.projectId || !project.orgId) throw new Error(`Invalid Vercel project link: ${projectPath}`);
+  env.VERCEL_PROJECT_ID = project.projectId;
+  env.VERCEL_ORG_ID = project.orgId;
+  if (command === "env-sync") {
+    argv = [...runner.slice(1), "tsx", "scripts/sync-vercel-env.ts", ...args, "--app", id];
+  } else {
+    argv = [...runner.slice(1), "vercel", ...(command === "deploy" ? [] : [command]), "--local-config", `vercel.${id}.json`, ...args];
+  }
+}
+const result = spawnSync(executable, argv, { stdio: "inherit", env });
+if (result.error) throw result.error;
+process.exit(result.status ?? 1);

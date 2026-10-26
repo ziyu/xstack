@@ -1,6 +1,12 @@
 {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
 import Fastify from "fastify";
 import fastifyCors from "@fastify/cors";
+{{#if (eq serverDeploy "vercel")}}
+import type { IncomingMessage, ServerResponse } from "node:http";
+{{/if}}
+{{#if application.nativeSplit}}
+import { registerProductRoutes } from "./lib/fastify-product";
+{{/if}}
 
 {{#if (eq api "trpc")}}
 import { fastifyTRPCPlugin, type FastifyTRPCPluginOptions } from "@trpc/server/adapters/fastify";
@@ -19,6 +25,7 @@ import { appRouter } from "@{{projectName}}/api/routers/index";
 {{/if}}
 
 
+{{#unless application.nativeSplit}}
 {{#if (eq auth "better-auth")}}
 import { auth } from "@{{projectName}}/auth";
 {{/if}}
@@ -26,13 +33,16 @@ import { auth } from "@{{projectName}}/auth";
 import { clerkPlugin } from "@clerk/fastify";
 {{/if}}
 
+{{/unless}}
 const baseCorsConfig = {
-    origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
-	methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    origin: [...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean), {{#each application.clientOrigins}}"{{this}}", {{/each}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}...desktopOrigins{{/if}}],
+	methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 	allowedHeaders: [
 		"Content-Type",
 		"Authorization",
-		"X-Requested-With"
+		"X-Requested-With",
+		"X-Captcha-Token",
+		"Accept-Language"
 	],
 	credentials: true,
 	maxAge: 86400,
@@ -70,16 +80,21 @@ const fastify = Fastify({
 {{/if}}
 
 fastify.register(fastifyCors, baseCorsConfig);
+{{#if application.nativeSplit}}
+fastify.register(registerProductRoutes);
+{{else}}
 {{#if (eq auth "clerk")}}
 fastify.register(clerkPlugin, {
 	publishableKey: ENV.CLERK_PUBLISHABLE_KEY,
 	secretKey: ENV.CLERK_SECRET_KEY,
 });
 {{/if}}
+{{/if}}
 
 {{#if (eq api "orpc")}}
 fastify.register(async (rpcApp) => {
 	// Fully utilize oRPC features by letting oRPC parse the request body.
+	rpcApp.removeAllContentTypeParsers();
 	rpcApp.addContentTypeParser("*", (_, _payload, done) => {
 		done(null, undefined);
 	});
@@ -108,36 +123,39 @@ fastify.register(async (rpcApp) => {
 });
 {{/if}}
 
+{{#unless application.nativeSplit}}
 {{#if (eq auth "better-auth")}}
-fastify.route({
-	method: ["GET", "POST"],
-	url: "/api/auth/*",
-	async handler(request, reply) {
-		try {
-			const url = new URL(request.url, `http://${request.headers.host}`);
+fastify.register(async (authApp) => {
+	authApp.removeAllContentTypeParsers();
+	authApp.addContentTypeParser("*", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
+	authApp.route({
+		method: ["GET", "POST"],
+		url: "/api/auth/*",
+		async handler(request, reply) {
 			const headers = new Headers();
-			Object.entries(request.headers).forEach(([key, value]) => {
-				if (value) headers.append(key, value.toString());
-			});
-			const req = new Request(url.toString(), {
-				method: request.method,
-				headers,
-				body: request.body ? JSON.stringify(request.body) : undefined,
-			});
-			const response = await auth.handler(req);
+			for (let index = 0; index < request.raw.rawHeaders.length; index += 2) {
+				headers.append(request.raw.rawHeaders[index]!, request.raw.rawHeaders[index + 1]!);
+			}
+			const response = await auth.handler(new Request(
+				new URL(request.url, {{#if application.backendOrigin}}"{{application.backendOrigin}}"{{else}}ENV.BETTER_AUTH_URL{{/if}}),
+				{
+					method: request.method,
+					headers,
+					body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body as Uint8Array<ArrayBuffer>,
+				},
+			));
 			reply.status(response.status);
-			response.headers.forEach((value, key) => reply.header(key, value));
-			reply.send(response.body ? await response.text() : null);
-		} catch (error) {
-			fastify.log.error({ err: error }, "Authentication Error:");
-			reply.status(500).send({
-				error: "Internal authentication error",
-				code: "AUTH_FAILURE"
+			response.headers.forEach((value, name) => {
+				if (name !== "set-cookie") reply.header(name, value);
 			});
-		}
-	}
+			const cookies = response.headers.getSetCookie();
+			if (cookies.length) reply.header("set-cookie", cookies);
+			return reply.send(response.body ? Buffer.from(await response.arrayBuffer()) : null);
+		},
+	});
 });
 {{/if}}
+{{/unless}}
 
 {{#if (eq api "trpc")}}
 fastify.register(fastifyTRPCPlugin, {
@@ -157,10 +175,22 @@ fastify.get('/', async () => {
 	return 'OK';
 });
 
-fastify.listen({ port: 3000{{#if (or (eq serverDeploy "docker") (eq serverDeploy "prisma"))}}, host: "0.0.0.0"{{/if}} }, (err) => {
+{{#if (eq serverDeploy "vercel")}}
+export default async function handler(request: IncomingMessage, response: ServerResponse) {
+	await fastify.ready();
+	fastify.server.emit("request", request, response);
+}
+
+if (!process.env.VERCEL) {
+{{/if}}
+const port = Number(process.env.PORT ?? {{#if application.port}}{{application.port}}{{else}}3000{{/if}});
+fastify.listen({ port{{#if (or (eq serverDeploy "docker") (eq serverDeploy "prisma"))}}, host: "0.0.0.0"{{/if}} }, (err) => {
 	if (err) {
 		fastify.log.error(err);
 		process.exit(1);
 	}
-	console.log("Server running on port 3000");
+	console.log(`Server running on port ${port}`);
 });
+{{#if (eq serverDeploy "vercel")}}
+}
+{{/if}}

@@ -1,7 +1,48 @@
 {
   "id": "express",
+  "name": "Express",
+  "description": "Popular Node.js framework",
+  "icon": "/icons/express.svg",
   "apps": {
     "backend": {
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["bun", "node"], "visibility": "visible" },
+        "api": { "values": ["trpc", "orpc", "none"], "visibility": "advanced" }
+      },
+      "devArgs": [],
+      "serverContributions": { "apiPrefix": "" },
+      "productContribution": {
+        "mode": "server",
+        "protocol": "product-http-v1",
+        "modules": [
+          "core",
+          "i18n",
+          "auth",
+          "admin",
+          "email",
+          "sms",
+          "captcha",
+          "payment",
+          "credits",
+          "affiliate"
+        ],
+        "constraints": {
+          "runtime": ["bun", "node"],
+          "api": ["none"],
+          "orm": ["drizzle"],
+          "database": ["sqlite", "postgres"],
+          "webDeploy": ["none"]
+        },
+        "frameworks": [
+          {
+            "id": "http-server",
+            "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"]
+          },
+          { "id": "node-http", "modules": ["core"] },
+          { "id": "express", "modules": ["core"] }
+        ]
+      },
       "stack": {
         "backend": "express",
         "runtime": "bun",

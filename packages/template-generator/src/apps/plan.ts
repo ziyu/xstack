@@ -2,8 +2,6 @@ import {
   ApplicationManifestSchema,
   ApplicationSelectionSchema,
   FrameworkAdapterSchema,
-  allowedApisForFrontends,
-  supportsRuntimeBackend,
   type ApplicationAdapter,
   type FrameworkAdapter,
   type ApplicationManifest,
@@ -11,7 +9,7 @@ import {
 } from "@xstack/types";
 
 import { GeneratorError } from "../types";
-import { isApplicationMetadataPath } from "./metadata";
+import { applicationOptions, isApplicationMetadataPath } from "./metadata";
 
 /** Rendering paths are derived from the template layout, never supplied by metadata. */
 export interface ResolvedApplicationAdapter extends ApplicationAdapter {
@@ -163,6 +161,16 @@ export function readFrameworkCatalog(
     }
     const apps: Record<string, ResolvedApplicationAdapter> = Object.create(null);
     for (const [type, adapter] of Object.entries(framework.apps)) {
+      const options = applicationOptions(adapter);
+      if (
+        !options.runtime.values.includes(adapter.stack.runtime ?? "none") ||
+        !options.api.values.includes(adapter.stack.api ?? "none")
+      ) {
+        throw new GeneratorError({
+          phase: "applications",
+          message: `Framework ${framework.id} application ${type} defaults must belong to its declared runtime/API options`,
+        });
+      }
       const source = `${appPrefix}${type}`;
       if (!implementationDirectories.has(source)) {
         throw new GeneratorError({
@@ -252,20 +260,14 @@ export function resolveApplications(
     const stack = { ...implementation.stack };
     if (selection.stack.runtime !== undefined) stack.runtime = selection.stack.runtime;
     if (selection.stack.api !== undefined) stack.api = selection.stack.api;
-    const runtimeSupported =
-      stack.backend && stack.backend !== "none"
-        ? supportsRuntimeBackend(stack.runtime, stack.backend)
-        : (stack.runtime ?? "none") === (implementation.stack.runtime ?? "none");
-    const apiSupported =
-      (!stack.api ||
-        stack.api === "none" ||
-        (stack.backend && !["none", "convex"].includes(stack.backend))) &&
-      allowedApisForFrontends(stack.frontend).includes(stack.api ?? "none");
+    const options = applicationOptions(implementation);
+    const runtimeSupported = options.runtime.values.includes(stack.runtime ?? "none");
+    const apiSupported = options.api.values.includes(stack.api ?? "none");
     if (!runtimeSupported || !apiSupported) {
       issues.push({
         code: "unsupported-stack",
         app: id,
-        message: `Framework ${framework.id} application ${selection.type} does not support runtime ${stack.runtime ?? "none"} and API ${stack.api ?? "none"}`,
+        message: `Framework ${framework.id} application ${selection.type} does not support runtime ${stack.runtime ?? "none"} and API ${stack.api ?? "none"}; select runtime ${options.runtime.values.join(" / ")} and API ${options.api.values.join(" / ")}, or update its adapter declarations`,
       });
       continue;
     }
@@ -381,7 +383,7 @@ export function resolveApplications(
     const backend = backendId ? appsById.get(backendId) : undefined;
     if (
       backend &&
-      !allowedApisForFrontends(app.adapter.stack.frontend).includes(
+      !(app.adapter.acceptsBackendApis ?? applicationOptions(app.adapter).api.values).includes(
         backend.adapter.stack.api ?? "none",
       )
     ) {

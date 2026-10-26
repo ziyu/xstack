@@ -1,6 +1,7 @@
 {
   "id": "fullstack-web",
   "name": "Fullstack web app",
+  "technologyLabel": "Fullstack framework",
   "defaultDirectoryName": "web",
   "roles": ["web-frontend", "backend", "admin"],
   "scope": "product",

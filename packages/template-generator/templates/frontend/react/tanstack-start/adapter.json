@@ -1,7 +1,22 @@
 {
   "id": "tanstack-start",
+  "name": "TanStack Start",
+  "description": "Full-stack React framework powered by TanStack Router",
+  "icon": "/icons/tanstack.svg",
   "apps": {
     "fullstack-web": {
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["trpc", "orpc", "none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
+      "clientContributions": {
+        "framework": "tanstack-start",
+        "family": "react",
+        "serverAuth": true
+      },
+      "serverContributions": { "apiPrefix": "/api" },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {
@@ -12,6 +27,17 @@
       }
     },
     "web-frontend": {
+      "legacy": true,
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
+      "clientContributions": {
+        "framework": "tanstack-start",
+        "family": "react",
+        "serverAuth": true
+      },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {

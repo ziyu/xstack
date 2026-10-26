@@ -1,6 +1,7 @@
 {
   "id": "native",
   "name": "Native application",
+  "technologyLabel": "Native framework",
   "defaultDirectoryName": "native",
   "roles": [],
   "scope": "independent",

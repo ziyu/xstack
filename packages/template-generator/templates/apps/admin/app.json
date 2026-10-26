@@ -1,6 +1,7 @@
 {
   "id": "admin",
   "name": "Administration application",
+  "technologyLabel": "Administration framework",
   "defaultDirectoryName": "admin",
   "roles": ["admin"],
   "scope": "product",

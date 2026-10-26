@@ -7,6 +7,7 @@ import {
   type WebFrontend,
 } from "@xstack/types";
 
+import { appOutputPath } from "../../contributions/context";
 import type { RenderConfig } from "../../types";
 
 export type DeployedWebFramework = Exclude<WebFrontend, "none">;
@@ -39,6 +40,11 @@ export type AlchemyServerPlan = { target: "none" } | { target: "cloudflare" | "p
 
 export type AlchemyDeploymentPlan = {
   config: RenderConfig;
+  webRoot: string;
+  serverRoot: string;
+  webPort: number;
+  serverPort: number;
+  resourceId: string;
   managedDatabase: ManagedDatabasePlan;
   web: AlchemyWebPlan;
   server: AlchemyServerPlan;
@@ -117,7 +123,10 @@ export function createAlchemyDeploymentPlan(config: RenderConfig): AlchemyDeploy
   const hasPrismaDeploy = config.webDeploy === "prisma" || config.serverDeploy === "prisma";
   const hasAlchemyManagedDatabase = usesAlchemyManagedDatabase(config);
   const hasAxiom = config.addons.includes("axiom");
-  const hasAxiomServerRuntime = hasAxiom && AXIOM_SERVER_BACKENDS.includes(config.backend);
+  const hasAxiomServerRuntime =
+    hasAxiom &&
+    (!config.application || config.application.roles.includes("backend")) &&
+    AXIOM_SERVER_BACKENDS.includes(config.backend);
   const hasAxiomWebRuntime =
     hasAxiom && config.frontend.some((frontend) => AXIOM_WEB_FRONTENDS.includes(frontend));
   const hasAxiomVercelRuntime =
@@ -128,7 +137,13 @@ export function createAlchemyDeploymentPlan(config: RenderConfig): AlchemyDeploy
     ? {
         target: config.webDeploy,
         framework: getDeployedWebFramework(config),
-        topology: config.backend === "self" ? "self" : "split",
+        topology: config.application
+          ? config.application.roles.includes("backend")
+            ? "self"
+            : "split"
+          : config.backend === "self"
+            ? "self"
+            : "split",
       }
     : { target: "none" };
 
@@ -138,6 +153,19 @@ export function createAlchemyDeploymentPlan(config: RenderConfig): AlchemyDeploy
 
   return {
     config,
+    webRoot: appOutputPath(config, "web"),
+    serverRoot: appOutputPath(config, "server"),
+    webPort:
+      config.application?.port ??
+      (config.frontend.includes("astro")
+        ? 4321
+        : config.frontend.some((frontend) => frontend === "svelte" || frontend === "react-router")
+          ? 5173
+          : 3001),
+    serverPort: config.application?.roles.includes("backend")
+      ? (config.application.port ?? 3000)
+      : Number(new URL(config.application?.backendOrigin ?? "http://localhost:3000").port || 3000),
+    resourceId: config.application?.id ?? "web",
     managedDatabase: createManagedDatabasePlan(config),
     web,
     server,

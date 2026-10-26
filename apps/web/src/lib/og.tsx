@@ -132,9 +132,7 @@ export function OgShell({
           }}
         >
           <span style={{ color: ogColors.accent, display: "flex" }}>•</span>
-          <span style={{ color: ogColors.text, fontWeight: 500, display: "flex" }}>
-            xstack
-          </span>
+          <span style={{ color: ogColors.text, fontWeight: 500, display: "flex" }}>xstack</span>
           <span style={{ color: ogColors.border, display: "flex" }}>|</span>
           <span style={{ color: ogColors.subtext, display: "flex" }}>{section}</span>
           <span style={{ flex: 1, display: "flex" }} />

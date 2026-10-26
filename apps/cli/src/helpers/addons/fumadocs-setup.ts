@@ -7,12 +7,12 @@ import fs from "fs-extra";
 import { navigableSelect } from "../../prompts/navigable";
 import { navigableGroup } from "../../prompts/navigable-group";
 import type { ProjectConfig } from "../../types";
-import { readXStackConfig } from "../../utils/xstack-config";
 import { isSilent } from "../../utils/context";
 import { AddonSetupError, UserCancelledError, userCancelled } from "../../utils/errors";
 import { shouldSkipExternalCommands } from "../../utils/external-commands";
 import { getPackageExecutionArgs } from "../../utils/package-runner";
 import { cliLog, createSpinner } from "../../utils/terminal-output";
+import { readXStackConfig } from "../../utils/xstack-config";
 
 type FumadocsTemplate =
   | "next-mdx"

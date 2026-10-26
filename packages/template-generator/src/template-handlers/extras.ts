@@ -1,6 +1,7 @@
 import type { ProjectConfig } from "@xstack/types";
 import { parse, stringify } from "yaml";
 
+import { appOutputPath, type ApplicationConfig } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { dependencyVersionMap } from "../utils/add-deps";
 import { getAllowedDependencyScripts } from "../utils/dependency-scripts";
@@ -9,7 +10,7 @@ import { type TemplateData, processSingleTemplate } from "./utils";
 export async function processExtrasTemplates(
   vfs: VirtualFileSystem,
   templates: TemplateData,
-  config: ProjectConfig,
+  config: ApplicationConfig,
 ): Promise<void> {
   const hasNative = config.frontend.some((f) =>
     ["native-bare", "native-uniwind", "native-unistyles"].includes(f),
@@ -30,16 +31,21 @@ export async function processExtrasTemplates(
       vfs,
       templates,
       "extras/env.d.ts",
-      config.backend === "self"
-        ? "apps/web/cloudflare-env.d.ts"
-        : "apps/server/cloudflare-env.d.ts",
+      appOutputPath(config, "server", "cloudflare-env.d.ts"),
       config,
+    );
+  }
+  if (config.application && config.webDeploy === "cloudflare") {
+    const name = `AppEnv_${Array.from(config.application.id, (character) => character.charCodeAt(0).toString(16)).join("_")}`;
+    vfs.writeFile(
+      appOutputPath(config, "web", "cloudflare-env.d.ts"),
+      `import type { ${name} } from "@${config.projectName}/infra/alchemy.run";\nexport type CloudflareEnv = ${name};\ndeclare global { type Env = CloudflareEnv; }\ndeclare module "cloudflare:workers" { namespace Cloudflare { interface Env extends CloudflareEnv {} } }\n`,
     );
   }
 }
 
 export function processPnpmWorkspaceConfig(vfs: VirtualFileSystem, config: ProjectConfig): void {
-  if (config.packageManager !== "pnpm") return;
+  if (config.packageManager !== "pnpm" || !vfs.ownsPath("pnpm-workspace.yaml")) return;
   const workspace = parse(vfs.readFile("pnpm-workspace.yaml") ?? "") ?? {};
   workspace.packages ??= ["apps/*", "packages/*"];
   const allowBuilds = getAllowedDependencyScripts(config);

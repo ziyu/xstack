@@ -1,3 +1,5 @@
+import { APPLICATION_TEMPLATES } from "../applications.generated";
+import { readFrameworkCatalog } from "../apps/plan";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import {
   hasTemplatesWithPrefix,
@@ -7,8 +9,47 @@ import {
 } from "../template-handlers/utils";
 import { GeneratorError, type RenderConfig } from "../types";
 
-/** Shared clients are reusable by these application types, not arbitrary apps. */
-export const WEB_CLIENT_APP_TYPES = ["fullstack-web", "web-frontend", "admin"] as const;
+/** Client applicability is a role contract, independent of application IDs and types. */
+export const WEB_CLIENT_ROLES = ["web-frontend", "admin"] as const;
+
+export type ClientContribution = { framework: string; family: string };
+
+/** Legacy entry points read the same adapter declarations as explicit applications. */
+export function stackClientContributions(config: RenderConfig): ClientContribution[] {
+  if (config.application) {
+    if (
+      !config.application.clientContributions &&
+      config.frontend.some((frontend) => frontend !== "none")
+    ) {
+      throw new GeneratorError({
+        phase: "contributions",
+        message: `Application ${config.application.id} has no declared auth/API client contribution`,
+      });
+    }
+    return config.application.clientContributions ? [config.application.clientContributions] : [];
+  }
+  const adapters = [...readFrameworkCatalog(APPLICATION_TEMPLATES).values()].flatMap((framework) =>
+    Object.values(framework.apps),
+  );
+  return config.frontend.flatMap((frontend) => {
+    if (frontend === "none") return [];
+    const adapter = adapters.find(
+      (candidate) =>
+        candidate.stack.frontend?.includes(frontend) &&
+        (candidate.clientContributions?.family === "native" ||
+          (config.backend === "self"
+            ? candidate.stack.backend === "self"
+            : candidate.stack.backend !== "self")),
+    );
+    if (!adapter?.clientContributions) {
+      throw new GeneratorError({
+        phase: "contributions",
+        message: `Framework ${frontend} has no declared auth/API client contribution for this stack`,
+      });
+    }
+    return [adapter.clientContributions];
+  });
+}
 
 export interface StackContribution {
   source: string;
@@ -16,16 +57,13 @@ export interface StackContribution {
   required: boolean;
   owner: string;
   kind: "prefix" | "file";
-  appTypes?: readonly string[];
+  roles?: readonly string[];
   /** Required for an intentional legacy no-op, never inferred from missing files. */
   optionalReason?: string;
 }
 
-export function acceptsStackApplication(
-  config: RenderConfig,
-  appTypes: readonly string[],
-): boolean {
-  return !config.application || appTypes.includes(config.application.type);
+export function acceptsStackRoles(config: RenderConfig, roles: readonly string[]): boolean {
+  return !config.application || roles.some((role) => config.application!.roles.includes(role));
 }
 
 /** Validate the entire selection before rendering; missing implementations cannot disappear. */
@@ -43,10 +81,10 @@ export function renderStackContributions(
         message: `Optional contribution ${contribution.source} must document why it is optional`,
       });
     }
-    if (contribution.appTypes && !acceptsStackApplication(config, contribution.appTypes)) {
+    if (contribution.roles && !acceptsStackRoles(config, contribution.roles)) {
       throw new GeneratorError({
         phase: "contributions",
-        message: `Contribution ${contribution.source} does not apply to application type ${config.application?.type}`,
+        message: `Contribution ${contribution.source} requires role ${contribution.roles.join(" or ")} on application ${config.application?.id}`,
       });
     }
     const present =

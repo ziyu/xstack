@@ -13,9 +13,9 @@
     "deploy": "convex deploy"
   },
   "dependencies": {
-    "@xstack/types": "workspace:*",
     "@convex-dev/crons": "^0.2.2",
     "@erquhart/convex-oss-stats": "catalog:",
+    "@xstack/types": "workspace:*",
     "convex": "catalog:",
     "convex-helpers": "catalog:"
   },

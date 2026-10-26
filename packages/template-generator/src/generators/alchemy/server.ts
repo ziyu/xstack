@@ -5,9 +5,9 @@ import { writeLines, writeObject, type AlchemyWriter } from "./writer";
 function writeCloudflareServer(writer: AlchemyWriter, plan: AlchemyDeploymentPlan): void {
   writeObject(
     writer,
-    'export const server = Cloudflare.Worker("server", {',
+    `export const server = Cloudflare.Worker(${JSON.stringify(plan.config.application?.id ?? "server")}, {`,
     () => {
-      writer.writeLine('main: "../../apps/server/src/index.ts",');
+      writer.writeLine(`main: "../../${plan.serverRoot}/src/index.ts",`);
       writeObject(
         writer,
         "compatibility: {",
@@ -28,7 +28,7 @@ function writeCloudflareServer(writer: AlchemyWriter, plan: AlchemyDeploymentPla
         writer,
         "dev: {",
         () => {
-          writer.writeLine("port: 3000,");
+          writer.writeLine(`port: ${plan.serverPort},`);
         },
         "},",
       );
@@ -40,7 +40,9 @@ function writeCloudflareServer(writer: AlchemyWriter, plan: AlchemyDeploymentPla
 }
 
 function writePrismaServer(writer: AlchemyWriter, plan: AlchemyDeploymentPlan): void {
-  writer.writeLine('export const server = Prisma.Compute("server", Effect.gen(function* () {');
+  writer.writeLine(
+    `export const server = Prisma.Compute(${JSON.stringify(plan.config.application?.id ?? "server")}, Effect.gen(function* () {`,
+  );
   writer.indent(() => {
     writer.writeLine("const project = yield* prismaProject;");
     writer.writeLine("const resolvedDatabaseEnv = yield* databaseEnv;");
@@ -51,7 +53,7 @@ function writePrismaServer(writer: AlchemyWriter, plan: AlchemyDeploymentPlan): 
     writer.writeLine("return {");
     writer.indent(() => {
       writer.writeLine("project,");
-      writer.writeLine('path: "../../apps/server",');
+      writer.writeLine(`path: "../../${plan.serverRoot}",`);
       writeObject(
         writer,
         "build: {",
@@ -62,7 +64,7 @@ function writePrismaServer(writer: AlchemyWriter, plan: AlchemyDeploymentPlan): 
         "},",
       );
       writer.writeLine('entrypoint: "src/index.ts",');
-      writer.writeLine("port: 3000,");
+      writer.writeLine(`port: ${plan.serverPort},`);
       writeObject(
         writer,
         "env: {",
@@ -78,7 +80,7 @@ function writePrismaServer(writer: AlchemyWriter, plan: AlchemyDeploymentPlan): 
         "dev: {",
         () => {
           writer.writeLine(`command: "${plan.config.packageManager} run dev:bare",`);
-          writer.writeLine("port: 3000,");
+          writer.writeLine(`port: ${plan.serverPort},`);
         },
         "},",
       );

@@ -6,12 +6,12 @@ import pc from "picocolors";
 import { navigableMultiselect, navigableSelect } from "../../prompts/navigable";
 import { navigableGroup } from "../../prompts/navigable-group";
 import type { AddonOptions, ProjectConfig } from "../../types";
-import { readXStackConfig } from "../../utils/xstack-config";
 import { isSilent } from "../../utils/context";
 import { AddonSetupError, UserCancelledError } from "../../utils/errors";
 import { shouldSkipExternalCommands } from "../../utils/external-commands";
 import { getPackageRunnerPrefix } from "../../utils/package-runner";
 import { cliLog, createSpinner } from "../../utils/terminal-output";
+import { readXStackConfig } from "../../utils/xstack-config";
 import { supportsEvlogLocalLogs } from "./evlog-setup";
 
 type SkillSource = {

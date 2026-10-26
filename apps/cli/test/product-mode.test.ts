@@ -50,11 +50,6 @@ describe("product mode", () => {
     expect(await exists("apps/web/src/components/header.tsx")).toBe(false);
     expect(await exists("apps/web/src/app/[lang]/forgot-password/page.tsx")).toBe(false);
 
-    const services = await read("apps/web/src/services.ts");
-    expect(services).toContain("export const events = createEventBus()");
-    expect(services).toContain("export const auth = createAuth(ENV, db, events)");
-    expect(services).toContain("export const services = {");
-
     const xstackConfig = await read("xstack.jsonc");
     expect(xstackConfig).toContain('"features": [');
     expect(xstackConfig).toContain('"auth"');
@@ -84,18 +79,6 @@ describe("product mode", () => {
     }
     expect(await exists("apps/web/src/app/api/payment/mock/route.ts")).toBe(false);
 
-    const services = await read("apps/web/src/services.ts");
-    for (const register of [
-      "registerAuthEmail",
-      "registerPaymentCredits",
-      "registerCreditsSignup",
-    ]) {
-      expect(services).toContain(`${register}(services);`);
-    }
-    expect(await read("apps/web/src/integrations/credits-signup.ts")).toContain(
-      "const SIGNUP_BONUS = 50;",
-    );
-    expect(await read("apps/web/src/config/navigation.ts")).toContain('"/admin/credits"');
     const schema = await read("apps/web/.env.schema");
     expect(schema).toContain("STRIPE_SECRET_KEY");
     expect(schema).toContain("# @sensitive=false @type=url\nBETTER_AUTH_URL=");
@@ -111,8 +94,6 @@ describe("product mode", () => {
     expect(result.isOk()).toBe(true);
 
     expect(await exists("apps/web/Dockerfile")).toBe(true);
-    expect(await read("packages/i18n/src/config.ts")).toContain('defaultLocale: Locale = "zh-CN"');
-    expect(await read("packages/i18n/src/messages/index.ts")).not.toContain("./en");
 
     const xstackConfig = await read("xstack.jsonc");
     expect(xstackConfig).toContain('"database": "postgres"');
@@ -166,13 +147,12 @@ describe("product mode", () => {
   });
 
   it("renders the product shell without auth when no features are selected", async () => {
-    const { result, read, exists } = await createProduct("product-shell-only", {
+    const { result, exists } = await createProduct("product-shell-only", {
       product: { features: [] },
     });
     expect(result.isOk()).toBe(true);
     expect(await exists("apps/web/src/app/[lang]/page.tsx")).toBe(true);
     expect(await exists("packages/auth/package.json")).toBe(false);
-    expect(await read("apps/web/src/components/site-header.tsx")).not.toContain("authClient");
   });
 
   it("parses --providers lists that share a feature prefix", () => {

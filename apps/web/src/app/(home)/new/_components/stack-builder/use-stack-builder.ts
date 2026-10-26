@@ -16,7 +16,7 @@ import {
   generateStackSharingUrl,
 } from "@/lib/stack-utils";
 import {
-  analyzeStackCompatibility,
+  type CompatibilityResult,
   isOptionCompatible,
   validateProjectName,
 } from "@/lib/stack-validation";
@@ -33,7 +33,7 @@ export type CategoryProgressItem = {
 
 const CATEGORY_LIST = CATEGORY_ORDER;
 type StackUpdate = Partial<StackState> | ((prev: StackState) => Partial<StackState>);
-type CompatibilityAnalysis = ReturnType<typeof analyzeStackCompatibility>;
+type CompatibilityAnalysis = CompatibilityResult;
 
 function withFormattedProjectName(stack: StackState) {
   return { ...stack, projectName: formatProjectName(stack.projectName) };

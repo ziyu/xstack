@@ -31,9 +31,11 @@ const trpcClient = createTRPCClient<AppRouter>({
 	links: [
 		httpBatchLink({
 {{#if (eq backend "self")}}
-			url: "/api/trpc",
+			url: `${typeof window !== "undefined" ? window.location.origin : (process.env.BETTER_AUTH_URL ?? {{#if application}}"{{application.origin}}"{{else}}"http://localhost:3001"{{/if}})}/api/trpc`,
 {{else}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+			url: `${getServerUrl(process.env.NEXT_PUBLIC_SERVER_URL!)}{{application.backendApiPrefix}}/trpc`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 			url: `${getServerUrl(process.env.NEXT_PUBLIC_SERVER_URL!)}/trpc`,
 {{else}}
 			url: `${process.env.NEXT_PUBLIC_SERVER_URL!.replace(/\/$/, "")}/trpc`,
@@ -54,6 +56,12 @@ const trpcClient = createTRPCClient<AppRouter>({
 			},
 {{/if}}
 {{#if (eq auth "better-auth")}}
+			headers: async () => {
+				if (typeof window !== "undefined") return {};
+				const { headers } = await import("next/headers");
+				const incoming = await headers();
+				return { cookie: incoming.get("cookie") ?? "" };
+			},
 			fetch(url, options) {
 				return fetch(url, {
 					...options,
@@ -108,7 +116,9 @@ export const queryClient = new QueryClient({
 export const trpcClient = createTRPCClient<AppRouter>({
 	links: [
 		httpBatchLink({
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+			url: `${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/trpc`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 			url: `${getServerUrl(ENV.VITE_SERVER_URL)}/trpc`,
 {{else}}
 			url: `${ENV.VITE_SERVER_URL.replace(/\/$/, "")}/trpc`,

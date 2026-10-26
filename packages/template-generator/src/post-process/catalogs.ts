@@ -32,23 +32,6 @@ type PackageInfo = {
   devDependencies: Record<string, string>;
 };
 
-const PACKAGE_PATHS = [
-  ".",
-  "apps/server",
-  "apps/web",
-  "apps/native",
-  "apps/desktop",
-  "apps/fumadocs",
-  "apps/docs",
-  "packages/api",
-  "packages/db",
-  "packages/auth",
-  "packages/backend",
-  "packages/config",
-  "packages/infra",
-  "packages/ui",
-];
-
 /**
  * Process dependency catalogs for pnpm/bun
  */
@@ -56,14 +39,12 @@ export function processCatalogs(vfs: VirtualFileSystem, config: ProjectConfig): 
   if (config.packageManager === "npm") return;
 
   const packagesInfo: PackageInfo[] = [];
-  const workspacePackages = ["apps", "packages"].flatMap((root) =>
-    vfs
-      .listDir(root)
-      .map((dir) => `${root}/${dir}`)
-      .filter((dir) => !PACKAGE_PATHS.includes(dir)),
-  );
+  const workspacePackages = [
+    ".",
+    ...["apps", "packages"].flatMap((root) => vfs.listDir(root).map((dir) => `${root}/${dir}`)),
+  ];
 
-  for (const pkgPath of [...PACKAGE_PATHS, ...workspacePackages]) {
+  for (const pkgPath of workspacePackages) {
     const jsonPath = pkgPath === "." ? "package.json" : `${pkgPath}/package.json`;
     const pkgJson = vfs.readJson<PackageJson>(jsonPath);
 

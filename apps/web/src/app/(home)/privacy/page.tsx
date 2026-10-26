@@ -8,8 +8,7 @@ import { SITE_URL, SUPPORT_EMAIL } from "@/lib/site";
 
 import { TrustPage, TrustSection, trustPageLinkClass } from "../_components/trust-page";
 
-const description =
-  "What the xstack website and CLI collect, why it is used, and how to opt out.";
+const description = "What the xstack website and CLI collect, why it is used, and how to opt out.";
 
 export const metadata: Metadata = {
   title: "Privacy - xstack",
@@ -71,8 +70,8 @@ export default function PrivacyPage() {
         <p>
           Disable CLI telemetry for one command with{" "}
           <code className="rounded bg-fd-muted px-1.5 py-0.5">--disable-analytics</code> or set{" "}
-          <code className="rounded bg-fd-muted px-1.5 py-0.5">XSTACK_TELEMETRY_DISABLED=1</code>. The
-          cross-tool <code className="rounded bg-fd-muted px-1.5 py-0.5">DO_NOT_TRACK=1</code>{" "}
+          <code className="rounded bg-fd-muted px-1.5 py-0.5">XSTACK_TELEMETRY_DISABLED=1</code>.
+          The cross-tool <code className="rounded bg-fd-muted px-1.5 py-0.5">DO_NOT_TRACK=1</code>{" "}
           convention is honored as well. Either variable can be added to a shell profile when
           telemetry should remain disabled. Project generation continues to work when telemetry is
           off.

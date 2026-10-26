@@ -1,10 +1,7 @@
 "use client";
 
-import {
-  allowedApisForFrontends,
-  supportsRuntimeBackend,
-  type ApplicationSelection,
-} from "@xstack/types";
+import { applicationOptions } from "@xstack/template-generator/apps";
+import type { ApplicationSelection } from "@xstack/types";
 import { Check, Terminal } from "lucide-react";
 
 import { TechIcon } from "@/components/ui/tech-icon";
@@ -17,12 +14,6 @@ import {
 import type { StackState } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const labels = [
-  ...TECH_OPTIONS.webFrontend,
-  ...TECH_OPTIONS.nativeFrontend,
-  ...TECH_OPTIONS.backend,
-  ...TECH_OPTIONS.runtime,
-];
 const fieldClass =
   "builder-focus-ring w-full rounded border border-fd-border bg-fd-background px-2 py-2 text-sm";
 
@@ -38,7 +29,6 @@ export function ApplicationTechnology({
   const apps = stack.apps;
   const app = apps?.[selectedIndex];
   if (!apps || !app) return null;
-  // Only adapters backed by real apps/<type> contributions are present in this catalog.
   const frameworks = APPLICATION_FRAMEWORKS.filter((framework) =>
     Object.hasOwn(framework.apps, app.type),
   );
@@ -48,37 +38,8 @@ export function ApplicationTechnology({
   const manifest = APPLICATION_TYPES.find((type) => type.id === app.type);
   const update = (next: ApplicationSelection) =>
     onChange({ apps: apps.map((entry, index) => (index === selectedIndex ? next : entry)) });
-  const runtimeOptions = TECH_OPTIONS.runtime.filter((option) =>
-    adapter?.stack.backend && adapter.stack.backend !== "none"
-      ? supportsRuntimeBackend(option.id, adapter.stack.backend)
-      : option.id === (adapter?.stack.runtime ?? "none"),
-  );
-  const apiOptions = TECH_OPTIONS.api.filter(
-    (option) =>
-      (option.id === "none" ||
-        (adapter?.stack.backend && !["none", "convex"].includes(adapter.stack.backend))) &&
-      allowedApisForFrontends(adapter?.stack.frontend).includes(option.id),
-  );
-  const backend = apps.find((candidate) =>
-    app.bindings?.backend
-      ? candidate.id === app.bindings.backend
-      : (candidate.product ?? "main") === (app.product ?? "main") &&
-        APPLICATION_TYPES.find((type) => type.id === candidate.type)?.roles.includes("backend"),
-  );
-  const backendAdapter = APPLICATION_FRAMEWORKS.find(
-    (framework) => framework.id === backend?.stack.framework,
-  )?.apps[backend?.type ?? ""];
-  const protocol = backend?.stack.api ?? backendAdapter?.stack.api ?? "none";
-  const title =
-    app.type === "fullstack-web"
-      ? "Fullstack framework"
-      : app.type === "backend"
-        ? "Backend framework"
-        : app.type === "cli"
-          ? "CLI implementation"
-          : app.type === "native"
-            ? "Native framework"
-            : "Frontend framework";
+  const options = adapter ? applicationOptions(adapter) : undefined;
+  const roles = [...new Set([...(manifest?.requires ?? []), ...Object.keys(app.bindings ?? {})])];
 
   return (
     <section aria-label={`Technology stack for ${app.id}`} className="@container mb-6 space-y-3">
@@ -89,19 +50,21 @@ export function ApplicationTechnology({
         <span className="text-fd-muted-foreground">{manifest?.name ?? app.type}</span>
       </div>
       <fieldset className="space-y-2">
-        <legend className="mb-2 text-xs text-fd-muted-foreground">{title}</legend>
+        <legend className="mb-2 text-xs text-fd-muted-foreground">
+          {manifest?.technologyLabel ?? `${manifest?.name ?? app.type} implementation`}
+        </legend>
         <div className="grid grid-cols-1 gap-2 @md:grid-cols-2 @min-[864px]:grid-cols-3">
           {frameworks.map((framework) => {
-            const label = labels.find((option) => option.id === framework.id);
             const selected = app.stack.framework === framework.id;
             return (
               <button
                 key={framework.id}
                 type="button"
                 aria-pressed={selected}
-                aria-label={`Use ${label?.name ?? framework.id} for ${app.id}`}
+                aria-label={`Use ${framework.name ?? framework.id} for ${app.id}`}
                 onClick={() => {
-                  if (!selected) update({ ...app, stack: { framework: framework.id } });
+                  if (!selected)
+                    update({ ...app, stack: { ...app.stack, framework: framework.id } });
                 }}
                 className={cn(
                   "builder-focus-ring flex items-center justify-between gap-3 rounded border p-3 text-left text-sm",
@@ -111,8 +74,17 @@ export function ApplicationTechnology({
                 )}
               >
                 <span className="flex items-center gap-2">
-                  {label?.icon && <TechIcon icon={label.icon} name={label.name} />}
-                  <span>{label?.name ?? framework.id}</span>
+                  {framework.icon && (
+                    <TechIcon icon={framework.icon} name={framework.name ?? framework.id} />
+                  )}
+                  <span>
+                    <span className="block">{framework.name ?? framework.id}</span>
+                    {framework.description && (
+                      <span className="block text-xs text-fd-muted-foreground">
+                        {framework.description}
+                      </span>
+                    )}
+                  </span>
                 </span>
                 {selected && <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />}
               </button>
@@ -121,49 +93,101 @@ export function ApplicationTechnology({
         </div>
         {!adapter && (
           <p role="alert" className="text-xs text-destructive">
-            Select an implemented framework for this application type.
+            {app.stack.framework
+              ? `Selected framework ${app.stack.framework} is unavailable for ${app.type}.`
+              : "No framework selected."}{" "}
+            Choose an available implementation or restore its template declaration.
           </p>
         )}
       </fieldset>
-      <div className="grid gap-3 @md:grid-cols-2">
-        {adapter &&
-          (runtimeOptions.length > 1 ||
-            (app.stack.runtime ?? adapter.stack.runtime ?? "none") !== "none") && (
-            <label className="space-y-1 text-xs text-fd-muted-foreground">
-              Runtime for {app.id}
+      {adapter &&
+        options &&
+        (["runtime", "api"] as const).map((key) => {
+          const control = options[key];
+          const value = app.stack[key] ?? adapter.stack[key] ?? "none";
+          const overridden = app.stack[key] !== undefined && app.stack[key] !== adapter.stack[key];
+          if (control.visibility === "hidden" && !overridden) return null;
+          const supported = control.values.some((candidate) => candidate === value);
+          const label = key === "api" ? "API protocol" : "Runtime";
+          const field = (
+            <label className="block space-y-1 text-xs text-fd-muted-foreground">
+              {label} for {app.id}
               <select
                 className={fieldClass}
-                disabled={runtimeOptions.length === 1}
-                value={app.stack.runtime ?? adapter.stack.runtime ?? "none"}
+                aria-invalid={!supported}
+                disabled={control.values.length === 1 && supported && !overridden}
+                value={value}
                 onChange={(event) => {
-                  const runtime = runtimeOptions.find(
-                    (option) => option.id === event.target.value,
-                  )?.id;
-                  if (runtime) update({ ...app, stack: { ...app.stack, runtime } });
+                  const next = control.values.find((candidate) => candidate === event.target.value);
+                  if (next) update({ ...app, stack: { ...app.stack, [key]: next } });
                 }}
               >
-                {app.stack.runtime &&
-                  !runtimeOptions.some((option) => option.id === app.stack.runtime) && (
-                    <option value={app.stack.runtime}>{app.stack.runtime} (unsupported)</option>
-                  )}
-                {runtimeOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
+                {!supported && <option value={value}>{value} (unsupported)</option>}
+                {control.values.map((id) => (
+                  <option key={id} value={id}>
+                    {TECH_OPTIONS[key].find((option) => option.id === id)?.name ?? id}
                   </option>
                 ))}
               </select>
+              {!supported && (
+                <span role="alert" className="block text-destructive">
+                  Select a declared {key} option or update this adapter's declaration.
+                </span>
+              )}
+              {app.stack[key] !== undefined && (
+                <button
+                  type="button"
+                  className="builder-focus-ring rounded underline"
+                  onClick={() => {
+                    const next = { ...app.stack };
+                    delete next[key];
+                    update({ ...app, stack: next });
+                  }}
+                >
+                  Use adapter default ({adapter.stack[key] ?? "none"})
+                </button>
+              )}
             </label>
-          )}
-        {manifest?.requires.map((role) => {
-          const targets = apps.filter(
-            (candidate) =>
-              (candidate.product ?? "main") === (app.product ?? "main") &&
-              APPLICATION_TYPES.find((type) => type.id === candidate.type)?.roles.includes(role),
           );
+          return control.visibility === "visible" ? (
+            <div key={key}>{field}</div>
+          ) : (
+            <details
+              key={key}
+              open={!supported || undefined}
+              className="rounded border border-fd-border p-3"
+            >
+              <summary className="builder-focus-ring cursor-pointer text-xs text-fd-muted-foreground">
+                Advanced · {label}
+              </summary>
+              <div className="mt-3 max-w-sm">{field}</div>
+            </details>
+          );
+        })}
+      <div className="grid gap-3 @md:grid-cols-2">
+        {roles.map((role) => {
+          const required = manifest?.requires.includes(role);
+          const targets = apps.filter((candidate) => {
+            const owner = APPLICATION_TYPES.find((type) => type.id === candidate.type);
+            return (
+              owner?.scope === "product" &&
+              (candidate.product ?? "main") === (app.product ?? "main") &&
+              owner.roles.includes(role)
+            );
+          });
           const target = app.bindings?.[role];
+          const connected = target
+            ? targets.find((entry) => entry.id === target)
+            : targets.length === 1
+              ? targets[0]
+              : undefined;
+          const connectedAdapter = APPLICATION_FRAMEWORKS.find(
+            (framework) => framework.id === connected?.stack.framework,
+          )?.apps[connected?.type ?? ""];
           return (
             <label key={role} className="space-y-1 text-xs text-fd-muted-foreground">
               {role} connection for {app.id}
+              {!required && " (not required by this application)"}
               <select
                 className={fieldClass}
                 value={target ?? ""}
@@ -171,13 +195,15 @@ export function ApplicationTechnology({
                   const bindings = { ...app.bindings };
                   if (event.target.value) bindings[role] = event.target.value;
                   else delete bindings[role];
-                  update({ ...app, bindings });
+                  update({ ...app, bindings: Object.keys(bindings).length ? bindings : undefined });
                 }}
               >
                 <option value="">
-                  {targets.length === 1
-                    ? `Automatic · ${targets[0].id}`
-                    : "Select a matching application"}
+                  {!required
+                    ? "Remove binding"
+                    : targets.length === 1
+                      ? `Automatic · ${targets[0].id}`
+                      : "Select a matching application"}
                 </option>
                 {target && !targets.some((entry) => entry.id === target) && (
                   <option value={target}>{target} (missing or incompatible)</option>
@@ -188,45 +214,16 @@ export function ApplicationTechnology({
                   </option>
                 ))}
               </select>
+              {role === "backend" && connected && (
+                <span className="block">
+                  API protocol: {connected.stack.api ?? connectedAdapter?.stack.api ?? "none"} ·
+                  configured by {connected.id}
+                </span>
+              )}
             </label>
           );
         })}
       </div>
-      {manifest?.requires.includes("backend") && backend && (
-        <p className="text-xs text-fd-muted-foreground">
-          API protocol: {protocol === "none" ? "Framework HTTP routes" : protocol} · configured by{" "}
-          {backend.id}
-        </p>
-      )}
-      {adapter &&
-        (app.type === "backend" ||
-          (app.stack.api !== undefined && app.stack.api !== adapter.stack.api)) && (
-          <details className="rounded border border-fd-border p-3">
-            <summary className="builder-focus-ring cursor-pointer text-xs text-fd-muted-foreground">
-              Advanced · API protocol
-            </summary>
-            <label className="mt-3 block max-w-sm space-y-1 text-xs text-fd-muted-foreground">
-              API protocol for {app.id}
-              <select
-                className={fieldClass}
-                value={app.stack.api ?? adapter.stack.api ?? "none"}
-                onChange={(event) => {
-                  const api = apiOptions.find((option) => option.id === event.target.value)?.id;
-                  if (api) update({ ...app, stack: { ...app.stack, api } });
-                }}
-              >
-                {app.stack.api && !apiOptions.some((option) => option.id === app.stack.api) && (
-                  <option value={app.stack.api}>{app.stack.api} (unsupported)</option>
-                )}
-                {apiOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.id === "none" ? "Framework HTTP routes" : option.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </details>
-        )}
       {applicationCapabilities(stack)
         .notes.filter((note) => note.startsWith(`${app.id}:`))
         .map((note) => (
@@ -238,8 +235,8 @@ export function ApplicationTechnology({
           </p>
         ))}
       <p className="text-xs text-fd-muted-foreground">
-        Only implementations available for this application type are shown. Other applications keep
-        their own selections.
+        Implementations and options come from template declarations. Changing implementations
+        preserves explicit selections; incompatible values must be resolved before generating.
       </p>
     </section>
   );

@@ -1,6 +1,7 @@
 {
   "id": "web-frontend",
   "name": "Web frontend application",
+  "technologyLabel": "Frontend framework",
   "defaultDirectoryName": "frontend",
   "roles": ["web-frontend"],
   "scope": "product",

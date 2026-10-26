@@ -9,6 +9,7 @@ import { AddonSetupError } from "../../utils/errors";
 import { shouldSkipExternalCommands } from "../../utils/external-commands";
 import { getPackageRunnerPrefix } from "../../utils/package-runner";
 import { createSpinner } from "../../utils/terminal-output";
+import { resolveWorkspaceApplications, type WorkspaceApplication } from "../workspace-applications";
 
 function getWebFrontend(frontend: Pick<ProjectConfig, "frontend">["frontend"]) {
   return frontend.find((value) => (desktopWebFrontends as readonly string[]).includes(value));
@@ -82,13 +83,42 @@ export function buildTauriInitArgs(
 }
 
 export async function setupTauri(config: ProjectConfig): Promise<Result<void, AddonSetupError>> {
+  const applications = await resolveWorkspaceApplications(config);
+  if (applications.isErr()) {
+    return Result.err(
+      new AddonSetupError({
+        addon: "tauri",
+        message: applications.error.message,
+        cause: applications.error,
+      }),
+    );
+  }
+  for (const application of applications.value) {
+    if (
+      !application.roles.includes("web-frontend") ||
+      !getWebFrontend(application.stack.frontend ?? [])
+    )
+      continue;
+    const result = await setupTauriApplication(
+      { ...config, frontend: application.stack.frontend ?? [] },
+      application,
+    );
+    if (result.isErr()) return result;
+  }
+  return Result.ok(undefined);
+}
+
+async function setupTauriApplication(
+  config: ProjectConfig,
+  application: WorkspaceApplication,
+): Promise<Result<void, AddonSetupError>> {
   if (shouldSkipExternalCommands()) {
     return Result.ok(undefined);
   }
 
   const { packageManager, frontend, projectDir } = config;
   const s = createSpinner();
-  const clientPackageDir = path.join(projectDir, "apps/web");
+  const clientPackageDir = path.join(projectDir, application.directory);
 
   if (!(await fs.pathExists(clientPackageDir))) {
     return Result.ok(undefined);
@@ -97,6 +127,8 @@ export async function setupTauri(config: ProjectConfig): Promise<Result<void, Ad
   s.start("Setting up Tauri desktop app support...");
 
   const [command, ...args] = buildTauriInitArgs({ packageManager, frontend, projectDir });
+  const devUrlIndex = args.indexOf("--dev-url");
+  if (application.origin && devUrlIndex !== -1) args[devUrlIndex + 1] = application.origin;
 
   const result = await Result.tryPromise({
     try: async () => {

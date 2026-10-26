@@ -11,6 +11,8 @@ import { getRequest } from "@tanstack/react-start/server";
 import { appRouter } from "@{{projectName}}/api/routers/index";
 import { createContext } from "@{{projectName}}/api/context";
 {{else if (includes frontend "tanstack-start")}}
+import { createIsomorphicFn } from "@tanstack/react-start";
+import { getRequestHeaders } from "@tanstack/react-start/server";
 import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
 import { ENV } from "../env{{#if (eq webDeploy "cloudflare")}}.public{{/if}}";
 {{#if (eq auth "clerk")}}
@@ -81,18 +83,30 @@ const getORPCClient = createIsomorphicFn()
 
 export const client: RouterClient<typeof appRouter> = getORPCClient();
 {{else if (includes frontend "tanstack-start")}}
+const requestHeaders = createIsomorphicFn()
+  .server(() => {
+    const incoming = getRequestHeaders();
+    return { cookie: incoming.get("cookie") ?? "", authorization: incoming.get("authorization") ?? "" };
+  })
+  .client(() => ({}));
+
 const link = new RPCLink({
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+	url: `${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/rpc`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 	url: `${getServerUrl(ENV.VITE_SERVER_URL)}/rpc`,
 {{else}}
 	url: `${ENV.VITE_SERVER_URL.replace(/\/$/, "")}/rpc`,
 {{/if}}
+  headers: async () => {
+    const headers = requestHeaders();
 {{#if (eq auth "clerk")}}
-	headers: async () => {
-		const token = await getClerkAuthToken();
-		return token ? { Authorization: `Bearer ${token}` } : {};
-	},
+    const token = await getClerkAuthToken();
+    return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
+{{else}}
+    return headers;
 {{/if}}
+  },
 {{#if (eq auth "better-auth")}}
 	fetch(url, options) {
 		return fetch(url, {
@@ -107,15 +121,19 @@ export const client: AppRouterClient = createORPCClient(link);
 {{else}}
 export const link = new RPCLink({
 {{#if (and (eq backend "self") (includes frontend "next"))}}
-	url: `${typeof window !== "undefined" ? window.location.origin : "http://localhost:3001"}/api/rpc`,
+	url: `${typeof window !== "undefined" ? window.location.origin : (process.env.BETTER_AUTH_URL ?? {{#if application}}"{{application.origin}}"{{else}}"http://localhost:3001"{{/if}})}/api/rpc`,
 {{else if (includes frontend "next")}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+	url: `${getServerUrl(process.env.NEXT_PUBLIC_SERVER_URL!)}{{application.backendApiPrefix}}/rpc`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 	url: `${getServerUrl(process.env.NEXT_PUBLIC_SERVER_URL!)}/rpc`,
 {{else}}
 	url: `${process.env.NEXT_PUBLIC_SERVER_URL!.replace(/\/$/, "")}/rpc`,
 {{/if}}
 {{else}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+	url: `${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/rpc`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 	url: `${getServerUrl(ENV.VITE_SERVER_URL)}/rpc`,
 {{else}}
 	url: `${ENV.VITE_SERVER_URL.replace(/\/$/, "")}/rpc`,

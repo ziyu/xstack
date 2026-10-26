@@ -8,7 +8,7 @@ export default defineNuxtPlugin(() => {
   const rawServerUrl = (import.meta.server && config.serverUrl) || config.public.serverUrl;
   // Same-origin paths like /api need an absolute base, and better-auth derives
   // its route matching from this URL's path, so it must be exactly /api/auth
-  const serverOrigin = {{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}getServerUrl(rawServerUrl);{{else}}rawServerUrl.startsWith("/")
+  const serverOrigin = {{#if application}}rawServerUrl;{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}getServerUrl(rawServerUrl);{{else}}rawServerUrl.startsWith("/")
     ? (import.meta.server ? useRequestURL() : window.location).origin + rawServerUrl
     : rawServerUrl;{{/if}}
   {{/if}}
@@ -18,7 +18,9 @@ export default defineNuxtPlugin(() => {
       headers: import.meta.server ? useRequestHeaders(["cookie"]) : undefined,
     },
     {{#if (ne backend "self")}}
-    baseURL: {{#if (and (eq webDeploy "vercel") (eq serverDeploy "vercel"))}}`${serverOrigin}/auth`{{else}}new URL("/api/auth", serverOrigin).toString(){{/if}},
+    baseURL: {{#if application}}new URL("/api/auth", serverOrigin).toString(){{else if (and (eq webDeploy "vercel") (eq serverDeploy "vercel"))}}`${serverOrigin}/auth`{{else}}new URL("/api/auth", serverOrigin).toString(){{/if}},
+    {{else}}
+    baseURL: new URL('/api/auth', useRequestURL()).toString(),
     {{/if}}
   });
 

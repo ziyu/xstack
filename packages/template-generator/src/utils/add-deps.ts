@@ -2,6 +2,9 @@
  * Add dependencies to a package.json in the virtual filesystem
  */
 
+import type { ProjectConfig } from "@xstack/types";
+
+import type { ApplicationConfig } from "../contributions/context";
 import type { JsonValue } from "../core/json-types";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 
@@ -259,4 +262,15 @@ export function addPackageDependency(options: AddDepsOptions): void {
   }
 
   vfs.writeJson(packagePath, pkgJson);
+}
+
+/** Client requirements belong to the bound backend's shared packages, not its own UI. */
+export function getBackendConsumerFrontends(config: ApplicationConfig): ProjectConfig["frontend"] {
+  if (!config.application) return config.frontend;
+  const frontends = new Set(config.frontend);
+  for (const application of config.application.workspaceApplications ?? []) {
+    if (application.backendRoot !== config.application.directory) continue;
+    for (const frontend of application.frontend) frontends.add(frontend);
+  }
+  return [...frontends];
 }

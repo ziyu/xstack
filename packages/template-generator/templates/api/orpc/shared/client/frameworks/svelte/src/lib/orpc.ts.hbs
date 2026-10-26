@@ -7,13 +7,13 @@ import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/svelte-query";
 import type { AppRouterClient } from "@{{projectName}}/api/routers/index";
 
-export const queryClient = new QueryClient({
-	queryCache: new QueryCache({
-		onError: (error) => {
-			console.error(`Error: ${error.message}`);
-		},
-	}),
-});
+export function createQueryClient() {
+  return new QueryClient({
+    queryCache: new QueryCache({
+      onError: (error) => console.error(`Error: ${error.message}`),
+    }),
+  });
+}
 
 {{#unless (eq backend "self")}}
 {{> getServerUrl}}
@@ -29,7 +29,9 @@ export const link = new RPCLink({
 		return `${window.location.origin}/rpc`;
 	},
 	{{else}}
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+	url: `${getServerUrl(ENV.PUBLIC_SERVER_URL)}{{application.backendApiPrefix}}/rpc`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 	url: `${getServerUrl(ENV.PUBLIC_SERVER_URL)}/rpc`,
 {{else}}
 	url: `${ENV.PUBLIC_SERVER_URL.replace(/\/$/, "")}/rpc`,
@@ -45,10 +47,6 @@ export const link = new RPCLink({
 	{{/if}}
 });
 
-{{#if (eq backend "self")}}
 export const client: AppRouterClient = globalThis.$client ?? createORPCClient(link);
-{{else}}
-export const client: AppRouterClient = createORPCClient(link);
-{{/if}}
 
 export const orpc = createTanstackQueryUtils(client);

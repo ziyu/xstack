@@ -7,6 +7,7 @@ export default defineConfig({
     "src/core/template-reader.ts",
     "src/modules/index.ts",
     "src/apps/index.ts",
+    "src/builder/index.ts",
   ],
   format: ["esm"],
   clean: true,

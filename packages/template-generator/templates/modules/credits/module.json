@@ -1,0 +1,95 @@
+{
+  "id": "credits",
+  "name": {
+    "en": "Credits",
+    "zh-CN": "积分"
+  },
+  "description": {
+    "en": "Usage credits with an auditable ledger; granted by purchases and sign-up bonuses",
+    "zh-CN": "可审计流水的积分体系，可由购买和注册赠送获得"
+  },
+  "category": "monetization",
+  "requires": ["auth"],
+  "enhances": ["payment", "admin"],
+  "supports": {
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
+  },
+  "nativeSplit": true,
+  "options": {
+    "signupBonus": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "integer": true,
+      "max": 2147483647,
+      "description": "Credits granted to every new account"
+    }
+  },
+  "packages": [
+    {
+      "dir": "credits",
+      "dependencies": {
+        "drizzle-orm": "$dependency:drizzle-orm"
+      },
+      "workspaceDependencies": ["db", "events"]
+    }
+  ],
+  "services": [
+    {
+      "name": "credits",
+      "imports": [
+        {
+          "from": "@app/credits",
+          "names": ["createCredits"]
+        }
+      ],
+      "init": "createCredits(db, events)"
+    }
+  ],
+  "nav": [
+    {
+      "area": "dashboard",
+      "href": "/dashboard/credits",
+      "labelKey": "nav.credits",
+      "order": 40
+    },
+    {
+      "area": "admin",
+      "href": "/admin/credits",
+      "labelKey": "nav.credits",
+      "order": 30,
+      "when": "admin"
+    }
+  ],
+  "sources": {
+    "dialects": true,
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start"],
+    "integrations": {
+      "admin": {
+        "frameworks": {
+          "next": "integrations/admin/frameworks/next",
+          "tanstack-start": "integrations/admin/frameworks/tanstack-start",
+          "nuxt": "frameworks/nuxt"
+        }
+      },
+      "payment": {
+        "base": "integrations/payment/apps/fullstack-web",
+        "required": [
+          "integrations/payment/apps/{application}/src/integrations/payment-credits.ts.hbs",
+          "shared/partials/payment-credits.hbs"
+        ]
+      }
+    },
+    "required": [
+      "files/apps/{application}/src/integrations/credits-signup.ts.hbs",
+      "shared/partials/credits-signup.hbs"
+    ],
+    "frameworkRequired": {
+      "http-server": ["shared/partials/credits.hbs"]
+    }
+  }
+}

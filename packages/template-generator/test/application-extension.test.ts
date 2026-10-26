@@ -6,6 +6,12 @@ import {
   type ApplicationSelection,
 } from "@xstack/types";
 
+import {
+  applicationOptions,
+  convertLegacyApplications,
+  readFrameworkCatalog,
+  resolveApplications,
+} from "../src/apps";
 import { generate } from "../src/generator";
 import { EMBEDDED_TEMPLATES } from "../src/templates.generated";
 import type { VirtualNode } from "../src/types";
@@ -56,7 +62,13 @@ function extensionTemplates() {
   );
   templates.set(
     "frontend/react/custom-router/adapter.json",
-    JSON.stringify({ id: "custom-router", apps: { "control-room": router.apps.admin } }),
+    JSON.stringify({
+      id: "custom-router",
+      name: "Operations router",
+      description: "Custom administration shell",
+      icon: "/icons/react-router.svg",
+      apps: { "control-room": router.apps.admin },
+    }),
   );
   for (const [source, content] of EMBEDDED_TEMPLATES) {
     const base = "frontend/react/react-router/";
@@ -100,6 +112,99 @@ test("new application type and framework adapter integrate through declarations 
     directory: "apps/aa-operator",
     bindings: { backend: "identity-service" },
   });
+});
+
+test("renamed adapters expose declared controls and enforce them during generation", async () => {
+  const templates = extensionTemplates();
+  const path = "backend/server/hono/adapter.json";
+  const declaration = FrameworkAdapterSchema.parse(JSON.parse(templates.get(path)!));
+  declaration.id = "service-engine";
+  declaration.name = "Service engine";
+  declaration.apps.backend!.stack.runtime = "node";
+  declaration.apps.backend!.options = {
+    runtime: { values: ["node"], visibility: "visible" },
+    api: { values: ["none", "orpc"], visibility: "advanced" },
+  };
+  templates.set(path, JSON.stringify(declaration));
+  const selected = selections.map((app) =>
+    app.id === "identity-service"
+      ? { ...app, stack: { ...app.stack, framework: "service-engine" } }
+      : app,
+  );
+  const catalog = readFrameworkCatalog(templates);
+  expect(catalog.get("custom-router")?.name).toBe("Operations router");
+  expect(applicationOptions(catalog.get("service-engine")!.apps.backend!).runtime.values).toEqual([
+    "node",
+  ]);
+  const result = await generate({ config: config(selected), templates });
+  if (result.isErr()) throw result.error;
+  expect(files(result.value.root).has("apps/identity-service/src/lib/native/admin.ts")).toBe(true);
+  const invalid = selected.map((app) =>
+    app.id === "identity-service"
+      ? { ...app, stack: { ...app.stack, runtime: "bun" as const } }
+      : app,
+  );
+  const rejected = await generate({ config: config(invalid), templates });
+  expect(rejected.isErr()).toBe(true);
+  if (rejected.isErr()) expect(rejected.error.message).toContain("select runtime node");
+  expect(invalid.find((app) => app.id === "identity-service")?.stack.runtime).toBe("bun");
+});
+
+test("backend API compatibility follows the client declaration", () => {
+  const templates = extensionTemplates();
+  const path = "frontend/react/custom-router/adapter.json";
+  const declaration = FrameworkAdapterSchema.parse(JSON.parse(templates.get(path)!));
+  declaration.apps["control-room"]!.acceptsBackendApis = ["orpc"];
+  templates.set(path, JSON.stringify(declaration));
+  expect(resolveApplications(selections, templates).issues).toContainEqual({
+    code: "unsupported-stack",
+    app: "aa-operator",
+    message: "Application aa-operator does not support backend API none",
+  });
+});
+
+test("legacy conversion discovers renamed native adapters and reports ambiguous or unsupported mappings", () => {
+  const templates = new Map(EMBEDDED_TEMPLATES);
+  const path = "frontend/native/bare/adapter.json";
+  const declaration = FrameworkAdapterSchema.parse(JSON.parse(templates.get(path)!));
+  declaration.id = "mobile-shell";
+  templates.set(path, JSON.stringify(declaration));
+  const converted = convertLegacyApplications(
+    { frontend: ["native-bare"], backend: "none", runtime: "none", api: "none" },
+    templates,
+  );
+  expect(converted.issues).toEqual([]);
+  expect(converted.apps).toEqual([
+    { id: "native", type: "native", stack: { framework: "mobile-shell" } },
+  ]);
+  templates.set(
+    "apps/handheld/app.json",
+    JSON.stringify({
+      id: "handheld",
+      name: "Handheld shell",
+      defaultDirectoryName: "handheld",
+      roles: [],
+      requires: [],
+      scope: "independent",
+    }),
+  );
+  declaration.apps.handheld = declaration.apps.native!;
+  templates.set(path, JSON.stringify(declaration));
+  for (const [source, content] of templates)
+    if (source.startsWith("frontend/native/bare/apps/native/"))
+      templates.set(source.replace("/apps/native/", "/apps/handheld/"), content);
+  expect(convertLegacyApplications({ frontend: ["native-bare"] }, templates).issues[0]?.code).toBe(
+    "ambiguous-legacy-mapping",
+  );
+  declaration.apps.native!.legacy = false;
+  declaration.apps.handheld = { ...declaration.apps.handheld!, legacy: true };
+  templates.set(path, JSON.stringify(declaration));
+  const custom = convertLegacyApplications({ frontend: ["native-bare"] }, templates);
+  expect(custom.issues).toEqual([]);
+  expect(custom.apps[0]).toMatchObject({ type: "handheld", stack: { framework: "mobile-shell" } });
+  expect(
+    convertLegacyApplications({ frontend: ["none"], backend: "convex" }, templates).issues[0]?.code,
+  ).toBe("unsupported-legacy-mapping");
 });
 
 test("declared custom app requires its actual role overlay instead of silently emitting a generic shell", async () => {

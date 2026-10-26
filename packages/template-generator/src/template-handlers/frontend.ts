@@ -1,15 +1,24 @@
-import type { ProjectConfig } from "@xstack/types";
-
 import { renderCatalogApplication } from "../apps/render";
 import type { VirtualFileSystem } from "../core/virtual-fs";
-import { GeneratorError } from "../types";
+import { GeneratorError, type RenderConfig } from "../types";
 import type { TemplateData } from "./utils";
 
 export async function processFrontendTemplates(
   vfs: VirtualFileSystem,
   templates: TemplateData,
-  config: ProjectConfig,
+  config: RenderConfig,
 ): Promise<void> {
+  if (config.application) {
+    const selected = config.frontend.filter((frontend) => frontend !== "none");
+    if (selected.length !== 1) {
+      throw new GeneratorError({
+        phase: "applications",
+        message: `Application ${config.application.id} must select exactly one frontend implementation`,
+      });
+    }
+    renderCatalogApplication(vfs, templates, config, config.application.type, selected[0]!);
+    return;
+  }
   const web = config.frontend.filter(
     (frontend) => frontend !== "none" && !frontend.startsWith("native-"),
   );

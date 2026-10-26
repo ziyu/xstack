@@ -40,7 +40,9 @@ const link = new RPCLink({
 {{> getServerUrl}}
 
 const link = new RPCLink({
-{{#if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
+{{#if application}}
+	url: `${getServerUrl(ENV.VITE_SERVER_URL)}{{application.backendApiPrefix}}/rpc`,
+{{else if (and (eq webDeploy serverDeploy) (or (eq webDeploy "vercel") (eq webDeploy "docker")))}}
 	url: `${getServerUrl(ENV.VITE_SERVER_URL)}/rpc`,
 {{else}}
 	url: `${ENV.VITE_SERVER_URL.replace(/\/$/, "")}/rpc`,

@@ -1,7 +1,7 @@
 "use client";
 
-import { api } from "@xstack/backend/convex/_generated/api";
 import { useNpmDownloadCounter } from "@erquhart/convex-oss-stats/react";
+import { api } from "@xstack/backend/convex/_generated/api";
 import { useQuery } from "convex/react";
 
 type NpmPackageStats = NonNullable<Parameters<typeof useNpmDownloadCounter>[0]>;

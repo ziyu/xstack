@@ -28,7 +28,7 @@ const stackFields = {
   dbSetup: option("dbSetup"),
   packageManager: option("packageManager"),
   addons: z.array(z.enum(["none", ...getStackOptionIds("addons")])),
-  features: z.array(z.enum(["none", ...getStackOptionIds("features")])),
+  features: z.array(z.string().min(1)),
   providers: StackProvidersSchema,
   moduleOptions: StackModuleOptionsSchema,
   git: option("git"),

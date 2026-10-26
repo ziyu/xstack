@@ -1,4 +1,7 @@
 {{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}import { desktopOrigins, ENV } from "./env.server";{{else}}import { ENV } from "./env.server";{{/if}}
+{{#if application.nativeSplit}}
+import { handleNativeRequest } from "./lib/native-request";
+{{/if}}
 {{#if (eq runtime "node")}}
 import { node } from "@elysiajs/node";
 {{/if}}
@@ -18,9 +21,11 @@ import { onError } from "@orpc/server";
 import { appRouter } from "@{{projectName}}/api/routers/index";
 import { createContext } from "@{{projectName}}/api/context";
 {{/if}}
+{{#unless application.nativeSplit}}
 {{#if (eq auth "better-auth")}}
 import { auth } from "@{{projectName}}/auth";
 {{/if}}
+{{/unless}}
 
 {{#if (eq api "orpc")}}
 const rpcHandler = new RPCHandler(appRouter, {
@@ -47,16 +52,19 @@ const apiHandler = new OpenAPIHandler(appRouter, {
 {{#if (eq serverDeploy "vercel")}}const app = {{/if}}{{#if (eq runtime "node")}}new Elysia({ adapter: node() }){{else}}new Elysia(){{/if}}
 	.use(
 		cors({
-            origin: {{#if application.clientOrigins}}[ENV.CORS_ORIGIN, {{#each application.clientOrigins}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{else}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}[ENV.CORS_ORIGIN, ...desktopOrigins]{{else}}ENV.CORS_ORIGIN{{/if}}{{/if}},
-			methods: ["GET", "POST", "OPTIONS"],
+            origin: [...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean), {{#each application.clientOrigins}}"{{this}}", {{/each}}{{#if (and (ne backend "self") (or (includes addons "electrobun") (includes addons "tauri")))}}...desktopOrigins{{/if}}],
+			methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 {{#if (or (eq auth "better-auth") (eq auth "clerk"))}}
-			allowedHeaders: ["Content-Type", "Authorization"],
+			allowedHeaders: ["Content-Type", "Authorization", "X-Captcha-Token", "Accept-Language"],
 {{/if}}
 {{#if (eq auth "better-auth")}}
 			credentials: true,
 {{/if}}
 		}),
 	)
+{{#if application.nativeSplit}}
+	.all("/api/*", ({ request }) => handleNativeRequest(request), { parse: "none" })
+{{else}}
 {{#if (eq auth "better-auth")}}
 	.all("/api/auth/*", async (context) => {
 		const { request, status } = context;
@@ -64,7 +72,8 @@ const apiHandler = new OpenAPIHandler(appRouter, {
 			return auth.handler(request);
 		}
 		return status(405)
-	})
+	}, { parse: "none" })
+{{/if}}
 {{/if}}
 {{#if (eq api "orpc")}}
 	.all(
@@ -103,7 +112,7 @@ const apiHandler = new OpenAPIHandler(appRouter, {
 			createContext: () => createContext({ context }),
 		});
 		return res;
-	})
+	}, { parse: "none" })
 {{/if}}
 	.get("/", () => "OK")
 {{#if (eq serverDeploy "vercel")}};
@@ -113,12 +122,12 @@ export default app;
 // Elysia's default export is not auto-served by Bun or Node, so start a local
 // server outside Vercel while still exporting the app for Vercel functions.
 if (!process.env.VERCEL) {
-	app.listen(3000, () => {
-		console.log("Server is running on http://localhost:3000");
+	app.listen(Number(process.env.PORT ?? {{#if application.port}}{{application.port}}{{else}}3000{{/if}}), ({ hostname, port }) => {
+		console.log(`Server is running on http://${hostname}:${port}`);
 	});
 }
 {{else}}
-	.listen(3000, () => {
-		console.log("Server is running on http://localhost:3000");
+	.listen(Number(process.env.PORT ?? {{#if application.port}}{{application.port}}{{else}}3000{{/if}}), ({ hostname, port }) => {
+		console.log(`Server is running on http://${hostname}:${port}`);
 	});
 {{/if}}

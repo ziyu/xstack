@@ -4,10 +4,8 @@
   "description": "A modern CLI tool for scaffolding end-to-end type-safe TypeScript projects with best practices and customizable configurations (alias for xstack)",
   "keywords": [
     "better-auth",
-    "xstack",
     "biome",
     "boilerplate",
-    "xstack",
     "cli",
     "drizzle",
     "elysia",
@@ -27,7 +25,8 @@
     "trpc",
     "turborepo",
     "type-safety",
-    "typescript"
+    "typescript",
+    "xstack"
   ],
   "homepage": "https://xstack.dev/",
   "license": "MIT",

@@ -1,63 +1,22 @@
-import { analyzeStackCompatibility } from "@/lib/stack-validation";
-
 import type { StackState } from "./constant";
 import { sanitizeStackState } from "./sanitize-stack-addons";
-import { applicationIssues } from "./stack-applications";
-
-const MAX_COMPATIBILITY_PASSES = 10;
+import { analyzeStackCompatibility, type CompatibilityResult } from "./stack-validation";
 
 type StackUpdate = Partial<StackState> | ((prev: StackState) => Partial<StackState>);
-type CompatibilityAnalysis = ReturnType<typeof analyzeStackCompatibility>;
-
-export type ResolvedStackCompatibility = CompatibilityAnalysis & {
-  stack: StackState;
-};
+export type ResolvedStackCompatibility = CompatibilityResult & { stack: StackState };
 
 export function resolveStackCompatibility(stack: StackState): ResolvedStackCompatibility {
-  let currentStack = sanitizeStackState(stack);
-  if (currentStack.apps !== undefined) {
-    const issues = applicationIssues(currentStack);
-    return {
-      stack: currentStack,
-      adjustedStack: null,
-      notes: { apps: { notes: issues, hasIssue: issues.length > 0 } },
-      changes: [],
-    };
-  }
-  let wasAdjusted = false;
-  const changes: CompatibilityAnalysis["changes"] = [];
-
-  for (let pass = 0; pass < MAX_COMPATIBILITY_PASSES; pass++) {
-    const analysis = analyzeStackCompatibility(currentStack);
-    if (!analysis.adjustedStack) {
-      return {
-        stack: currentStack,
-        adjustedStack: wasAdjusted ? currentStack : null,
-        notes: analysis.notes,
-        changes,
-      };
-    }
-
-    wasAdjusted = true;
-    changes.push(...analysis.changes);
-    currentStack = sanitizeStackState(analysis.adjustedStack);
-  }
-
-  const finalAnalysis = analyzeStackCompatibility(currentStack);
-  return {
-    stack: currentStack,
-    adjustedStack: wasAdjusted ? currentStack : null,
-    notes: finalAnalysis.notes,
-    changes,
-  };
+  const normalized = sanitizeStackState(stack);
+  return { ...analyzeStackCompatibility(normalized), stack: normalized };
 }
 
 export function applyStackUpdate(
-  currentStack: StackState,
+  current: StackState,
   update: StackUpdate,
 ): ResolvedStackCompatibility {
-  const resolvedCurrentStack = resolveStackCompatibility(currentStack).stack;
-  const partialUpdate = update instanceof Function ? update(resolvedCurrentStack) : update;
-  const requestedStack = sanitizeStackState({ ...resolvedCurrentStack, ...partialUpdate });
-  return resolveStackCompatibility(requestedStack);
+  const stack = resolveStackCompatibility(current).stack;
+  return resolveStackCompatibility({
+    ...stack,
+    ...(update instanceof Function ? update(stack) : update),
+  });
 }

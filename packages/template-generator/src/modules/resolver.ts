@@ -40,7 +40,11 @@ function oneOf<T>(allowed: readonly T[] | undefined, value: T): boolean {
 }
 
 /** Messages for each way `stack` falls outside `support`. */
-function supportGaps(support: Support | undefined, stack: StackContext, subject: string): string[] {
+export function supportGaps(
+  support: Support | undefined,
+  stack: StackContext,
+  subject: string,
+): string[] {
   if (!support) return [];
   const gaps: string[] = [];
   if (support.frameworks && !stack.frontend.some((f) => support.frameworks!.includes(f))) {
@@ -163,6 +167,13 @@ function resolveAttempt(
     }
   } else {
     for (const manifest of catalog.values()) {
+      if (!manifest.requiredWhen || supportGaps(manifest.requiredWhen, stack, manifest.id).length)
+        continue;
+      for (const message of supportGaps(manifest.supports, stack, `Module "${manifest.id}"`)) {
+        issues.push({ level: "error", module: manifest.id, message });
+      }
+    }
+    for (const manifest of catalog.values()) {
       if (!manifest.hidden || reasons.has(manifest.id)) continue;
       if (
         !(manifest.nativeSplit && supportsNativeSplit(stack, manifest.id)) &&
@@ -201,7 +212,9 @@ function resolveAttempt(
   const modules: ResolvedModule[] = ordered.map((id) => {
     const { manifest, variant, providers, options } = entries.get(id)!;
     if (manifest.domain) {
-      domains[manifest.domain.field] = manifest.domain.value({ providers, options });
+      const value = manifest.domain.value;
+      domains[manifest.domain.field] =
+        "literal" in value ? value.literal : String(options[value.option]);
     }
     const integrations =
       variant === "native"
@@ -251,7 +264,12 @@ function resolveEntry(
           ),
         ),
       ];
-  const nativeFits = manifest.domain?.native?.(input) ?? true;
+  const predicate = manifest.domain?.native;
+  const nativeFits =
+    !predicate ||
+    ("option" in predicate
+      ? input.options[predicate.option] === predicate.equals
+      : input.providers.includes(predicate.provider));
   const fallback = manifest.domain?.stack;
 
   if (!forceStack && !nativeGaps.length && nativeFits) {
@@ -414,6 +432,13 @@ function resolveOptions(
         level: "error",
         module: manifest.id,
         message: `Option "${manifest.id}.${key}" must be a boolean`,
+      });
+    }
+    if (spec.type === "string" && value !== String(value)) {
+      issues.push({
+        level: "error",
+        module: manifest.id,
+        message: `Option "${manifest.id}.${key}" must be a string`,
       });
     }
     result[key] = value;

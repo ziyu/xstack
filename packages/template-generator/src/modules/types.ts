@@ -47,14 +47,14 @@ export type Support = {
 /** Stack fields owned by domain modules: derived from the plan, never chosen directly. */
 export type DomainField = "auth";
 
-export type DomainInput = { providers: string[]; options: ModuleOptionValues };
+export type ModulePredicate = { option: string; equals: OptionValue } | { provider: string };
 
 export type ModuleDomain = {
   field: DomainField;
   /** Field value while the module is present. */
-  value: (module: DomainInput) => string;
+  value: { literal: string } | { option: string };
   /** Extra condition for the native implementation, beyond `supports`. */
-  native?: (module: DomainInput) => boolean;
+  native?: ModulePredicate;
   /**
    * Implementation by the stack templates, used where the native one is unavailable.
    * Module templates, providers' env and integrations do not apply to it.
@@ -75,6 +75,8 @@ export type Variant = "native" | "stack";
 export type ProviderSpec = {
   name: string;
   market: Market;
+  /** Guidance shown when this provider is selected. */
+  help?: string;
   env?: EnvSpec[];
   /** Dependencies added to the module's workspace package. */
   dependencies?: Record<string, string>;
@@ -87,6 +89,7 @@ export type ProviderSpec = {
 };
 
 export type ProvidersSpec = {
+  help?: string;
   /** Minimum number of providers that must be selected. */
   min?: number;
   /** Maximum number of providers (1 = single choice). */
@@ -152,11 +155,33 @@ export type ProxyStep = {
   order: number;
 };
 
+export type ModuleSourceContract = {
+  /** Paths relative to the module; {application} expands to the current service application. */
+  required?: string[];
+  serverRequired?: string[];
+  frameworkRequired?: Record<string, string[]>;
+  dialects?: true;
+  frameworks?: string[];
+  providers?:
+    | { mode: "inline"; source: string }
+    | { mode: "separate"; frameworks?: Record<string, Record<string, string>> };
+  integrations?: Record<
+    string,
+    {
+      base?: string;
+      frameworks?: Record<string, string>;
+      required?: string[];
+    }
+  >;
+};
+
 export type ModuleManifest = {
   id: string;
   name: Localized;
   description: Localized;
   category: ModuleCategory;
+  /** User-facing setup guidance, owned by the template author. */
+  notices?: string[];
   /** Foundation modules are added automatically and not shown in the feature picker. */
   hidden?: boolean;
   requires?: string[];
@@ -165,8 +190,11 @@ export type ModuleManifest = {
   conflicts?: string[];
   /** Where the native implementation (the module's own templates) works. */
   supports?: Support;
+  /** When matched, the stack must satisfy this module's supports even without an explicit selection. */
+  requiredWhen?: Support;
   /** Opt-in to adapter-declared native HTTP server/client implementations. */
   nativeSplit?: true;
+  sources?: ModuleSourceContract;
   domain?: ModuleDomain;
   providers?: ProvidersSpec;
   options?: Record<string, OptionSpec>;

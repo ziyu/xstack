@@ -61,15 +61,6 @@ export async function getFeaturesChoice(
   return answer(response);
 }
 
-/** Providers the module keeps its current implementation with. */
-function providerChoices(module: ModuleManifest, native: boolean): string[] {
-  const all = Object.keys(module.providers?.options ?? {});
-  const domain = module.domain;
-  if (!domain) return all;
-  if (!native) return all.filter((id) => domain.stack?.providers?.includes(id));
-  return all.filter((id) => domain.native?.({ providers: [id], options: {} }) ?? true);
-}
-
 async function getProvidersChoice(module: ModuleManifest, choices: string[]): Promise<string[]> {
   markPromptShown();
   const spec = module.providers!;
@@ -131,7 +122,7 @@ export async function completeProduct(
     const resolved = planFor({ features, providers, options }, stack).modules.find(
       (m) => m.manifest.id === id,
     );
-    const choices = providerChoices(module, resolved?.variant !== "stack").filter((provider) => {
+    const choices = Object.keys(module.providers.options).filter((provider) => {
       const candidate = planFor(
         {
           features,
@@ -140,7 +131,11 @@ export async function completeProduct(
         },
         stack,
       );
-      return !candidate.issues.some((issue) => issue.level === "error" && issue.module === id);
+      return (
+        candidate.modules.find((entry) => entry.manifest.id === id)?.variant ===
+          resolved?.variant &&
+        !candidate.issues.some((issue) => issue.level === "error" && issue.module === id)
+      );
     });
     if (choices.length) providers[id] = await getProvidersChoice(module, choices);
   }

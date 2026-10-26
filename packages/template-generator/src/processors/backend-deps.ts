@@ -1,3 +1,4 @@
+import { appOutputPath } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { RenderConfig } from "../types";
 import { addPackageDependency, type AvailableDependencies } from "../utils/add-deps";
@@ -13,8 +14,14 @@ export function processBackendDeps(vfs: VirtualFileSystem, config: RenderConfig)
     return;
   }
 
-  const serverPath = "apps/server/package.json";
-  if (!vfs.exists(serverPath) || backend === "self" || backend === "none") return;
+  const serverPath = appOutputPath(config, "server", "package.json");
+  if (
+    !vfs.ownsPath(serverPath) ||
+    !vfs.exists(serverPath) ||
+    backend === "self" ||
+    backend === "none"
+  )
+    return;
 
   const deps: AvailableDependencies[] = [];
   const devDeps: AvailableDependencies[] = [];

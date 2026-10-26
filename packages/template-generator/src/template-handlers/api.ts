@@ -1,81 +1,87 @@
 import {
-  acceptsStackApplication,
+  acceptsStackRoles,
   renderStackContributions,
-  WEB_CLIENT_APP_TYPES,
+  stackClientContributions,
+  WEB_CLIENT_ROLES,
   type StackContribution,
 } from "../contributions/stack";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import type { RenderConfig } from "../types";
 import type { TemplateData } from "./utils";
 
-/** Select technology-local adapters without treating a physical apps/web path as an app type. */
+/** Select declared client families and backend roles, never application names. */
 export function planApiContributions(config: RenderConfig): StackContribution[] {
   if (config.api === "none" || config.backend === "convex") return [];
 
   const root = `api/${config.api}`;
   const owner = `api:${config.api}`;
   const plan: StackContribution[] = [];
-  const webTarget = config.application ? `apps/${config.application.type}` : "apps/web";
+  const target = config.application?.directory ?? "apps/web";
+  const ownsBackend = config.backend !== "none" && acceptsStackRoles(config, ["backend"]);
   function add(
     source: string,
-    target: string,
-    appTypes?: readonly string[],
+    destination: string,
+    roles?: readonly string[],
     kind: StackContribution["kind"] = "prefix",
   ) {
-    plan.push({ source, target, owner, appTypes, kind, required: true });
+    plan.push({ source, target: destination, owner, roles, kind, required: true });
   }
 
   add(`${root}/server`, "packages/api");
-  if (config.backend !== "none" && acceptsStackApplication(config, ["fullstack-web", "backend"])) {
-    const server = config.backend === "self" ? webTarget : "apps/server";
-    add(`${root}/context.ts.hbs`, `${server}/src/context.ts`, ["fullstack-web", "backend"], "file");
+  if (ownsBackend) {
+    const server =
+      config.application?.directory ?? (config.backend === "self" ? target : "apps/server");
+    add(`${root}/context.ts.hbs`, `${server}/src/context.ts`, ["backend"], "file");
   }
 
-  if (acceptsStackApplication(config, WEB_CLIENT_APP_TYPES)) {
-    const react = config.frontend.find((frontend) =>
-      ["tanstack-router", "react-router", "tanstack-start", "next"].includes(frontend),
-    );
-    if (react) {
-      add(`${root}/shared/client/frameworks/react/base`, webTarget, WEB_CLIENT_APP_TYPES);
-      if (config.backend === "self" && (react === "next" || react === "tanstack-start")) {
-        add(`${root}/apps/fullstack-web/frameworks/${react}`, webTarget, ["fullstack-web"]);
-      }
-    } else if (config.api === "orpc") {
-      const framework = ["nuxt", "svelte", "solid", "astro"].find((candidate) =>
-        config.frontend.some((frontend) => frontend === candidate),
-      );
-      if (framework) {
-        if (framework === "nuxt" && config.backend === "self") {
-          add(`${root}/apps/fullstack-web/frameworks/nuxt`, webTarget, ["fullstack-web"]);
-          // Fullstack Nuxt supplies its own server/client transport, retaining only vue-query.
-          add(
-            `${root}/shared/client/frameworks/nuxt/app/plugins/vue-query.ts.hbs`,
-            `${webTarget}/app/plugins/vue-query.ts`,
-            WEB_CLIENT_APP_TYPES,
-            "file",
-          );
-        } else {
-          add(`${root}/shared/client/frameworks/${framework}`, webTarget, WEB_CLIENT_APP_TYPES);
-          if (config.backend === "self") {
-            add(`${root}/apps/fullstack-web/frameworks/${framework}`, webTarget, ["fullstack-web"]);
-            if (framework === "svelte" && config.auth !== "better-auth") {
-              add(
-                `${root}/shared/server/svelte/hooks.server.ts.hbs`,
-                `${webTarget}/src/hooks.server.ts`,
-                ["fullstack-web"],
-                "file",
-              );
-            }
-          }
-        }
-      }
+  for (const { framework, family } of stackClientContributions(config)) {
+    if (family === "native") {
+      add(`${root}/apps/native`, config.application?.directory ?? "apps/native");
+      continue;
     }
-  }
-  if (
-    acceptsStackApplication(config, ["native"]) &&
-    config.frontend.some((frontend) => frontend.startsWith("native-"))
-  ) {
-    add(`${root}/apps/native`, "apps/native", ["native"]);
+    if (!acceptsStackRoles(config, WEB_CLIENT_ROLES)) continue;
+    if (family === "react") {
+      add(`${root}/shared/client/frameworks/react/base`, target, WEB_CLIENT_ROLES);
+      if (ownsBackend && config.backend === "self") {
+        add(`${root}/apps/fullstack-web/frameworks/${framework}`, target, ["backend"]);
+      }
+      continue;
+    }
+    if (framework === "nuxt" && ownsBackend && config.backend === "self") {
+      add(`${root}/apps/fullstack-web/frameworks/${framework}`, target, ["backend"]);
+      add(
+        `${root}/shared/client/frameworks/nuxt/app/plugins/vue-query.ts.hbs`,
+        `${target}/app/plugins/vue-query.ts`,
+        WEB_CLIENT_ROLES,
+        "file",
+      );
+      continue;
+    }
+    add(`${root}/shared/client/frameworks/${framework}`, target, WEB_CLIENT_ROLES);
+    if (ownsBackend && config.backend === "self") {
+      add(`${root}/apps/fullstack-web/frameworks/${framework}`, target, ["backend"]);
+      if (framework === "svelte" && config.auth !== "better-auth") {
+        add(
+          `${root}/shared/server/svelte/hooks.server.ts.hbs`,
+          `${target}/src/hooks.server.ts`,
+          ["backend"],
+          "file",
+        );
+      }
+    } else if (framework === "svelte") {
+      add(
+        `${root}/shared/server/svelte/orpc.remote.server.ts.hbs`,
+        `${target}/src/lib/orpc.server.ts`,
+        WEB_CLIENT_ROLES,
+        "file",
+      );
+      add(
+        `${root}/shared/server/svelte/hooks.server.ts.hbs`,
+        `${target}/src/hooks.server.ts`,
+        WEB_CLIENT_ROLES,
+        "file",
+      );
+    }
   }
   return plan;
 }

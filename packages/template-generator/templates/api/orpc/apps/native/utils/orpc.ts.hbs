@@ -32,7 +32,9 @@ async function expoFetch(request: Request, init?: RequestInit) {
 }
 
 export const link = new RPCLink({
-{{#if (eq backend "self")}}
+{{#if application}}
+	url: `${ENV.EXPO_PUBLIC_SERVER_URL.replace(/\/$/, "")}{{application.backendApiPrefix}}/rpc`,
+{{else if (eq backend "self")}}
 {{#if (or (includes frontend "next") (includes frontend "tanstack-start"))}}
 	url: `${ENV.EXPO_PUBLIC_SERVER_URL}/api/rpc`,
 {{else}}

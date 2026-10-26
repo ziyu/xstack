@@ -30,13 +30,6 @@ export async function setupDatabase(
   const { database, dbSetup, backend, projectDir } = config;
 
   if (backend === "convex" || database === "none") {
-    // Clean up server db dir if not using convex
-    if (backend !== "convex") {
-      const serverDbDir = path.join(projectDir, "apps/server/src/db");
-      if (await fs.pathExists(serverDbDir)) {
-        await fs.remove(serverDbDir);
-      }
-    }
     return;
   }
 

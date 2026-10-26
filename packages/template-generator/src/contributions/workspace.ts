@@ -71,6 +71,29 @@ export function buildWorkspacePlan(
   const basePort = webApps.includes(firstApp) ? 3001 : 3000;
   const ports = new Map(portOrder.map((app, index) => [app.selection.id, basePort + index]));
   const clientOrigins = webApps.map((app) => `http://localhost:${ports.get(app.selection.id)}`);
+  const workspaceApplications = ordered.map((app) => {
+    const local = resolveApplicationContext(config, app);
+    return {
+      id: app.selection.id,
+      type: app.selection.type,
+      roles: app.manifest.roles,
+      directory: `apps/${app.selection.id}`,
+      port: ports.get(app.selection.id)!,
+      origin: `http://localhost:${ports.get(app.selection.id)!}`,
+      bindings: app.bindings,
+      backendRoot: app.manifest.roles.includes("backend")
+        ? `apps/${app.selection.id}`
+        : app.bindings.backend
+          ? `apps/${app.bindings.backend}`
+          : undefined,
+      frontend: local.frontend,
+      backend: local.backend,
+      runtime: local.runtime,
+      api: local.api,
+      webDeploy: local.webDeploy,
+      serverDeploy: local.serverDeploy,
+    };
+  });
   const packageOwners = new Map<string, string>([
     ["config", rootOwner],
     ["db", serverOwner],
@@ -78,13 +101,14 @@ export function buildWorkspacePlan(
     ["auth", serverOwner],
     ["backend", serverOwner],
     ["infra", rootOwner],
+    ...(config.addons.includes("electrobun") ? [["desktop", rootOwner] as [string, string]] : []),
     ...ordered
       .flatMap((app) =>
         app.adapter.sharedPackages.map((name) => [name, app.selection.id] as [string, string]),
       )
       .reverse(),
   ]);
-  for (const module of getModulePlan(config).modules) {
+  for (const module of getModulePlan(config, templates).modules) {
     for (const spec of module.manifest.packages ?? []) packageOwners.set(spec.dir, serverOwner);
   }
   const rootFileOwners = new Map<string, string>();
@@ -129,6 +153,12 @@ export function buildWorkspacePlan(
       type: app.selection.type,
       roles: app.manifest.roles,
       contribution: nativeSplit ? app.adapter.productContribution : undefined,
+      clientContributions: app.adapter.clientContributions,
+      backendApiPrefix:
+        ordered.find(
+          (candidate) => candidate.selection.id === (app.bindings.backend ?? app.selection.id),
+        )?.adapter.serverContributions?.apiPrefix ?? "",
+      workspaceApplications,
       directory: targetRoot,
       origin: `http://localhost:${ports.get(app.selection.id)!}`,
       devArgs: app.adapter.devArgs,
@@ -153,7 +183,7 @@ export function buildWorkspacePlan(
     { content: string; owner: string; declarers: Set<string> }
   >();
   for (const entry of applications) {
-    const renderConfig = { ...toRenderConfig(entry.config), application: entry.context };
+    const renderConfig = { ...toRenderConfig(entry.config, templates), application: entry.context };
     for (const layer of entry.app.adapter.layers) {
       if (layer.target !== "") continue;
       for (const [source, template] of templates) {

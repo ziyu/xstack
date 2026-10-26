@@ -1,14 +1,14 @@
-import type { ProjectConfig } from "@xstack/types";
-
 import { renderCatalogApplication } from "../apps/render";
+import type { ApplicationConfig } from "../contributions/context";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { type TemplateData, processTemplatesFromPrefix } from "./utils";
 
 export async function processBackendTemplates(
   vfs: VirtualFileSystem,
   templates: TemplateData,
-  config: ProjectConfig,
+  config: ApplicationConfig,
 ): Promise<void> {
+  if (config.application && !config.application.roles.includes("backend")) return;
   if (config.backend === "none") return;
 
   if (config.backend === "convex") {
@@ -24,5 +24,11 @@ export async function processBackendTemplates(
 
   if (config.backend === "self") return;
 
-  renderCatalogApplication(vfs, templates, config, "backend", config.backend);
+  renderCatalogApplication(
+    vfs,
+    templates,
+    config,
+    config.application?.type ?? "backend",
+    config.backend,
+  );
 }

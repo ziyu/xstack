@@ -110,10 +110,10 @@ function writeStandaloneDevResources(writer: AlchemyWriter, plan: AlchemyDeploym
   if (plan.needsStandaloneServerDev) {
     writeObject(
       writer,
-      'const serverDev = yield* Command.Dev("server-dev", {',
+      `const serverDev = yield* Command.Dev(${JSON.stringify(`${plan.config.application?.id ?? "server"}-dev`)}, {`,
       () => {
         writer.writeLine(`command: "${plan.config.packageManager} run dev:bare",`);
-        writer.writeLine('cwd: "../../apps/server",');
+        writer.writeLine(`cwd: "../../${plan.serverRoot}",`);
         writer.writeLine("env: observabilityResources.runtimeEnv,");
       },
       "});",
@@ -122,10 +122,10 @@ function writeStandaloneDevResources(writer: AlchemyWriter, plan: AlchemyDeploym
   if (plan.needsStandaloneWebDev) {
     writeObject(
       writer,
-      'const webDev = yield* Command.Dev("web-dev", {',
+      `const webDev = yield* Command.Dev(${JSON.stringify(`${plan.resourceId}-dev`)}, {`,
       () => {
         writer.writeLine(`command: "${plan.config.packageManager} run dev:bare",`);
-        writer.writeLine('cwd: "../../apps/web",');
+        writer.writeLine(`cwd: "../../${plan.webRoot}",`);
         writer.writeLine("env: observabilityResources.runtimeEnv,");
       },
       "});",
@@ -142,9 +142,11 @@ function writeVercelEnvSync(writer: AlchemyWriter, plan: AlchemyDeploymentPlan):
   writer.indent(() => {
     writeObject(
       writer,
-      'yield* Command.Exec("axiom-vercel-env", {',
+      `yield* Command.Exec(${JSON.stringify(`axiom-vercel-env${plan.config.application ? `-${plan.config.application.id}` : ""}`)}, {`,
       () => {
-        writer.writeLine(`command: \`${plan.config.packageManager} run env:\${stage}\`,`);
+        writer.writeLine(
+          `command: \`${plan.config.packageManager} run env:${plan.config.application ? `${plan.config.application.id}:` : ""}\${stage}\`,`,
+        );
         writer.writeLine('cwd: "../..",');
         writer.writeLine("env: observabilityResources.runtimeEnv,");
         writer.writeLine('memo: { include: ["scripts/sync-vercel-env.ts", "vercel.json"] },');
@@ -220,4 +222,126 @@ export function generateAlchemyRun(config: RenderConfig): string {
 
 export function processAlchemyRun(vfs: VirtualFileSystem, config: RenderConfig): void {
   vfs.writeFile("packages/infra/alchemy.run.ts", generateAlchemyRun(config));
+}
+
+/** One stack owns infrastructure; application resources retain their own roots and bindings. */
+export function generateWorkspaceAlchemyRun(configs: RenderConfig[]): string {
+  const plans = configs.map(createAlchemyDeploymentPlan);
+  const owners = plans.filter((plan) => plan.config.application?.roles.includes("backend"));
+  if (owners.length > 1) throw new Error("Infrastructure requires one backend owner");
+  const owner = owners[0];
+  const base = owner ?? plans[0];
+  if (!base) throw new Error("Infrastructure requires an application");
+  const shared: AlchemyDeploymentPlan = {
+    ...base,
+    hasCloudflare: plans.some((plan) => plan.hasCloudflare),
+    hasPrismaDeploy: plans.some((plan) => plan.hasPrismaDeploy),
+    hasAxiom: plans.some((plan) => plan.hasAxiom),
+    hasAxiomVercelRuntime: plans.some((plan) => plan.hasAxiomVercelRuntime),
+    needsStandaloneServerDev: plans.some((plan) => plan.needsStandaloneServerDev),
+    needsStandaloneWebDev: plans.some((plan) => plan.needsStandaloneWebDev),
+  };
+  const writer = createAlchemyWriter();
+  const imports = createAlchemyWriter();
+  for (const plan of [...plans, shared]) writeImports(imports, plan);
+  for (const line of new Set(imports.toString().trim().split("\n"))) writer.writeLine(line);
+  if (!imports.toString().includes("import * as Redacted"))
+    writer.writeLine('import * as Redacted from "effect/Redacted";');
+  writer.blankLine();
+  writeDatabaseResources(writer, shared);
+  writeObservabilityResources(writer, shared);
+  writer.blankLine();
+  const ordered = owner ? [owner, ...plans.filter((plan) => plan !== owner)] : plans;
+  const backendResource =
+    owner?.server.target !== "none" && owner?.server.target
+      ? "backendResources.server"
+      : owner?.web.target !== "none" && owner?.web.target
+        ? "backendResources.web"
+        : undefined;
+  const resources: { name: string; id: string; key: string }[] = [];
+  for (const [index, original] of ordered.entries()) {
+    if (
+      original.web.target === "none" &&
+      original.server.target === "none" &&
+      !original.needsStandaloneServerDev &&
+      !original.needsStandaloneWebDev
+    )
+      continue;
+    const name = original === owner ? "backendResources" : `application${index}`;
+    const plan = { ...original };
+    const bound =
+      original !== owner &&
+      original.config.application?.backendRoot === owner?.config.application?.directory &&
+      backendResource;
+    if (bound && owner)
+      plan.server =
+        owner.server.target !== "none"
+          ? owner.server
+          : { target: owner.web.target as "cloudflare" | "prisma" };
+    writer.writeLine(`const ${name} = (() => {`);
+    writer.indent(() => {
+      if (bound) writer.writeLine(`const server = ${backendResource};`);
+      if (original === owner) writeServerResource(writer, original);
+      writeExportedWebResource(writer, plan);
+      writer.writeLine("const application = Effect.gen(function* () {");
+      writer.indent(() => {
+        if (plan.server.target !== "none" && (bound || original === owner))
+          writer.writeLine("const serverWorker = yield* server;");
+        writeStackWebResource(writer, plan);
+        if (plan.hasAxiom) writer.writeLine("const observabilityResources = yield* observability;");
+        writeStandaloneDevResources(writer, original);
+        writer.writeLine("return {");
+        writer.indent(() => {
+          if (original.web.target !== "none") writer.writeLine("url: webWorker.url,");
+          else if (original.server.target !== "none") writer.writeLine("url: serverWorker.url,");
+          else if (original.needsStandaloneWebDev) writer.writeLine("url: webDev.url,");
+          else if (original.needsStandaloneServerDev) writer.writeLine("url: serverDev.url,");
+        });
+        writer.writeLine("};");
+      });
+      writer.writeLine("});");
+      const keys = ["application"];
+      if (original === owner && original.server.target !== "none") keys.push("server");
+      if (original.web.target !== "none") keys.push("web");
+      writer.writeLine(`return { ${keys.join(", ")} };`);
+    });
+    writer.writeLine("})();");
+    if (original.web.target === "cloudflare")
+      writer.writeLine(
+        `export type AppEnv_${Array.from(original.config.application!.id, (character) => character.charCodeAt(0).toString(16)).join("_")} = Cloudflare.InferEnv<typeof ${name}.web>;`,
+      );
+    resources.push({ name, id: original.config.application!.id, key: "application" });
+  }
+  if (owner?.server.target === "cloudflare")
+    writer.writeLine(
+      "export type ServerEnv = Cloudflare.InferEnv<typeof backendResources.server>;",
+    );
+  if (owner?.web.target === "cloudflare")
+    writer.writeLine("export type WebEnv = Cloudflare.InferEnv<typeof backendResources.web>;");
+  writer.writeLine("export default Alchemy.Stack(");
+  writer.indent(() => {
+    writer.writeLine(`${JSON.stringify(base.config.projectName)},`);
+    writeStackOptions(writer, shared);
+    writer.writeLine("Effect.gen(function* () {");
+    writer.indent(() => {
+      if (shared.hasAxiom) writer.writeLine("const observabilityResources = yield* observability;");
+      for (const plan of plans.filter((candidate) => candidate.hasAxiomVercelRuntime)) {
+        writer.writeLine("{");
+        writer.indent(() => writeVercelEnvSync(writer, plan));
+        writer.writeLine("}");
+      }
+      writer.writeLine("return {");
+      writer.indent(() => {
+        for (const resource of resources)
+          writer.writeLine(
+            `${JSON.stringify(resource.id)}: (yield* ${resource.name}.${resource.key}).url,`,
+          );
+      });
+      writer.writeLine("};");
+    });
+    writer.writeLine("}),");
+  });
+  writer.writeLine(");");
+  // Resource declarations are enclosed to keep their implementation-local names isolated.
+  return writer.toString().replace(/^  export /gm, "  ");
 }

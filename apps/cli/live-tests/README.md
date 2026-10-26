@@ -47,8 +47,6 @@ Every case selects Stripe, Polar, WeChat Pay, Alipay and explicit development mo
 
 `c3-protocol.ts <fixture>` is also directly runnable (Postgres needs `DATABASE_URL`). SQLite runs reuse `payments.ts` and `affiliate.ts`, which resolve the backend from `applications.json`. Signatures and local mock payment are protocol fixtures, not cloud purchases. Polar checkout still requires real plan product references; merchant approvals, actual provider checkout/portal and payment delivery need independent staging credentials. Never deploy fixture transports.
 
-
-
 ### Native Cloudflare D1 and R2 binding
 
 Generate a disposable Next/self/Drizzle project with `--web-deploy cloudflare --database sqlite --db-setup d1`, storage provider `r2-binding`, and compatible full providers (`email=resend`, `sms=twilio`, `payment=stripe`). Explicit Node-only provider selections are errors, not automatic substitutions. From the generated root, run `db:generate` then `db:migrate:local`. Set the app origin/credentials in `.env`, copy them to `apps/web/.dev.vars`, and run `build:cloudflare` then `preview:cloudflare` from `apps/web`. This uses real local workerd/D1/R2 without a Cloudflare account; it does not verify deployed cloud IAM or paid providers.
@@ -175,6 +173,55 @@ For each disposable full SQLite project, install, apply its schema, configure a 
 Start runs its generated Vite build/preview scripts; Nuxt runs its Nitro `.output/server/index.mjs`. Do not claim browser success from a build alone. Verify locale changes, client navigation, auth token handoff and at least one stateful feature in each actual browser UI. External API transport fixtures must remain outside generated code and use distinct synthetic secret values to avoid triggering leak detection by matching public fixture text.
 
 Content safety is evaluated with an HTML parser, not a substring search: literal `<script>` text inside an escaped quoted metadata attribute is not an executable script element. Markdown and JSON-LD must remain safe and truthful across serializers.
+
+## Application framework matrix
+
+`framework-cases.ts` reads the application/framework declarations rather than maintaining a separate framework allowlist. It covers 16 adapters and 23 framework/type implementations with 294 compatible generation cases: renamed applications, API choices, authentication, database configurations, deployment outputs, supported addons, independent companions and separate public/admin instances.
+
+```sh
+bun apps/cli/live-tests/framework-matrix.ts plan
+bun apps/cli/live-tests/framework-matrix.ts generate --directory apps/cli/.smoke/framework-run
+bun apps/cli/live-tests/framework-matrix.ts install --variant api-none --directory apps/cli/.smoke/framework-run --resume
+bun apps/cli/live-tests/framework-matrix.ts typecheck --variant api-none --directory apps/cli/.smoke/framework-run --resume
+bun apps/cli/live-tests/framework-matrix.ts build --variant api-none --directory apps/cli/.smoke/framework-run --resume
+bun apps/cli/live-tests/framework-matrix.ts runtime --variant api-none --directory apps/cli/.smoke/framework-run --resume
+bun apps/cli/live-tests/framework-matrix.ts report --directory apps/cli/.smoke/framework-run
+```
+
+Use `--framework`, `--case` or `--variant` to select comma-separated catalog entries. `--generator cli` exercises the built CLI instead of the source generator. `FRAMEWORK_INSTALL_ARGS` accepts a JSON array of Bun install flags; certificate failures and install timeouts are failed prerequisites, never framework passes. `--resume` skips recorded passing stages: after source/template changes use a fresh directory, not a resumed generation result. A successful `report` means no recorded failures or missing cases; inspect each case's stages because generation alone does not certify install/build/runtime.
+
+Runtime reads `applications.json` for directories, roles, ports and `devArgs`. Run runtime jobs serially: they share generated ports. Astro uses foreground `--ignore-lock` because agent detection otherwise detaches its dev server. Native acceptance exports local Expo bundles, not device/store execution. Postgres runtime requires `FRAMEWORK_DATABASE_URL` pointing at a disposable loopback database and `FRAMEWORK_DISPOSABLE_POSTGRES=1`; the runner owns a separate schema. Clerk and real cloud deployment remain credential-dependent, and no deployment/provisioning command is executed by this matrix.
+
+Fixture `.env` overrides are limited to keys declared by that application's `.env.schema`. Injecting every framework's public URL alias can make Varlock treat an undeclared alias as sensitive and block legitimate SSR output. Keep leak protection enabled; fix the fixture declaration mismatch instead.
+
+When npmjs TLS is unavailable, a verified registry mirror can be selected without disabling certificate verification, for example `FRAMEWORK_INSTALL_ARGS='["--registry","https://registry.npmmirror.com","--network-concurrency","8"]'`. Verify the mirror is reachable with valid TLS in the current environment; an earlier successful mirror call is not a guarantee of future availability.
+
+### Observed application-model acceptance
+
+The 2026-10-26 local run generated all 294 cases. The following checks used renamed application directories and real installed dependencies; API-none baselines do not establish every API/auth/provider combination.
+
+| Framework/type coverage                           | Install and typecheck                        | Build/export                   | Runtime evidence                                                                      |
+| ------------------------------------------------- | -------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------- |
+| Astro fullstack/web                               | Passed                                       | Passed                         | Both browser pages; supervised foreground startup                                     |
+| Next fullstack/web                                | Passed                                       | Passed                         | Fullstack production `/en`; frontend browser page                                     |
+| Nuxt fullstack/web                                | Passed on fresh corrected-env fixtures       | Passed                         | Production pages/assets, locale handling and 404 behavior                             |
+| Svelte fullstack/web                              | Passed                                       | Passed                         | Built-output preview pages/assets and 404 behavior; no production deployment claim    |
+| Solid fullstack/web                               | Passed; web regenerated after dependency fix | Passed                         | Both HTTP pages; web uses corrected fixture                                           |
+| TanStack Start fullstack/web; TanStack Router web | Passed                                       | Passed                         | Development HTTP pages; Start locale redirect                                         |
+| React Router web/admin                            | Passed                                       | Passed                         | Browser pages; web additionally connected to Elysia oRPC in the Docker-output fixture |
+| Elysia/Express/Fastify/Hono backend               | Passed                                       | Passed                         | Node production `GET /` returned exact `OK` for API-none                              |
+| Node CLI                                          | Passed                                       | Passed                         | Named `dev` help command and `greet --name Acceptance` output                         |
+| Native bare/Unistyles/Uniwind                     | Passed                                       | iOS/Android/web exports passed | No device-runtime claim                                                               |
+
+Generation evidence remains in `apps/cli/.smoke/framework-acceptance-final`; baseline projects in `framework-baseline2`, corrected Solid in `framework-solid-fixed`, corrected Nuxt in `framework-nuxt-env-fixed`, and the connected React Router Docker-output fixture in `framework-all-final`. Direct acceptance commands do not rewrite the matrix runner's stage records. Superseded generation-only fixtures and temporary native exports were cleaned; owned acceptance servers and browser tabs were stopped. An unrelated process occupying port 3000 prevented additional Nuxt/Svelte companion HTTP checks and was left untouched.
+
+Final repository checks: 72 generator tests, 37 CLI/MCP/product tests and 32 Web tests passed; generator/CLI/test TypeScript checks and targeted lint passed. Generator and CLI builds passed. Full cloud deployment, external identity/provider flows, device execution and every package-manager installation remain outside this local evidence.
+
+Results and provenance are retained under the selected private `.smoke` root. Stop active runners before cleanup. `cleanup` verifies ownership before removing generated projects and owned Postgres schemas; it replaces stage records with a cleanup record, so preserve the acceptance report first.
+
+```sh
+bun apps/cli/live-tests/framework-matrix.ts cleanup --directory apps/cli/.smoke/framework-run
+```
 
 ## Selected validation run
 

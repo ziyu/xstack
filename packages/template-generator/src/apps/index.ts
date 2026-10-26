@@ -1,5 +1,7 @@
 export { APPLICATION_TEMPLATES } from "../applications.generated";
 export { readApplicationCatalog, readFrameworkCatalog, resolveApplications } from "./plan";
+export { applicationOptions } from "./metadata";
+export { convertLegacyApplications } from "./selection";
 export type {
   ApplicationPlan,
   ApplicationIssue,

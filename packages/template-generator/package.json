@@ -39,6 +39,10 @@
       "types": "./dist/apps/index.d.mts",
       "default": "./dist/apps/index.mjs"
     },
+    "./builder": {
+      "types": "./dist/builder/index.d.mts",
+      "default": "./dist/builder/index.mjs"
+    },
     "./template-reader": {
       "types": "./dist/core/template-reader.d.mts",
       "default": "./dist/core/template-reader.mjs"
@@ -65,7 +69,8 @@
     "memfs": "^4.71.0",
     "pathe": "^2.0.3",
     "ts-morph": "^28.0.0",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",

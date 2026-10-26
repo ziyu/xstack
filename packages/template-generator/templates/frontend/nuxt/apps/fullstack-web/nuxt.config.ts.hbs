@@ -95,7 +95,7 @@ export default defineNuxtConfig({
   },
 {{/if}}
   devServer: {
-    port: 3001
+    port: {{#if application}}{{application.port}}{{else}}3001{{/if}}
   },
   {{#if (or (and (eq api "orpc") (ne backend "convex") (ne backend "none")) (and (eq webDeploy "cloudflare") (eq backend "self") (eq orm "prisma")) (and (eq backend "self") (eq database "sqlite") (ne dbSetup "d1") (ne webDeploy "cloudflare") (or (eq orm "drizzle") (eq orm "prisma"))))}}
   nitro: {

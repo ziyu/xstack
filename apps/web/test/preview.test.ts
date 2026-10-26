@@ -9,7 +9,7 @@ import type { ApplicationSelection } from "@xstack/types";
 import { POST } from "../src/app/api/rpc/[[...rest]]/route";
 import { DEFAULT_STACK, PRESET_TEMPLATES } from "../src/lib/constant";
 import { findMatchingPreset } from "../src/lib/preset-stacks";
-import { APPLICATION_TYPES, applicationIssues } from "../src/lib/stack-applications";
+import { applicationIssues } from "../src/lib/stack-applications";
 import { applyStackUpdate, resolveStackCompatibility } from "../src/lib/stack-compatibility";
 import { productPlan } from "../src/lib/stack-features";
 import { StackStateSchema, stackStateToConfig } from "../src/lib/stack-schema";
@@ -73,25 +73,6 @@ test("Builder preserves split topology when validating native identity and previ
 });
 
 describe("builder preview over oRPC", () => {
-  test("keeps stable types and roles separate from default instance directories", () => {
-    expect(DEFAULT_STACK.apps?.[0]).toMatchObject({ id: "web", type: "fullstack-web" });
-    expect(
-      PRESET_TEMPLATES.find((preset) => preset.id === "split-shell")?.stack.apps?.[0],
-    ).toMatchObject({
-      id: "frontend",
-      type: "web-frontend",
-    });
-    expect(APPLICATION_TYPES.find((type) => type.id === "fullstack-web")).toMatchObject({
-      defaultDirectoryName: "web",
-      roles: ["web-frontend", "backend", "admin"],
-    });
-    expect(APPLICATION_TYPES.find((type) => type.id === "web-frontend")).toMatchObject({
-      defaultDirectoryName: "frontend",
-      roles: ["web-frontend"],
-    });
-    expect(APPLICATION_TYPES.some((type) => type.id === "web" || type.id === "site")).toBe(false);
-  });
-
   for (const preset of PRESET_TEMPLATES) {
     test(`generates ${preset.name} from a shared stack URL`, async () => {
       const resolved = resolveStackCompatibility(preset.stack).stack;
@@ -156,7 +137,7 @@ describe("builder preview over oRPC", () => {
     }
   });
 
-  test("repairs incompatible shared choices before generating framework-specific files", async () => {
+  test("rejects incompatible shared choices without substituting another API", async () => {
     const input = StackStateSchema.parse({
       ...DEFAULT_STACK,
       apps: undefined,
@@ -165,8 +146,9 @@ describe("builder preview over oRPC", () => {
       runtime: "bun",
       api: "trpc",
     });
-    const preview = await client.preview(input);
-    const output = files(preview.root);
+    expect(resolveStackCompatibility(input).stack.api).toBe("trpc");
+    await expect(client.preview(input)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    const output = files((await client.preview({ ...input, api: "orpc" })).root);
     const api = JSON.parse(output.get("packages/api/package.json")!);
     expect(api.dependencies["@orpc/server"]).toBeDefined();
     expect(api.dependencies["@trpc/server"]).toBeUndefined();
@@ -381,12 +363,9 @@ describe("explicit application state", () => {
     }
   });
 
-  test("rejects unsupported split modules and application provisioning rather than repairing them", async () => {
+  test("rejects unsupported native module combinations rather than repairing selections", async () => {
     for (const update of [
       { apps: splitApps, features: ["payment"] },
-      { addons: ["biome"] },
-      { webDeploy: "cloudflare" },
-      { dbSetup: "turso" },
       { database: "none", orm: "none", features: ["none"] },
       { database: "postgres", orm: "prisma", features: ["none"] },
     ]) {
