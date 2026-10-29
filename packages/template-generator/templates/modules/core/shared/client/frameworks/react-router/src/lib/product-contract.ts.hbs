@@ -8,6 +8,7 @@ export type ProductUser = z.infer<typeof userSchema>;
 export const sessionSchema = z.object({ user: userSchema }).nullable();
 export const configSchema = z.object({
   socialProviders: z.array(z.enum(["google", "github", "wechat"])),
+  siteUrl: z.string().url().optional(),
   verifyEmail: z.boolean(), canResetPassword: z.boolean(),
 });
 export const overviewSchema = z.object({ users: z.number(), admins: z.number(), recent: z.array(userSchema) });

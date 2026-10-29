@@ -25,7 +25,11 @@
           "captcha",
           "payment",
           "credits",
-          "affiliate"
+          "affiliate",
+          "storage",
+          "ai",
+          "blog",
+          "seo"
         ],
         "constraints": {
           "runtime": ["bun", "node"],
@@ -37,7 +41,19 @@
         "frameworks": [
           {
             "id": "http-server",
-            "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"]
+            "modules": [
+              "core",
+              "auth",
+              "admin",
+              "captcha",
+              "payment",
+              "credits",
+              "affiliate",
+              "storage",
+              "ai",
+              "blog",
+              "seo"
+            ]
           }
         ]
       },

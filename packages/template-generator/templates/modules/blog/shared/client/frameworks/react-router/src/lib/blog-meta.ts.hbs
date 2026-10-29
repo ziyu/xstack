@@ -1,0 +1,33 @@
+import type { MetaDescriptor } from "react-router";
+import { createTranslator, defaultLocale, getMessages, locales, type Locale } from "@{{projectName}}/i18n";
+import type { PublicBlogData, PublicPostData } from "./blog-contract";
+
+export function blogMeta({ locale, list, article }: { locale: Locale; list?: PublicBlogData | null; article?: PublicPostData | null }): MetaDescriptor[] {
+  if (!list && !article) return [];
+  const t = createTranslator(getMessages(locale));
+  const title = article?.post.title ?? t("blog.title");
+  const description = article?.post.excerpt ?? t("blog.description");
+  const origin = article?.siteUrl ?? list!.siteUrl;
+  const page = list && list.page > 1 ? `?page=${list.page}` : "";
+  const canonical = new URL(`/${locale}/blog${article ? `/${article.post.slug}` : ""}${page}`, origin).href;
+  const translations = article ? article.translations.map((post) => ({ locale: post.locale, path: `/${post.locale}/blog/${post.slug}` })) : locales.map((locale) => ({ locale, path: `/${locale}/blog` }));
+  const languages = list && list.page > 1 ? [] : translations;
+  const fallback = languages.find((entry) => entry.locale === defaultLocale);
+  return [
+    { title }, { name: "description", content: description }, { name: "robots", content: "index, follow" },
+    { tagName: "link", rel: "canonical", href: canonical },
+    ...languages.map((entry): MetaDescriptor => ({ tagName: "link", rel: "alternate", hrefLang: entry.locale, href: new URL(entry.path, origin).href })),
+    ...(fallback ? [{ tagName: "link" as const, rel: "alternate", hrefLang: "x-default", href: new URL(fallback.path, origin).href }] : []),
+    { property: "og:title", content: title }, { property: "og:description", content: description },
+    { property: "og:url", content: canonical }, { property: "og:type", content: article ? "article" : "website" },
+    { property: "og:locale", content: locale.replaceAll("-", "_") },
+    ...languages.filter((entry) => entry.locale !== locale).map((entry) => ({ property: "og:locale:alternate", content: entry.locale.replaceAll("-", "_") })),
+    { name: "twitter:card", content: "summary" }, { name: "twitter:title", content: title }, { name: "twitter:description", content: description },
+  ];
+}
+
+export function blogPosting({ post, siteUrl }: PublicPostData) {
+  const canonical = new URL(`/${post.locale}/blog/${post.slug}`, siteUrl).href;
+  return { "@context": "https://schema.org", "@type": "BlogPosting", headline: post.title, description: post.excerpt, inLanguage: post.locale, author: { "@type": "Person", name: post.authorName }, ...(post.publishedAt ? { datePublished: post.publishedAt } : {}), dateModified: post.updatedAt, mainEntityOfPage: canonical, url: canonical };
+}
+export function safeJsonLd(value: unknown) { return JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026"); }

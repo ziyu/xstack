@@ -93,7 +93,7 @@ test("RPC stack auth and unsupported native modules do not inherit split native 
   ).toEqual(["stack", "stack", "stack"]);
   expect(
     resolveWorkspaceCapabilities({
-      ...config,
+      ...rpc,
       product: { features: ["storage"], providers: { auth: [] } },
     }).issues.length,
   ).toBeGreaterThan(0);

@@ -1,0 +1,17 @@
+import { z } from "zod";
+
+/** Wire data only: no database or server-service imports in clients. */
+export const postSchema = z.object({
+  id: z.string().uuid(), locale: z.string(), slug: z.string(), title: z.string(),
+  excerpt: z.string(), body: z.string(), translationKey: z.string().uuid(),
+  status: z.enum(["draft", "published"]), revision: z.number().int().positive(),
+  authorName: z.string(), publishedAt: z.string().nullable(), updatedAt: z.string(),
+});
+export const postListSchema = z.object({ posts: z.array(postSchema), page: z.number().int().positive(), limit: z.number().int().positive(), total: z.number().int().nonnegative() });
+const publishedPostSchema = postSchema.extend({ status: z.literal("published") });
+export const publicBlogSchema = postListSchema.extend({ posts: z.array(publishedPostSchema), siteUrl: z.string().url() });
+export const publicPostSchema = z.object({ post: publishedPostSchema, siteUrl: z.string().url(), translations: z.array(z.object({ locale: z.string(), slug: z.string() })) });
+export type BlogPost = z.infer<typeof postSchema>;
+export type BlogListData = z.infer<typeof postListSchema>;
+export type PublicBlogData = z.infer<typeof publicBlogSchema>;
+export type PublicPostData = z.infer<typeof publicPostSchema>;

@@ -4,4 +4,6 @@ Set `SITE_URL` to the public HTTPS origin before deployment. Do not use preview 
 
 `/robots.txt` excludes authentication, dashboard, admin and API paths. `/sitemap.xml` is computed per request and initially includes only localized homepages. Modules register live contributors through `seo.registerSitemap`; the payment integration adds localized pricing URLs, and the blog integration includes published posts and populated blog indexes, never drafts. Sitemap/robots are discovery controls, not authorization. All private routes must retain their session/permission guards.
 
+For split applications, the generated `SITE_URL` initially resolves the `web-frontend` role owner's origin. Keep it set to that application's public production URL, not the backend or admin URL. The public frontend proxies robots and sitemap requests to the backend; the admin application disallows all crawling and returns 404 for its sitemap. Public SSR pages are indexable while private pages and errors retain noindex/no-store behavior.
+
 The module does not invent review claims, organization facts, social images or sample articles. BlogPosting data comes from the blog's persisted publication record. No external SEO service or paid data is required.

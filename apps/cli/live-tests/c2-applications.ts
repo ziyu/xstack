@@ -112,6 +112,22 @@ export async function readC2Applications(project: string): Promise<C2Application
         `Missing resolved backend binding: ${client.id}`,
       );
   }
+  if (process.env.C2_BACKEND_PORT !== undefined) {
+    const port = z.coerce.number().int().min(1024).max(65535).parse(process.env.C2_BACKEND_PORT);
+    assert.ok(
+      targets.backend !== targets.public && targets.backend !== targets.admin,
+      "C2_BACKEND_PORT only supports a separate backend; public/admin origins stay declared",
+    );
+    assert.ok(
+      !applications.some((app) => app !== targets.backend && app.port === port),
+      "C2_BACKEND_PORT conflicts with another declared application",
+    );
+    assert.notEqual(port, 4399, "C2_BACKEND_PORT conflicts with the protocol fixture");
+    const origin = new URL(targets.backend.origin);
+    origin.port = String(port);
+    targets.backend.port = port;
+    targets.backend.origin = origin.origin;
+  }
   // Only role owners participate in HTTP acceptance; independent apps still install/check/build.
   const runtime = [...new Set([targets.backend, targets.public, targets.admin])];
   return { applications, targets, runtime };

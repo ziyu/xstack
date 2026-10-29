@@ -49,6 +49,7 @@ export function requiredModuleContributions(
           `shared/client/frameworks/${client.framework}`,
         );
         for (const integration of module.integrations) {
+          if (contract.integrations?.[integration]?.serverOnly) continue;
           if (!client.integrations.includes(integration))
             throw new GeneratorError({
               phase: "contributions",

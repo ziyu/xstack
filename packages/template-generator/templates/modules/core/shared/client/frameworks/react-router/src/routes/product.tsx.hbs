@@ -1,5 +1,9 @@
-import { data, redirect, useLoaderData, type HeadersFunction, type LoaderFunctionArgs } from "react-router";
+import { data, redirect, useLoaderData, type HeadersFunction, type LoaderFunctionArgs, type MetaFunction } from "react-router";
+import { z } from "zod";
 import { getMessages, isLocale, localeFromHeaders } from "@{{projectName}}/i18n";
+{{#if (includes product.features "seo")}}
+import { createTranslator } from "@{{projectName}}/i18n";
+{{/if}}
 import { I18nProvider, useT } from "@/components/i18n-provider";
 import { ProductShell } from "@/components/product-shell";
 import { privateHeaders, readBackend } from "@/lib/backend.server";
@@ -43,15 +47,48 @@ import { AdminCredits, adminCreditsSchema } from "@/components/admin/admin-credi
 {{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}
 import { AdminAffiliate, adminAffiliateSchema } from "@/components/admin/admin-affiliate";
 {{/if}}
+{{#if (includes product.features "storage")}}
+import { FilesPage } from "@/components/storage/files-page";
+import { storageSchema } from "@/lib/storage-contract";
+{{/if}}
+{{#if (includes product.features "ai")}}
+import { AIPage } from "@/components/ai/ai-page";
+import { aiSchema } from "@/lib/ai-contract";
+{{/if}}
+{{#if (includes product.features "blog")}}
+import { BlogList, BlogArticle, AdminBlog, BlogEdit } from "@/components/blog/blog-pages";
+import { postSchema, postListSchema, publicBlogSchema, publicPostSchema } from "@/lib/blog-contract";
+import { blogMeta } from "@/lib/blog-meta";
+{{/if}}
+{{#if (includes product.features "seo")}}
+import { pageMeta } from "@/lib/seo-meta";
+{{/if}}
 
 export const headers: HeadersFunction = ({ loaderHeaders, errorHeaders }) => {
-  const output = new Headers(privateHeaders);
+  const output = new Headers(errorHeaders?.has("X-Robots-Tag") ? errorHeaders : loaderHeaders);
+  output.set("Cache-Control", "no-store");
+  output.delete("Set-Cookie");
   for (const source of [loaderHeaders, errorHeaders]) {
     if (source) for (const cookie of source.getSetCookie()) output.append("Set-Cookie", cookie);
   }
   return output;
 };
-export const meta = () => [{ title: "{{projectName}}" }, { name: "robots", content: "noindex, nofollow" }];
+export const meta: MetaFunction<typeof loader> = ({ loaderData: result }) => {
+  if (result && !isAdminClient) {
+{{#if (includes product.features "blog")}}
+    if (result.blogList || result.blogArticle) return blogMeta({ locale: result.locale, list: result.blogList ?? undefined, article: result.blogArticle ?? undefined });
+{{/if}}
+{{#if (includes product.features "seo")}}
+    if (result.indexable && result.config.siteUrl) {
+      const t = createTranslator(getMessages(result.locale));
+      const title = {{#if (includes product.features "payment")}}result.page === "pricing" ? t("payment.pricing.title") : {{/if}}t("core.landing.title");
+      const description = {{#if (includes product.features "payment")}}result.page === "pricing" ? t("payment.pricing.subtitle") : {{/if}}t("core.landing.subtitle");
+      return pageMeta({ siteUrl: result.config.siteUrl, locale: result.locale, path: result.page ? `/${result.page}` : "/", title, description });
+    }
+{{/if}}
+  }
+  return [{ title: "{{projectName}}" }, { name: "robots", content: "noindex, nofollow" }];
+};
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -63,25 +100,34 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const page = segments.slice(1).join("/");
   const orderId = {{#if (includes product.features "payment")}}/^payment\/[^/]+$/.test(page) ? page.slice("payment/".length) : {{/if}}null;
   const referralCode = {{#if (includes product.features "affiliate")}}/^ref\/[a-zA-Z0-9_-]+$/.test(page) ? page.slice("ref/".length) : {{/if}}null;
+  const blogSlug = {{#if (includes product.features "blog")}}/^blog\/[^/]+$/.test(page) ? page.slice("blog/".length) : {{/if}}null;
+  const blogEditorId = {{#if (includes product.features "blog")}}/^admin\/blog\/[^/]+$/.test(page) && page !== "admin/blog/new" ? page.slice("admin/blog/".length) : {{/if}}null;
+  const blogAdminPage = {{#if (includes product.features "blog")}}page === "admin/blog" || page === "admin/blog/new" || !!blogEditorId{{else}}false{{/if}};
+  const blogPublicPage = {{#if (includes product.features "blog")}}!isAdminClient && (page === "blog" || !!blogSlug){{else}}false{{/if}};
   const publicPages: string[] = ["", {{#if (includes product.features "auth")}}"login", "signup",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "email"))}} "forgot-password", "reset-password", "verify-email",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "sms"))}} "login/phone",{{/if}}{{#if (includes product.features "payment")}} "pricing",{{/if}}];
-  const accountPages: string[] = [{{#if (includes product.features "auth")}}"dashboard", "dashboard/settings",{{/if}}{{#if (includes product.features "payment")}} "dashboard/billing",{{/if}}{{#if (includes product.features "credits")}} "dashboard/credits",{{/if}}{{#if (includes product.features "affiliate")}} "dashboard/affiliate",{{/if}}];
+  const accountPages: string[] = [{{#if (includes product.features "auth")}}"dashboard", "dashboard/settings",{{/if}}{{#if (includes product.features "payment")}} "dashboard/billing",{{/if}}{{#if (includes product.features "credits")}} "dashboard/credits",{{/if}}{{#if (includes product.features "affiliate")}} "dashboard/affiliate",{{/if}}{{#if (includes product.features "storage")}} "dashboard/files",{{/if}}{{#if (includes product.features "ai")}} "dashboard/ai",{{/if}}];
   const adminPages: string[] = [{{#if (includes product.features "admin")}}"admin", "admin/users",{{#if (includes product.features "payment")}} "admin/orders",{{/if}}{{#if (includes product.features "credits")}} "admin/credits",{{/if}}{{#if (includes product.features "affiliate")}} "admin/affiliate",{{/if}}{{/if}}];
-  if (!publicPages.includes(page) && !accountPages.includes(page) && !orderId && !referralCode && !(isAdminClient && adminPages.includes(page))) throw new Response("Not found", { status: 404, headers });
+  if (!publicPages.includes(page) && !accountPages.includes(page) && !orderId && !referralCode && !blogPublicPage && !(isAdminClient && (adminPages.includes(page) || blogAdminPage))) throw new Response("Not found", { status: 404, headers });
   let user: ProductUser | null = null;
   let config: ReturnType<typeof configSchema.parse> = { socialProviders: [], verifyEmail: false, canResetPassword: false };
 {{#if (includes product.features "auth")}}
   const session = await readBackend(request, "/api/product/session", sessionSchema, headers);
   user = session?.user ?? null;
-  const privatePage = accountPages.includes(page) || adminPages.includes(page) || !!orderId;
+  const privatePage = accountPages.includes(page) || adminPages.includes(page) || blogAdminPage || !!orderId;
   if (privatePage && !user) throw redirect(`/${locale}/login?next=${encodeURIComponent(`/${segments.join("/")}${url.search}`)}`, { headers });
   if (privatePage && ({{#if (includes product.features "admin")}}isAdminClient || {{/if}}adminPages.includes(page)) && !isAdministrator(user)) throw new Response("Forbidden", { status: 403, headers });
   if (publicPages.includes(page)) config = await readBackend(request, "/api/product/config", configSchema, headers);
 {{/if}}
+{{#unless (includes product.features "auth")}}
+  if (publicPages.includes(page)) config = await readBackend(request, "/api/product/config", configSchema, headers);
+{{/unless}}
   const home = `/${locale}/${isAdminClient && {{#if (includes product.features "admin")}}true{{else}}false{{/if}} ? "admin" : "dashboard"}`;
   const destination = safeNext(url.searchParams.get("next"), home, url.origin);
   const next = new URL(destination, url.origin).href;
   const nextPath = `${new URL(next).pathname}${new URL(next).search}${new URL(next).hash}`;
-  const search = { q: url.searchParams.get("q") ?? "", page: Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1)) };
+  const pageInput = z.coerce.number().int().min(1).max(100000).safeParse(url.searchParams.get("page") ?? 1);
+  if (!pageInput.success) throw new Response("Invalid page", { status: 400, headers });
+  const search = { q: url.searchParams.get("q") ?? "", page: pageInput.data };
   const overview = {{#if (includes product.features "admin")}}page === "admin" ? await readBackend(request, "/api/product/admin", overviewSchema, headers) : {{/if}}null;
   const users = {{#if (includes product.features "admin")}}page === "admin/users" ? await readBackend(request, `/api/product/users?${new URLSearchParams({ q: search.q, page: String(search.page) })}`, usersSchema, headers) : {{/if}}null;
   const pricing = {{#if (includes product.features "payment")}}page === "pricing" ? await readBackend(request, "/api/product/pricing", pricingSchema, headers) : {{/if}}null;
@@ -95,7 +141,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const orders = {{#if (and (includes product.features "payment") (includes product.features "admin"))}}page === "admin/orders" ? await readBackend(request, `/api/product/orders?page=${search.page}`, ordersSchema, headers) : {{/if}}null;
   const adminCredits = {{#if (and (includes product.features "credits") (includes product.features "admin"))}}page === "admin/credits" ? await readBackend(request, `/api/product/credit-transactions?page=${search.page}`, adminCreditsSchema, headers) : {{/if}}null;
   const adminAffiliate = {{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}page === "admin/affiliate" ? await readBackend(request, `/api/product/referrals?page=${search.page}`, adminAffiliateSchema, headers) : {{/if}}null;
-  return data({ locale, page, user, config, next, nextPath, search, overview, users, pricing, billing, paymentOrder, credits, affiliate, referralCode, orders, adminCredits, adminAffiliate, returned: url.searchParams.get("status") === "success", token: url.searchParams.get("token") ?? "", error: url.searchParams.get("error") }, { headers });
+  const files = {{#if (includes product.features "storage")}}page === "dashboard/files" ? await readBackend(request, "/api/product/files", storageSchema, headers) : {{/if}}null;
+  const ai = {{#if (includes product.features "ai")}}page === "dashboard/ai" ? await readBackend(request, "/api/product/ai", aiSchema, headers) : {{/if}}null;
+  const blogList = {{#if (includes product.features "blog")}}blogPublicPage && page === "blog" ? await readBackend(request, `/api/product/blog?locale=${locale}&page=${search.page}`, publicBlogSchema, headers) : {{/if}}null;
+{{#if (includes product.features "blog")}}
+  if (blogList && blogList.page > 1 && blogList.posts.length === 0) throw new Response("Not found", { status: 404, headers });
+{{/if}}
+  const blogArticle = {{#if (includes product.features "blog")}}blogPublicPage && blogSlug ? await readBackend(request, `/api/product/blog/${encodeURIComponent(blogSlug)}?locale=${locale}`, publicPostSchema, headers) : {{/if}}null;
+  const adminBlog = {{#if (includes product.features "blog")}}isAdminClient && page === "admin/blog" ? await readBackend(request, `/api/blog?page=${search.page}`, postListSchema, headers) : {{/if}}null;
+  const editPost = {{#if (includes product.features "blog")}}isAdminClient && blogEditorId ? await readBackend(request, `/api/blog/${encodeURIComponent(blogEditorId)}`, postSchema, headers) : {{/if}}null;
+  const indexable = !isAdminClient && (blogPublicPage || {{#if (includes product.features "seo")}}page === "" || page === "pricing"{{else}}false{{/if}});
+  if (indexable) headers.delete("X-Robots-Tag");
+  return data({ locale, page, user, config, next, nextPath, search, overview, users, pricing, billing, paymentOrder, credits, affiliate, referralCode, orders, adminCredits, adminAffiliate, files, ai, blogList, blogArticle, adminBlog, editPost, indexable, returned: url.searchParams.get("status") === "success", token: url.searchParams.get("token") ?? "", error: url.searchParams.get("error") }, { headers });
 }
 
 export default function ProductPage() {
@@ -150,6 +207,19 @@ function Content({ result }: { result: ReturnType<typeof useLoaderData<typeof lo
 {{/if}}
 {{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}
   if (page === "admin/affiliate" && result.adminAffiliate) return <AdminAffiliate data={result.adminAffiliate} page={result.search.page} />;
+{{/if}}
+{{#if (includes product.features "storage")}}
+  if (page === "dashboard/files" && result.files) return <FilesPage data={result.files} />;
+{{/if}}
+{{#if (includes product.features "ai")}}
+  if (page === "dashboard/ai" && result.ai) return <AIPage data={result.ai} />;
+{{/if}}
+{{#if (includes product.features "blog")}}
+  if (result.blogList) return <BlogList data={result.blogList} locale={locale} />;
+  if (result.blogArticle) return <BlogArticle data={result.blogArticle} locale={locale} />;
+  if (result.adminBlog) return <AdminBlog data={result.adminBlog} locale={locale} />;
+  if (isAdminClient && page === "admin/blog/new") return <BlogEdit locale={locale} />;
+  if (isAdminClient && result.editPost) return <BlogEdit locale={locale} post={result.editPost} />;
 {{/if}}
   return <section className="space-y-10 py-12"><div className="max-w-3xl space-y-6"><p className="text-sm uppercase tracking-widest">{{projectName}}</p><h1 className="font-serif text-5xl">{t("core.landing.title")}</h1><p className="text-lg text-muted-foreground">{t("core.landing.subtitle")}</p>{{#if (includes product.features "auth")}}<a href={`/${locale}/${user ? isAdminClient && {{#if (includes product.features "admin")}}true{{else}}false{{/if}} ? "admin" : "dashboard" : "signup"}`} className="inline-block border bg-foreground px-6 py-3 text-background">{t("core.landing.cta")}</a>{{/if}}</div><section className="space-y-6"><h2 className="text-2xl">{t("core.landing.features.title")}</h2><div className="grid gap-6 md:grid-cols-3">{(["modular", "portable", "deploy"] as const).map((feature) => <article key={feature} className="space-y-3 border p-6"><h3 className="font-semibold">{t(`core.landing.features.${feature}.title`)}</h3><p className="text-muted-foreground">{t(`core.landing.features.${feature}.body`)}</p></article>)}</div></section></section>;
 }

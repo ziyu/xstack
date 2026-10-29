@@ -1,0 +1,9 @@
+import type { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import { AIStudio } from "@/components/ai/studio";
+import type { aiSchema } from "@/lib/ai-contract";
+
+export function AIPage({ data }: { data: z.infer<typeof aiSchema> }) {
+  const t = useT();
+  return <section className="space-y-8"><header className="space-y-3"><h1 className="font-serif text-4xl">{t("ai.title")}</h1><p className="text-muted-foreground">{t("ai.subtitle")}</p></header><AIStudio initialJobs={data.jobs} capabilities={data.capabilities} /></section>;
+}

@@ -4,6 +4,8 @@ The storage module uses exactly one private provider: S3, Cloudflare R2 (S3 API 
 
 Selecting storage automatically includes the authentication module. The file list shows all files owned by the signed-in user, newest first, without a pagination limit; it never includes another user's files.
 
+In a split application layout, the backend owns the storage service, SDK, database and credentials. Frontend and administration applications use authenticated same-origin BFF routes; uploads are streamed to the backend before its existing size-limited multipart parser. Configure secrets only in the backend owner's environment, never the frontend environment. The generated `applications.json` records application roles and directories.
+
 ## Configure the selected provider
 
 {{#if (includes module.providers "s3")}}
@@ -69,7 +71,7 @@ The service checks the owning user's database row before download/read/delete op
 | `GET /api/storage/:id` | Authenticated owner lookup; `307` signed attachment redirect for API providers, `200` attachment stream for R2 binding |
 | `DELETE /api/storage/:id` | Authenticated owner deletion, returns `204` |
 
-Mutations require an `Origin` header matching the origin of configured `BETTER_AUTH_URL`, including scheme and port. Missing or mismatched origins return `403`; forwarded host headers cannot authorize a mutation. Unauthenticated requests return `401`, invalid files `400`, oversize bodies/files `413`, missing or another user's files `404`, and unavailable provider operations `503`. Provider errors do not expose credentials, keys or raw SDK messages.
+Mutations require an `Origin` header matching the configured backend origin or, in split layouts, an explicitly declared frontend/admin origin (including scheme and port). Production custom domains must be added to the backend `CORS_ORIGIN` and authentication configuration. Missing or mismatched origins return `403`; forwarded host headers cannot authorize a mutation. Unauthenticated requests return `401`, invalid files `400`, oversize bodies/files `413`, missing or another user's files `404`, and unavailable provider operations `503`. Provider errors do not expose credentials, keys or raw SDK messages.
 
 ## Cloud acceptance
 

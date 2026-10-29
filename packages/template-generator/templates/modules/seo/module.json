@@ -16,6 +16,7 @@
     "backends": ["self"],
     "apis": ["none"]
   },
+  "nativeSplit": true,
   "frameworkReplaces": {
     "tanstack-start": ["apps/web/public/robots.txt"],
     "nuxt": ["apps/web/public/robots.txt"]
@@ -23,6 +24,7 @@
   "env": [
     {
       "key": "SITE_URL",
+      "originRole": "web-frontend",
       "type": "url",
       "example": "http://localhost:3001",
       "sensitive": false,
@@ -51,9 +53,11 @@
     }
   ],
   "sources": {
+    "required": ["shared/partials/metadata.hbs"],
     "frameworks": ["http-server", "next", "nuxt", "tanstack-start"],
     "integrations": {
       "core": {
+        "serverOnly": true,
         "frameworks": {
           "next": "integrations/core/frameworks/next",
           "nuxt": "frameworks/nuxt",
@@ -61,8 +65,16 @@
         }
       },
       "payment": {
-        "base": "integrations/payment/apps/fullstack-web"
+        "base": "integrations/payment/apps/fullstack-web",
+        "serverOnly": true,
+        "required": [
+          "integrations/payment/apps/{application}/src/integrations/seo-payment.ts.hbs",
+          "shared/partials/seo-payment.hbs"
+        ]
       }
+    },
+    "frameworkRequired": {
+      "http-server": ["shared/partials/seo.hbs"]
     }
   }
 }

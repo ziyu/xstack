@@ -1,0 +1,6 @@
+import { z } from "zod";
+
+export const storageSchema = z.object({
+  configured: z.boolean(),
+  files: z.array(z.object({ id: z.string(), name: z.string(), size: z.number(), createdAt: z.string() })),
+});

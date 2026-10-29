@@ -1,0 +1,9 @@
+import { z } from "zod";
+
+export const kind = z.enum(["chat", "image", "video"]);
+export const jobSchema = z.object({ id: z.string(), requestId: z.string(), provider: z.string(), kind, model: z.string(), prompt: z.string(), cost: z.number(), status: z.enum(["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"]), text: z.string().nullable(), error: z.string().nullable(), mediaUrl: z.string().nullable(), cancellable: z.boolean() });
+export const capabilitySchema = z.object({ id: z.string(), models: z.object({ chat: z.string().optional(), image: z.string().optional(), video: z.string().optional() }), costs: z.object({ chat: z.number(), image: z.number(), video: z.number() }) });
+export const aiSchema = z.object({ jobs: z.array(jobSchema), capabilities: z.array(capabilitySchema) });
+export type Job = z.infer<typeof jobSchema>;
+export type Capability = z.infer<typeof capabilitySchema>;
+export type Kind = z.infer<typeof kind>;

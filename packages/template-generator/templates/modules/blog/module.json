@@ -18,6 +18,7 @@
     "orms": ["drizzle"],
     "dialects": ["sqlite", "postgres"]
   },
+  "nativeSplit": true,
   "packages": [
     {
       "dir": "blog",
@@ -29,6 +30,9 @@
     }
   ],
   "frameworkAppDependencies": {
+    "react-router": {
+      "react-markdown": "^10.1.0"
+    },
     "next": {
       "react-markdown": "^10.1.0"
     },
@@ -71,8 +75,18 @@
     "frameworks": ["http-server", "next", "nuxt", "tanstack-start", "react"],
     "integrations": {
       "seo": {
-        "base": "integrations/seo/apps/fullstack-web"
+        "base": "integrations/seo/apps/fullstack-web",
+        "serverOnly": true,
+        "required": [
+          "integrations/seo/apps/{application}/src/integrations/blog-seo.ts.hbs",
+          "shared/partials/blog-seo.hbs"
+        ]
       }
+    },
+    "required": ["shared/partials/editor.hbs", "shared/partials/markdown.hbs"],
+    "frameworkRequired": {
+      "http-server": ["shared/partials/blog.hbs", "shared/partials/blog-http.hbs"],
+      "next": ["shared/partials/blog-http.hbs"]
     }
   }
 }

@@ -8,11 +8,11 @@ Create each translation as a separate post with its configured language, localiz
 
 Public listing and detail routes are `/{locale}/blog` and `/{locale}/blog/{slug}`. Listing pages use `?page=2` pagination with self-canonical URLs. Draft detail requests return 404 even for signed-in administrators; private previews exist only in the guarded editor. Markdown is rendered using react-markdown without raw HTML, unsafe URL schemes or remote images. Inline HTML is dropped, not injected. JSON-LD is escaped before embedding and reports the real saved headline, author, first publication date and last modification date.
 
-Without SEO, metadata uses `BETTER_AUTH_URL` as its canonical public origin. With SEO, set `SITE_URL` and the blog integration uses it for both metadata and sitemap URLs. SEO dynamically includes published posts and populated blog index pages. No private routes are listed. The blog works independently without adding robots/sitemap routes.
+Without SEO, fullstack metadata uses `BETTER_AUTH_URL`; split public responses use the validated frontend request origin, never the backend or admin origin. With SEO, set `SITE_URL` to the public frontend and the blog integration uses it for metadata and sitemap URLs. SEO dynamically includes published posts and populated blog index pages. No private routes are listed. The blog works independently without adding robots/sitemap routes.
 
 ## HTTP authoring API
 
-All `/api/blog` routes require an authenticated administrator. Writes additionally require an Origin header matching `BETTER_AUTH_URL`; body parsing is bounded to 512KB and validated with Zod. No API response is publicly cached.
+All `/api/blog` routes require an authenticated administrator. Writes additionally require a trusted configured backend or split-client Origin; body parsing is bounded to 512KB and validated with Zod. No API response is publicly cached. In split layouts, authoring pages exist only in the admin application and published pages only in the public frontend. The backend owns persistence and publication checks; clients use same-origin BFF routes.
 
 - `GET /api/blog?page=1`: paginated private records, including drafts.
 - `POST /api/blog`: `{ locale, slug, title, excerpt, body, translationKey?, status: "draft" }`; returns the new record (201).

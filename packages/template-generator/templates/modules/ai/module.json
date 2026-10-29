@@ -18,6 +18,7 @@
     "orms": ["drizzle"],
     "dialects": ["sqlite", "postgres"]
   },
+  "nativeSplit": true,
   "providers": {
     "min": 1,
     "default": {
@@ -161,15 +162,35 @@
   "sources": {
     "dialects": true,
     "frameworks": ["http-server", "next", "nuxt", "tanstack-start", "react"],
+    "frameworkRequired": {
+      "http-server": [
+        "frameworks/http-server/apps/{application}/src/lib/native/ai.ts.hbs",
+        "frameworks/http-server/apps/{application}/src/lib/ai-http.ts.hbs",
+        "shared/partials/ai.hbs",
+        "shared/partials/ai-http.hbs"
+      ],
+      "next": ["shared/partials/ai-http.hbs"],
+      "react": ["shared/partials/studio.hbs", "shared/partials/ai-contract.hbs"]
+    },
     "providers": {
       "mode": "separate"
     },
     "integrations": {
       "credits": {
-        "base": "integrations/credits/apps/fullstack-web"
+        "base": "integrations/credits/apps/fullstack-web",
+        "serverOnly": true,
+        "required": [
+          "integrations/credits/apps/{application}/src/integrations/ai-credits.ts.hbs",
+          "shared/partials/ai-credits.hbs"
+        ]
       },
       "storage": {
-        "base": "integrations/storage/apps/fullstack-web"
+        "base": "integrations/storage/apps/fullstack-web",
+        "serverOnly": true,
+        "required": [
+          "integrations/storage/apps/{application}/src/integrations/ai-storage.ts.hbs",
+          "shared/partials/ai-storage.hbs"
+        ]
       }
     }
   }

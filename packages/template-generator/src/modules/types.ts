@@ -30,6 +30,8 @@ export type EnvSpec = {
   values?: string[];
   /** Value written to the generated `.env`. */
   example?: string;
+  /** Use the resolved role owner's origin as the generated environment example. */
+  originRole?: string;
   /** Default written to `.env.schema`, used when the variable is unset. */
   default?: string;
   comment?: string;
@@ -168,6 +170,8 @@ export type ModuleSourceContract = {
   integrations?: Record<
     string,
     {
+      /** Integration executes only in the service owner; clients consume its HTTP result. */
+      serverOnly?: boolean;
       base?: string;
       frameworks?: Record<string, string>;
       required?: string[];

@@ -27,7 +27,11 @@
           "captcha",
           "payment",
           "credits",
-          "affiliate"
+          "affiliate",
+          "storage",
+          "ai",
+          "blog",
+          "seo"
         ],
         "constraints": {
           "runtime": ["bun", "node"],
@@ -47,9 +51,13 @@
             "captcha",
             "payment",
             "credits",
-            "affiliate"
+            "affiliate",
+            "storage",
+            "ai",
+            "blog",
+            "seo"
           ],
-          "integrations": ["email", "sms", "admin", "payment"]
+          "integrations": ["email", "sms", "admin", "payment", "seo"]
         }
       },
       "stack": {
@@ -81,7 +89,11 @@
           "captcha",
           "payment",
           "credits",
-          "affiliate"
+          "affiliate",
+          "storage",
+          "ai",
+          "blog",
+          "seo"
         ],
         "constraints": {
           "runtime": ["bun", "node"],
@@ -101,9 +113,13 @@
             "captcha",
             "payment",
             "credits",
-            "affiliate"
+            "affiliate",
+            "storage",
+            "ai",
+            "blog",
+            "seo"
           ],
-          "integrations": ["email", "sms", "admin", "payment"]
+          "integrations": ["email", "sms", "admin", "payment", "seo"]
         }
       },
       "stack": {

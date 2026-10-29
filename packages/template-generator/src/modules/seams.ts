@@ -187,7 +187,12 @@ export function appendEnv(
       lastModule = module;
     }
     if (spec.comment) content += `# ${spec.comment}\n`;
-    const value = spec.example ?? spec.default ?? "";
+    const origin = spec.originRole
+      ? config.application?.workspaceApplications.find((app) =>
+          app.roles.includes(spec.originRole!),
+        )?.origin
+      : undefined;
+    const value = origin ?? spec.example ?? spec.default ?? "";
     content += spec.required === false && !value ? `# ${spec.key}=\n` : `${spec.key}=${value}\n`;
   }
   vfs.writeFile(path, content);

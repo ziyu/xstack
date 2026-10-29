@@ -223,6 +223,18 @@ Results and provenance are retained under the selected private `.smoke` root. St
 bun apps/cli/live-tests/framework-matrix.ts cleanup --directory apps/cli/.smoke/framework-run
 ```
 
+## C4 content and AI acceptance
+
+`bun apps/cli/live-tests/c4.ts plan|prepare|check|runtime|report|cleanup` uses the existing owned-workspace lifecycle. Cases are `fullstack-next-sqlite`, `fullstack-start-sqlite`, `fullstack-nuxt-sqlite`, `split-sqlite`, `split-postgres`, and `split-renamed-cli`. Use `--case` and the same `--directory apps/cli/.smoke/<name>` across phases. Prepare creates real CLI output, installs dependencies and applies/repeats migrations; check runs every workspace's typecheck and production build. Runtime runs actual generated routes and databases.
+
+Runtime covers authenticated files, request limits, cross-user isolation, signed downloads, AI history/media/replay, private drafts, administrator CRUD, optimistic revisions, translations, safe Markdown/JSON-LD and live canonical/sitemap metadata. SQLite additionally runs the existing generated AI/credits protocol fixture for concurrent debit, refunds, cancellation and uncertain outcomes. Accounts are explicitly verified/promoted through the disposable database; this does not claim email delivery verification.
+
+S3/OpenAI/Google/compatible transports are exact-domain local protocol fixtures, never real cloud operations. Nuxt's two Google fonts/icons discovery URLs receive empty offline catalogues, counted separately; other unexpected external calls fail closed. Real provider credentials, cloud IAM, billing and deployment remain unverified. Runtime jobs must run serially because they share frontend ports and fixture port 4399. If port 3000 belongs to another project, `C2_BACKEND_PORT=4300` remaps only the separate backend through environment configuration; it refuses fullstack owners, invalid ports and declared collisions. Never stop unrelated services.
+
+Next's exact npm bulk-advisory endpoint is blocked offline with HTTP 503 and recorded separately as `toolingBlockedUrls`; this is an unavailable security check, not a clean audit response. The fixture does not allow arbitrary npm traffic.
+
+Postgres requires an empty loopback database via `C2_DATABASE_URL` and `C2_DISPOSABLE_POSTGRES=1`; cleanup validates ownership and known tables. Retained check/runtime refresh generated `.env` with role-resolved origins and schema-declared `PORT`, without disabling Varlock or copying secrets into clients.
+
 ## Selected validation run
 
 The [2026-10-02 verification record](./verification-2026-10-02.md) lists the 19 local, five Postgres, and two Vercel fixtures that passed, including production and protected preview stages.

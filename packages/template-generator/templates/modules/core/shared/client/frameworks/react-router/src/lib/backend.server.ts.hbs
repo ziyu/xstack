@@ -6,7 +6,7 @@ const hopByHop = ["connection", "keep-alive", "proxy-authenticate", "proxy-autho
 export const privateHeaders = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" };
 
 /** Only the declared backend is reachable; browser-supplied forwarding headers are replaced. */
-export async function backendRequest(request: Request, path: string, forwardBody = false): Promise<Response> {
+export async function backendRequest(request: Request, path: string, forwardBody = false, publicResponse = false): Promise<Response> {
   const original = new URL(request.url);
   const destination = new URL(upstream.origin);
   destination.pathname = path.split("?")[0]!;
@@ -20,16 +20,20 @@ export async function backendRequest(request: Request, path: string, forwardBody
   headers.delete("x-forwarded-port");
   headers.set("x-xstack-client-origin", original.origin);
   headers.set("accept-encoding", "identity");
-  const response = await fetch(destination, {
+  const init: RequestInit & { duplex?: "half" } = {
     method: forwardBody ? request.method : "GET", headers, redirect: "manual", cache: "no-store",
-    ...(forwardBody && request.method !== "GET" && request.method !== "HEAD" ? { body: await request.arrayBuffer() } : {}),
-  });
+  };
+  if (forwardBody && request.method !== "GET" && request.method !== "HEAD") {
+    init.body = request.body;
+    init.duplex = "half";
+  }
+  const response = await fetch(destination, init);
   const outgoing = new Headers(response.headers);
   for (const name of hopByHop) outgoing.delete(name);
   outgoing.delete("content-encoding");
   outgoing.delete("set-cookie");
   for (const cookie of response.headers.getSetCookie()) outgoing.append("set-cookie", cookie);
-  for (const [name, value] of Object.entries(privateHeaders)) outgoing.set(name, value);
+  if (!publicResponse) for (const [name, value] of Object.entries(privateHeaders)) outgoing.set(name, value);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers: outgoing });
 }
 

@@ -1,0 +1,32 @@
+import type { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { FileManager, type StorageLabels } from "@/components/storage/file-manager";
+import type { storageSchema } from "@/lib/storage-contract";
+
+export function FilesPage({ data }: { data: z.infer<typeof storageSchema> }) {
+  const locale = useLocale();
+  const t = useT();
+  const labels: StorageLabels = {
+    uploadTitle: t("storage.page.uploadTitle"), fileLabel: t("storage.page.fileLabel"),
+    upload: t("storage.page.upload"), uploading: t("storage.page.uploading"),
+    listTitle: t("storage.page.listTitle"), empty: t("storage.page.empty"),
+    download: t("storage.page.download"), delete: t("storage.page.delete"),
+    deleting: t("storage.page.deleting"), deleteConfirm: t("storage.page.deleteConfirm"),
+    uploaded: t("storage.page.uploaded"), deleted: t("storage.page.deleted"),
+    errors: {
+      unauthorized: t("storage.errors.unauthorized"), forbidden: t("storage.errors.forbidden"),
+      tooLarge: t("storage.errors.tooLarge"), invalidFile: t("storage.errors.invalidFile"),
+      notFound: t("storage.errors.notFound"), unavailable: t("storage.errors.unavailable"),
+      generic: t("storage.errors.generic"),
+    },
+  };
+  return <section className="space-y-8">
+    <header><h1 className="font-serif text-4xl">{t("storage.page.title")}</h1><p className="mt-4 text-muted-foreground">{t("storage.page.description")}</p><p id="storage-limits" className="mt-2 text-xs">{t("storage.page.limits")}</p></header>
+    {!data.configured && <p role="status">{t("storage.page.unavailable")}</p>}
+    <FileManager configured={data.configured} labels={labels} files={data.files.map((file) => ({
+      id: file.id, name: file.name,
+      size: `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(file.size / 1024)} KiB`,
+      createdAt: new Date(file.createdAt).toLocaleString(locale),
+    }))} />
+  </section>;
+}

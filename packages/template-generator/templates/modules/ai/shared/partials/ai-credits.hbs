@@ -1,0 +1,13 @@
+import { AIError } from "@{{projectName}}/ai";
+import { InsufficientCreditsError } from "@{{projectName}}/credits";
+import type { Services } from "../services";
+
+export default function registerAICredits({ ai, credits }: Services) {
+  ai.setBilling({
+    async charge(userId, cost, referenceId) {
+      try { await credits.consume(userId, cost, { referenceId, reason: "AI generation" }); }
+      catch (error) { if (error instanceof InsufficientCreditsError) throw new AIError("insufficient_credits"); throw error; }
+    },
+    async refund(userId, referenceId) { await credits.refund(userId, referenceId); },
+  });
+}

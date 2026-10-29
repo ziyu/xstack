@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import type { SocialProvider } from "@/lib/social-providers";
 
-import { useLocale, useT } from "../i18n-provider";
+import { {{#if (includes product.features "email")}}useLocale, {{/if}}useT } from "../i18n-provider";
 import { Field, formValue } from "./field";
 import { SocialButtons } from "./social-buttons";
 {{#if (includes product.features "captcha")}}
@@ -25,7 +25,9 @@ export default function SignUpForm({
   verifyEmail: boolean;
 }) {
   const t = useT();
+{{#if (includes product.features "email")}}
   const locale = useLocale();
+{{/if}}
   const [pending, setPending] = useState(false);
   const [sentTo, setSentTo] = useState<string>();
 {{#if (includes product.features "captcha")}}

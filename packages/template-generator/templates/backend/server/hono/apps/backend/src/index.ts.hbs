@@ -48,6 +48,10 @@ app.use(
 
 {{#if application.nativeSplit}}
 app.all("/api/*", (c) => handleNativeRequest(c.req.raw));
+{{#if (includes product.features "seo")}}
+app.get("/robots.txt", (c) => handleNativeRequest(c.req.raw));
+app.get("/sitemap.xml", (c) => handleNativeRequest(c.req.raw));
+{{/if}}
 {{else}}
 {{#if (eq auth "better-auth")}}
 app.on(

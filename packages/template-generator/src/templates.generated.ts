@@ -3063,13 +3063,27 @@ export default defineSchema({
   "apps": {
     "backend": {
       "legacy": true,
-      "options": {"runtime":{"values":["bun","node"],"visibility":"visible"},"api":{"values":["trpc","orpc","none"],"visibility":"advanced"}},
+      "options": {
+        "runtime": { "values": ["bun", "node"], "visibility": "visible" },
+        "api": { "values": ["trpc", "orpc", "none"], "visibility": "advanced" }
+      },
       "devArgs": [],
       "serverContributions": { "apiPrefix": "" },
       "productContribution": {
         "mode": "server",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "modules": [
+          "core",
+          "i18n",
+          "auth",
+          "admin",
+          "email",
+          "sms",
+          "captcha",
+          "payment",
+          "credits",
+          "affiliate"
+        ],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -3078,7 +3092,10 @@ export default defineSchema({
           "webDeploy": ["none"]
         },
         "frameworks": [
-          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] }
+          {
+            "id": "http-server",
+            "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"]
+          }
         ]
       },
       "stack": {
@@ -3232,13 +3249,27 @@ if (!process.env.VERCEL) {
   "apps": {
     "backend": {
       "legacy": true,
-      "options": {"runtime":{"values":["bun","node"],"visibility":"visible"},"api":{"values":["trpc","orpc","none"],"visibility":"advanced"}},
+      "options": {
+        "runtime": { "values": ["bun", "node"], "visibility": "visible" },
+        "api": { "values": ["trpc", "orpc", "none"], "visibility": "advanced" }
+      },
       "devArgs": [],
       "serverContributions": { "apiPrefix": "" },
       "productContribution": {
         "mode": "server",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "modules": [
+          "core",
+          "i18n",
+          "auth",
+          "admin",
+          "email",
+          "sms",
+          "captcha",
+          "payment",
+          "credits",
+          "affiliate"
+        ],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -3247,7 +3278,10 @@ if (!process.env.VERCEL) {
           "webDeploy": ["none"]
         },
         "frameworks": [
-          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] },
+          {
+            "id": "http-server",
+            "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"]
+          },
           { "id": "node-http", "modules": ["core"] },
           { "id": "express", "modules": ["core"] }
         ]
@@ -3394,13 +3428,27 @@ app.listen(port, () => {
   "apps": {
     "backend": {
       "legacy": true,
-      "options": {"runtime":{"values":["bun","node"],"visibility":"visible"},"api":{"values":["trpc","orpc","none"],"visibility":"advanced"}},
+      "options": {
+        "runtime": { "values": ["bun", "node"], "visibility": "visible" },
+        "api": { "values": ["trpc", "orpc", "none"], "visibility": "advanced" }
+      },
       "devArgs": [],
       "serverContributions": { "apiPrefix": "" },
       "productContribution": {
         "mode": "server",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "modules": [
+          "core",
+          "i18n",
+          "auth",
+          "admin",
+          "email",
+          "sms",
+          "captcha",
+          "payment",
+          "credits",
+          "affiliate"
+        ],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -3409,7 +3457,10 @@ app.listen(port, () => {
           "webDeploy": ["none"]
         },
         "frameworks": [
-          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] },
+          {
+            "id": "http-server",
+            "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"]
+          },
           { "id": "node-http", "modules": ["core"] },
           { "id": "fastify", "modules": ["core"] }
         ]
@@ -3628,13 +3679,31 @@ fastify.listen({ port{{#if (or (eq serverDeploy "docker") (eq serverDeploy "pris
   "apps": {
     "backend": {
       "legacy": true,
-      "options": {"runtime":{"values":["bun","node","workers"],"visibility":"visible"},"api":{"values":["trpc","orpc","none"],"visibility":"advanced"}},
+      "options": {
+        "runtime": { "values": ["bun", "node", "workers"], "visibility": "visible" },
+        "api": { "values": ["trpc", "orpc", "none"], "visibility": "advanced" }
+      },
       "devArgs": [],
       "serverContributions": { "apiPrefix": "" },
       "productContribution": {
         "mode": "server",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "modules": [
+          "core",
+          "i18n",
+          "auth",
+          "admin",
+          "email",
+          "sms",
+          "captcha",
+          "payment",
+          "credits",
+          "affiliate",
+          "storage",
+          "ai",
+          "blog",
+          "seo"
+        ],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -3643,7 +3712,22 @@ fastify.listen({ port{{#if (or (eq serverDeploy "docker") (eq serverDeploy "pris
           "webDeploy": ["none"]
         },
         "frameworks": [
-          { "id": "http-server", "modules": ["core", "auth", "admin", "captcha", "payment", "credits", "affiliate"] }
+          {
+            "id": "http-server",
+            "modules": [
+              "core",
+              "auth",
+              "admin",
+              "captcha",
+              "payment",
+              "credits",
+              "affiliate",
+              "storage",
+              "ai",
+              "blog",
+              "seo"
+            ]
+          }
         ]
       },
       "stack": {
@@ -3705,6 +3789,10 @@ app.use(
 
 {{#if application.nativeSplit}}
 app.all("/api/*", (c) => handleNativeRequest(c.req.raw));
+{{#if (includes product.features "seo")}}
+app.get("/robots.txt", (c) => handleNativeRequest(c.req.raw));
+app.get("/sitemap.xml", (c) => handleNativeRequest(c.req.raw));
+{{/if}}
 {{else}}
 {{#if (eq auth "better-auth")}}
 app.on(
@@ -4696,20 +4784,14 @@ temp
         }
       }
     ],
-    "webFrontend": [
-      "next"
-    ],
-    "nativeFrontend": [
-      "none"
-    ],
+    "webFrontend": ["next"],
+    "nativeFrontend": ["none"],
     "runtime": "none",
     "backend": "self-next",
     "database": "sqlite",
     "orm": "drizzle",
     "dbSetup": "none",
-    "features": [
-      "none"
-    ],
+    "features": ["none"],
     "providers": {},
     "moduleOptions": {
       "i18n": {
@@ -4717,9 +4799,7 @@ temp
       }
     },
     "packageManager": "bun",
-    "addons": [
-      "turborepo"
-    ],
+    "addons": ["turborepo"],
     "git": "true",
     "install": "true",
     "api": "none",
@@ -4778,9 +4858,7 @@ temp
             }
           }
         ],
-        "webFrontend": [
-          "tanstack-start"
-        ],
+        "webFrontend": ["tanstack-start"],
         "backend": "self-tanstack-start"
       }
     },
@@ -4800,9 +4878,7 @@ temp
             }
           }
         ],
-        "webFrontend": [
-          "tanstack-start"
-        ],
+        "webFrontend": ["tanstack-start"],
         "backend": "self-tanstack-start"
       }
     },
@@ -4822,9 +4898,7 @@ temp
             }
           }
         ],
-        "webFrontend": [
-          "tanstack-start"
-        ],
+        "webFrontend": ["tanstack-start"],
         "backend": "self-tanstack-start",
         "database": "postgres"
       }
@@ -4845,9 +4919,7 @@ temp
             }
           }
         ],
-        "webFrontend": [
-          "tanstack-start"
-        ],
+        "webFrontend": ["tanstack-start"],
         "backend": "self-tanstack-start",
         "database": "postgres"
       }
@@ -4867,9 +4939,7 @@ temp
             }
           }
         ],
-        "webFrontend": [
-          "nuxt"
-        ],
+        "webFrontend": ["nuxt"],
         "backend": "self-nuxt"
       }
     },
@@ -4889,9 +4959,7 @@ temp
             }
           }
         ],
-        "webFrontend": [
-          "nuxt"
-        ],
+        "webFrontend": ["nuxt"],
         "backend": "self-nuxt"
       }
     },
@@ -4911,9 +4979,7 @@ temp
             }
           }
         ],
-        "webFrontend": [
-          "nuxt"
-        ],
+        "webFrontend": ["nuxt"],
         "backend": "self-nuxt",
         "database": "postgres"
       }
@@ -4934,9 +5000,7 @@ temp
             }
           }
         ],
-        "webFrontend": [
-          "nuxt"
-        ],
+        "webFrontend": ["nuxt"],
         "backend": "self-nuxt",
         "database": "postgres"
       }
@@ -4978,9 +5042,7 @@ temp
             }
           }
         ],
-        "webFrontend": [
-          "react-router"
-        ],
+        "webFrontend": ["react-router"],
         "runtime": "bun",
         "backend": "hono",
         "database": "none",
@@ -5004,9 +5066,7 @@ temp
             }
           }
         ],
-        "webFrontend": [
-          "none"
-        ],
+        "webFrontend": ["none"],
         "runtime": "node",
         "backend": "none",
         "database": "none",
@@ -5017,28 +5077,12 @@ temp
   ],
   "defaultPreset": "shell",
   "exclusiveAddonGroups": [
-    [
-      "turborepo",
-      "nx",
-      "vite-plus"
-    ],
-    [
-      "evlog",
-      "axiom"
-    ]
+    ["turborepo", "nx", "vite-plus"],
+    ["evlog", "axiom"]
   ],
   "desktop": {
-    "addons": [
-      "tauri",
-      "electrobun"
-    ],
-    "frontends": [
-      "tanstack-start",
-      "next",
-      "nuxt",
-      "svelte",
-      "astro"
-    ]
+    "addons": ["tauri", "electrobun"],
+    "frontends": ["tanstack-start", "next", "nuxt", "svelte", "astro"]
   }
 }
 `],
@@ -5050,7 +5094,10 @@ temp
   "apps": {
     "cli": {
       "legacy": false,
-      "options": {"runtime":{"values":["node"],"visibility":"visible"},"api":{"values":["none"],"visibility":"hidden"}},
+      "options": {
+        "runtime": { "values": ["node"], "visibility": "visible" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
       "stack": {
         "runtime": "node",
         "api": "none"
@@ -7149,8 +7196,11 @@ declare module "cloudflare:workers" {
   "apps": {
     "fullstack-web": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["orpc","none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["orpc", "none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
       "clientContributions": { "framework": "astro", "family": "astro" },
       "serverContributions": { "apiPrefix": "" },
       "devArgs": ["--host", "127.0.0.1", "--ignore-lock"],
@@ -7163,8 +7213,11 @@ declare module "cloudflare:workers" {
     },
     "web-frontend": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
       "clientContributions": { "framework": "astro", "family": "astro" },
       "devArgs": ["--host", "127.0.0.1", "--ignore-lock"],
       "stack": {
@@ -7590,8 +7643,11 @@ const { title = "{{projectName}}" } = Astro.props;
   "apps": {
     "native": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["trpc","orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
       "clientContributions": { "framework": "bare", "family": "native" },
       "stack": {
         "frontend": ["native-bare"],
@@ -8751,8 +8807,11 @@ module.exports = withVarlockMetroConfig(config);
   "apps": {
     "native": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["trpc","orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
       "clientContributions": { "framework": "unistyles", "family": "native" },
       "stack": {
         "frontend": ["native-unistyles"],
@@ -10110,8 +10169,11 @@ StyleSheet.configure({
   "apps": {
     "native": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["trpc","orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
       "clientContributions": { "framework": "uniwind", "family": "native" },
       "stack": {
         "frontend": ["native-uniwind"],
@@ -11106,8 +11168,11 @@ declare module "*.css";
   "apps": {
     "fullstack-web": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["orpc","none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["orpc", "none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
       "clientContributions": { "framework": "nuxt", "family": "nuxt" },
       "serverContributions": { "apiPrefix": "" },
       "devArgs": ["--host", "127.0.0.1"],
@@ -11120,8 +11185,11 @@ declare module "*.css";
     },
     "web-frontend": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
       "clientContributions": { "framework": "nuxt", "family": "nuxt" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
@@ -11880,8 +11948,11 @@ Disallow:
   "apps": {
     "fullstack-web": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["trpc","orpc","none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["trpc","orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["trpc", "orpc", "none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
       "clientContributions": { "framework": "next", "family": "react", "serverAuth": true },
       "serverContributions": { "apiPrefix": "/api" },
       "devArgs": ["--hostname", "127.0.0.1"],
@@ -11895,8 +11966,11 @@ Disallow:
     },
     "web-frontend": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["trpc","orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
       "clientContributions": { "framework": "next", "family": "react", "serverAuth": true },
       "devArgs": ["--hostname", "127.0.0.1"],
       "sharedPackages": ["ui"],
@@ -12647,15 +12721,33 @@ export function ThemeProvider({
   "apps": {
     "web-frontend": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["trpc","orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
       "clientContributions": { "framework": "react-router", "family": "react", "serverAuth": true },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "productContribution": {
         "mode": "client",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "modules": [
+          "core",
+          "i18n",
+          "auth",
+          "admin",
+          "email",
+          "sms",
+          "captcha",
+          "payment",
+          "credits",
+          "affiliate",
+          "storage",
+          "ai",
+          "blog",
+          "seo"
+        ],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -12666,8 +12758,21 @@ export function ThemeProvider({
         "frameworks": [{ "id": "react-router", "modules": ["core"] }],
         "client": {
           "framework": "react-router",
-          "modules": ["core", "i18n", "auth", "admin", "captcha", "payment", "credits", "affiliate"],
-          "integrations": ["email", "sms", "admin", "payment"]
+          "modules": [
+            "core",
+            "i18n",
+            "auth",
+            "admin",
+            "captcha",
+            "payment",
+            "credits",
+            "affiliate",
+            "storage",
+            "ai",
+            "blog",
+            "seo"
+          ],
+          "integrations": ["email", "sms", "admin", "payment", "seo"]
         }
       },
       "stack": {
@@ -12678,15 +12783,33 @@ export function ThemeProvider({
     },
     "admin": {
       "legacy": false,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["trpc","orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
       "clientContributions": { "framework": "react-router", "family": "react", "serverAuth": true },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "productContribution": {
         "mode": "client",
         "protocol": "product-http-v1",
-        "modules": ["core", "i18n", "auth", "admin", "email", "sms", "captcha", "payment", "credits", "affiliate"],
+        "modules": [
+          "core",
+          "i18n",
+          "auth",
+          "admin",
+          "email",
+          "sms",
+          "captcha",
+          "payment",
+          "credits",
+          "affiliate",
+          "storage",
+          "ai",
+          "blog",
+          "seo"
+        ],
         "constraints": {
           "runtime": ["bun", "node"],
           "api": ["none"],
@@ -12697,8 +12820,21 @@ export function ThemeProvider({
         "frameworks": [{ "id": "react-router", "modules": ["core"] }],
         "client": {
           "framework": "react-router",
-          "modules": ["core", "i18n", "auth", "admin", "captcha", "payment", "credits", "affiliate"],
-          "integrations": ["email", "sms", "admin", "payment"]
+          "modules": [
+            "core",
+            "i18n",
+            "auth",
+            "admin",
+            "captcha",
+            "payment",
+            "credits",
+            "affiliate",
+            "storage",
+            "ai",
+            "blog",
+            "seo"
+          ],
+          "integrations": ["email", "sms", "admin", "payment", "seo"]
         }
       },
       "stack": {
@@ -13984,8 +14120,11 @@ export default function Loader() {
   "apps": {
     "web-frontend": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["trpc","orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
       "clientContributions": { "framework": "tanstack-router", "family": "react" },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
@@ -14475,9 +14614,16 @@ export default defineConfig({
   "apps": {
     "fullstack-web": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["trpc","orpc","none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["trpc","orpc","none"],
-      "clientContributions": { "framework": "tanstack-start", "family": "react", "serverAuth": true },
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["trpc", "orpc", "none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
+      "clientContributions": {
+        "framework": "tanstack-start",
+        "family": "react",
+        "serverAuth": true
+      },
       "serverContributions": { "apiPrefix": "/api" },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
@@ -14490,9 +14636,16 @@ export default defineConfig({
     },
     "web-frontend": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["trpc","orpc","none"],
-      "clientContributions": { "framework": "tanstack-start", "family": "react", "serverAuth": true },
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["trpc", "orpc", "none"],
+      "clientContributions": {
+        "framework": "tanstack-start",
+        "family": "react",
+        "serverAuth": true
+      },
       "devArgs": ["--host", "127.0.0.1"],
       "sharedPackages": ["ui"],
       "stack": {
@@ -15844,8 +15997,11 @@ Disallow:
   "apps": {
     "fullstack-web": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["orpc","none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["orpc", "none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
       "clientContributions": { "framework": "solid", "family": "solid" },
       "serverContributions": { "apiPrefix": "" },
       "devArgs": ["--host", "127.0.0.1"],
@@ -15858,8 +16014,11 @@ Disallow:
     },
     "web-frontend": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
       "clientContributions": { "framework": "solid", "family": "solid" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
@@ -16516,8 +16675,11 @@ body {
   "apps": {
     "fullstack-web": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["orpc","none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["orpc", "none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
       "clientContributions": { "framework": "svelte", "family": "svelte" },
       "serverContributions": { "apiPrefix": "" },
       "devArgs": ["--host", "127.0.0.1"],
@@ -16530,8 +16692,11 @@ body {
     },
     "web-frontend": {
       "legacy": true,
-      "options": {"runtime":{"values":["none"],"visibility":"hidden"},"api":{"values":["none"],"visibility":"hidden"}},
-      "acceptsBackendApis": ["orpc","none"],
+      "options": {
+        "runtime": { "values": ["none"], "visibility": "hidden" },
+        "api": { "values": ["none"], "visibility": "hidden" }
+      },
+      "acceptsBackendApis": ["orpc", "none"],
       "clientContributions": { "framework": "svelte", "family": "svelte" },
       "devArgs": ["--host", "127.0.0.1"],
       "stack": {
@@ -17826,21 +17991,11 @@ function Users() { const data = Route.useLoaderData(); const search = Route.useS
     "zh-CN": "基于角色的管理后台与用户管理，其他模块可挂载页面"
   },
   "category": "operations",
-  "requires": [
-    "auth"
-  ],
+  "requires": ["auth"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"]
   },
   "nativeSplit": true,
   "packages": [
@@ -17873,16 +18028,9 @@ function Users() { const data = Route.useLoaderData(); const search = Route.useS
     }
   ],
   "sources": {
-    "frameworks": [
-      "http-server",
-      "next",
-      "nuxt",
-      "tanstack-start"
-    ],
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start"],
     "frameworkRequired": {
-      "http-server": [
-        "shared/partials/admin.hbs"
-      ]
+      "http-server": ["shared/partials/admin.hbs"]
     }
   }
 }
@@ -18590,33 +18738,14 @@ export function AdminAffiliate({ data, page }: { data: z.infer<typeof adminAffil
     "zh-CN": "签名邀请归因与幂等购买奖励，仅发放应用积分，不提供现金提现"
   },
   "category": "monetization",
-  "requires": [
-    "payment",
-    "credits",
-    "auth"
-  ],
-  "enhances": [
-    "admin"
-  ],
+  "requires": ["payment", "credits", "auth"],
+  "enhances": ["admin"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ],
-    "orms": [
-      "drizzle"
-    ],
-    "dialects": [
-      "sqlite",
-      "postgres"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
   },
   "nativeSplit": true,
   "options": {
@@ -18643,9 +18772,7 @@ export function AdminAffiliate({ data, page }: { data: z.infer<typeof adminAffil
         "drizzle-orm": "$dependency:drizzle-orm",
         "zod": "$dependency:zod"
       },
-      "workspaceDependencies": [
-        "db"
-      ]
+      "workspaceDependencies": ["db"]
     }
   ],
   "appDependencies": {
@@ -18657,9 +18784,7 @@ export function AdminAffiliate({ data, page }: { data: z.infer<typeof adminAffil
       "imports": [
         {
           "from": "@app/affiliate",
-          "names": [
-            "createAffiliate"
-          ]
+          "names": ["createAffiliate"]
         }
       ],
       "init": "createAffiliate({ db, secret: ENV.BETTER_AUTH_SECRET })"
@@ -18682,12 +18807,7 @@ export function AdminAffiliate({ data, page }: { data: z.infer<typeof adminAffil
   ],
   "sources": {
     "dialects": true,
-    "frameworks": [
-      "http-server",
-      "next",
-      "nuxt",
-      "tanstack-start"
-    ],
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start"],
     "integrations": {
       "admin": {
         "frameworks": {
@@ -18704,9 +18824,7 @@ export function AdminAffiliate({ data, page }: { data: z.infer<typeof adminAffil
       "shared/partials/affiliate-payment.hbs"
     ],
     "frameworkRequired": {
-      "http-server": [
-        "shared/partials/affiliate.hbs"
-      ]
+      "http-server": ["shared/partials/affiliate.hbs"]
     }
   }
 }
@@ -18936,6 +19054,8 @@ export const aiMediaChunk = sqliteTable(
 
 Open \`/en/dashboard/ai\` or \`/zh-CN/dashboard/ai\` after signing in. The studio offers only configured providers and supported modalities, complete-text conversational replies, images, asynchronous video, private history, cancellation where supported, and owned downloads. No API key is sent to the browser.
 
+Split layouts keep AI services, provider keys, jobs and billing/storage integrations in the backend owner. Frontend/admin pages consume typed same-origin HTTP responses and never import server service packages. Both fullstack and split handlers share request parsing, ownership checks and lifecycle behavior; no background queue or cross-process event bus is implied.
+
 ## Configuration and current provider capabilities
 
 Documentation checked on 2026-10-23. Model availability, access verification, region restrictions and upstream prices remain provider-controlled. Configure keys only on the server, and enable billing/access in each provider console before sending a real request.
@@ -18971,7 +19091,7 @@ A network timeout, unexpected provider response, or crash between submission and
 
 \`ai_job\` stores owned request history, model/cost snapshots, status, leases, and provider IDs. \`ai_media_chunk\` persists base64 in 256,000-character rows to stay below D1 row limits. Only validated image PNG/JPEG/WebP and MP4 media are served, with a maximum of **8 MiB decoded bytes**; provider JSON is bounded while streaming at **12 MiB before parsing** to leave memory headroom on Workers. Oversized provider output is not false success: a submitted synchronous request becomes \`unknown\`, while an async job keeps its provider ID for operator reconciliation. Configure suitable short/small media models for this limit. Generated images are displayed without rendering provider text as HTML. Without storage, private media remains in the database. With storage, \`ai-storage\` calls \`storage.storeGenerated(userId,{name,contentType,body})\`, retains the returned file ID, and reads through ownership-checked \`storage.readFile\`; temporary database media is deleted after successful completion. Configure the selected storage provider before generating media.
 
-Media downloads accept **only an owned local job ID**, never client-supplied URLs. Provider output is inline base64: no arbitrary remote media URL is fetched. \`/api/ai/{id}/media\` authenticates every request and sends private/no-store responses. All mutation and polling requests enforce \`BETTER_AUTH_URL\` as their exact trusted Origin. JSON bodies are bounded at 40 KB, prompts at 8,000 characters, and chat history sent to OpenAI-compatible providers at 12 prior turns. The dashboard displays the newest 100 jobs.
+Media downloads accept **only an owned local job ID**, never client-supplied URLs. Provider output is inline base64: no arbitrary remote media URL is fetched. \`/api/ai/{id}/media\` authenticates every request and sends no-store responses. Mutation and polling requests require the exact configured backend origin or an explicitly declared split frontend/admin origin; configure production client domains in the backend \`CORS_ORIGIN\`. JSON bodies are bounded at 40 KB, prompts at 8,000 characters, and chat history sent to OpenAI-compatible providers at 12 prior turns. The dashboard displays the newest 100 jobs.
 
 All job transitions are fenced by an owner token; a 30-second heartbeat renews the 180-second lease. External calls have bounded timeouts, and each media persistence stage renews ownership. A worker that loses its token cannot overwrite another worker's completion/refund. If an upload finishes after losing ownership, its unlinked storage object is removed. There is no cross-system transaction: a process crash after storage upload but before recording the returned file ID may leave an orphaned private storage file, visible in the owner's files list for cleanup. A crash during partial chunk persistence before \`saving\` is an unknown result for synchronous providers, not an automatically recoverable completed upload; asynchronous jobs with a saved provider ID can re-fetch their result. Do not claim exactly-once external delivery across an unknown network/crash boundary.
 
@@ -19443,64 +19563,13 @@ export async function jsonRequest(
   },
 } as const;
 `],
-  ["modules/ai/frameworks/http-server/apps/fullstack-web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
-import { z } from "zod";
-import { ENV } from "@/env.server";
-
-export const privateHeaders = { "Cache-Control": "no-store" };
-export function requireAIOrigin(request: Request) {
-  if (request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new AIError("invalid_request");
-}
-export async function readAIRequest(request: Request): Promise<unknown> {
-  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new AIError("invalid_request");
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const item = await reader.read();
-      if (item.done) break;
-      size += item.value.length;
-      if (size > 40_000) { await reader.cancel(); throw new AIError("invalid_request"); }
-      chunks.push(item.value);
-    }
-  } finally { reader.releaseLock(); }
-  const data = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
-  try { return JSON.parse(new TextDecoder().decode(data)); } catch { throw new AIError("invalid_request"); }
-}
-export function aiErrorResponse(error: unknown) {
-  const code = error instanceof AIError ? error.code : error instanceof z.ZodError ? "invalid_request" : "provider_error";
-  const status = code === "not_found" ? 404 : code === "insufficient_credits" ? 402 : code === "invalid_request" || code === "unsupported" ? 400 : code === "conflict" || code === "busy" ? 409 : 503;
-  return Response.json({ error: code }, { status, headers: privateHeaders });
-}
+  ["modules/ai/frameworks/http-server/apps/backend/src/lib/ai-http.ts.hbs", `{{> ai/ai-http}}
 `],
-  ["modules/ai/frameworks/http-server/apps/fullstack-web/src/lib/native/ai.ts.hbs", `import { ai } from "@{{projectName}}/app-services";
-import { requestSchema } from "@{{projectName}}/ai";
-import { json, requireSession } from "../product-api";
-import { aiErrorResponse, privateHeaders, readAIRequest, requireAIOrigin } from "../ai-http";
-export async function handle(request: Request, path: string): Promise<Response | undefined> {
-  if (path !== "/api/product/ai" && path !== "/api/ai" && !path.startsWith("/api/ai/")) return;
-  const { user } = await requireSession(request);
-  try {
-    if ((path === "/api/ai" || path === "/api/product/ai") && request.method === "GET") return json({ capabilities: ai.capabilities(), jobs: await ai.history(user.id) });
-    if (path === "/api/ai" && request.method === "POST") {
-      requireAIOrigin(request);
-      const job = await ai.generate(user.id, requestSchema.parse(await readAIRequest(request)));
-      return json({ job }, job.status === "failed" ? job.error === "insufficient_credits" ? 402 : 422 : job.status === "unknown" ? 503 : 200);
-    }
-    const match = /^\\/api\\/ai\\/([^/]+)(\\/media)?$/.exec(path);
-    if (!match) return json({ error: "not_found" }, 404);
-    const id = decodeURIComponent(match[1]!);
-    if (match[2] && request.method === "GET") {
-      const media = await ai.media(user.id, id);
-      return new Response(media.body, { headers: { ...privateHeaders, "Content-Type": media.contentType, "Content-Disposition": "inline", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" } });
-    }
-    if (!match[2] && (request.method === "POST" || request.method === "DELETE")) { requireAIOrigin(request); return json({ job: await (request.method === "POST" ? ai.poll(user.id, id) : ai.cancel(user.id, id)) }); }
-    return json({ error: "method_not_allowed" }, 405);
-  } catch (error) { return aiErrorResponse(error); }
-}
+  ["modules/ai/frameworks/http-server/apps/backend/src/lib/native/ai.ts.hbs", `{{> ai/ai}}
+`],
+  ["modules/ai/frameworks/http-server/apps/fullstack-web/src/lib/ai-http.ts.hbs", `{{> ai/ai-http}}
+`],
+  ["modules/ai/frameworks/http-server/apps/fullstack-web/src/lib/native/ai.ts.hbs", `{{> ai/ai}}
 `],
   ["modules/ai/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/ai/page.tsx.hbs", `import { ai } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
@@ -19577,38 +19646,7 @@ export async function POST(request: Request) {
   } catch (error) { return aiErrorResponse(error); }
 }
 `],
-  ["modules/ai/frameworks/next/apps/fullstack-web/src/lib/ai-http.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
-import { z } from "zod";
-import { ENV } from "@/env.server";
-
-export const privateHeaders = { "Cache-Control": "no-store" };
-export function requireAIOrigin(request: Request) {
-  if (request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new AIError("invalid_request");
-}
-export async function readAIRequest(request: Request): Promise<unknown> {
-  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new AIError("invalid_request");
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const item = await reader.read();
-      if (item.done) break;
-      size += item.value.length;
-      if (size > 40_000) { await reader.cancel(); throw new AIError("invalid_request"); }
-      chunks.push(item.value);
-    }
-  } finally { reader.releaseLock(); }
-  const data = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
-  try { return JSON.parse(new TextDecoder().decode(data)); } catch { throw new AIError("invalid_request"); }
-}
-export function aiErrorResponse(error: unknown) {
-  const code = error instanceof AIError ? error.code : error instanceof z.ZodError ? "invalid_request" : "provider_error";
-  const status = code === "not_found" ? 404 : code === "insufficient_credits" ? 402 : code === "invalid_request" || code === "unsupported" ? 400 : code === "conflict" || code === "busy" ? 409 : 503;
-  return Response.json({ error: code }, { status, headers: privateHeaders });
-}
+  ["modules/ai/frameworks/next/apps/fullstack-web/src/lib/ai-http.ts.hbs", `{{> ai/ai-http}}
 `],
   ["modules/ai/frameworks/nuxt/apps/fullstack-web/app/components/ProductAI.vue.hbs", `<script setup lang="ts">
 import { z } from "zod";
@@ -19670,128 +19708,25 @@ onBeforeUnmount(() => { disposed = true; if (timer) clearTimeout(timer); });
   <p v-if="!data?.jobs.length">\\{{ label('Your generations will appear here.', '生成结果将在这里显示。') }}</p>
 </template>
 `],
-  ["modules/ai/frameworks/react/apps/fullstack-web/src/components/ai/studio.tsx.hbs", `"use client";
-
-import { useEffect, useRef, useState } from "react";
-import { z } from "zod";
-import { useT } from "../i18n-provider";
-
-const kind = z.enum(["chat", "image", "video"]);
-const jobSchema = z.object({ id: z.string(), requestId: z.string(), provider: z.string(), kind, model: z.string(), prompt: z.string(), cost: z.number(), status: z.enum(["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"]), text: z.string().nullable(), error: z.string().nullable(), mediaUrl: z.string().nullable(), cancellable: z.boolean() });
-const capabilitySchema = z.object({ id: z.string(), models: z.object({ chat: z.string().optional(), image: z.string().optional(), video: z.string().optional() }), costs: z.object({ chat: z.number(), image: z.number(), video: z.number() }) });
-type Job = z.infer<typeof jobSchema>;
-type Capability = z.infer<typeof capabilitySchema>;
-type Kind = z.infer<typeof kind>;
-const active: Partial<Record<Job["status"], true>> = { queued: true, starting: true, running: true, saving: true };
-
-export function AIStudio({ initialJobs, capabilities }: { initialJobs: Job[]; capabilities: Capability[] }) {
-  const t = useT();
-  const [jobs, setJobs] = useState(initialJobs);
-  const [provider, setProvider] = useState(capabilities[0]?.id ?? "");
-  const [mode, setMode] = useState<Kind>("chat");
-  const [prompt, setPrompt] = useState("");
-  const [parentId, setParentId] = useState<string>();
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState(false);
-  const request = useRef<{ requestId: string; provider: string; kind: Kind; prompt: string; parentId?: string } | null>(null);
-  const selected = capabilities.find((item) => item.id === provider);
-  function merge(job: Job) { setJobs((current) => [job, ...current.filter((item) => item.id !== job.id)]); }
-  async function update(id: string, cancel = false) {
-    const response = await fetch(\`/api/ai/\${id}\`, { method: cancel ? "DELETE" : "POST" });
-    if (!response.ok) throw new Error("Request failed");
-    merge(z.object({ job: jobSchema }).parse(await response.json()).job);
-  }
-  useEffect(() => {
-    if (!jobs.some((job) => active[job.status])) return;
-    let stopped = false;
-    const timer = setTimeout(async () => {
-      try {
-        for (const job of jobs.filter((item) => active[item.status])) {
-          if (stopped) return;
-          await update(job.id);
-        }
-        if (!stopped) setError(false);
-      } catch { if (!stopped) setError(true); }
-    }, 10_000);
-    return () => { stopped = true; clearTimeout(timer); };
-  }, [jobs]);
-  async function submit(retry = false) {
-    setPending(true); setError(false);
-    if (!retry || !request.current) request.current = { requestId: crypto.randomUUID(), provider, kind: mode, prompt, ...(parentId && mode === "chat" ? { parentId } : {}) };
-    try {
-      const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.current) });
-      const payload: unknown = await response.json();
-      const parsed = z.object({ job: jobSchema }).safeParse(payload);
-      if (!parsed.success) throw new Error("Request failed");
-      merge(parsed.data.job);
-      request.current = null;
-      if (parsed.data.job.status === "completed" && mode === "chat") setParentId(parsed.data.job.id);
-    } catch { setError(true); }
-    finally { setPending(false); }
-  }
-  return <div className="grid gap-10 lg:grid-cols-[minmax(280px,360px)_1fr]">
-    <section className="space-y-6 border-t-4 border-foreground pt-5">
-      {!capabilities.length ? <p role="status">{t("ai.notConfigured")}</p> : <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-        <label className="block space-y-2 text-sm"><span>{t("ai.provider")}</span><select className="w-full border bg-background p-3" value={provider} onChange={(event) => { setProvider(event.target.value); setMode("chat"); setParentId(undefined); }} disabled={pending}>{capabilities.map((item) => <option key={item.id}>{item.id}</option>)}</select></label>
-        <fieldset><legend className="mb-2 text-sm">{t("ai.kind")}</legend><div className="flex gap-2">{(["chat", "image", "video"] as const).filter((item) => selected?.models[item]).map((item) => <button key={item} type="button" aria-pressed={mode === item} className={\`flex-1 border px-3 py-2 \${mode === item ? "bg-foreground text-background" : ""}\`} onClick={() => { setMode(item); setParentId(undefined); }}>{t(\`ai.kinds.\${item}\`)}</button>)}</div></fieldset>
-        <p className="text-xs text-muted-foreground">{t("ai.model")}: {selected?.models[mode]} · {t("ai.cost")}: {selected?.costs[mode]}</p>
-        {parentId && <div className="flex justify-between gap-2 text-sm"><span>{t("ai.reply")}</span><button type="button" className="underline" onClick={() => setParentId(undefined)}>{t("ai.newChat")}</button></div>}
-        <label className="block space-y-2 text-sm"><span>{t("ai.prompt")}</span><textarea required maxLength={8000} rows={8} className="w-full resize-y border bg-background p-3 leading-relaxed" value={prompt} onChange={(event) => setPrompt(event.target.value)} disabled={pending} /></label>
-        <button className="w-full bg-foreground px-4 py-3 font-medium text-background disabled:opacity-50" disabled={pending || !prompt.trim()}>{t(pending ? "ai.working" : "ai.generate")}</button>
-      </form>}
-      {error && <div role="alert" className="space-y-2 border-l-2 border-destructive pl-3 text-sm"><p>{t("ai.error")}</p>{request.current && <button disabled={pending} className="underline" onClick={() => void submit(true)}>{t("ai.retry")}</button>}</div>}
-    </section>
-    <section className="space-y-4"><h2 className="font-medium text-lg">{t("ai.history")}</h2>{jobs.length === 0 && <p className="py-16 text-muted-foreground">{t("ai.empty")}</p>}
-      <ol className="space-y-5">{jobs.map((job) => <li key={job.id} className="space-y-3 border p-5">
-        <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{job.provider} / {t(\`ai.kinds.\${job.kind}\`)} / {job.cost} {t("ai.cost")}</span><span role="status">{t(\`ai.statuses.\${job.status}\`)}</span></div>
-        <p className="whitespace-pre-wrap font-medium">{job.prompt}</p>
-        {job.text && <p className="whitespace-pre-wrap border-t pt-3 leading-relaxed">{job.text}</p>}
-        {job.mediaUrl && job.kind === "image" && <img src={job.mediaUrl} alt={job.prompt} className="max-h-[520px] w-full object-contain" />}
-        {job.mediaUrl && job.kind === "video" && <video src={job.mediaUrl} controls preload="metadata" className="w-full" aria-label={job.prompt} />}
-        {job.error && <p className="text-sm text-destructive">{t(\`ai.errors.\${job.error === "insufficient_credits" ? "insufficient_credits" : job.error === "unknown" ? "unknown" : job.error === "cancelled" ? "cancelled" : "provider_error"}\`)}</p>}
-        <div className="flex flex-wrap gap-4 text-sm">
-          {job.mediaUrl && <a href={job.mediaUrl} download className="underline">{t("ai.download")}</a>}
-          {job.kind === "chat" && job.status === "completed" && <button className="underline" onClick={() => { setParentId(job.id); setProvider(job.provider); setMode("chat"); setPrompt(""); }}>{t("ai.continue")}</button>}
-          {active[job.status] && <button className="underline" onClick={() => void update(job.id).catch(() => setError(true))}>{t("ai.refresh")}</button>}
-          {job.cancellable && <button className="underline" onClick={() => void update(job.id, true).catch(() => setError(true))}>{t("ai.cancel")}</button>}
-        </div>
-      </li>)}</ol>
-    </section>
-  </div>;
-}
+  ["modules/ai/frameworks/react/apps/fullstack-web/src/components/ai/studio.tsx.hbs", `{{> ai/studio}}
+`],
+  ["modules/ai/frameworks/react/apps/fullstack-web/src/lib/ai-contract.ts.hbs", `{{> ai/ai-contract}}
 `],
   ["modules/ai/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.ai.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
+import { aiSchema } from "@/lib/ai-contract";
 import { AIStudio } from "@/components/ai/studio";
 import { useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
-const schema = z.object({ jobs: z.array(z.object({ id: z.string(), requestId: z.string(), provider: z.string(), kind: z.enum(["chat", "image", "video"]), model: z.string(), prompt: z.string(), cost: z.number(), status: z.enum(["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"]), text: z.string().nullable(), error: z.string().nullable(), mediaUrl: z.string().nullable(), cancellable: z.boolean() })), capabilities: z.array(z.object({ id: z.string(), models: z.object({ chat: z.string().optional(), image: z.string().optional(), video: z.string().optional() }), costs: z.object({ chat: z.number(), image: z.number(), video: z.number() }) })) });
-export const Route = createFileRoute("/$lang/dashboard/ai")({ loader: ({ params }) => loadProduct("/api/product/ai", params.lang, schema), component: Studio });
+export const Route = createFileRoute("/$lang/dashboard/ai")({ loader: ({ params }) => loadProduct("/api/product/ai", params.lang, aiSchema), component: Studio });
 function Studio() { const data = Route.useLoaderData(); const t = useT(); return <section className="space-y-8"><header className="space-y-3"><h1 className="font-serif text-4xl">{t("ai.title")}</h1><p className="text-muted-foreground">{t("ai.subtitle")}</p></header><AIStudio initialJobs={data.jobs} capabilities={data.capabilities} /></section>; }
 `],
-  ["modules/ai/integrations/credits/apps/fullstack-web/src/integrations/ai-credits.ts.hbs", `import { AIError } from "@{{projectName}}/ai";
-import { InsufficientCreditsError } from "@{{projectName}}/credits";
-import type { Services } from "../services";
-
-export default function registerAICredits({ ai, credits }: Services) {
-  ai.setBilling({
-    async charge(userId, cost, referenceId) {
-      try { await credits.consume(userId, cost, { referenceId, reason: "AI generation" }); }
-      catch (error) { if (error instanceof InsufficientCreditsError) throw new AIError("insufficient_credits"); throw error; }
-    },
-    async refund(userId, referenceId) { await credits.refund(userId, referenceId); },
-  });
-}
+  ["modules/ai/integrations/credits/apps/backend/src/integrations/ai-credits.ts.hbs", `{{> ai/ai-credits}}
 `],
-  ["modules/ai/integrations/storage/apps/fullstack-web/src/integrations/ai-storage.ts.hbs", `import type { Services } from "../services";
-
-export default function registerAIStorage({ ai, storage }: Services) {
-  ai.setStorage({
-    save: (userId, input) => storage.storeGenerated(userId, input),
-    read: (userId, id) => storage.readFile(userId, id),
-    remove: (userId, id) => storage.deleteFile(userId, id),
-  });
-}
+  ["modules/ai/integrations/credits/apps/fullstack-web/src/integrations/ai-credits.ts.hbs", `{{> ai/ai-credits}}
+`],
+  ["modules/ai/integrations/storage/apps/backend/src/integrations/ai-storage.ts.hbs", `{{> ai/ai-storage}}
+`],
+  ["modules/ai/integrations/storage/apps/fullstack-web/src/integrations/ai-storage.ts.hbs", `{{> ai/ai-storage}}
 `],
   ["modules/ai/module.json", `{
   "id": "ai",
@@ -19804,42 +19739,21 @@ export default function registerAIStorage({ ai, storage }: Services) {
     "zh-CN": "私有对话、图片与视频生成及持久化任务"
   },
   "category": "ai",
-  "requires": [
-    "auth"
-  ],
-  "enhances": [
-    "credits",
-    "storage"
-  ],
+  "requires": ["auth"],
+  "enhances": ["credits", "storage"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ],
-    "orms": [
-      "drizzle"
-    ],
-    "dialects": [
-      "sqlite",
-      "postgres"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
   },
+  "nativeSplit": true,
   "providers": {
     "min": 1,
     "default": {
-      "global": [
-        "openai"
-      ],
-      "cn": [
-        "openai-compatible"
-      ]
+      "global": ["openai"],
+      "cn": ["openai-compatible"]
     },
     "options": {
       "openai": {
@@ -19949,9 +19863,7 @@ export default function registerAIStorage({ ai, storage }: Services) {
         "drizzle-orm": "$dependency:drizzle-orm",
         "zod": "$dependency:zod"
       },
-      "workspaceDependencies": [
-        "db"
-      ]
+      "workspaceDependencies": ["db"]
     }
   ],
   "appDependencies": {
@@ -19963,9 +19875,7 @@ export default function registerAIStorage({ ai, storage }: Services) {
       "imports": [
         {
           "from": "@app/ai",
-          "names": [
-            "createAI"
-          ]
+          "names": ["createAI"]
         }
       ],
       "init": "createAI({ db, env: ENV })"
@@ -19981,22 +19891,36 @@ export default function registerAIStorage({ ai, storage }: Services) {
   ],
   "sources": {
     "dialects": true,
-    "frameworks": [
-      "http-server",
-      "next",
-      "nuxt",
-      "tanstack-start",
-      "react"
-    ],
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start", "react"],
+    "frameworkRequired": {
+      "http-server": [
+        "frameworks/http-server/apps/{application}/src/lib/native/ai.ts.hbs",
+        "frameworks/http-server/apps/{application}/src/lib/ai-http.ts.hbs",
+        "shared/partials/ai.hbs",
+        "shared/partials/ai-http.hbs"
+      ],
+      "next": ["shared/partials/ai-http.hbs"],
+      "react": ["shared/partials/studio.hbs", "shared/partials/ai-contract.hbs"]
+    },
     "providers": {
       "mode": "separate"
     },
     "integrations": {
       "credits": {
-        "base": "integrations/credits/apps/fullstack-web"
+        "base": "integrations/credits/apps/fullstack-web",
+        "serverOnly": true,
+        "required": [
+          "integrations/credits/apps/{application}/src/integrations/ai-credits.ts.hbs",
+          "shared/partials/ai-credits.hbs"
+        ]
       },
       "storage": {
-        "base": "integrations/storage/apps/fullstack-web"
+        "base": "integrations/storage/apps/fullstack-web",
+        "serverOnly": true,
+        "required": [
+          "integrations/storage/apps/{application}/src/integrations/ai-storage.ts.hbs",
+          "shared/partials/ai-storage.hbs"
+        ]
       }
     }
   }
@@ -20191,6 +20115,199 @@ export function openai(env: {
       };
     },
   };
+}
+`],
+  ["modules/ai/shared/client/frameworks/react-router/src/components/ai/ai-page.tsx.hbs", `import type { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+import { AIStudio } from "@/components/ai/studio";
+import type { aiSchema } from "@/lib/ai-contract";
+
+export function AIPage({ data }: { data: z.infer<typeof aiSchema> }) {
+  const t = useT();
+  return <section className="space-y-8"><header className="space-y-3"><h1 className="font-serif text-4xl">{t("ai.title")}</h1><p className="text-muted-foreground">{t("ai.subtitle")}</p></header><AIStudio initialJobs={data.jobs} capabilities={data.capabilities} /></section>;
+}
+`],
+  ["modules/ai/shared/client/frameworks/react-router/src/components/ai/studio.tsx.hbs", `{{> ai/studio}}
+`],
+  ["modules/ai/shared/client/frameworks/react-router/src/lib/ai-contract.ts.hbs", `{{> ai/ai-contract}}
+`],
+  ["modules/ai/shared/partials/ai-contract.hbs", `import { z } from "zod";
+
+export const kind = z.enum(["chat", "image", "video"]);
+export const jobSchema = z.object({ id: z.string(), requestId: z.string(), provider: z.string(), kind, model: z.string(), prompt: z.string(), cost: z.number(), status: z.enum(["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"]), text: z.string().nullable(), error: z.string().nullable(), mediaUrl: z.string().nullable(), cancellable: z.boolean() });
+export const capabilitySchema = z.object({ id: z.string(), models: z.object({ chat: z.string().optional(), image: z.string().optional(), video: z.string().optional() }), costs: z.object({ chat: z.number(), image: z.number(), video: z.number() }) });
+export const aiSchema = z.object({ jobs: z.array(jobSchema), capabilities: z.array(capabilitySchema) });
+export type Job = z.infer<typeof jobSchema>;
+export type Capability = z.infer<typeof capabilitySchema>;
+export type Kind = z.infer<typeof kind>;
+`],
+  ["modules/ai/shared/partials/ai-credits.hbs", `import { AIError } from "@{{projectName}}/ai";
+import { InsufficientCreditsError } from "@{{projectName}}/credits";
+import type { Services } from "../services";
+
+export default function registerAICredits({ ai, credits }: Services) {
+  ai.setBilling({
+    async charge(userId, cost, referenceId) {
+      try { await credits.consume(userId, cost, { referenceId, reason: "AI generation" }); }
+      catch (error) { if (error instanceof InsufficientCreditsError) throw new AIError("insufficient_credits"); throw error; }
+    },
+    async refund(userId, referenceId) { await credits.refund(userId, referenceId); },
+  });
+}
+`],
+  ["modules/ai/shared/partials/ai-http.hbs", `import { AIError } from "@{{projectName}}/ai";
+import { z } from "zod";
+import { ENV } from "@/env.server";
+
+export const privateHeaders = { "Cache-Control": "no-store" };
+const trustedOrigins = new Set([new URL(ENV.BETTER_AUTH_URL).origin{{#if application.nativeSplit}}{{#each application.clientOrigins}}, "{{this}}"{{/each}}{{#if (includes application.roles "backend")}}, ...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean){{/if}}{{/if}}]);
+export function requireAIOrigin(request: Request) {
+  if (!trustedOrigins.has(request.headers.get("origin") ?? "")) throw new AIError("invalid_request");
+}
+export async function readAIRequest(request: Request): Promise<unknown> {
+  if (!request.headers.get("content-type")?.startsWith("application/json") || !request.body) throw new AIError("invalid_request");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const item = await reader.read();
+      if (item.done) break;
+      size += item.value.length;
+      if (size > 40_000) { await reader.cancel(); throw new AIError("invalid_request"); }
+      chunks.push(item.value);
+    }
+  } finally { reader.releaseLock(); }
+  const data = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder().decode(data)); } catch { throw new AIError("invalid_request"); }
+}
+export function aiErrorResponse(error: unknown) {
+  const code = error instanceof AIError ? error.code : error instanceof z.ZodError ? "invalid_request" : "provider_error";
+  const status = code === "not_found" ? 404 : code === "insufficient_credits" ? 402 : code === "invalid_request" || code === "unsupported" ? 400 : code === "conflict" || code === "busy" ? 409 : 503;
+  return Response.json({ error: code }, { status, headers: privateHeaders });
+}
+`],
+  ["modules/ai/shared/partials/ai-storage.hbs", `import type { Services } from "../services";
+
+export default function registerAIStorage({ ai, storage }: Services) {
+  ai.setStorage({
+    save: (userId, input) => storage.storeGenerated(userId, input),
+    read: (userId, id) => storage.readFile(userId, id),
+    remove: (userId, id) => storage.deleteFile(userId, id),
+  });
+}
+`],
+  ["modules/ai/shared/partials/ai.hbs", `import { ai } from "@{{projectName}}/app-services";
+import { requestSchema } from "@{{projectName}}/ai";
+import { json, requireSession } from "../product-api";
+import { aiErrorResponse, privateHeaders, readAIRequest, requireAIOrigin } from "../ai-http";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path !== "/api/product/ai" && path !== "/api/ai" && !path.startsWith("/api/ai/")) return;
+  const { user } = await requireSession(request);
+  try {
+    if ((path === "/api/ai" || path === "/api/product/ai") && request.method === "GET") return json({ capabilities: ai.capabilities(), jobs: await ai.history(user.id) });
+    if (path === "/api/ai" && request.method === "POST") {
+      requireAIOrigin(request);
+      const job = await ai.generate(user.id, requestSchema.parse(await readAIRequest(request)));
+      return json({ job }, job.status === "failed" ? job.error === "insufficient_credits" ? 402 : 422 : job.status === "unknown" ? 503 : 200);
+    }
+    const match = /^\\/api\\/ai\\/([^/]+)(\\/media)?$/.exec(path);
+    if (!match) return json({ error: "not_found" }, 404);
+    const id = decodeURIComponent(match[1]!);
+    if (match[2] && request.method === "GET") {
+      const media = await ai.media(user.id, id);
+      return new Response(media.body, { headers: { ...privateHeaders, "Content-Type": media.contentType, "Content-Disposition": "inline", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox" } });
+    }
+    if (!match[2] && (request.method === "POST" || request.method === "DELETE")) { requireAIOrigin(request); return json({ job: await (request.method === "POST" ? ai.poll(user.id, id) : ai.cancel(user.id, id)) }); }
+    return json({ error: "method_not_allowed" }, 405);
+  } catch (error) { return aiErrorResponse(error); }
+}
+`],
+  ["modules/ai/shared/partials/studio.hbs", `"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import { useT } from "../i18n-provider";
+
+import { jobSchema, type Job, type Capability, type Kind } from "@/lib/ai-contract";
+const active: Partial<Record<Job["status"], true>> = { queued: true, starting: true, running: true, saving: true };
+
+export function AIStudio({ initialJobs, capabilities }: { initialJobs: Job[]; capabilities: Capability[] }) {
+  const t = useT();
+  const [jobs, setJobs] = useState(initialJobs);
+  const [provider, setProvider] = useState(capabilities[0]?.id ?? "");
+  const [mode, setMode] = useState<Kind>("chat");
+  const [prompt, setPrompt] = useState("");
+  const [parentId, setParentId] = useState<string>();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(false);
+  const request = useRef<{ requestId: string; provider: string; kind: Kind; prompt: string; parentId?: string } | null>(null);
+  const selected = capabilities.find((item) => item.id === provider);
+  function merge(job: Job) { setJobs((current) => [job, ...current.filter((item) => item.id !== job.id)]); }
+  async function update(id: string, cancel = false) {
+    const response = await fetch(\`/api/ai/\${id}\`, { method: cancel ? "DELETE" : "POST" });
+    if (!response.ok) throw new Error("Request failed");
+    merge(z.object({ job: jobSchema }).parse(await response.json()).job);
+  }
+  useEffect(() => {
+    if (!jobs.some((job) => active[job.status])) return;
+    let stopped = false;
+    const timer = setTimeout(async () => {
+      try {
+        for (const job of jobs.filter((item) => active[item.status])) {
+          if (stopped) return;
+          await update(job.id);
+        }
+        if (!stopped) setError(false);
+      } catch { if (!stopped) setError(true); }
+    }, 10_000);
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [jobs]);
+  async function submit(retry = false) {
+    setPending(true); setError(false);
+    if (!retry || !request.current) request.current = { requestId: crypto.randomUUID(), provider, kind: mode, prompt, ...(parentId && mode === "chat" ? { parentId } : {}) };
+    try {
+      const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.current) });
+      const payload: unknown = await response.json();
+      const parsed = z.object({ job: jobSchema }).safeParse(payload);
+      if (!parsed.success) throw new Error("Request failed");
+      merge(parsed.data.job);
+      request.current = null;
+      if (parsed.data.job.status === "completed" && mode === "chat") setParentId(parsed.data.job.id);
+    } catch { setError(true); }
+    finally { setPending(false); }
+  }
+  return <div className="grid gap-10 lg:grid-cols-[minmax(280px,360px)_1fr]">
+    <section className="space-y-6 border-t-4 border-foreground pt-5">
+      {!capabilities.length ? <p role="status">{t("ai.notConfigured")}</p> : <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        <label className="block space-y-2 text-sm"><span>{t("ai.provider")}</span><select className="w-full border bg-background p-3" value={provider} onChange={(event) => { setProvider(event.target.value); setMode("chat"); setParentId(undefined); }} disabled={pending}>{capabilities.map((item) => <option key={item.id}>{item.id}</option>)}</select></label>
+        <fieldset><legend className="mb-2 text-sm">{t("ai.kind")}</legend><div className="flex gap-2">{(["chat", "image", "video"] as const).filter((item) => selected?.models[item]).map((item) => <button key={item} type="button" aria-pressed={mode === item} className={\`flex-1 border px-3 py-2 \${mode === item ? "bg-foreground text-background" : ""}\`} onClick={() => { setMode(item); setParentId(undefined); }}>{t(\`ai.kinds.\${item}\`)}</button>)}</div></fieldset>
+        <p className="text-xs text-muted-foreground">{t("ai.model")}: {selected?.models[mode]} · {t("ai.cost")}: {selected?.costs[mode]}</p>
+        {parentId && <div className="flex justify-between gap-2 text-sm"><span>{t("ai.reply")}</span><button type="button" className="underline" onClick={() => setParentId(undefined)}>{t("ai.newChat")}</button></div>}
+        <label className="block space-y-2 text-sm"><span>{t("ai.prompt")}</span><textarea required maxLength={8000} rows={8} className="w-full resize-y border bg-background p-3 leading-relaxed" value={prompt} onChange={(event) => setPrompt(event.target.value)} disabled={pending} /></label>
+        <button className="w-full bg-foreground px-4 py-3 font-medium text-background disabled:opacity-50" disabled={pending || !prompt.trim()}>{t(pending ? "ai.working" : "ai.generate")}</button>
+      </form>}
+      {error && <div role="alert" className="space-y-2 border-l-2 border-destructive pl-3 text-sm"><p>{t("ai.error")}</p>{request.current && <button disabled={pending} className="underline" onClick={() => void submit(true)}>{t("ai.retry")}</button>}</div>}
+    </section>
+    <section className="space-y-4"><h2 className="font-medium text-lg">{t("ai.history")}</h2>{jobs.length === 0 && <p className="py-16 text-muted-foreground">{t("ai.empty")}</p>}
+      <ol className="space-y-5">{jobs.map((job) => <li key={job.id} className="space-y-3 border p-5">
+        <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{job.provider} / {t(\`ai.kinds.\${job.kind}\`)} / {job.cost} {t("ai.cost")}</span><span role="status">{t(\`ai.statuses.\${job.status}\`)}</span></div>
+        <p className="whitespace-pre-wrap font-medium">{job.prompt}</p>
+        {job.text && <p className="whitespace-pre-wrap border-t pt-3 leading-relaxed">{job.text}</p>}
+        {job.mediaUrl && job.kind === "image" && <img src={job.mediaUrl} alt={job.prompt} className="max-h-[520px] w-full object-contain" />}
+        {job.mediaUrl && job.kind === "video" && <video src={job.mediaUrl} controls preload="metadata" className="w-full" aria-label={job.prompt} />}
+        {job.error && <p className="text-sm text-destructive">{t(\`ai.errors.\${job.error === "insufficient_credits" ? "insufficient_credits" : job.error === "unknown" ? "unknown" : job.error === "cancelled" ? "cancelled" : "provider_error"}\`)}</p>}
+        <div className="flex flex-wrap gap-4 text-sm">
+          {job.mediaUrl && <a href={job.mediaUrl} download className="underline">{t("ai.download")}</a>}
+          {job.kind === "chat" && job.status === "completed" && <button className="underline" onClick={() => { setParentId(job.id); setProvider(job.provider); setMode("chat"); setPrompt(""); }}>{t("ai.continue")}</button>}
+          {active[job.status] && <button className="underline" onClick={() => void update(job.id).catch(() => setError(true))}>{t("ai.refresh")}</button>}
+          {job.cancellable && <button className="underline" onClick={() => void update(job.id, true).catch(() => setError(true))}>{t("ai.cancel")}</button>}
+        </div>
+      </li>)}</ol>
+    </section>
+  </div>;
 }
 `],
   ["modules/auth/dialects/postgres/packages/db/src/schema/auth.ts.hbs", `import { defineRelationsPart } from "drizzle-orm";
@@ -21072,8 +21189,8 @@ export default async function DashboardLayout({
 `],
   ["modules/auth/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/page.tsx", `import type { Metadata } from "next";
 
-import { getTranslator, resolveLocale } from "@/lib/i18n/server";
 import { localePath } from "@/lib/i18n/paths";
+import { getTranslator, resolveLocale } from "@/lib/i18n/server";
 import { requireUser } from "@/lib/session";
 
 type Props = { params: Promise<{ lang: string }> };
@@ -21092,10 +21209,18 @@ export default async function DashboardPage({ params }: Props) {
     <div className="flex flex-col gap-4">
       <h1 className="font-semibold text-2xl">{t("auth.dashboard.welcome", { name: user.name })}</h1>
       <dl className="grid max-w-xl gap-4 rounded-lg border p-6">
-        <div><dt className="text-sm text-muted-foreground">{t("auth.fields.name")}</dt><dd>{user.name}</dd></div>
-        <div><dt className="text-sm text-muted-foreground">{t("auth.fields.email")}</dt><dd>{user.email}</dd></div>
+        <div>
+          <dt className="text-sm text-muted-foreground">{t("auth.fields.name")}</dt>
+          <dd>{user.name}</dd>
+        </div>
+        <div>
+          <dt className="text-sm text-muted-foreground">{t("auth.fields.email")}</dt>
+          <dd>{user.email}</dd>
+        </div>
       </dl>
-      <a href={localePath(locale, "/dashboard/settings")} className="text-sm underline">{t("auth.settings.title")}</a>
+      <a href={localePath(locale, "/dashboard/settings")} className="text-sm underline">
+        {t("auth.settings.title")}
+      </a>
     </div>
   );
 }
@@ -21799,7 +21924,7 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import type { SocialProvider } from "@/lib/social-providers";
 
-import { useLocale, useT } from "../i18n-provider";
+import { {{#if (includes product.features "email")}}useLocale, {{/if}}useT } from "../i18n-provider";
 import { Field, formValue } from "./field";
 import { SocialButtons } from "./social-buttons";
 {{#if (includes product.features "captcha")}}
@@ -21817,7 +21942,9 @@ export default function SignUpForm({
   verifyEmail: boolean;
 }) {
   const t = useT();
+{{#if (includes product.features "email")}}
   const locale = useLocale();
+{{/if}}
   const [pending, setPending] = useState(false);
   const [sentTo, setSentTo] = useState<string>();
 {{#if (includes product.features "captcha")}}
@@ -22071,14 +22198,29 @@ import { safeNext } from "@/lib/session";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-export default async function VerificationPage({ params, searchParams }: {
+export default async function VerificationPage({
+  params,
+  searchParams,
+}: {
   params: Promise<{ lang: string }>;
   searchParams: Promise<{ next?: string }>;
 }) {
   const locale = resolveLocale((await params).lang);
   const t = getTranslator(locale);
   const next = safeNext((await searchParams).next, localePath(locale, "/dashboard"));
-  return <AuthCard title={t("auth.verification.title")} description={t("auth.verification.subtitle")} footer={<a href={localePath(locale, "/login")} className="underline">{t("auth.forgot.back")}</a>}><VerificationForm next={next} /></AuthCard>;
+  return (
+    <AuthCard
+      title={t("auth.verification.title")}
+      description={t("auth.verification.subtitle")}
+      footer={
+        <a href={localePath(locale, "/login")} className="underline">
+          {t("auth.forgot.back")}
+        </a>
+      }
+    >
+      <VerificationForm next={next} />
+    </AuthCard>
+  );
 }
 `],
   ["modules/auth/integrations/email/frameworks/react/apps/fullstack-web/src/components/auth/password-reset-forms.tsx.hbs", `"use client";
@@ -22964,32 +23106,14 @@ export default function PhoneSignInForm({ next }: { next: string }) {
     "zh-CN": "邮箱密码登录、第三方登录、角色与账户设置"
   },
   "category": "identity",
-  "requires": [
-    "core"
-  ],
-  "enhances": [
-    "email",
-    "sms"
-  ],
+  "requires": ["core"],
+  "enhances": ["email", "sms"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ],
-    "orms": [
-      "drizzle"
-    ],
-    "dialects": [
-      "sqlite",
-      "postgres"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
   },
   "nativeSplit": true,
   "domain": {
@@ -23009,10 +23133,7 @@ export default function PhoneSignInForm({ next }: { next: string }) {
   "options": {
     "engine": {
       "type": "enum",
-      "values": [
-        "better-auth",
-        "clerk"
-      ],
+      "values": ["better-auth", "clerk"],
       "default": "better-auth",
       "description": "Clerk is only available through the stack templates"
     }
@@ -23020,10 +23141,7 @@ export default function PhoneSignInForm({ next }: { next: string }) {
   "providers": {
     "min": 0,
     "default": {
-      "global": [
-        "google",
-        "github"
-      ],
+      "global": ["google", "github"],
       "cn": []
     },
     "options": {
@@ -23081,11 +23199,7 @@ export default function PhoneSignInForm({ next }: { next: string }) {
   "packages": [
     {
       "dir": "auth",
-      "workspaceDependencies": [
-        "db",
-        "events",
-        "i18n"
-      ]
+      "workspaceDependencies": ["db", "events", "i18n"]
     }
   ],
   "env": [
@@ -23102,9 +23216,7 @@ export default function PhoneSignInForm({ next }: { next: string }) {
       "imports": [
         {
           "from": "@app/auth",
-          "names": [
-            "createAuth"
-          ]
+          "names": ["createAuth"]
         }
       ],
       "init": "createAuth(ENV, db, events, {{{clientOrigins}}})"
@@ -23141,13 +23253,7 @@ export default function PhoneSignInForm({ next }: { next: string }) {
   ],
   "sources": {
     "dialects": true,
-    "frameworks": [
-      "http-server",
-      "next",
-      "nuxt",
-      "tanstack-start",
-      "react"
-    ],
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start", "react"],
     "providers": {
       "mode": "inline",
       "source": "files/packages/auth/src/index.ts.hbs"
@@ -34432,11 +34538,11 @@ Create each translation as a separate post with its configured language, localiz
 
 Public listing and detail routes are \`/{locale}/blog\` and \`/{locale}/blog/{slug}\`. Listing pages use \`?page=2\` pagination with self-canonical URLs. Draft detail requests return 404 even for signed-in administrators; private previews exist only in the guarded editor. Markdown is rendered using react-markdown without raw HTML, unsafe URL schemes or remote images. Inline HTML is dropped, not injected. JSON-LD is escaped before embedding and reports the real saved headline, author, first publication date and last modification date.
 
-Without SEO, metadata uses \`BETTER_AUTH_URL\` as its canonical public origin. With SEO, set \`SITE_URL\` and the blog integration uses it for both metadata and sitemap URLs. SEO dynamically includes published posts and populated blog index pages. No private routes are listed. The blog works independently without adding robots/sitemap routes.
+Without SEO, fullstack metadata uses \`BETTER_AUTH_URL\`; split public responses use the validated frontend request origin, never the backend or admin origin. With SEO, set \`SITE_URL\` to the public frontend and the blog integration uses it for metadata and sitemap URLs. SEO dynamically includes published posts and populated blog index pages. No private routes are listed. The blog works independently without adding robots/sitemap routes.
 
 ## HTTP authoring API
 
-All \`/api/blog\` routes require an authenticated administrator. Writes additionally require an Origin header matching \`BETTER_AUTH_URL\`; body parsing is bounded to 512KB and validated with Zod. No API response is publicly cached.
+All \`/api/blog\` routes require an authenticated administrator. Writes additionally require a trusted configured backend or split-client Origin; body parsing is bounded to 512KB and validated with Zod. No API response is publicly cached. In split layouts, authoring pages exist only in the admin application and published pages only in the public frontend. The backend owns persistence and publication checks; clients use same-origin BFF routes.
 
 - \`GET /api/blog?page=1\`: paginated private records, including drafts.
 - \`POST /api/blog\`: \`{ locale, slug, title, excerpt, body, translationKey?, status: "draft" }\`; returns the new record (201).
@@ -34637,92 +34743,13 @@ export type Blog = ReturnType<typeof createBlog>;
   },
 } as const;
 `],
-  ["modules/blog/frameworks/http-server/apps/fullstack-web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
-import { BlogError, type BlogActor } from "@{{projectName}}/blog";
-import { defineAbilityFor } from "@{{projectName}}/permissions";
-import { z } from "zod";
-import { ENV } from "@/env.server";
-
-class RequestError extends Error {
-  constructor(readonly status: number, readonly code: string) { super(code); }
-}
-export async function blogActor(request: Request, mutate = false): Promise<BlogActor> {
-  if (mutate && request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new RequestError(403, "forbidden");
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) throw new RequestError(401, "unauthorized");
-  const actor = session.user;
-  if (defineAbilityFor(actor).cannot("access", "Admin")) throw new RequestError(403, "forbidden");
-  return actor;
-}
-export async function readBlogJson(request: Request): Promise<unknown> {
-  if (!/^application\\/json(?:;|$)/i.test(request.headers.get("content-type") ?? "")) throw new RequestError(400, "invalid_input");
-  if (!request.body) throw new RequestError(400, "invalid_input");
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const part = await reader.read();
-      if (part.done) break;
-      size += part.value.byteLength;
-      if (size > 512_000) { await reader.cancel(); throw new RequestError(413, "too_large"); }
-      chunks.push(part.value);
-    }
-  } finally { reader.releaseLock(); }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  try { return JSON.parse(new TextDecoder().decode(bytes)) as unknown; }
-  catch { throw new RequestError(400, "invalid_input"); }
-}
-export function blogResponse<T>(data: T, status = 200) {
-  return Response.json(data, { status, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
-}
-export function blogFailure(error: unknown) {
-  if (error instanceof RequestError) return blogResponse({ error: error.code }, error.status);
-  if (error instanceof z.ZodError) return blogResponse({ error: "invalid_input" }, 400);
-  if (error instanceof BlogError) return blogResponse({ error: error.code }, error.code === "forbidden" ? 403 : error.code === "not_found" ? 404 : 409);
-  console.error("Blog request failed");
-  return blogResponse({ error: "server_error" }, 500);
-}
+  ["modules/blog/frameworks/http-server/apps/backend/src/lib/blog-http.ts.hbs", `{{> blog/blog-http}}
 `],
-  ["modules/blog/frameworks/http-server/apps/fullstack-web/src/lib/native/blog.ts.hbs", `import { blog } from "@{{projectName}}/app-services";
-import { revisionInput } from "@{{projectName}}/blog";
-import { isLocale, defaultLocale } from "@{{projectName}}/i18n";
-import { z } from "zod";
-import { ENV } from "@/env.server";
-import { blogActor, blogFailure, blogResponse, readBlogJson } from "../blog-http";
-import { json, pageOf } from "../product-api";
-export async function handle(request: Request, path: string): Promise<Response | undefined> {
-  if (path !== "/api/blog" && !path.startsWith("/api/blog/") && path !== "/api/product/blog" && !path.startsWith("/api/product/blog/")) return;
-  try {
-    if (path.startsWith("/api/product/blog") && request.method === "GET") {
-      const lang = new URL(request.url).searchParams.get("locale") ?? defaultLocale;
-      if (!isLocale(lang)) return json({ error: "not_found" }, 404);
-      if (path === "/api/product/blog") return json({ ...await blog.listPublished(lang, { page: pageOf(request) }), siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}ENV.BETTER_AUTH_URL{{/if}} });
-      const post = await blog.getPublished(lang, decodeURIComponent(path.slice("/api/product/blog/".length)));
-      return post ? json({ post, translations: await blog.translations(post.translationKey), siteUrl: {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}ENV.BETTER_AUTH_URL{{/if}} }) : json({ error: "not_found" }, 404);
-    }
-    if (path === "/api/blog") {
-      if (request.method === "GET") return blogResponse(await blog.listAdmin(await blogActor(request), { page: pageOf(request) }));
-      if (request.method === "POST") return blogResponse(await blog.create(await blogActor(request, true), await readBlogJson(request)), 201);
-    }
-    const id = decodeURIComponent(path.slice("/api/blog/".length));
-    if (request.method === "GET") return blogResponse(await blog.getAdmin(await blogActor(request), id));
-    if (request.method === "PUT") {
-      const actor = await blogActor(request, true);
-      const data = z.object({ revision: revisionInput, post: z.unknown() }).strict().parse(await readBlogJson(request));
-      return blogResponse(await blog.update(actor, id, data.revision, data.post));
-    }
-    if (request.method === "DELETE") {
-      const actor = await blogActor(request, true);
-      const data = z.object({ revision: revisionInput }).strict().parse(await readBlogJson(request));
-      await blog.delete(actor, id, data.revision);
-      return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
-    }
-    return json({ error: "method_not_allowed" }, 405);
-  } catch (error) { return blogFailure(error); }
-}
+  ["modules/blog/frameworks/http-server/apps/backend/src/lib/native/blog.ts.hbs", `{{> blog/blog}}
+`],
+  ["modules/blog/frameworks/http-server/apps/fullstack-web/src/lib/blog-http.ts.hbs", `{{> blog/blog-http}}
+`],
+  ["modules/blog/frameworks/http-server/apps/fullstack-web/src/lib/native/blog.ts.hbs", `{{> blog/blog}}
 `],
   ["modules/blog/frameworks/next/apps/fullstack-web/src/app/[lang]/admin/blog/[id]/page.tsx.hbs", `import { blog } from "@{{projectName}}/app-services";
 import { BlogError } from "@{{projectName}}/blog";
@@ -34879,54 +34906,7 @@ export async function POST(request: Request) {
   } catch (error) { return blogFailure(error); }
 }
 `],
-  ["modules/blog/frameworks/next/apps/fullstack-web/src/lib/blog-http.ts.hbs", `import { auth } from "@{{projectName}}/app-services";
-import { BlogError, type BlogActor } from "@{{projectName}}/blog";
-import { defineAbilityFor } from "@{{projectName}}/permissions";
-import { z } from "zod";
-import { ENV } from "@/env.server";
-
-class RequestError extends Error {
-  constructor(readonly status: number, readonly code: string) { super(code); }
-}
-export async function blogActor(request: Request, mutate = false): Promise<BlogActor> {
-  if (mutate && request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new RequestError(403, "forbidden");
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) throw new RequestError(401, "unauthorized");
-  const actor = session.user;
-  if (defineAbilityFor(actor).cannot("access", "Admin")) throw new RequestError(403, "forbidden");
-  return actor;
-}
-export async function readBlogJson(request: Request): Promise<unknown> {
-  if (!/^application\\/json(?:;|$)/i.test(request.headers.get("content-type") ?? "")) throw new RequestError(400, "invalid_input");
-  if (!request.body) throw new RequestError(400, "invalid_input");
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const part = await reader.read();
-      if (part.done) break;
-      size += part.value.byteLength;
-      if (size > 512_000) { await reader.cancel(); throw new RequestError(413, "too_large"); }
-      chunks.push(part.value);
-    }
-  } finally { reader.releaseLock(); }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  try { return JSON.parse(new TextDecoder().decode(bytes)) as unknown; }
-  catch { throw new RequestError(400, "invalid_input"); }
-}
-export function blogResponse(data: unknown, status = 200) {
-  return Response.json(data, { status, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
-}
-export function blogFailure(error: unknown) {
-  if (error instanceof RequestError) return blogResponse({ error: error.code }, error.status);
-  if (error instanceof z.ZodError) return blogResponse({ error: "invalid_input" }, 400);
-  if (error instanceof BlogError) return blogResponse({ error: error.code }, error.code === "forbidden" ? 403 : error.code === "not_found" ? 404 : 409);
-  console.error("Blog request failed", error);
-  return blogResponse({ error: "server_error" }, 500);
-}
+  ["modules/blog/frameworks/next/apps/fullstack-web/src/lib/blog-http.ts.hbs", `{{> blog/blog-http}}
 `],
   ["modules/blog/frameworks/next/apps/fullstack-web/src/lib/blog-metadata.ts.hbs", `import type { BlogPost } from "@{{projectName}}/blog";
 import { defaultLocale } from "@{{projectName}}/i18n";
@@ -34992,11 +34972,12 @@ const html = computed(() => article.value ? markdown.render(article.value.post.b
 const { data: config } = await useFetch<{ siteUrl: string }>("/api/product/config");
 const title = computed(() => article.value?.post.title ?? label("Journal", "博客"));
 const description = computed(() => article.value?.post.excerpt ?? label("News and ideas from {{projectName}}.", "{{projectName}} 的新闻与想法。"));
-useSeoMeta({ title: () => \`\${title.value} · {{projectName}}\`, description: () => description.value, ogTitle: () => title.value, ogDescription: () => description.value, ogType: () => article.value ? "article" : "website", twitterCard: "summary", twitterTitle: () => title.value, twitterDescription: () => description.value });
-useHead(() => ({ link: !article.value || !config.value?.siteUrl ? [] : [
-  { rel: "canonical" as const, href: \`\${config.value.siteUrl}/\${article.value.post.locale}/blog/\${article.value.post.slug}\` },
-  ...article.value.translations.map((entry) => ({ rel: "alternate" as const, hreflang: entry.locale, href: \`\${config.value!.siteUrl}/\${entry.locale}/blog/\${entry.slug}\` })),
-  ...article.value.translations.filter((entry) => entry.locale === defaultLocale).map((entry) => ({ rel: "alternate" as const, hreflang: "x-default", href: \`\${config.value!.siteUrl}/\${entry.locale}/blog/\${entry.slug}\` })),
+const canonical = computed(() => config.value?.siteUrl ? new URL(article.value ? \`/\${article.value.post.locale}/blog/\${article.value.post.slug}\` : \`/\${locale.value}/blog\${page > 1 ? \`?page=\${page}\` : ""}\`, config.value.siteUrl).href : undefined);
+useSeoMeta({ title: () => \`\${title.value} · {{projectName}}\`, description: () => description.value, ogTitle: () => title.value, ogDescription: () => description.value, ogUrl: () => canonical.value, ogLocale: () => locale.value.replaceAll("-", "_"), ogType: () => article.value ? "article" : "website", twitterCard: "summary", twitterTitle: () => title.value, twitterDescription: () => description.value });
+useHead(() => ({ link: !canonical.value ? [] : [
+  { rel: "canonical" as const, href: canonical.value },
+  ...(article.value?.translations ?? []).map((entry) => ({ rel: "alternate" as const, hreflang: entry.locale, href: new URL(\`/\${entry.locale}/blog/\${entry.slug}\`, config.value!.siteUrl).href })),
+  ...(article.value?.translations ?? []).filter((entry) => entry.locale === defaultLocale).map((entry) => ({ rel: "alternate" as const, hreflang: "x-default", href: new URL(\`/\${entry.locale}/blog/\${entry.slug}\`, config.value!.siteUrl).href })),
 ] }));
 useHead(() => ({ script: !article.value || !config.value?.siteUrl ? [] : [{ type: "application/ld+json", innerHTML: JSON.stringify({ "@context": "https://schema.org", "@type": "BlogPosting", headline: article.value.post.title, description: article.value.post.excerpt, author: { "@type": "Person", name: article.value.post.authorName }, datePublished: article.value.post.publishedAt, dateModified: article.value.post.updatedAt, inLanguage: article.value.post.locale, mainEntityOfPage: \`\${config.value.siteUrl}/\${article.value.post.locale}/blog/\${article.value.post.slug}\` }).replace(/</g, "\\\\u003c").replace(/\\u2028/g, "\\\\u2028").replace(/\\u2029/g, "\\\\u2029") }] }));
 </script>
@@ -35053,74 +35034,9 @@ async function remove(post: Post) {
 </template>
 <style scoped>.body-editor{min-height:24rem;font-family:ui-monospace,monospace}</style>
 `],
-  ["modules/blog/frameworks/react/apps/fullstack-web/src/components/blog/editor.tsx.hbs", `"use client";
-
-import { locales } from "@{{projectName}}/i18n";
-import type { Locale } from "@{{projectName}}/i18n";
-import { useProductNavigation } from "@/lib/product-navigation";
-import { useState } from "react";
-import { z } from "zod";
-import { useT } from "@/components/i18n-provider";
-import { localePath } from "@/lib/i18n/paths";
-
-type Editable = { id: string; locale: string; slug: string; title: string; excerpt: string; body: string; translationKey: string; status: "draft" | "published"; revision: number };
-export default function BlogEditor({ locale, post }: { locale: Locale; post?: Editable }) {
-  const t = useT();
-  const navigation = useProductNavigation();
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  async function save(form: HTMLFormElement) {
-    setBusy(true); setMessage("");
-    const values = new FormData(form);
-    const data = { locale: String(values.get("locale")), slug: String(values.get("slug")), title: String(values.get("title")), excerpt: String(values.get("excerpt")), body: String(values.get("body")), translationKey: String(values.get("translationKey") ?? "") || undefined, status: String(values.get("status") ?? "draft") };
-    try {
-      const response = await fetch(post ? \`/api/blog/\${post.id}\` : "/api/blog", { method: post ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(post ? { revision: post.revision, post: data } : data) });
-      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
-      const result = z.object({ id: z.string().uuid() }).parse(await response.json());
-      navigation.navigate(localePath(locale, \`/admin/blog/\${result.id}\`)); navigation.refresh(); setMessage(t("blog.editor.saved"));
-    } catch { setMessage(t("blog.editor.failed")); }
-    finally { setBusy(false); }
-  }
-  async function remove() {
-    if (!post || !window.confirm(t("blog.editor.confirmDelete"))) return;
-    setBusy(true); setMessage("");
-    try {
-      const response = await fetch(\`/api/blog/\${post.id}\`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: post.revision }) });
-      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
-      navigation.navigate(localePath(locale, "/admin/blog")); navigation.refresh();
-    } catch { setMessage(t("blog.editor.failed")); }
-    finally { setBusy(false); }
-  }
-  const field = "mt-2 w-full rounded border bg-background px-3 py-2";
-  return <form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void save(event.currentTarget); }}>
-    <fieldset disabled={busy} className="space-y-6">
-      <div className="grid gap-6 sm:grid-cols-2"><label>{t("blog.editor.locale")}<select name="locale" defaultValue={post?.locale ?? locale} className={field}>{locales.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label>{t("blog.editor.slug")}<input className={field} name="slug" required maxLength={160} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={post?.slug} /></label></div>
-      <label className="block">{t("blog.editor.title")}<input className={field} name="title" required maxLength={200} defaultValue={post?.title} /></label>
-      <label className="block">{t("blog.editor.excerpt")}<textarea className={field} name="excerpt" required maxLength={500} rows={3} defaultValue={post?.excerpt} /></label>
-      <label className="block">{t("blog.editor.body")}<textarea className={\`\${field} font-mono text-sm\`} name="body" required maxLength={100000} rows={20} defaultValue={post?.body} /></label>
-      <p className="text-sm text-muted-foreground">{t("blog.editor.markdownHelp")}</p>
-      <label className="block">{t("blog.editor.translation")}<input className={\`\${field} font-mono text-sm\`} name="translationKey" defaultValue={post?.translationKey} /><span className="mt-2 block text-sm text-muted-foreground">{t("blog.editor.translationHelp")}</span></label>
-      {post && <label className="block">{t("blog.editor.status")}<select name="status" className={field} defaultValue={post.status}><option value="draft">{t("blog.draft")}</option><option value="published">{t("blog.published")}</option></select></label>}
-      <div className="flex gap-4"><button type="submit" className="rounded bg-primary px-5 py-2 text-primary-foreground">{busy ? t("blog.editor.saving") : post ? t("blog.editor.save") : t("blog.editor.create")}</button>{post && <button type="button" onClick={() => void remove()} className="rounded border border-destructive px-5 py-2 text-destructive">{t("blog.editor.delete")}</button>}</div>
-    </fieldset><p role="status" aria-live="polite">{message}</p>
-  </form>;
-}
+  ["modules/blog/frameworks/react/apps/fullstack-web/src/components/blog/editor.tsx.hbs", `{{> blog/editor}}
 `],
-  ["modules/blog/frameworks/react/apps/fullstack-web/src/components/blog/markdown.tsx", `import ReactMarkdown from "react-markdown";
-
-/** Raw HTML is never interpreted. react-markdown also rejects unsafe URL schemes. */
-export default function Markdown({ children }: { children: string }) {
-  return (
-    <div className="space-y-5 text-base leading-8 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-5 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:font-serif [&_h1]:text-3xl [&_h2]:mt-10 [&_h2]:font-serif [&_h2]:text-2xl [&_h3]:text-xl [&_li]:ml-6 [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:bg-muted [&_pre]:p-5 [&_ul]:list-disc">
-      <ReactMarkdown
-        skipHtml
-        components={{ img: ({ alt }) => <span className="text-muted-foreground">{alt}</span> }}
-      >
-        {children}
-      </ReactMarkdown>
-    </div>
-  );
-}
+  ["modules/blog/frameworks/react/apps/fullstack-web/src/components/blog/markdown.tsx.hbs", `{{> blog/markdown}}
 `],
   ["modules/blog/frameworks/tanstack-start/apps/fullstack-web/src/lib/blog-data.ts", `import { z } from "zod";
 export const postSchema = z.object({
@@ -35210,23 +35126,9 @@ export const Route = createFileRoute("/$lang/blog/")({
 });
 function Journal() { const data = Route.useLoaderData(); const locale = useLocale(); const t = useT(); return <section className="mx-auto max-w-5xl px-6 py-20"><header className="mb-12 border-b pb-10"><p className="mb-4 text-xs uppercase tracking-widest">{t("blog.journal")}</p><h1 className="font-serif text-5xl">{t("blog.title")}</h1><p className="mt-5 text-muted-foreground">{t("blog.description")}</p></header>{!data.posts.length && <p>{t("blog.empty")}</p>}<div className="divide-y">{data.posts.map((post) => <article key={post.id} className="grid gap-5 py-8 md:grid-cols-[10rem_1fr]"><div className="text-sm text-muted-foreground"><time>{post.publishedAt && new Date(post.publishedAt).toLocaleDateString(locale)}</time><p>{post.authorName}</p></div><div><h2 className="font-serif text-3xl"><a href={\`/\${locale}/blog/\${post.slug}\`}>{post.title}</a></h2><p className="mt-4 text-muted-foreground">{post.excerpt}</p></div></article>)}</div><nav className="mt-8 flex justify-between border-t pt-6" aria-label={t("blog.pagination")}>{data.page > 1 ? <a href={\`?page=\${data.page - 1}\`}>{t("blog.previous")}</a> : <span />}{data.page * data.limit < data.total && <a href={\`?page=\${data.page + 1}\`}>{t("blog.next")}</a>}</nav></section>; }
 `],
-  ["modules/blog/integrations/seo/apps/fullstack-web/src/integrations/blog-seo.ts.hbs", `import type { Services } from "../services";
-
-export default function registerBlogSeo({ blog, seo }: Services) {
-  seo.registerSitemap("blog", async () => {
-    const posts = await blog.sitemapPosts();
-    const translations = new Map<string, Record<string, string>>();
-    for (const post of posts) {
-      const group = translations.get(post.translationKey) ?? {};
-      group[post.locale] = seo.url(\`/\${post.locale}/blog/\${post.slug}\`);
-      translations.set(post.translationKey, group);
-    }
-    return [
-      ...[...new Set(posts.map((post) => post.locale))].map((locale) => ({ url: seo.url(\`/\${locale}/blog\`) })),
-      ...posts.map((post) => ({ url: seo.url(\`/\${post.locale}/blog/\${post.slug}\`), lastModified: post.updatedAt, alternates: { languages: translations.get(post.translationKey)! } })),
-    ];
-  });
-}
+  ["modules/blog/integrations/seo/apps/backend/src/integrations/blog-seo.ts.hbs", `{{> blog/blog-seo}}
+`],
+  ["modules/blog/integrations/seo/apps/fullstack-web/src/integrations/blog-seo.ts.hbs", `{{> blog/blog-seo}}
 `],
   ["modules/blog/integrations/seo/apps/fullstack-web/src/lib/blog-origin.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 export function blogOrigin() { return seo.origin; }
@@ -35242,32 +35144,16 @@ export function blogOrigin() { return seo.origin; }
     "zh-CN": "数据库驱动的多语言发布、后台编辑与安全 Markdown"
   },
   "category": "content",
-  "requires": [
-    "admin"
-  ],
-  "enhances": [
-    "seo"
-  ],
+  "requires": ["admin"],
+  "enhances": ["seo"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ],
-    "orms": [
-      "drizzle"
-    ],
-    "dialects": [
-      "sqlite",
-      "postgres"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
   },
+  "nativeSplit": true,
   "packages": [
     {
       "dir": "blog",
@@ -35275,14 +35161,13 @@ export function blogOrigin() { return seo.origin; }
         "drizzle-orm": "$dependency:drizzle-orm",
         "zod": "$dependency:zod"
       },
-      "workspaceDependencies": [
-        "db",
-        "i18n",
-        "permissions"
-      ]
+      "workspaceDependencies": ["db", "i18n", "permissions"]
     }
   ],
   "frameworkAppDependencies": {
+    "react-router": {
+      "react-markdown": "^10.1.0"
+    },
     "next": {
       "react-markdown": "^10.1.0"
     },
@@ -35300,9 +35185,7 @@ export function blogOrigin() { return seo.origin; }
       "imports": [
         {
           "from": "@app/blog",
-          "names": [
-            "createBlog"
-          ]
+          "names": ["createBlog"]
         }
       ],
       "init": "createBlog(db)"
@@ -35324,19 +35207,315 @@ export function blogOrigin() { return seo.origin; }
   ],
   "sources": {
     "dialects": true,
-    "frameworks": [
-      "http-server",
-      "next",
-      "nuxt",
-      "tanstack-start",
-      "react"
-    ],
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start", "react"],
     "integrations": {
       "seo": {
-        "base": "integrations/seo/apps/fullstack-web"
+        "base": "integrations/seo/apps/fullstack-web",
+        "serverOnly": true,
+        "required": [
+          "integrations/seo/apps/{application}/src/integrations/blog-seo.ts.hbs",
+          "shared/partials/blog-seo.hbs"
+        ]
       }
+    },
+    "required": ["shared/partials/editor.hbs", "shared/partials/markdown.hbs"],
+    "frameworkRequired": {
+      "http-server": ["shared/partials/blog.hbs", "shared/partials/blog-http.hbs"],
+      "next": ["shared/partials/blog-http.hbs"]
     }
   }
+}
+`],
+  ["modules/blog/shared/client/frameworks/react-router/src/components/blog/blog-pages.tsx.hbs", `import type { Locale } from "@{{projectName}}/i18n";
+import { useT } from "@/components/i18n-provider";
+import type { BlogListData, BlogPost, PublicBlogData, PublicPostData } from "@/lib/blog-contract";
+import { blogPosting, safeJsonLd } from "@/lib/blog-meta";
+import BlogEditor from "./editor";
+import Markdown from "./markdown";
+
+function Pagination({ data, locale, admin = false }: { data: BlogListData; locale: Locale; admin?: boolean }) {
+  const t = useT();
+  const path = \`/\${locale}/\${admin ? "admin/" : ""}blog\`;
+  return <nav aria-label={t("blog.pagination")} className="flex gap-6 pt-8">
+    {data.page > 1 && <a className="underline" href={\`\${path}?page=\${data.page - 1}\`}>{t("blog.previous")}</a>}
+    {data.page * data.limit < data.total && <a className="underline" href={\`\${path}?page=\${data.page + 1}\`}>{t("blog.next")}</a>}
+  </nav>;
+}
+export function BlogList({ data, locale }: { data: PublicBlogData; locale: Locale }) {
+  const t = useT();
+  return <section className="mx-auto max-w-5xl py-12">
+    <header className="mb-12 border-b pb-10"><p className="mb-4 text-xs uppercase tracking-widest">{t("blog.journal")}</p><h1 className="font-serif text-5xl">{t("blog.title")}</h1><p className="mt-5 text-muted-foreground">{t("blog.description")}</p></header>
+    {!data.posts.length && <p>{t("blog.empty")}</p>}
+    <div className="divide-y">{data.posts.map((post) => <article key={post.id} className="grid gap-5 py-8 md:grid-cols-[10rem_1fr]">
+      <div className="text-sm text-muted-foreground">{post.publishedAt && <time dateTime={post.publishedAt}>{new Date(post.publishedAt).toLocaleDateString(locale, { timeZone: "UTC" })}</time>}<p>{post.authorName}</p></div>
+      <div><h2 className="font-serif text-3xl"><a href={\`/\${locale}/blog/\${post.slug}\`} className="hover:underline">{post.title}</a></h2><p className="mt-4 text-muted-foreground">{post.excerpt}</p></div>
+    </article>)}</div><Pagination data={data} locale={locale} />
+  </section>;
+}
+export function BlogArticle({ data, locale }: { data: PublicPostData; locale: Locale }) {
+  const t = useT(); const { post } = data;
+  return <article className="mx-auto max-w-3xl py-12"><a className="text-sm underline" href={\`/\${locale}/blog\`}>{t("blog.back")}</a>
+    <header className="my-10 border-b pb-10"><h1 className="font-serif text-5xl leading-tight">{post.title}</h1><p className="mt-6 text-lg text-muted-foreground">{post.excerpt}</p><p className="mt-6 text-sm">{post.authorName}{post.publishedAt && <> · <time dateTime={post.publishedAt}>{new Date(post.publishedAt).toLocaleDateString(locale, { timeZone: "UTC" })}</time></>}</p></header>
+    <Markdown>{post.body}</Markdown>
+    <script type="application/ld+json" dangerouslySetInnerHTML={ { __html: safeJsonLd(blogPosting(data)) } } />
+  </article>;
+}
+export function AdminBlog({ data, locale }: { data: BlogListData; locale: Locale }) {
+  const t = useT();
+  return <section className="space-y-8"><header className="flex items-center justify-between"><h1 className="font-serif text-4xl">{t("blog.manage")}</h1><a href={\`/\${locale}/admin/blog/new\`} className="border px-4 py-2">{t("blog.editor.create")}</a></header>
+    {!data.posts.length && <p>{t("blog.adminEmpty")}</p>}
+    <ul className="divide-y border">{data.posts.map((post) => <li key={post.id} className="flex justify-between gap-4 p-5"><div><a className="font-medium underline" href={\`/\${locale}/admin/blog/\${post.id}\`}>{post.title}</a><p className="mt-1 text-sm text-muted-foreground">{post.locale} / {post.slug}</p></div><span>{t(post.status === "published" ? "blog.published" : "blog.draft")}</span></li>)}</ul>
+    <Pagination data={data} locale={locale} admin />
+  </section>;
+}
+export function BlogEdit({ locale, post }: { locale: Locale; post?: BlogPost }) {
+  const t = useT();
+  return <section className="max-w-3xl space-y-8"><a className="underline" href={\`/\${locale}/admin/blog\`}>{t("blog.manage")}</a><h1 className="font-serif text-4xl">{post ? post.title : t("blog.editor.create")}</h1><BlogEditor key={\`\${post?.id ?? "new"}:\${post?.revision ?? 0}\`} locale={locale} post={post} /></section>;
+}
+`],
+  ["modules/blog/shared/client/frameworks/react-router/src/components/blog/editor.tsx.hbs", `{{> blog/editor}}
+`],
+  ["modules/blog/shared/client/frameworks/react-router/src/components/blog/markdown.tsx.hbs", `{{> blog/markdown}}
+`],
+  ["modules/blog/shared/client/frameworks/react-router/src/lib/blog-contract.ts.hbs", `import { z } from "zod";
+
+/** Wire data only: no database or server-service imports in clients. */
+export const postSchema = z.object({
+  id: z.string().uuid(), locale: z.string(), slug: z.string(), title: z.string(),
+  excerpt: z.string(), body: z.string(), translationKey: z.string().uuid(),
+  status: z.enum(["draft", "published"]), revision: z.number().int().positive(),
+  authorName: z.string(), publishedAt: z.string().nullable(), updatedAt: z.string(),
+});
+export const postListSchema = z.object({ posts: z.array(postSchema), page: z.number().int().positive(), limit: z.number().int().positive(), total: z.number().int().nonnegative() });
+const publishedPostSchema = postSchema.extend({ status: z.literal("published") });
+export const publicBlogSchema = postListSchema.extend({ posts: z.array(publishedPostSchema), siteUrl: z.string().url() });
+export const publicPostSchema = z.object({ post: publishedPostSchema, siteUrl: z.string().url(), translations: z.array(z.object({ locale: z.string(), slug: z.string() })) });
+export type BlogPost = z.infer<typeof postSchema>;
+export type BlogListData = z.infer<typeof postListSchema>;
+export type PublicBlogData = z.infer<typeof publicBlogSchema>;
+export type PublicPostData = z.infer<typeof publicPostSchema>;
+`],
+  ["modules/blog/shared/client/frameworks/react-router/src/lib/blog-meta.ts.hbs", `import type { MetaDescriptor } from "react-router";
+import { createTranslator, defaultLocale, getMessages, locales, type Locale } from "@{{projectName}}/i18n";
+import type { PublicBlogData, PublicPostData } from "./blog-contract";
+
+export function blogMeta({ locale, list, article }: { locale: Locale; list?: PublicBlogData | null; article?: PublicPostData | null }): MetaDescriptor[] {
+  if (!list && !article) return [];
+  const t = createTranslator(getMessages(locale));
+  const title = article?.post.title ?? t("blog.title");
+  const description = article?.post.excerpt ?? t("blog.description");
+  const origin = article?.siteUrl ?? list!.siteUrl;
+  const page = list && list.page > 1 ? \`?page=\${list.page}\` : "";
+  const canonical = new URL(\`/\${locale}/blog\${article ? \`/\${article.post.slug}\` : ""}\${page}\`, origin).href;
+  const translations = article ? article.translations.map((post) => ({ locale: post.locale, path: \`/\${post.locale}/blog/\${post.slug}\` })) : locales.map((locale) => ({ locale, path: \`/\${locale}/blog\` }));
+  const languages = list && list.page > 1 ? [] : translations;
+  const fallback = languages.find((entry) => entry.locale === defaultLocale);
+  return [
+    { title }, { name: "description", content: description }, { name: "robots", content: "index, follow" },
+    { tagName: "link", rel: "canonical", href: canonical },
+    ...languages.map((entry): MetaDescriptor => ({ tagName: "link", rel: "alternate", hrefLang: entry.locale, href: new URL(entry.path, origin).href })),
+    ...(fallback ? [{ tagName: "link" as const, rel: "alternate", hrefLang: "x-default", href: new URL(fallback.path, origin).href }] : []),
+    { property: "og:title", content: title }, { property: "og:description", content: description },
+    { property: "og:url", content: canonical }, { property: "og:type", content: article ? "article" : "website" },
+    { property: "og:locale", content: locale.replaceAll("-", "_") },
+    ...languages.filter((entry) => entry.locale !== locale).map((entry) => ({ property: "og:locale:alternate", content: entry.locale.replaceAll("-", "_") })),
+    { name: "twitter:card", content: "summary" }, { name: "twitter:title", content: title }, { name: "twitter:description", content: description },
+  ];
+}
+
+export function blogPosting({ post, siteUrl }: PublicPostData) {
+  const canonical = new URL(\`/\${post.locale}/blog/\${post.slug}\`, siteUrl).href;
+  return { "@context": "https://schema.org", "@type": "BlogPosting", headline: post.title, description: post.excerpt, inLanguage: post.locale, author: { "@type": "Person", name: post.authorName }, ...(post.publishedAt ? { datePublished: post.publishedAt } : {}), dateModified: post.updatedAt, mainEntityOfPage: canonical, url: canonical };
+}
+export function safeJsonLd(value: unknown) { return JSON.stringify(value).replace(/</g, "\\\\u003c").replace(/>/g, "\\\\u003e").replace(/&/g, "\\\\u0026"); }
+`],
+  ["modules/blog/shared/partials/blog-http.hbs", `import { auth } from "@{{projectName}}/app-services";
+import { BlogError, type BlogActor } from "@{{projectName}}/blog";
+import { defineAbilityFor } from "@{{projectName}}/permissions";
+import { z } from "zod";
+{{#unless application.nativeSplit}}
+import { ENV } from "@/env.server";
+{{/unless}}
+{{#if application.nativeSplit}}
+import { HttpError, requireOrigin } from "./product-api";
+{{/if}}
+
+class RequestError extends Error {
+  constructor(readonly status: number, readonly code: string) { super(code); }
+}
+export async function blogActor(request: Request, mutate = false): Promise<BlogActor> {
+{{#if application.nativeSplit}}
+  if (mutate) requireOrigin(request);
+{{else}}
+  if (mutate && request.headers.get("origin") !== new URL(ENV.BETTER_AUTH_URL).origin) throw new RequestError(403, "forbidden");
+{{/if}}
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) throw new RequestError(401, "unauthorized");
+  const actor = session.user;
+  if (defineAbilityFor(actor).cannot("access", "Admin")) throw new RequestError(403, "forbidden");
+  return actor;
+}
+export async function readBlogJson(request: Request): Promise<unknown> {
+  if (!/^application\\/json(?:;|$)/i.test(request.headers.get("content-type") ?? "")) throw new RequestError(400, "invalid_input");
+  if (!request.body) throw new RequestError(400, "invalid_input");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      size += part.value.byteLength;
+      if (size > 512_000) { await reader.cancel(); throw new RequestError(413, "too_large"); }
+      chunks.push(part.value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder().decode(bytes)) as unknown; }
+  catch { throw new RequestError(400, "invalid_input"); }
+}
+export function blogResponse<T>(data: T, status = 200) {
+  return Response.json(data, { status, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" } });
+}
+export function blogFailure(error: unknown) {
+  if (error instanceof RequestError) return blogResponse({ error: error.code }, error.status);
+{{#if application.nativeSplit}}
+  if (error instanceof HttpError) return blogResponse({ error: error.message }, error.status);
+{{/if}}
+  if (error instanceof z.ZodError) return blogResponse({ error: "invalid_input" }, 400);
+  if (error instanceof BlogError) return blogResponse({ error: error.code }, error.code === "forbidden" ? 403 : error.code === "not_found" ? 404 : 409);
+  console.error("Blog request failed");
+  return blogResponse({ error: "server_error" }, 500);
+}
+`],
+  ["modules/blog/shared/partials/blog-seo.hbs", `import type { Services } from "../services";
+
+export default function registerBlogSeo({ blog, seo }: Services) {
+  seo.registerSitemap("blog", async () => {
+    const posts = await blog.sitemapPosts();
+    const translations = new Map<string, Record<string, string>>();
+    for (const post of posts) {
+      const group = translations.get(post.translationKey) ?? {};
+      group[post.locale] = seo.url(\`/\${post.locale}/blog/\${post.slug}\`);
+      translations.set(post.translationKey, group);
+    }
+    return [
+      ...[...new Set(posts.map((post) => post.locale))].map((locale) => ({ url: seo.url(\`/\${locale}/blog\`) })),
+      ...posts.map((post) => ({ url: seo.url(\`/\${post.locale}/blog/\${post.slug}\`), lastModified: post.updatedAt, alternates: { languages: translations.get(post.translationKey)! } })),
+    ];
+  });
+}
+`],
+  ["modules/blog/shared/partials/blog.hbs", `import { blog } from "@{{projectName}}/app-services";
+import { revisionInput } from "@{{projectName}}/blog";
+import { isLocale, defaultLocale } from "@{{projectName}}/i18n";
+import { z } from "zod";
+{{#if (or (includes product.features "seo") (not application.nativeSplit))}}
+import { ENV } from "@/env.server";
+{{/if}}
+import { blogActor, blogFailure, blogResponse, readBlogJson } from "../blog-http";
+import { json, pageOf } from "../product-api";
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path !== "/api/blog" && !path.startsWith("/api/blog/") && path !== "/api/product/blog" && !path.startsWith("/api/product/blog/")) return;
+  try {
+    if (path.startsWith("/api/product/blog") && request.method === "GET") {
+      const lang = new URL(request.url).searchParams.get("locale") ?? defaultLocale;
+      if (!isLocale(lang)) return json({ error: "not_found" }, 404);
+      const siteUrl = {{#if (includes product.features "seo")}}ENV.SITE_URL{{else}}{{#if application.nativeSplit}}new URL(request.url).origin{{else}}ENV.BETTER_AUTH_URL{{/if}}{{/if}};
+      if (path === "/api/product/blog") return json({ ...await blog.listPublished(lang, { page: pageOf(request) }), siteUrl });
+      const post = await blog.getPublished(lang, decodeURIComponent(path.slice("/api/product/blog/".length)));
+      return post ? json({ post, translations: await blog.translations(post.translationKey), siteUrl }) : json({ error: "not_found" }, 404);
+    }
+    if (path.startsWith("/api/product/blog")) return json({ error: "method_not_allowed" }, 405);
+    if (path === "/api/blog") {
+      if (request.method === "GET") return blogResponse(await blog.listAdmin(await blogActor(request), { page: pageOf(request) }));
+      if (request.method === "POST") return blogResponse(await blog.create(await blogActor(request, true), await readBlogJson(request)), 201);
+    }
+    const id = decodeURIComponent(path.slice("/api/blog/".length));
+    if (request.method === "GET") return blogResponse(await blog.getAdmin(await blogActor(request), id));
+    if (request.method === "PUT") {
+      const actor = await blogActor(request, true);
+      const data = z.object({ revision: revisionInput, post: z.unknown() }).strict().parse(await readBlogJson(request));
+      return blogResponse(await blog.update(actor, id, data.revision, data.post));
+    }
+    if (request.method === "DELETE") {
+      const actor = await blogActor(request, true);
+      const data = z.object({ revision: revisionInput }).strict().parse(await readBlogJson(request));
+      await blog.delete(actor, id, data.revision);
+      return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+    }
+    return json({ error: "method_not_allowed" }, 405);
+  } catch (error) { return blogFailure(error); }
+}
+`],
+  ["modules/blog/shared/partials/editor.hbs", `"use client";
+
+import { locales } from "@{{projectName}}/i18n";
+import type { Locale } from "@{{projectName}}/i18n";
+import { useProductNavigation } from "@/lib/product-navigation";
+import { useState } from "react";
+import { z } from "zod";
+import { useT } from "@/components/i18n-provider";
+
+type Editable = { id: string; locale: string; slug: string; title: string; excerpt: string; body: string; translationKey: string; status: "draft" | "published"; revision: number };
+export default function BlogEditor({ locale, post }: { locale: Locale; post?: Editable }) {
+  const t = useT();
+  const navigation = useProductNavigation();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  async function save(form: HTMLFormElement) {
+    setBusy(true); setMessage("");
+    const values = new FormData(form);
+    const data = { locale: String(values.get("locale")), slug: String(values.get("slug")), title: String(values.get("title")), excerpt: String(values.get("excerpt")), body: String(values.get("body")), translationKey: String(values.get("translationKey") ?? "") || undefined, status: String(values.get("status") ?? "draft") };
+    try {
+      const response = await fetch(post ? \`/api/blog/\${post.id}\` : "/api/blog", { method: post ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(post ? { revision: post.revision, post: data } : data) });
+      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
+      const result = z.object({ id: z.string().uuid() }).parse(await response.json());
+      navigation.{{#if application.nativeSplit}}push{{else}}navigate{{/if}}(\`/\${locale}/admin/blog/\${result.id}\`); navigation.refresh(); setMessage(t("blog.editor.saved"));
+    } catch { setMessage(t("blog.editor.failed")); }
+    finally { setBusy(false); }
+  }
+  async function remove() {
+    if (!post || !window.confirm(t("blog.editor.confirmDelete"))) return;
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch(\`/api/blog/\${post.id}\`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: post.revision }) });
+      if (!response.ok) { setMessage(response.status === 409 ? t("blog.editor.conflict") : t("blog.editor.failed")); return; }
+      navigation.{{#if application.nativeSplit}}push{{else}}navigate{{/if}}(\`/\${locale}/admin/blog\`); navigation.refresh();
+    } catch { setMessage(t("blog.editor.failed")); }
+    finally { setBusy(false); }
+  }
+  const field = "mt-2 w-full rounded border bg-background px-3 py-2";
+  return <form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void save(event.currentTarget); }}>
+    <fieldset disabled={busy} className="space-y-6">
+      <div className="grid gap-6 sm:grid-cols-2"><label>{t("blog.editor.locale")}<select name="locale" defaultValue={post?.locale ?? locale} className={field}>{locales.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label>{t("blog.editor.slug")}<input className={field} name="slug" required maxLength={160} pattern="[a-z0-9]+(-[a-z0-9]+)*" defaultValue={post?.slug} /></label></div>
+      <label className="block">{t("blog.editor.title")}<input className={field} name="title" required maxLength={200} defaultValue={post?.title} /></label>
+      <label className="block">{t("blog.editor.excerpt")}<textarea className={field} name="excerpt" required maxLength={500} rows={3} defaultValue={post?.excerpt} /></label>
+      <label className="block">{t("blog.editor.body")}<textarea className={\`\${field} font-mono text-sm\`} name="body" required maxLength={100000} rows={20} defaultValue={post?.body} /></label>
+      <p className="text-sm text-muted-foreground">{t("blog.editor.markdownHelp")}</p>
+      <label className="block">{t("blog.editor.translation")}<input className={\`\${field} font-mono text-sm\`} name="translationKey" defaultValue={post?.translationKey} /><span className="mt-2 block text-sm text-muted-foreground">{t("blog.editor.translationHelp")}</span></label>
+      {post && <label className="block">{t("blog.editor.status")}<select name="status" className={field} defaultValue={post.status}><option value="draft">{t("blog.draft")}</option><option value="published">{t("blog.published")}</option></select></label>}
+      <div className="flex gap-4"><button type="submit" className="rounded bg-primary px-5 py-2 text-primary-foreground">{busy ? t("blog.editor.saving") : post ? t("blog.editor.save") : t("blog.editor.create")}</button>{post && <button type="button" onClick={() => void remove()} className="rounded border border-destructive px-5 py-2 text-destructive">{t("blog.editor.delete")}</button>}</div>
+    </fieldset><p role="status" aria-live="polite">{message}</p>
+  </form>;
+}
+`],
+  ["modules/blog/shared/partials/markdown.hbs", `import ReactMarkdown from "react-markdown";
+
+/** Raw HTML is never interpreted. react-markdown also rejects unsafe URL schemes. */
+export default function Markdown({ children }: { children: string }) {
+  return (
+    <div className="space-y-5 text-base leading-8 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-5 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h1]:font-serif [&_h1]:text-3xl [&_h2]:mt-10 [&_h2]:font-serif [&_h2]:text-2xl [&_h3]:text-xl [&_li]:ml-6 [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:bg-muted [&_pre]:p-5 [&_ul]:list-disc">
+      <ReactMarkdown
+        skipHtml
+        components=\\{{ img: ({ alt }) => <span className="text-muted-foreground">{alt}</span> }}
+      >
+        {children}
+      </ReactMarkdown>
+    </div>
+  );
 }
 `],
   ["modules/captcha/files/docs/modules/captcha.md.hbs", `# Bot protection / 人机验证
@@ -35698,40 +35877,21 @@ export function Captcha({ action, challenge }: {
     "zh-CN": "认证操作前强制执行 Turnstile 人机验证"
   },
   "category": "identity",
-  "requires": [
-    "auth"
-  ],
+  "requires": ["auth"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ],
-    "orms": [
-      "drizzle"
-    ],
-    "dialects": [
-      "sqlite",
-      "postgres"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
   },
   "nativeSplit": true,
   "providers": {
     "min": 1,
     "max": 1,
     "default": {
-      "global": [
-        "turnstile"
-      ],
-      "cn": [
-        "turnstile"
-      ]
+      "global": ["turnstile"],
+      "cn": ["turnstile"]
     },
     "options": {
       "turnstile": {
@@ -35769,29 +35929,20 @@ export function Captcha({ action, challenge }: {
     },
     {
       "dir": "auth",
-      "workspaceDependencies": [
-        "captcha"
-      ]
+      "workspaceDependencies": ["captcha"]
     }
   ],
   "appDependencies": {
     "zod": "$dependency:zod"
   },
   "sources": {
-    "frameworks": [
-      "http-server",
-      "react",
-      "next",
-      "nuxt"
-    ],
+    "frameworks": ["http-server", "react", "next", "nuxt"],
     "providers": {
       "mode": "inline",
       "source": "files/packages/captcha/src/index.ts.hbs"
     },
     "frameworkRequired": {
-      "http-server": [
-        "shared/partials/captcha.hbs"
-      ]
+      "http-server": ["shared/partials/captcha.hbs"]
     }
   }
 }
@@ -36852,28 +37003,13 @@ export const Route = createFileRoute("/")({ beforeLoad: async () => { throw redi
   },
   "category": "foundation",
   "hidden": true,
-  "requires": [
-    "i18n"
-  ],
+  "requires": ["i18n"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ],
-    "orms": [
-      "drizzle"
-    ],
-    "dialects": [
-      "sqlite",
-      "postgres"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
   },
   "requiredWhen": {
     "frameworks": ["next", "tanstack-start", "nuxt"],
@@ -36892,9 +37028,7 @@ export const Route = createFileRoute("/")({ beforeLoad: async () => { throw redi
       "imports": [
         {
           "from": "@app/events",
-          "names": [
-            "createEventBus"
-          ]
+          "names": ["createEventBus"]
         }
       ],
       "init": "createEventBus()"
@@ -36933,22 +37067,11 @@ export const Route = createFileRoute("/")({ beforeLoad: async () => { throw redi
     ]
   },
   "sources": {
-    "frameworks": [
-      "http-server",
-      "next",
-      "nuxt",
-      "tanstack-start"
-    ],
-    "required": [
-      "shared/partials/site.hbs"
-    ],
-    "serverRequired": [
-      "files/apps/{application}"
-    ],
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start"],
+    "required": ["shared/partials/site.hbs"],
+    "serverRequired": ["files/apps/{application}"],
     "frameworkRequired": {
-      "http-server": [
-        "shared/partials/product-api.hbs"
-      ]
+      "http-server": ["shared/partials/product-api.hbs"]
     }
   }
 }
@@ -37027,7 +37150,7 @@ const hopByHop = ["connection", "keep-alive", "proxy-authenticate", "proxy-autho
 export const privateHeaders = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" };
 
 /** Only the declared backend is reachable; browser-supplied forwarding headers are replaced. */
-export async function backendRequest(request: Request, path: string, forwardBody = false): Promise<Response> {
+export async function backendRequest(request: Request, path: string, forwardBody = false, publicResponse = false): Promise<Response> {
   const original = new URL(request.url);
   const destination = new URL(upstream.origin);
   destination.pathname = path.split("?")[0]!;
@@ -37041,16 +37164,20 @@ export async function backendRequest(request: Request, path: string, forwardBody
   headers.delete("x-forwarded-port");
   headers.set("x-xstack-client-origin", original.origin);
   headers.set("accept-encoding", "identity");
-  const response = await fetch(destination, {
+  const init: RequestInit & { duplex?: "half" } = {
     method: forwardBody ? request.method : "GET", headers, redirect: "manual", cache: "no-store",
-    ...(forwardBody && request.method !== "GET" && request.method !== "HEAD" ? { body: await request.arrayBuffer() } : {}),
-  });
+  };
+  if (forwardBody && request.method !== "GET" && request.method !== "HEAD") {
+    init.body = request.body;
+    init.duplex = "half";
+  }
+  const response = await fetch(destination, init);
   const outgoing = new Headers(response.headers);
   for (const name of hopByHop) outgoing.delete(name);
   outgoing.delete("content-encoding");
   outgoing.delete("set-cookie");
   for (const cookie of response.headers.getSetCookie()) outgoing.append("set-cookie", cookie);
-  for (const [name, value] of Object.entries(privateHeaders)) outgoing.set(name, value);
+  if (!publicResponse) for (const [name, value] of Object.entries(privateHeaders)) outgoing.set(name, value);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers: outgoing });
 }
 
@@ -37076,6 +37203,7 @@ export type ProductUser = z.infer<typeof userSchema>;
 export const sessionSchema = z.object({ user: userSchema }).nullable();
 export const configSchema = z.object({
   socialProviders: z.array(z.enum(["google", "github", "wechat"])),
+  siteUrl: z.string().url().optional(),
   verifyEmail: z.boolean(), canResetPassword: z.boolean(),
 });
 export const overviewSchema = z.object({ users: z.number(), admins: z.number(), recent: z.array(userSchema) });
@@ -37146,6 +37274,10 @@ export function ErrorBoundary() {
 export default [
   index("routes/index.ts"),
   route("api/*", "routes/api.ts"),
+{{#if (includes product.features "seo")}}
+  route("robots.txt", "routes/robots.ts"),
+  route("sitemap.xml", "routes/sitemap.ts"),
+{{/if}}
   route("*", "routes/product.tsx"),
 ] satisfies RouteConfig;
 `],
@@ -37167,8 +37299,12 @@ export function loader({ request }: LoaderFunctionArgs) {
 }
 export default function Index() { return null; }
 `],
-  ["modules/core/shared/client/frameworks/react-router/src/routes/product.tsx.hbs", `import { data, redirect, useLoaderData, type HeadersFunction, type LoaderFunctionArgs } from "react-router";
+  ["modules/core/shared/client/frameworks/react-router/src/routes/product.tsx.hbs", `import { data, redirect, useLoaderData, type HeadersFunction, type LoaderFunctionArgs, type MetaFunction } from "react-router";
+import { z } from "zod";
 import { getMessages, isLocale, localeFromHeaders } from "@{{projectName}}/i18n";
+{{#if (includes product.features "seo")}}
+import { createTranslator } from "@{{projectName}}/i18n";
+{{/if}}
 import { I18nProvider, useT } from "@/components/i18n-provider";
 import { ProductShell } from "@/components/product-shell";
 import { privateHeaders, readBackend } from "@/lib/backend.server";
@@ -37212,15 +37348,48 @@ import { AdminCredits, adminCreditsSchema } from "@/components/admin/admin-credi
 {{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}
 import { AdminAffiliate, adminAffiliateSchema } from "@/components/admin/admin-affiliate";
 {{/if}}
+{{#if (includes product.features "storage")}}
+import { FilesPage } from "@/components/storage/files-page";
+import { storageSchema } from "@/lib/storage-contract";
+{{/if}}
+{{#if (includes product.features "ai")}}
+import { AIPage } from "@/components/ai/ai-page";
+import { aiSchema } from "@/lib/ai-contract";
+{{/if}}
+{{#if (includes product.features "blog")}}
+import { BlogList, BlogArticle, AdminBlog, BlogEdit } from "@/components/blog/blog-pages";
+import { postSchema, postListSchema, publicBlogSchema, publicPostSchema } from "@/lib/blog-contract";
+import { blogMeta } from "@/lib/blog-meta";
+{{/if}}
+{{#if (includes product.features "seo")}}
+import { pageMeta } from "@/lib/seo-meta";
+{{/if}}
 
 export const headers: HeadersFunction = ({ loaderHeaders, errorHeaders }) => {
-  const output = new Headers(privateHeaders);
+  const output = new Headers(errorHeaders?.has("X-Robots-Tag") ? errorHeaders : loaderHeaders);
+  output.set("Cache-Control", "no-store");
+  output.delete("Set-Cookie");
   for (const source of [loaderHeaders, errorHeaders]) {
     if (source) for (const cookie of source.getSetCookie()) output.append("Set-Cookie", cookie);
   }
   return output;
 };
-export const meta = () => [{ title: "{{projectName}}" }, { name: "robots", content: "noindex, nofollow" }];
+export const meta: MetaFunction<typeof loader> = ({ loaderData: result }) => {
+  if (result && !isAdminClient) {
+{{#if (includes product.features "blog")}}
+    if (result.blogList || result.blogArticle) return blogMeta({ locale: result.locale, list: result.blogList ?? undefined, article: result.blogArticle ?? undefined });
+{{/if}}
+{{#if (includes product.features "seo")}}
+    if (result.indexable && result.config.siteUrl) {
+      const t = createTranslator(getMessages(result.locale));
+      const title = {{#if (includes product.features "payment")}}result.page === "pricing" ? t("payment.pricing.title") : {{/if}}t("core.landing.title");
+      const description = {{#if (includes product.features "payment")}}result.page === "pricing" ? t("payment.pricing.subtitle") : {{/if}}t("core.landing.subtitle");
+      return pageMeta({ siteUrl: result.config.siteUrl, locale: result.locale, path: result.page ? \`/\${result.page}\` : "/", title, description });
+    }
+{{/if}}
+  }
+  return [{ title: "{{projectName}}" }, { name: "robots", content: "noindex, nofollow" }];
+};
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -37232,25 +37401,34 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const page = segments.slice(1).join("/");
   const orderId = {{#if (includes product.features "payment")}}/^payment\\/[^/]+$/.test(page) ? page.slice("payment/".length) : {{/if}}null;
   const referralCode = {{#if (includes product.features "affiliate")}}/^ref\\/[a-zA-Z0-9_-]+$/.test(page) ? page.slice("ref/".length) : {{/if}}null;
+  const blogSlug = {{#if (includes product.features "blog")}}/^blog\\/[^/]+$/.test(page) ? page.slice("blog/".length) : {{/if}}null;
+  const blogEditorId = {{#if (includes product.features "blog")}}/^admin\\/blog\\/[^/]+$/.test(page) && page !== "admin/blog/new" ? page.slice("admin/blog/".length) : {{/if}}null;
+  const blogAdminPage = {{#if (includes product.features "blog")}}page === "admin/blog" || page === "admin/blog/new" || !!blogEditorId{{else}}false{{/if}};
+  const blogPublicPage = {{#if (includes product.features "blog")}}!isAdminClient && (page === "blog" || !!blogSlug){{else}}false{{/if}};
   const publicPages: string[] = ["", {{#if (includes product.features "auth")}}"login", "signup",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "email"))}} "forgot-password", "reset-password", "verify-email",{{/if}}{{#if (and (includes product.features "auth") (includes product.features "sms"))}} "login/phone",{{/if}}{{#if (includes product.features "payment")}} "pricing",{{/if}}];
-  const accountPages: string[] = [{{#if (includes product.features "auth")}}"dashboard", "dashboard/settings",{{/if}}{{#if (includes product.features "payment")}} "dashboard/billing",{{/if}}{{#if (includes product.features "credits")}} "dashboard/credits",{{/if}}{{#if (includes product.features "affiliate")}} "dashboard/affiliate",{{/if}}];
+  const accountPages: string[] = [{{#if (includes product.features "auth")}}"dashboard", "dashboard/settings",{{/if}}{{#if (includes product.features "payment")}} "dashboard/billing",{{/if}}{{#if (includes product.features "credits")}} "dashboard/credits",{{/if}}{{#if (includes product.features "affiliate")}} "dashboard/affiliate",{{/if}}{{#if (includes product.features "storage")}} "dashboard/files",{{/if}}{{#if (includes product.features "ai")}} "dashboard/ai",{{/if}}];
   const adminPages: string[] = [{{#if (includes product.features "admin")}}"admin", "admin/users",{{#if (includes product.features "payment")}} "admin/orders",{{/if}}{{#if (includes product.features "credits")}} "admin/credits",{{/if}}{{#if (includes product.features "affiliate")}} "admin/affiliate",{{/if}}{{/if}}];
-  if (!publicPages.includes(page) && !accountPages.includes(page) && !orderId && !referralCode && !(isAdminClient && adminPages.includes(page))) throw new Response("Not found", { status: 404, headers });
+  if (!publicPages.includes(page) && !accountPages.includes(page) && !orderId && !referralCode && !blogPublicPage && !(isAdminClient && (adminPages.includes(page) || blogAdminPage))) throw new Response("Not found", { status: 404, headers });
   let user: ProductUser | null = null;
   let config: ReturnType<typeof configSchema.parse> = { socialProviders: [], verifyEmail: false, canResetPassword: false };
 {{#if (includes product.features "auth")}}
   const session = await readBackend(request, "/api/product/session", sessionSchema, headers);
   user = session?.user ?? null;
-  const privatePage = accountPages.includes(page) || adminPages.includes(page) || !!orderId;
+  const privatePage = accountPages.includes(page) || adminPages.includes(page) || blogAdminPage || !!orderId;
   if (privatePage && !user) throw redirect(\`/\${locale}/login?next=\${encodeURIComponent(\`/\${segments.join("/")}\${url.search}\`)}\`, { headers });
   if (privatePage && ({{#if (includes product.features "admin")}}isAdminClient || {{/if}}adminPages.includes(page)) && !isAdministrator(user)) throw new Response("Forbidden", { status: 403, headers });
   if (publicPages.includes(page)) config = await readBackend(request, "/api/product/config", configSchema, headers);
 {{/if}}
+{{#unless (includes product.features "auth")}}
+  if (publicPages.includes(page)) config = await readBackend(request, "/api/product/config", configSchema, headers);
+{{/unless}}
   const home = \`/\${locale}/\${isAdminClient && {{#if (includes product.features "admin")}}true{{else}}false{{/if}} ? "admin" : "dashboard"}\`;
   const destination = safeNext(url.searchParams.get("next"), home, url.origin);
   const next = new URL(destination, url.origin).href;
   const nextPath = \`\${new URL(next).pathname}\${new URL(next).search}\${new URL(next).hash}\`;
-  const search = { q: url.searchParams.get("q") ?? "", page: Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1)) };
+  const pageInput = z.coerce.number().int().min(1).max(100000).safeParse(url.searchParams.get("page") ?? 1);
+  if (!pageInput.success) throw new Response("Invalid page", { status: 400, headers });
+  const search = { q: url.searchParams.get("q") ?? "", page: pageInput.data };
   const overview = {{#if (includes product.features "admin")}}page === "admin" ? await readBackend(request, "/api/product/admin", overviewSchema, headers) : {{/if}}null;
   const users = {{#if (includes product.features "admin")}}page === "admin/users" ? await readBackend(request, \`/api/product/users?\${new URLSearchParams({ q: search.q, page: String(search.page) })}\`, usersSchema, headers) : {{/if}}null;
   const pricing = {{#if (includes product.features "payment")}}page === "pricing" ? await readBackend(request, "/api/product/pricing", pricingSchema, headers) : {{/if}}null;
@@ -37264,7 +37442,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const orders = {{#if (and (includes product.features "payment") (includes product.features "admin"))}}page === "admin/orders" ? await readBackend(request, \`/api/product/orders?page=\${search.page}\`, ordersSchema, headers) : {{/if}}null;
   const adminCredits = {{#if (and (includes product.features "credits") (includes product.features "admin"))}}page === "admin/credits" ? await readBackend(request, \`/api/product/credit-transactions?page=\${search.page}\`, adminCreditsSchema, headers) : {{/if}}null;
   const adminAffiliate = {{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}page === "admin/affiliate" ? await readBackend(request, \`/api/product/referrals?page=\${search.page}\`, adminAffiliateSchema, headers) : {{/if}}null;
-  return data({ locale, page, user, config, next, nextPath, search, overview, users, pricing, billing, paymentOrder, credits, affiliate, referralCode, orders, adminCredits, adminAffiliate, returned: url.searchParams.get("status") === "success", token: url.searchParams.get("token") ?? "", error: url.searchParams.get("error") }, { headers });
+  const files = {{#if (includes product.features "storage")}}page === "dashboard/files" ? await readBackend(request, "/api/product/files", storageSchema, headers) : {{/if}}null;
+  const ai = {{#if (includes product.features "ai")}}page === "dashboard/ai" ? await readBackend(request, "/api/product/ai", aiSchema, headers) : {{/if}}null;
+  const blogList = {{#if (includes product.features "blog")}}blogPublicPage && page === "blog" ? await readBackend(request, \`/api/product/blog?locale=\${locale}&page=\${search.page}\`, publicBlogSchema, headers) : {{/if}}null;
+{{#if (includes product.features "blog")}}
+  if (blogList && blogList.page > 1 && blogList.posts.length === 0) throw new Response("Not found", { status: 404, headers });
+{{/if}}
+  const blogArticle = {{#if (includes product.features "blog")}}blogPublicPage && blogSlug ? await readBackend(request, \`/api/product/blog/\${encodeURIComponent(blogSlug)}?locale=\${locale}\`, publicPostSchema, headers) : {{/if}}null;
+  const adminBlog = {{#if (includes product.features "blog")}}isAdminClient && page === "admin/blog" ? await readBackend(request, \`/api/blog?page=\${search.page}\`, postListSchema, headers) : {{/if}}null;
+  const editPost = {{#if (includes product.features "blog")}}isAdminClient && blogEditorId ? await readBackend(request, \`/api/blog/\${encodeURIComponent(blogEditorId)}\`, postSchema, headers) : {{/if}}null;
+  const indexable = !isAdminClient && (blogPublicPage || {{#if (includes product.features "seo")}}page === "" || page === "pricing"{{else}}false{{/if}});
+  if (indexable) headers.delete("X-Robots-Tag");
+  return data({ locale, page, user, config, next, nextPath, search, overview, users, pricing, billing, paymentOrder, credits, affiliate, referralCode, orders, adminCredits, adminAffiliate, files, ai, blogList, blogArticle, adminBlog, editPost, indexable, returned: url.searchParams.get("status") === "success", token: url.searchParams.get("token") ?? "", error: url.searchParams.get("error") }, { headers });
 }
 
 export default function ProductPage() {
@@ -37319,6 +37508,19 @@ function Content({ result }: { result: ReturnType<typeof useLoaderData<typeof lo
 {{/if}}
 {{#if (and (includes product.features "affiliate") (includes product.features "admin"))}}
   if (page === "admin/affiliate" && result.adminAffiliate) return <AdminAffiliate data={result.adminAffiliate} page={result.search.page} />;
+{{/if}}
+{{#if (includes product.features "storage")}}
+  if (page === "dashboard/files" && result.files) return <FilesPage data={result.files} />;
+{{/if}}
+{{#if (includes product.features "ai")}}
+  if (page === "dashboard/ai" && result.ai) return <AIPage data={result.ai} />;
+{{/if}}
+{{#if (includes product.features "blog")}}
+  if (result.blogList) return <BlogList data={result.blogList} locale={locale} />;
+  if (result.blogArticle) return <BlogArticle data={result.blogArticle} locale={locale} />;
+  if (result.adminBlog) return <AdminBlog data={result.adminBlog} locale={locale} />;
+  if (isAdminClient && page === "admin/blog/new") return <BlogEdit locale={locale} />;
+  if (isAdminClient && result.editPost) return <BlogEdit locale={locale} post={result.editPost} />;
 {{/if}}
   return <section className="space-y-10 py-12"><div className="max-w-3xl space-y-6"><p className="text-sm uppercase tracking-widest">{{projectName}}</p><h1 className="font-serif text-5xl">{t("core.landing.title")}</h1><p className="text-lg text-muted-foreground">{t("core.landing.subtitle")}</p>{{#if (includes product.features "auth")}}<a href={\`/\${locale}/\${user ? isAdminClient && {{#if (includes product.features "admin")}}true{{else}}false{{/if}} ? "admin" : "dashboard" : "signup"}\`} className="inline-block border bg-foreground px-6 py-3 text-background">{t("core.landing.cta")}</a>{{/if}}</div><section className="space-y-6"><h2 className="text-2xl">{t("core.landing.features.title")}</h2><div className="grid gap-6 md:grid-cols-3">{(["modular", "portable", "deploy"] as const).map((feature) => <article key={feature} className="space-y-3 border p-6"><h3 className="font-semibold">{t(\`core.landing.features.\${feature}.title\`)}</h3><p className="text-muted-foreground">{t(\`core.landing.features.\${feature}.body\`)}</p></article>)}</div></section></section>;
 }
@@ -38172,32 +38374,14 @@ export function BuyCredits() {
     "zh-CN": "可审计流水的积分体系，可由购买和注册赠送获得"
   },
   "category": "monetization",
-  "requires": [
-    "auth"
-  ],
-  "enhances": [
-    "payment",
-    "admin"
-  ],
+  "requires": ["auth"],
+  "enhances": ["payment", "admin"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ],
-    "orms": [
-      "drizzle"
-    ],
-    "dialects": [
-      "sqlite",
-      "postgres"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
   },
   "nativeSplit": true,
   "options": {
@@ -38216,10 +38400,7 @@ export function BuyCredits() {
       "dependencies": {
         "drizzle-orm": "$dependency:drizzle-orm"
       },
-      "workspaceDependencies": [
-        "db",
-        "events"
-      ]
+      "workspaceDependencies": ["db", "events"]
     }
   ],
   "services": [
@@ -38228,9 +38409,7 @@ export function BuyCredits() {
       "imports": [
         {
           "from": "@app/credits",
-          "names": [
-            "createCredits"
-          ]
+          "names": ["createCredits"]
         }
       ],
       "init": "createCredits(db, events)"
@@ -38253,12 +38432,7 @@ export function BuyCredits() {
   ],
   "sources": {
     "dialects": true,
-    "frameworks": [
-      "http-server",
-      "next",
-      "nuxt",
-      "tanstack-start"
-    ],
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start"],
     "integrations": {
       "admin": {
         "frameworks": {
@@ -38280,9 +38454,7 @@ export function BuyCredits() {
       "shared/partials/credits-signup.hbs"
     ],
     "frameworkRequired": {
-      "http-server": [
-        "shared/partials/credits.hbs"
-      ]
+      "http-server": ["shared/partials/credits.hbs"]
     }
   }
 }
@@ -38523,41 +38695,23 @@ export type Transport = {
     "zh-CN": "可切换服务商的事务邮件，负责发送认证相关邮件"
   },
   "category": "communication",
-  "requires": [
-    "core"
-  ],
-  "enhances": [
-    "auth"
-  ],
+  "requires": ["core"],
+  "enhances": ["auth"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"]
   },
   "nativeSplit": true,
   "providers": {
     "min": 1,
     "max": 1,
     "default": {
-      "global": [
-        "resend"
-      ],
-      "cn": [
-        "smtp"
-      ]
+      "global": ["resend"],
+      "cn": ["smtp"]
     },
     "targetDefaults": {
-      "cloudflare": [
-        "resend"
-      ]
+      "cloudflare": ["resend"]
     },
     "options": {
       "resend": {
@@ -38577,12 +38731,7 @@ export type Transport = {
         "name": "SMTP",
         "market": "any",
         "supports": {
-          "targets": [
-            "none",
-            "node",
-            "vercel",
-            "docker"
-          ]
+          "targets": ["none", "node", "vercel", "docker"]
         },
         "dependencies": {
           "nodemailer": "^10.0.13"
@@ -38643,9 +38792,7 @@ export type Transport = {
       "imports": [
         {
           "from": "@app/email",
-          "names": [
-            "createMailer"
-          ]
+          "names": ["createMailer"]
         }
       ],
       "init": "createMailer(ENV)"
@@ -38661,9 +38808,7 @@ export type Transport = {
     "integrations": {
       "auth": {
         "base": "integrations/auth/apps/fullstack-web",
-        "required": [
-          "shared/partials/auth-email.hbs"
-        ]
+        "required": ["shared/partials/auth-email.hbs"]
       }
     }
   }
@@ -39012,28 +39157,15 @@ export function localePath(locale: Locale, href: \`/\${string}\`): string { retu
   "category": "foundation",
   "hidden": true,
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"]
   },
   "nativeSplit": true,
   "options": {
     "locales": {
       "type": "enum",
-      "values": [
-        "en,zh-CN",
-        "zh-CN,en",
-        "en",
-        "zh-CN"
-      ],
+      "values": ["en,zh-CN", "zh-CN,en", "en", "zh-CN"],
       "default": "en,zh-CN",
       "description": "Enabled locales; the first one is the default"
     }
@@ -39052,11 +39184,7 @@ export function localePath(locale: Locale, href: \`/\${string}\`): string { retu
     }
   ],
   "sources": {
-    "frameworks": [
-      "react",
-      "next",
-      "tanstack-start"
-    ]
+    "frameworks": ["react", "next", "tanstack-start"]
   }
 }
 `],
@@ -40653,43 +40781,21 @@ export function AdminOrders({ data, page }: { data: z.infer<typeof ordersSchema>
     "zh-CN": "定价页、一次性支付与订阅，处理服务商 webhook"
   },
   "category": "monetization",
-  "requires": [
-    "auth"
-  ],
-  "enhances": [
-    "admin"
-  ],
+  "requires": ["auth"],
+  "enhances": ["admin"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ],
-    "orms": [
-      "drizzle"
-    ],
-    "dialects": [
-      "sqlite",
-      "postgres"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
   },
   "nativeSplit": true,
   "providers": {
     "min": 1,
     "default": {
-      "global": [
-        "stripe"
-      ],
-      "cn": [
-        "wechat",
-        "alipay"
-      ]
+      "global": ["stripe"],
+      "cn": ["wechat", "alipay"]
     },
     "options": {
       "wechat": {
@@ -40741,12 +40847,7 @@ export function AdminOrders({ data, page }: { data: z.infer<typeof ordersSchema>
         "name": "Alipay",
         "market": "cn",
         "supports": {
-          "targets": [
-            "none",
-            "node",
-            "vercel",
-            "docker"
-          ]
+          "targets": ["none", "node", "vercel", "docker"]
         },
         "dependencies": {
           "alipay-sdk": "^4.14.0"
@@ -40820,10 +40921,7 @@ export function AdminOrders({ data, page }: { data: z.infer<typeof ordersSchema>
             "required": false,
             "sensitive": false,
             "type": "enum",
-            "values": [
-              "sandbox",
-              "production"
-            ],
+            "values": ["sandbox", "production"],
             "default": "sandbox"
           }
         ]
@@ -40836,10 +40934,7 @@ export function AdminOrders({ data, page }: { data: z.infer<typeof ordersSchema>
       "dependencies": {
         "drizzle-orm": "$dependency:drizzle-orm"
       },
-      "workspaceDependencies": [
-        "db",
-        "events"
-      ]
+      "workspaceDependencies": ["db", "events"]
     }
   ],
   "services": [
@@ -40848,9 +40943,7 @@ export function AdminOrders({ data, page }: { data: z.infer<typeof ordersSchema>
       "imports": [
         {
           "from": "@app/payment",
-          "names": [
-            "createPayment"
-          ]
+          "names": ["createPayment"]
         }
       ],
       "init": "createPayment({ env: ENV, db, events, baseUrl: ENV.BETTER_AUTH_URL, clientOrigins: {{{clientOrigins}}} })"
@@ -40882,12 +40975,7 @@ export function AdminOrders({ data, page }: { data: z.infer<typeof ordersSchema>
   ],
   "sources": {
     "dialects": true,
-    "frameworks": [
-      "http-server",
-      "next",
-      "nuxt",
-      "tanstack-start"
-    ],
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start"],
     "providers": {
       "mode": "separate",
       "frameworks": {
@@ -40906,9 +40994,7 @@ export function AdminOrders({ data, page }: { data: z.infer<typeof ordersSchema>
       }
     },
     "frameworkRequired": {
-      "http-server": [
-        "shared/partials/payment.hbs"
-      ]
+      "http-server": ["shared/partials/payment.hbs"]
     }
   }
 }
@@ -41876,29 +41962,14 @@ export async function handle(request: Request, path: string): Promise<Response |
 `],
   ["modules/presets.json", `{
   "starter": {
-    "features": [
-      "auth"
-    ]
+    "features": ["auth"]
   },
   "saas-global": {
-    "features": [
-      "auth",
-      "email",
-      "admin",
-      "payment",
-      "credits"
-    ],
+    "features": ["auth", "email", "admin", "payment", "credits"],
     "providers": {
-      "auth": [
-        "google",
-        "github"
-      ],
-      "email": [
-        "resend"
-      ],
-      "payment": [
-        "stripe"
-      ]
+      "auth": ["google", "github"],
+      "email": ["resend"],
+      "payment": ["stripe"]
     }
   },
   "full": {
@@ -41917,30 +41988,13 @@ export async function handle(request: Request, path: string): Promise<Response |
       "captcha"
     ],
     "providers": {
-      "auth": [
-        "google",
-        "github"
-      ],
-      "email": [
-        "resend"
-      ],
-      "sms": [
-        "twilio"
-      ],
-      "payment": [
-        "stripe"
-      ],
-      "storage": [
-        "s3"
-      ],
-      "ai": [
-        "openai",
-        "google",
-        "openai-compatible"
-      ],
-      "captcha": [
-        "turnstile"
-      ]
+      "auth": ["google", "github"],
+      "email": ["resend"],
+      "sms": ["twilio"],
+      "payment": ["stripe"],
+      "storage": ["s3"],
+      "ai": ["openai", "google", "openai-compatible"],
+      "captcha": ["turnstile"]
     }
   }
 }
@@ -41951,21 +42005,17 @@ Set \`SITE_URL\` to the public HTTPS origin before deployment. Do not use previe
 
 \`/robots.txt\` excludes authentication, dashboard, admin and API paths. \`/sitemap.xml\` is computed per request and initially includes only localized homepages. Modules register live contributors through \`seo.registerSitemap\`; the payment integration adds localized pricing URLs, and the blog integration includes published posts and populated blog indexes, never drafts. Sitemap/robots are discovery controls, not authorization. All private routes must retain their session/permission guards.
 
+For split applications, the generated \`SITE_URL\` initially resolves the \`web-frontend\` role owner's origin. Keep it set to that application's public production URL, not the backend or admin URL. The public frontend proxies robots and sitemap requests to the backend; the admin application disallows all crawling and returns 404 for its sitemap. Public SSR pages are indexable while private pages and errors retain noindex/no-store behavior.
+
 The module does not invent review claims, organization facts, social images or sample articles. BlogPosting data comes from the blog's persisted publication record. No external SEO service or paid data is required.
 `],
-  ["modules/seo/files/packages/seo/src/index.ts", `export type SitemapEntry = {
+  ["modules/seo/files/packages/seo/src/index.ts", `import { createMetadata } from "./metadata";
+export type { MetadataInput } from "./metadata";
+
+export type SitemapEntry = {
   url: string;
   lastModified?: Date;
   alternates?: { languages: Record<string, string> };
-};
-export type MetadataInput = {
-  title: string;
-  description: string;
-  locale: string;
-  path: \`/\${string}\`;
-  translations?: Record<string, string>;
-  image?: string;
-  type?: "website" | "article";
 };
 
 export function createSeo(config: {
@@ -41973,52 +42023,8 @@ export function createSeo(config: {
   locales: readonly string[];
   defaultLocale: string;
 }) {
-  const origin = new URL(config.origin).origin;
+  const { origin, url, metadata } = createMetadata(config);
   const contributors = new Map<string, () => Promise<SitemapEntry[]>>();
-  function url(path: string) {
-    const result = new URL(path, origin);
-    if (!["http:", "https:"].includes(result.protocol) || result.username || result.password)
-      throw new Error("SEO URLs must be public HTTP(S) URLs without credentials");
-    return result.href;
-  }
-  function metadata(input: MetadataInput) {
-    const canonical = url(\`/\${input.locale}\${input.path === "/" ? "" : input.path}\`);
-    const translations =
-      input.translations ??
-      Object.fromEntries(
-        config.locales.map((locale) => [
-          locale,
-          \`/\${locale}\${input.path === "/" ? "" : input.path}\`,
-        ]),
-      );
-    const languages = Object.fromEntries(
-      Object.entries(translations).map(([locale, path]) => [locale, url(path)]),
-    );
-    if (languages[config.defaultLocale]) languages["x-default"] = languages[config.defaultLocale]!;
-    const images = input.image ? [url(input.image)] : undefined;
-    return {
-      title: input.title,
-      description: input.description,
-      alternates: { canonical, languages },
-      openGraph: {
-        title: input.title,
-        description: input.description,
-        url: canonical,
-        locale: input.locale.replaceAll("-", "_"),
-        alternateLocale: Object.keys(translations)
-          .filter((locale) => locale !== input.locale)
-          .map((locale) => locale.replaceAll("-", "_")),
-        type: input.type ?? "website",
-        images,
-      },
-      twitter: {
-        card: images ? ("summary_large_image" as const) : ("summary" as const),
-        title: input.title,
-        description: input.description,
-        images,
-      },
-    };
-  }
   return {
     origin,
     url,
@@ -42045,21 +42051,11 @@ export function createSeo(config: {
 }
 export type Seo = ReturnType<typeof createSeo>;
 `],
-  ["modules/seo/frameworks/http-server/apps/fullstack-web/src/lib/native/seo.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
-import { locales } from "@{{projectName}}/i18n";
-const escape = (value: string) => value.replace(/[<>&"']/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[char]!);
-export async function handle(request: Request, path: string): Promise<Response | undefined> {
-  if (request.method !== "GET") return;
-  if (path === "/robots.txt") {
-    const paths = ["/login", "/signup", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/verify-email", "/dashboard", "/admin", "/api"];
-    return new Response(["User-agent: *", "Allow: /", ...[...paths, ...locales.flatMap((locale) => paths.map((path) => \`/\${locale}\${path}\`))].map((path) => \`Disallow: \${path}\`), \`Sitemap: \${seo.url("/sitemap.xml")}\`, ""].join("\\n"), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
-  }
-  if (path === "/sitemap.xml") {
-    const entries = await seo.sitemap();
-    const body = entries.map((entry) => \`<url><loc>\${escape(entry.url)}</loc>\${entry.lastModified ? \`<lastmod>\${entry.lastModified.toISOString()}</lastmod>\` : ""}\${Object.entries(entry.alternates?.languages ?? {}).map(([lang, href]) => \`<xhtml:link rel="alternate" hreflang="\${escape(lang)}" href="\${escape(href)}"/>\`).join("")}</url>\`).join("");
-    return new Response(\`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\${body}</urlset>\`, { headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "no-store" } });
-  }
-}
+  ["modules/seo/files/packages/seo/src/metadata.ts.hbs", `{{> seo/metadata}}
+`],
+  ["modules/seo/frameworks/http-server/apps/backend/src/lib/native/seo.ts.hbs", `{{> seo/seo}}
+`],
+  ["modules/seo/frameworks/http-server/apps/fullstack-web/src/lib/native/seo.ts.hbs", `{{> seo/seo}}
 `],
   ["modules/seo/frameworks/next/apps/fullstack-web/src/app/robots.ts.hbs", `import { seo } from "@{{projectName}}/app-services";
 import { locales } from "@{{projectName}}/i18n";
@@ -42102,16 +42098,9 @@ export function pageMetadata(input: { locale: Locale; path: \`/\${string}\`; tit
   return seo.metadata(input);
 }
 `],
-  ["modules/seo/integrations/payment/apps/fullstack-web/src/integrations/seo-payment.ts.hbs", `import { defaultLocale, locales } from "@{{projectName}}/i18n";
-import type { Services } from "../services";
-
-export default function registerSeoPayment({ seo }: Services) {
-  seo.registerSitemap("pricing", async () => {
-    const languages = Object.fromEntries(locales.map((locale) => [locale, seo.url(\`/\${locale}/pricing\`)]));
-    languages["x-default"] = seo.url(\`/\${defaultLocale}/pricing\`);
-    return locales.map((locale) => ({ url: seo.url(\`/\${locale}/pricing\`), alternates: { languages } }));
-  });
-}
+  ["modules/seo/integrations/payment/apps/backend/src/integrations/seo-payment.ts.hbs", `{{> seo/seo-payment}}
+`],
+  ["modules/seo/integrations/payment/apps/fullstack-web/src/integrations/seo-payment.ts.hbs", `{{> seo/seo-payment}}
 `],
   ["modules/seo/module.json", `{
   "id": "seo",
@@ -42124,38 +42113,22 @@ export default function registerSeoPayment({ seo }: Services) {
     "zh-CN": "本地化规范链接、社交卡片、robots 与动态站点地图"
   },
   "category": "content",
-  "requires": [
-    "core",
-    "i18n"
-  ],
-  "enhances": [
-    "core",
-    "payment"
-  ],
+  "requires": ["core", "i18n"],
+  "enhances": ["core", "payment"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"]
   },
+  "nativeSplit": true,
   "frameworkReplaces": {
-    "tanstack-start": [
-      "apps/web/public/robots.txt"
-    ],
-    "nuxt": [
-      "apps/web/public/robots.txt"
-    ]
+    "tanstack-start": ["apps/web/public/robots.txt"],
+    "nuxt": ["apps/web/public/robots.txt"]
   },
   "env": [
     {
       "key": "SITE_URL",
+      "originRole": "web-frontend",
       "type": "url",
       "example": "http://localhost:3001",
       "sensitive": false,
@@ -42173,30 +42146,22 @@ export default function registerSeoPayment({ seo }: Services) {
       "imports": [
         {
           "from": "@app/seo",
-          "names": [
-            "createSeo"
-          ]
+          "names": ["createSeo"]
         },
         {
           "from": "@app/i18n",
-          "names": [
-            "locales",
-            "defaultLocale"
-          ]
+          "names": ["locales", "defaultLocale"]
         }
       ],
       "init": "createSeo({ origin: ENV.SITE_URL, locales, defaultLocale })"
     }
   ],
   "sources": {
-    "frameworks": [
-      "http-server",
-      "next",
-      "nuxt",
-      "tanstack-start"
-    ],
+    "required": ["shared/partials/metadata.hbs"],
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start"],
     "integrations": {
       "core": {
+        "serverOnly": true,
         "frameworks": {
           "next": "integrations/core/frameworks/next",
           "nuxt": "frameworks/nuxt",
@@ -42204,9 +42169,128 @@ export default function registerSeoPayment({ seo }: Services) {
         }
       },
       "payment": {
-        "base": "integrations/payment/apps/fullstack-web"
+        "base": "integrations/payment/apps/fullstack-web",
+        "serverOnly": true,
+        "required": [
+          "integrations/payment/apps/{application}/src/integrations/seo-payment.ts.hbs",
+          "shared/partials/seo-payment.hbs"
+        ]
       }
+    },
+    "frameworkRequired": {
+      "http-server": ["shared/partials/seo.hbs"]
     }
+  }
+}
+`],
+  ["modules/seo/shared/client/frameworks/react-router/src/lib/seo-meta.ts.hbs", `import type { MetaDescriptor } from "react-router";
+import { defaultLocale, locales, type Locale } from "@{{projectName}}/i18n";
+import { createMetadata } from "./seo-metadata";
+
+export function pageMeta(input: { siteUrl: string; locale: Locale; path: \`/\${string}\`; title: string; description: string; page?: number }): MetaDescriptor[] {
+  const seo = createMetadata({ origin: input.siteUrl, defaultLocale, locales });
+  const paginated = input.page !== undefined && input.page > 1;
+  const metadata = seo.metadata({ ...input, path: paginated ? \`\${input.path}?page=\${input.page}\` : input.path, ...(paginated ? { translations: {} } : {}) });
+  return [
+    { title: metadata.title }, { name: "description", content: metadata.description },
+    { name: "robots", content: "index, follow" },
+    { tagName: "link", rel: "canonical", href: metadata.alternates.canonical },
+    ...Object.entries(metadata.alternates.languages).map(([hrefLang, href]): MetaDescriptor => ({ tagName: "link", rel: "alternate", hrefLang, href })),
+    { property: "og:title", content: metadata.openGraph.title }, { property: "og:description", content: metadata.openGraph.description },
+    { property: "og:url", content: metadata.openGraph.url }, { property: "og:type", content: metadata.openGraph.type },
+    { property: "og:locale", content: metadata.openGraph.locale },
+    ...metadata.openGraph.alternateLocale.map((content) => ({ property: "og:locale:alternate", content })),
+    { name: "twitter:card", content: metadata.twitter.card }, { name: "twitter:title", content: metadata.twitter.title }, { name: "twitter:description", content: metadata.twitter.description },
+  ];
+}
+`],
+  ["modules/seo/shared/client/frameworks/react-router/src/lib/seo-metadata.ts.hbs", `{{> seo/metadata}}
+`],
+  ["modules/seo/shared/client/frameworks/react-router/src/lib/seo.server.ts.hbs", `import { backendRequest, privateHeaders } from "@/lib/backend.server";
+import { isAdminClient } from "@/lib/client-role";
+
+/** Crawl files belong to the public frontend, never the admin origin. */
+export async function publicSeoResponse(request: Request, path: "/robots.txt" | "/sitemap.xml") {
+  if (isAdminClient) {
+    if (path === "/robots.txt") return new Response("User-agent: *\\nDisallow: /\\n", { headers: { ...privateHeaders, "Content-Type": "text/plain; charset=utf-8" } });
+    throw new Response("Not found", { status: 404, headers: privateHeaders });
+  }
+  return backendRequest(request, path, false, true);
+}
+`],
+  ["modules/seo/shared/client/frameworks/react-router/src/routes/robots.ts.hbs", `import type { LoaderFunctionArgs } from "react-router";
+import { publicSeoResponse } from "@/lib/seo.server";
+export function loader({ request }: LoaderFunctionArgs) { return publicSeoResponse(request, "/robots.txt"); }
+`],
+  ["modules/seo/shared/client/frameworks/react-router/src/routes/sitemap.ts.hbs", `import type { LoaderFunctionArgs } from "react-router";
+import { publicSeoResponse } from "@/lib/seo.server";
+export function loader({ request }: LoaderFunctionArgs) { return publicSeoResponse(request, "/sitemap.xml"); }
+`],
+  ["modules/seo/shared/partials/metadata.hbs", `export type MetadataInput = {
+  title: string;
+  description: string;
+  locale: string;
+  path: \`/\${string}\`;
+  translations?: Record<string, string>;
+  image?: string;
+  type?: "website" | "article";
+};
+
+/** Pure public metadata: safe to share with SSR clients without the service graph. */
+export function createMetadata(config: { origin: string; locales: readonly string[]; defaultLocale: string }) {
+  const origin = new URL(config.origin).origin;
+  function url(path: string) {
+    const result = new URL(path, origin);
+    if (!["http:", "https:"].includes(result.protocol) || result.username || result.password)
+      throw new Error("SEO URLs must be public HTTP(S) URLs without credentials");
+    return result.href;
+  }
+  function metadata(input: MetadataInput) {
+    const canonical = url(\`/\${input.locale}\${input.path === "/" ? "" : input.path}\`);
+    const translations = input.translations ?? Object.fromEntries(config.locales.map((locale) => [locale, \`/\${locale}\${input.path === "/" ? "" : input.path}\`]));
+    const languages = Object.fromEntries(Object.entries(translations).map(([locale, path]) => [locale, url(path)]));
+    if (languages[config.defaultLocale]) languages["x-default"] = languages[config.defaultLocale]!;
+    const images = input.image ? [url(input.image)] : undefined;
+    return {
+      title: input.title,
+      description: input.description,
+      alternates: { canonical, languages },
+      openGraph: {
+        title: input.title, description: input.description, url: canonical,
+        locale: input.locale.replaceAll("-", "_"),
+        alternateLocale: Object.keys(translations).filter((locale) => locale !== input.locale).map((locale) => locale.replaceAll("-", "_")),
+        type: input.type ?? "website", images,
+      },
+      twitter: { card: images ? ("summary_large_image" as const) : ("summary" as const), title: input.title, description: input.description, images },
+    };
+  }
+  return { origin, url, metadata };
+}
+`],
+  ["modules/seo/shared/partials/seo-payment.hbs", `import { defaultLocale, locales } from "@{{projectName}}/i18n";
+import type { Services } from "../services";
+
+export default function registerSeoPayment({ seo }: Services) {
+  seo.registerSitemap("pricing", async () => {
+    const languages = Object.fromEntries(locales.map((locale) => [locale, seo.url(\`/\${locale}/pricing\`)]));
+    languages["x-default"] = seo.url(\`/\${defaultLocale}/pricing\`);
+    return locales.map((locale) => ({ url: seo.url(\`/\${locale}/pricing\`), alternates: { languages } }));
+  });
+}
+`],
+  ["modules/seo/shared/partials/seo.hbs", `import { seo } from "@{{projectName}}/app-services";
+import { locales } from "@{{projectName}}/i18n";
+const escape = (value: string) => value.replace(/[<>&"']/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[char]!);
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (request.method !== "GET") return;
+  if (path === "/robots.txt") {
+    const paths = ["/login", "/signup", "/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/verify-email", "/dashboard", "/admin", "/api"];
+    return new Response(["User-agent: *", "Allow: /", ...[...paths, ...locales.flatMap((locale) => paths.map((path) => \`/\${locale}\${path}\`))].map((path) => \`Disallow: \${path}\`), \`Sitemap: \${seo.url("/sitemap.xml")}\`, ""].join("\\n"), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  }
+  if (path === "/sitemap.xml") {
+    const entries = await seo.sitemap();
+    const body = entries.map((entry) => \`<url><loc>\${escape(entry.url)}</loc>\${entry.lastModified ? \`<lastmod>\${entry.lastModified.toISOString()}</lastmod>\` : ""}\${Object.entries(entry.alternates?.languages ?? {}).map(([lang, href]) => \`<xhtml:link rel="alternate" hreflang="\${escape(lang)}" href="\${escape(href)}"/>\`).join("")}</url>\`).join("");
+    return new Response(\`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\${body}</urlset>\`, { headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "no-store" } });
   }
 }
 `],
@@ -42392,60 +42476,32 @@ export type Sms = {
     "zh-CN": "通过阿里云、腾讯云或 Twilio 发送短信验证码"
   },
   "category": "communication",
-  "requires": [
-    "core"
-  ],
-  "enhances": [
-    "auth"
-  ],
+  "requires": ["core"],
+  "enhances": ["auth"],
   "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ],
-    "orms": [
-      "drizzle"
-    ],
-    "dialects": [
-      "sqlite",
-      "postgres"
-    ]
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
   },
   "nativeSplit": true,
   "providers": {
     "min": 1,
     "max": 1,
     "default": {
-      "global": [
-        "aliyun"
-      ],
-      "cn": [
-        "aliyun"
-      ]
+      "global": ["aliyun"],
+      "cn": ["aliyun"]
     },
     "targetDefaults": {
-      "cloudflare": [
-        "twilio"
-      ]
+      "cloudflare": ["twilio"]
     },
     "options": {
       "aliyun": {
         "name": "Alibaba Cloud SMS",
         "market": "cn",
         "supports": {
-          "targets": [
-            "none",
-            "node",
-            "vercel",
-            "docker"
-          ]
+          "targets": ["none", "node", "vercel", "docker"]
         },
         "dependencies": {
           "@alicloud/dysmsapi20170525": "4.6.0",
@@ -42483,12 +42539,7 @@ export type Sms = {
         "name": "Tencent Cloud SMS",
         "market": "cn",
         "supports": {
-          "targets": [
-            "none",
-            "node",
-            "vercel",
-            "docker"
-          ]
+          "targets": ["none", "node", "vercel", "docker"]
         },
         "dependencies": {
           "tencentcloud-sdk-nodejs-sms": "4.1.306"
@@ -42558,10 +42609,7 @@ export type Sms = {
     {
       "key": "SMS_DELIVERY_MODE",
       "type": "enum",
-      "values": [
-        "provider",
-        "console"
-      ],
+      "values": ["provider", "console"],
       "default": "provider",
       "sensitive": false,
       "comment": "console prints OTPs only when NODE_ENV=development; never a fallback"
@@ -42573,9 +42621,7 @@ export type Sms = {
       "imports": [
         {
           "from": "@app/sms",
-          "names": [
-            "createSms"
-          ]
+          "names": ["createSms"]
         }
       ],
       "init": "createSms(ENV)"
@@ -42591,9 +42637,7 @@ export type Sms = {
     "integrations": {
       "auth": {
         "base": "integrations/auth/apps/fullstack-web",
-        "required": [
-          "shared/partials/auth-sms.hbs"
-        ]
+        "required": ["shared/partials/auth-sms.hbs"]
       }
     }
   }
@@ -42855,6 +42899,8 @@ The storage module uses exactly one private provider: S3, Cloudflare R2 (S3 API 
 
 Selecting storage automatically includes the authentication module. The file list shows all files owned by the signed-in user, newest first, without a pagination limit; it never includes another user's files.
 
+In a split application layout, the backend owns the storage service, SDK, database and credentials. Frontend and administration applications use authenticated same-origin BFF routes; uploads are streamed to the backend before its existing size-limited multipart parser. Configure secrets only in the backend owner's environment, never the frontend environment. The generated \`applications.json\` records application roles and directories.
+
 ## Configure the selected provider
 
 {{#if (includes module.providers "s3")}}
@@ -42920,7 +42966,7 @@ The service checks the owning user's database row before download/read/delete op
 | \`GET /api/storage/:id\` | Authenticated owner lookup; \`307\` signed attachment redirect for API providers, \`200\` attachment stream for R2 binding |
 | \`DELETE /api/storage/:id\` | Authenticated owner deletion, returns \`204\` |
 
-Mutations require an \`Origin\` header matching the origin of configured \`BETTER_AUTH_URL\`, including scheme and port. Missing or mismatched origins return \`403\`; forwarded host headers cannot authorize a mutation. Unauthenticated requests return \`401\`, invalid files \`400\`, oversize bodies/files \`413\`, missing or another user's files \`404\`, and unavailable provider operations \`503\`. Provider errors do not expose credentials, keys or raw SDK messages.
+Mutations require an \`Origin\` header matching the configured backend origin or, in split layouts, an explicitly declared frontend/admin origin (including scheme and port). Production custom domains must be added to the backend \`CORS_ORIGIN\` and authentication configuration. Missing or mismatched origins return \`403\`; forwarded host headers cannot authorize a mutation. Unauthenticated requests return \`401\`, invalid files \`400\`, oversize bodies/files \`413\`, missing or another user's files \`404\`, and unavailable provider operations \`503\`. Provider errors do not expose credentials, keys or raw SDK messages.
 
 ## Cloud acceptance
 
@@ -43453,123 +43499,13 @@ export function createProvider({{#if (includes module.providers "r2-binding")}}_
 {{/if}}
 }
 `],
-  ["modules/storage/frameworks/http-server/apps/fullstack-web/src/lib/native/storage.ts.hbs", `import { storage } from "@{{projectName}}/app-services";
-import { z } from "zod";
-import { json, requireSession } from "../product-api";
-import { readStorageFile, requireStorageOrigin, storageErrorResponse, StorageRequestError } from "../storage-http";
-
-export async function handle(request: Request, path: string): Promise<Response | undefined> {
-  if (path !== "/api/product/files" && path !== "/api/storage" && !path.startsWith("/api/storage/")) return;
-  const { user } = await requireSession(request);
-  try {
-    if (path === "/api/product/files" && request.method === "GET") return json({ configured: storage.configured, files: await storage.listFiles(user.id) });
-    if (path === "/api/storage" && request.method === "POST") {
-      requireStorageOrigin(request);
-      if (!storage.configured) return json({ error: "not_configured" }, 503);
-      const file = await storage.upload(user.id, await readStorageFile(request));
-      return json({ id: file.id }, 201);
-    }
-    const id = z.string().min(1).max(255).regex(/^[a-zA-Z0-9_-]+$/).safeParse(path.slice("/api/storage/".length));
-    if (!id.success) throw new StorageRequestError(404, "not_found");
-    if (request.method === "GET") return new Response(null, { status: 307, headers: { Location: await storage.downloadUrl(user.id, id.data), "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
-    if (request.method === "DELETE") { requireStorageOrigin(request); await storage.deleteFile(user.id, id.data); return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } }); }
-    return json({ error: "method_not_allowed" }, 405);
-  } catch (error) { return storageErrorResponse(error); }
-}
+  ["modules/storage/frameworks/http-server/apps/backend/src/lib/native/storage.ts.hbs", `{{> storage/storage}}
 `],
-  ["modules/storage/frameworks/http-server/apps/fullstack-web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
-import { z } from "zod";
-
-import { ENV } from "@/env.server";
-
-const MAX_BODY_BYTES = MAX_FILE_BYTES + 64 * 1024;
-const contentLengthSchema = z.string().regex(/^\\d+$/).transform(Number).pipe(z.number().int().nonnegative().safe());
-const fileSchema = z.instanceof(File);
-
-export class StorageRequestError extends Error {
-  constructor(public readonly status: number, public readonly code: string) {
-    super(code);
-  }
-}
-
-export function requireStorageOrigin(request: Request): void {
-  // The auth module configures this same URL as its sole trusted origin.
-  // Do not trust forwarded/Host headers to authorize cookie-authenticated mutations.
-  const trustedOrigin = new URL(ENV.BETTER_AUTH_URL).origin;
-  if (request.headers.get("origin") !== trustedOrigin) {
-    throw new StorageRequestError(403, "forbidden");
-  }
-}
-
-export function storageErrorResponse(error: unknown): Response {
-  if (error instanceof StorageRequestError) {
-    return Response.json({ error: error.code }, { status: error.status, headers: { "Cache-Control": "no-store" } });
-  }
-  if (error instanceof StorageError) {
-    const status = error.code === "not_found" ? 404 : error.code === "invalid_file" ? 400 : 503;
-    return Response.json({ error: error.code }, { status, headers: { "Cache-Control": "no-store" } });
-  }
-  return Response.json({ error: "provider_error" }, { status: 503, headers: { "Cache-Control": "no-store" } });
-}
-
-export async function readStorageFile(request: Request): Promise<File> {
-  if (!/^multipart\\/form-data(?:;|$)/i.test(request.headers.get("content-type") ?? "")) {
-    throw new StorageRequestError(400, "invalid_file");
-  }
-  const header = request.headers.get("content-length");
-  if (header !== null) {
-    const length = contentLengthSchema.safeParse(header);
-    if (!length.success) throw new StorageRequestError(400, "invalid_file");
-    if (length.data > MAX_BODY_BYTES) throw new StorageRequestError(413, "too_large");
-  }
-  if (!request.body) throw new StorageRequestError(400, "invalid_file");
-
-  // Count actual bytes before formData() buffers/parses multipart data. This also
-  // bounds chunked requests and requests with an understated Content-Length.
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let length = 0;
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      length += chunk.value.byteLength;
-      if (length > MAX_BODY_BYTES) {
-        await reader.cancel();
-        throw new StorageRequestError(413, "too_large");
-      }
-      chunks.push(chunk.value);
-    }
-  } catch (error) {
-    if (error instanceof StorageRequestError) throw error;
-    throw new StorageRequestError(400, "invalid_file");
-  } finally {
-    reader.releaseLock();
-  }
-
-  const bytes = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  let form: FormData;
-  try {
-    form = await new Response(bytes, {
-      headers: { "Content-Type": request.headers.get("content-type")! },
-    }).formData();
-  } catch {
-    throw new StorageRequestError(400, "invalid_file");
-  }
-  const entries = [...form.entries()];
-  if (entries.length !== 1 || entries[0]?.[0] !== "file") {
-    throw new StorageRequestError(400, "invalid_file");
-  }
-  const parsed = fileSchema.safeParse(entries[0][1]);
-  if (!parsed.success || parsed.data.size === 0) throw new StorageRequestError(400, "invalid_file");
-  if (parsed.data.size > MAX_FILE_BYTES) throw new StorageRequestError(413, "too_large");
-  return parsed.data;
-}
+  ["modules/storage/frameworks/http-server/apps/backend/src/lib/storage-http.ts.hbs", `{{> storage/storage-http}}
+`],
+  ["modules/storage/frameworks/http-server/apps/fullstack-web/src/lib/native/storage.ts.hbs", `{{> storage/storage}}
+`],
+  ["modules/storage/frameworks/http-server/apps/fullstack-web/src/lib/storage-http.ts.hbs", `{{> storage/storage-http}}
 `],
   ["modules/storage/frameworks/next/apps/fullstack-web/src/app/[lang]/dashboard/files/page.tsx.hbs", `import { storage } from "@{{projectName}}/app-services";
 import type { Metadata } from "next";
@@ -43723,99 +43659,7 @@ export async function POST(request: Request) {
   }
 }
 `],
-  ["modules/storage/frameworks/next/apps/fullstack-web/src/lib/storage-http.ts.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
-import { z } from "zod";
-
-import { ENV } from "@/env.server";
-
-const MAX_BODY_BYTES = MAX_FILE_BYTES + 64 * 1024;
-const contentLengthSchema = z.string().regex(/^\\d+$/).transform(Number).pipe(z.number().int().nonnegative().safe());
-const fileSchema = z.instanceof(File);
-
-export class StorageRequestError extends Error {
-  constructor(public readonly status: number, public readonly code: string) {
-    super(code);
-  }
-}
-
-export function requireStorageOrigin(request: Request): void {
-  // The auth module configures this same URL as its sole trusted origin.
-  // Do not trust forwarded/Host headers to authorize cookie-authenticated mutations.
-  const trustedOrigin = new URL(ENV.BETTER_AUTH_URL).origin;
-  if (request.headers.get("origin") !== trustedOrigin) {
-    throw new StorageRequestError(403, "forbidden");
-  }
-}
-
-export function storageErrorResponse(error: unknown): Response {
-  if (error instanceof StorageRequestError) {
-    return Response.json({ error: error.code }, { status: error.status, headers: { "Cache-Control": "no-store" } });
-  }
-  if (error instanceof StorageError) {
-    const status = error.code === "not_found" ? 404 : error.code === "invalid_file" ? 400 : 503;
-    return Response.json({ error: error.code }, { status, headers: { "Cache-Control": "no-store" } });
-  }
-  return Response.json({ error: "provider_error" }, { status: 503, headers: { "Cache-Control": "no-store" } });
-}
-
-export async function readStorageFile(request: Request): Promise<File> {
-  if (!/^multipart\\/form-data(?:;|$)/i.test(request.headers.get("content-type") ?? "")) {
-    throw new StorageRequestError(400, "invalid_file");
-  }
-  const header = request.headers.get("content-length");
-  if (header !== null) {
-    const length = contentLengthSchema.safeParse(header);
-    if (!length.success) throw new StorageRequestError(400, "invalid_file");
-    if (length.data > MAX_BODY_BYTES) throw new StorageRequestError(413, "too_large");
-  }
-  if (!request.body) throw new StorageRequestError(400, "invalid_file");
-
-  // Count actual bytes before formData() buffers/parses multipart data. This also
-  // bounds chunked requests and requests with an understated Content-Length.
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let length = 0;
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      length += chunk.value.byteLength;
-      if (length > MAX_BODY_BYTES) {
-        await reader.cancel();
-        throw new StorageRequestError(413, "too_large");
-      }
-      chunks.push(chunk.value);
-    }
-  } catch (error) {
-    if (error instanceof StorageRequestError) throw error;
-    throw new StorageRequestError(400, "invalid_file");
-  } finally {
-    reader.releaseLock();
-  }
-
-  const bytes = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  let form: FormData;
-  try {
-    form = await new Response(bytes, {
-      headers: { "Content-Type": request.headers.get("content-type")! },
-    }).formData();
-  } catch {
-    throw new StorageRequestError(400, "invalid_file");
-  }
-  const entries = [...form.entries()];
-  if (entries.length !== 1 || entries[0]?.[0] !== "file") {
-    throw new StorageRequestError(400, "invalid_file");
-  }
-  const parsed = fileSchema.safeParse(entries[0][1]);
-  if (!parsed.success || parsed.data.size === 0) throw new StorageRequestError(400, "invalid_file");
-  if (parsed.data.size > MAX_FILE_BYTES) throw new StorageRequestError(413, "too_large");
-  return parsed.data;
-}
+  ["modules/storage/frameworks/next/apps/fullstack-web/src/lib/storage-http.ts.hbs", `{{> storage/storage-http}}
 `],
   ["modules/storage/frameworks/nuxt/apps/fullstack-web/app/components/ProductFiles.vue.hbs", `<script setup lang="ts">
 const { label } = useProductLocale();
@@ -43841,7 +43685,305 @@ async function remove(id: string) { if (!window.confirm(label("Delete this file 
   <div class="table-wrap"><table><thead><tr><th>\\{{ label('Name', '名称') }}</th><th>\\{{ label('Size', '大小') }}</th><th>\\{{ label('Created', '创建时间') }}</th><th>\\{{ label('Actions', '操作') }}</th></tr></thead><tbody><tr v-for="file in data?.files ?? []" :key="file.id"><td>\\{{ file.name }}</td><td>\\{{ (file.size / 1024).toFixed(1) }} KiB</td><td>\\{{ file.createdAt.slice(0, 10) }}</td><td class="actions"><a :href="\`/api/storage/\${encodeURIComponent(file.id)}\`" rel="noreferrer">\\{{ label('Download', '下载') }}</a><button class="text-button" :disabled="pending" @click="remove(file.id)">\\{{ label('Delete', '删除') }}</button></td></tr></tbody></table><p v-if="!data?.files.length">\\{{ label('No files yet.', '暂无文件。') }}</p></div>
 </template>
 `],
-  ["modules/storage/frameworks/react/apps/fullstack-web/src/components/storage/file-manager.tsx.hbs", `"use client";
+  ["modules/storage/frameworks/react/apps/fullstack-web/src/components/storage/file-manager.tsx.hbs", `{{> storage/file-manager}}
+`],
+  ["modules/storage/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.files.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { FileManager, type StorageLabels } from "@/components/storage/file-manager";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { loadProduct } from "@/lib/product-data";
+const schema = z.object({ configured: z.boolean(), files: z.array(z.object({ id: z.string(), name: z.string(), size: z.number(), createdAt: z.string() })) });
+export const Route = createFileRoute("/$lang/dashboard/files")({ loader: ({ params }) => loadProduct("/api/product/files", params.lang, schema), component: Files });
+function Files() {
+  const { files, configured } = Route.useLoaderData(); const locale = useLocale(); const t = useT();
+  const labels: StorageLabels = { uploadTitle: t("storage.page.uploadTitle"), fileLabel: t("storage.page.fileLabel"), upload: t("storage.page.upload"), uploading: t("storage.page.uploading"), listTitle: t("storage.page.listTitle"), empty: t("storage.page.empty"), download: t("storage.page.download"), delete: t("storage.page.delete"), deleting: t("storage.page.deleting"), deleteConfirm: t("storage.page.deleteConfirm"), uploaded: t("storage.page.uploaded"), deleted: t("storage.page.deleted"), errors: { unauthorized: t("storage.errors.unauthorized"), forbidden: t("storage.errors.forbidden"), tooLarge: t("storage.errors.tooLarge"), invalidFile: t("storage.errors.invalidFile"), notFound: t("storage.errors.notFound"), unavailable: t("storage.errors.unavailable"), generic: t("storage.errors.generic") } };
+  return <section className="space-y-8"><header><h1 className="font-serif text-4xl">{t("storage.page.title")}</h1><p className="mt-4 text-muted-foreground">{t("storage.page.description")}</p><p id="storage-limits" className="mt-2 text-xs">{t("storage.page.limits")}</p></header>{!configured && <p role="status">{t("storage.page.unavailable")}</p>}<FileManager configured={configured} labels={labels} files={files.map((file) => ({ id: file.id, name: file.name, size: \`\${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(file.size / 1024)} KiB\`, createdAt: new Date(file.createdAt).toLocaleString(locale) }))} /></section>;
+}
+`],
+  ["modules/storage/module.json", `{
+  "id": "storage",
+  "name": {
+    "en": "Private files",
+    "zh-CN": "私有文件"
+  },
+  "description": {
+    "en": "Private S3, R2, OSS or COS uploads and owned downloads",
+    "zh-CN": "S3、R2、OSS 或 COS 私有上传与个人文件下载"
+  },
+  "category": "content",
+  "requires": ["auth"],
+  "supports": {
+    "frameworks": ["next", "tanstack-start", "nuxt"],
+    "backends": ["self"],
+    "apis": ["none"],
+    "orms": ["drizzle"],
+    "dialects": ["sqlite", "postgres"]
+  },
+  "nativeSplit": true,
+  "providers": {
+    "min": 1,
+    "max": 1,
+    "default": {
+      "global": ["s3"],
+      "cn": ["oss"]
+    },
+    "targetDefaults": {
+      "cloudflare": ["r2-binding"]
+    },
+    "options": {
+      "s3": {
+        "name": "Amazon S3",
+        "market": "global",
+        "supports": {
+          "targets": ["none", "node", "vercel", "docker"]
+        },
+        "dependencies": {
+          "@aws-sdk/client-s3": "^3.1000.0",
+          "@aws-sdk/s3-request-presigner": "^3.1000.0"
+        },
+        "env": [
+          {
+            "key": "S3_REGION",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "S3_BUCKET",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "S3_ACCESS_KEY_ID",
+            "required": false
+          },
+          {
+            "key": "S3_SECRET_ACCESS_KEY",
+            "required": false
+          },
+          {
+            "key": "S3_SESSION_TOKEN",
+            "required": false
+          }
+        ]
+      },
+      "r2": {
+        "name": "Cloudflare R2 (S3 API)",
+        "market": "global",
+        "supports": {
+          "targets": ["none", "node", "vercel", "docker"]
+        },
+        "dependencies": {
+          "@aws-sdk/client-s3": "^3.1000.0",
+          "@aws-sdk/s3-request-presigner": "^3.1000.0"
+        },
+        "env": [
+          {
+            "key": "R2_ACCOUNT_ID",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "R2_BUCKET",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "R2_ACCESS_KEY_ID",
+            "required": false
+          },
+          {
+            "key": "R2_SECRET_ACCESS_KEY",
+            "required": false
+          }
+        ]
+      },
+      "r2-binding": {
+        "name": "Cloudflare R2 (Workers binding)",
+        "market": "global",
+        "supports": {
+          "frameworks": ["next"],
+          "targets": ["cloudflare"]
+        },
+        "dependencies": {
+          "@opennextjs/cloudflare": "$dependency:@opennextjs/cloudflare"
+        },
+        "devDependencies": {
+          "@cloudflare/workers-types": "$dependency:@cloudflare/workers-types"
+        }
+      },
+      "oss": {
+        "name": "Alibaba Cloud OSS",
+        "market": "cn",
+        "supports": {
+          "targets": ["none", "node", "vercel", "docker"]
+        },
+        "dependencies": {
+          "ali-oss": "^6.23.0"
+        },
+        "devDependencies": {
+          "@types/ali-oss": "^6.23.3"
+        },
+        "appDependencies": {
+          "ali-oss": "^6.23.0"
+        },
+        "serverExternalPackages": ["ali-oss"],
+        "env": [
+          {
+            "key": "OSS_REGION",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "OSS_BUCKET",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "OSS_ACCESS_KEY_ID",
+            "required": false
+          },
+          {
+            "key": "OSS_ACCESS_KEY_SECRET",
+            "required": false
+          },
+          {
+            "key": "OSS_SECURITY_TOKEN",
+            "required": false
+          }
+        ]
+      },
+      "cos": {
+        "name": "Tencent Cloud COS",
+        "market": "cn",
+        "supports": {
+          "targets": ["none", "node", "vercel", "docker"]
+        },
+        "dependencies": {
+          "cos-nodejs-sdk-v5": "^3.0.0"
+        },
+        "env": [
+          {
+            "key": "COS_REGION",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "COS_BUCKET",
+            "required": false,
+            "sensitive": false
+          },
+          {
+            "key": "COS_SECRET_ID",
+            "required": false
+          },
+          {
+            "key": "COS_SECRET_KEY",
+            "required": false
+          },
+          {
+            "key": "COS_SECURITY_TOKEN",
+            "required": false
+          }
+        ]
+      }
+    }
+  },
+  "packages": [
+    {
+      "dir": "storage",
+      "dependencies": {
+        "drizzle-orm": "$dependency:drizzle-orm",
+        "zod": "$dependency:zod"
+      },
+      "workspaceDependencies": ["db"]
+    }
+  ],
+  "appDependencies": {
+    "zod": "$dependency:zod"
+  },
+  "services": [
+    {
+      "name": "storage",
+      "imports": [
+        {
+          "from": "@app/storage",
+          "names": ["createStorage"]
+        }
+      ],
+      "init": "createStorage({ env: ENV, db })"
+    }
+  ],
+  "nav": [
+    {
+      "area": "dashboard",
+      "href": "/dashboard/files",
+      "labelKey": "nav.files",
+      "order": 60
+    }
+  ],
+  "sources": {
+    "dialects": true,
+    "frameworks": ["http-server", "next", "nuxt", "tanstack-start", "react"],
+    "frameworkRequired": {
+      "http-server": [
+        "frameworks/http-server/apps/{application}/src/lib/native/storage.ts.hbs",
+        "frameworks/http-server/apps/{application}/src/lib/storage-http.ts.hbs",
+        "shared/partials/storage.hbs",
+        "shared/partials/storage-http.hbs"
+      ],
+      "next": ["shared/partials/storage-http.hbs"],
+      "react": ["shared/partials/file-manager.hbs"]
+    },
+    "providers": {
+      "mode": "inline",
+      "source": "files/packages/storage/src/provider.ts.hbs"
+    }
+  }
+}
+`],
+  ["modules/storage/shared/client/frameworks/react-router/src/components/storage/file-manager.tsx.hbs", `{{> storage/file-manager}}
+`],
+  ["modules/storage/shared/client/frameworks/react-router/src/components/storage/files-page.tsx.hbs", `import type { z } from "zod";
+import { useLocale, useT } from "@/components/i18n-provider";
+import { FileManager, type StorageLabels } from "@/components/storage/file-manager";
+import type { storageSchema } from "@/lib/storage-contract";
+
+export function FilesPage({ data }: { data: z.infer<typeof storageSchema> }) {
+  const locale = useLocale();
+  const t = useT();
+  const labels: StorageLabels = {
+    uploadTitle: t("storage.page.uploadTitle"), fileLabel: t("storage.page.fileLabel"),
+    upload: t("storage.page.upload"), uploading: t("storage.page.uploading"),
+    listTitle: t("storage.page.listTitle"), empty: t("storage.page.empty"),
+    download: t("storage.page.download"), delete: t("storage.page.delete"),
+    deleting: t("storage.page.deleting"), deleteConfirm: t("storage.page.deleteConfirm"),
+    uploaded: t("storage.page.uploaded"), deleted: t("storage.page.deleted"),
+    errors: {
+      unauthorized: t("storage.errors.unauthorized"), forbidden: t("storage.errors.forbidden"),
+      tooLarge: t("storage.errors.tooLarge"), invalidFile: t("storage.errors.invalidFile"),
+      notFound: t("storage.errors.notFound"), unavailable: t("storage.errors.unavailable"),
+      generic: t("storage.errors.generic"),
+    },
+  };
+  return <section className="space-y-8">
+    <header><h1 className="font-serif text-4xl">{t("storage.page.title")}</h1><p className="mt-4 text-muted-foreground">{t("storage.page.description")}</p><p id="storage-limits" className="mt-2 text-xs">{t("storage.page.limits")}</p></header>
+    {!data.configured && <p role="status">{t("storage.page.unavailable")}</p>}
+    <FileManager configured={data.configured} labels={labels} files={data.files.map((file) => ({
+      id: file.id, name: file.name,
+      size: \`\${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(file.size / 1024)} KiB\`,
+      createdAt: new Date(file.createdAt).toLocaleString(locale),
+    }))} />
+  </section>;
+}
+`],
+  ["modules/storage/shared/client/frameworks/react-router/src/lib/storage-contract.ts.hbs", `import { z } from "zod";
+
+export const storageSchema = z.object({
+  configured: z.boolean(),
+  files: z.array(z.object({ id: z.string(), name: z.string(), size: z.number(), createdAt: z.string() })),
+});
+`],
+  ["modules/storage/shared/partials/file-manager.hbs", `"use client";
 
 import { Button, buttonVariants } from "@{{projectName}}/ui/components/button";
 import { useProductNavigation } from "@/lib/product-navigation";
@@ -44031,304 +44173,121 @@ export function FileManager({
   );
 }
 `],
-  ["modules/storage/frameworks/tanstack-start/apps/fullstack-web/src/routes/$lang.dashboard.files.tsx.hbs", `import { createFileRoute } from "@tanstack/react-router";
+  ["modules/storage/shared/partials/storage-http.hbs", `import { MAX_FILE_BYTES, StorageError } from "@{{projectName}}/storage";
 import { z } from "zod";
-import { FileManager, type StorageLabels } from "@/components/storage/file-manager";
-import { useLocale, useT } from "@/components/i18n-provider";
-import { loadProduct } from "@/lib/product-data";
-const schema = z.object({ configured: z.boolean(), files: z.array(z.object({ id: z.string(), name: z.string(), size: z.number(), createdAt: z.string() })) });
-export const Route = createFileRoute("/$lang/dashboard/files")({ loader: ({ params }) => loadProduct("/api/product/files", params.lang, schema), component: Files });
-function Files() {
-  const { files, configured } = Route.useLoaderData(); const locale = useLocale(); const t = useT();
-  const labels: StorageLabels = { uploadTitle: t("storage.page.uploadTitle"), fileLabel: t("storage.page.fileLabel"), upload: t("storage.page.upload"), uploading: t("storage.page.uploading"), listTitle: t("storage.page.listTitle"), empty: t("storage.page.empty"), download: t("storage.page.download"), delete: t("storage.page.delete"), deleting: t("storage.page.deleting"), deleteConfirm: t("storage.page.deleteConfirm"), uploaded: t("storage.page.uploaded"), deleted: t("storage.page.deleted"), errors: { unauthorized: t("storage.errors.unauthorized"), forbidden: t("storage.errors.forbidden"), tooLarge: t("storage.errors.tooLarge"), invalidFile: t("storage.errors.invalidFile"), notFound: t("storage.errors.notFound"), unavailable: t("storage.errors.unavailable"), generic: t("storage.errors.generic") } };
-  return <section className="space-y-8"><header><h1 className="font-serif text-4xl">{t("storage.page.title")}</h1><p className="mt-4 text-muted-foreground">{t("storage.page.description")}</p><p id="storage-limits" className="mt-2 text-xs">{t("storage.page.limits")}</p></header>{!configured && <p role="status">{t("storage.page.unavailable")}</p>}<FileManager configured={configured} labels={labels} files={files.map((file) => ({ id: file.id, name: file.name, size: \`\${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(file.size / 1024)} KiB\`, createdAt: new Date(file.createdAt).toLocaleString(locale) }))} /></section>;
+
+import { ENV } from "@/env.server";
+
+const MAX_BODY_BYTES = MAX_FILE_BYTES + 64 * 1024;
+const contentLengthSchema = z.string().regex(/^\\d+$/).transform(Number).pipe(z.number().int().nonnegative().safe());
+const fileSchema = z.instanceof(File);
+const trustedOrigins = new Set([new URL(ENV.BETTER_AUTH_URL).origin{{#if application.nativeSplit}}{{#each application.clientOrigins}}, "{{this}}"{{/each}}{{#if (includes application.roles "backend")}}, ...ENV.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean){{/if}}{{/if}}]);
+
+export class StorageRequestError extends Error {
+  constructor(public readonly status: number, public readonly code: string) {
+    super(code);
+  }
+}
+
+export function requireStorageOrigin(request: Request): void {
+  // Trust declared origins only, never forwarded/Host headers.
+  if (!trustedOrigins.has(request.headers.get("origin") ?? "")) {
+    throw new StorageRequestError(403, "forbidden");
+  }
+}
+
+export function storageErrorResponse(error: unknown): Response {
+  if (error instanceof StorageRequestError) {
+    return Response.json({ error: error.code }, { status: error.status, headers: { "Cache-Control": "no-store" } });
+  }
+  if (error instanceof StorageError) {
+    const status = error.code === "not_found" ? 404 : error.code === "invalid_file" ? 400 : 503;
+    return Response.json({ error: error.code }, { status, headers: { "Cache-Control": "no-store" } });
+  }
+  return Response.json({ error: "provider_error" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+}
+
+export async function readStorageFile(request: Request): Promise<File> {
+  if (!/^multipart\\/form-data(?:;|$)/i.test(request.headers.get("content-type") ?? "")) {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const header = request.headers.get("content-length");
+  if (header !== null) {
+    const length = contentLengthSchema.safeParse(header);
+    if (!length.success) throw new StorageRequestError(400, "invalid_file");
+    if (length.data > MAX_BODY_BYTES) throw new StorageRequestError(413, "too_large");
+  }
+  if (!request.body) throw new StorageRequestError(400, "invalid_file");
+
+  // Count actual bytes before formData() buffers/parses multipart data. This also
+  // bounds chunked requests and requests with an understated Content-Length.
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      length += chunk.value.byteLength;
+      if (length > MAX_BODY_BYTES) {
+        await reader.cancel();
+        throw new StorageRequestError(413, "too_large");
+      }
+      chunks.push(chunk.value);
+    }
+  } catch (error) {
+    if (error instanceof StorageRequestError) throw error;
+    throw new StorageRequestError(400, "invalid_file");
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  let form: FormData;
+  try {
+    form = await new Response(bytes, {
+      headers: { "Content-Type": request.headers.get("content-type")! },
+    }).formData();
+  } catch {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const entries = [...form.entries()];
+  if (entries.length !== 1 || entries[0]?.[0] !== "file") {
+    throw new StorageRequestError(400, "invalid_file");
+  }
+  const parsed = fileSchema.safeParse(entries[0][1]);
+  if (!parsed.success || parsed.data.size === 0) throw new StorageRequestError(400, "invalid_file");
+  if (parsed.data.size > MAX_FILE_BYTES) throw new StorageRequestError(413, "too_large");
+  return parsed.data;
 }
 `],
-  ["modules/storage/module.json", `{
-  "id": "storage",
-  "name": {
-    "en": "Private files",
-    "zh-CN": "私有文件"
-  },
-  "description": {
-    "en": "Private S3, R2, OSS or COS uploads and owned downloads",
-    "zh-CN": "S3、R2、OSS 或 COS 私有上传与个人文件下载"
-  },
-  "category": "content",
-  "requires": [
-    "auth"
-  ],
-  "supports": {
-    "frameworks": [
-      "next",
-      "tanstack-start",
-      "nuxt"
-    ],
-    "backends": [
-      "self"
-    ],
-    "apis": [
-      "none"
-    ],
-    "orms": [
-      "drizzle"
-    ],
-    "dialects": [
-      "sqlite",
-      "postgres"
-    ]
-  },
-  "providers": {
-    "min": 1,
-    "max": 1,
-    "default": {
-      "global": [
-        "s3"
-      ],
-      "cn": [
-        "oss"
-      ]
-    },
-    "targetDefaults": {
-      "cloudflare": [
-        "r2-binding"
-      ]
-    },
-    "options": {
-      "s3": {
-        "name": "Amazon S3",
-        "market": "global",
-        "supports": {
-          "targets": [
-            "none",
-            "node",
-            "vercel",
-            "docker"
-          ]
-        },
-        "dependencies": {
-          "@aws-sdk/client-s3": "^3.1000.0",
-          "@aws-sdk/s3-request-presigner": "^3.1000.0"
-        },
-        "env": [
-          {
-            "key": "S3_REGION",
-            "required": false,
-            "sensitive": false
-          },
-          {
-            "key": "S3_BUCKET",
-            "required": false,
-            "sensitive": false
-          },
-          {
-            "key": "S3_ACCESS_KEY_ID",
-            "required": false
-          },
-          {
-            "key": "S3_SECRET_ACCESS_KEY",
-            "required": false
-          },
-          {
-            "key": "S3_SESSION_TOKEN",
-            "required": false
-          }
-        ]
-      },
-      "r2": {
-        "name": "Cloudflare R2 (S3 API)",
-        "market": "global",
-        "supports": {
-          "targets": [
-            "none",
-            "node",
-            "vercel",
-            "docker"
-          ]
-        },
-        "dependencies": {
-          "@aws-sdk/client-s3": "^3.1000.0",
-          "@aws-sdk/s3-request-presigner": "^3.1000.0"
-        },
-        "env": [
-          {
-            "key": "R2_ACCOUNT_ID",
-            "required": false,
-            "sensitive": false
-          },
-          {
-            "key": "R2_BUCKET",
-            "required": false,
-            "sensitive": false
-          },
-          {
-            "key": "R2_ACCESS_KEY_ID",
-            "required": false
-          },
-          {
-            "key": "R2_SECRET_ACCESS_KEY",
-            "required": false
-          }
-        ]
-      },
-      "r2-binding": {
-        "name": "Cloudflare R2 (Workers binding)",
-        "market": "global",
-        "supports": {
-          "frameworks": [
-            "next"
-          ],
-          "targets": [
-            "cloudflare"
-          ]
-        },
-        "dependencies": {
-          "@opennextjs/cloudflare": "$dependency:@opennextjs/cloudflare"
-        },
-        "devDependencies": {
-          "@cloudflare/workers-types": "$dependency:@cloudflare/workers-types"
-        }
-      },
-      "oss": {
-        "name": "Alibaba Cloud OSS",
-        "market": "cn",
-        "supports": {
-          "targets": [
-            "none",
-            "node",
-            "vercel",
-            "docker"
-          ]
-        },
-        "dependencies": {
-          "ali-oss": "^6.23.0"
-        },
-        "devDependencies": {
-          "@types/ali-oss": "^6.23.3"
-        },
-        "appDependencies": {
-          "ali-oss": "^6.23.0"
-        },
-        "serverExternalPackages": [
-          "ali-oss"
-        ],
-        "env": [
-          {
-            "key": "OSS_REGION",
-            "required": false,
-            "sensitive": false
-          },
-          {
-            "key": "OSS_BUCKET",
-            "required": false,
-            "sensitive": false
-          },
-          {
-            "key": "OSS_ACCESS_KEY_ID",
-            "required": false
-          },
-          {
-            "key": "OSS_ACCESS_KEY_SECRET",
-            "required": false
-          },
-          {
-            "key": "OSS_SECURITY_TOKEN",
-            "required": false
-          }
-        ]
-      },
-      "cos": {
-        "name": "Tencent Cloud COS",
-        "market": "cn",
-        "supports": {
-          "targets": [
-            "none",
-            "node",
-            "vercel",
-            "docker"
-          ]
-        },
-        "dependencies": {
-          "cos-nodejs-sdk-v5": "^3.0.0"
-        },
-        "env": [
-          {
-            "key": "COS_REGION",
-            "required": false,
-            "sensitive": false
-          },
-          {
-            "key": "COS_BUCKET",
-            "required": false,
-            "sensitive": false
-          },
-          {
-            "key": "COS_SECRET_ID",
-            "required": false
-          },
-          {
-            "key": "COS_SECRET_KEY",
-            "required": false
-          },
-          {
-            "key": "COS_SECURITY_TOKEN",
-            "required": false
-          }
-        ]
-      }
+  ["modules/storage/shared/partials/storage.hbs", `import { storage } from "@{{projectName}}/app-services";
+import { z } from "zod";
+import { json, requireSession } from "../product-api";
+import { readStorageFile, requireStorageOrigin, storageErrorResponse, StorageRequestError } from "../storage-http";
+
+export async function handle(request: Request, path: string): Promise<Response | undefined> {
+  if (path !== "/api/product/files" && path !== "/api/storage" && !path.startsWith("/api/storage/")) return;
+  const { user } = await requireSession(request);
+  try {
+    if (path === "/api/product/files" && request.method === "GET") return json({ configured: storage.configured, files: await storage.listFiles(user.id) });
+    if (path === "/api/storage" && request.method === "POST") {
+      requireStorageOrigin(request);
+      if (!storage.configured) return json({ error: "not_configured" }, 503);
+      const file = await storage.upload(user.id, await readStorageFile(request));
+      return json({ id: file.id }, 201);
     }
-  },
-  "packages": [
-    {
-      "dir": "storage",
-      "dependencies": {
-        "drizzle-orm": "$dependency:drizzle-orm",
-        "zod": "$dependency:zod"
-      },
-      "workspaceDependencies": [
-        "db"
-      ]
-    }
-  ],
-  "appDependencies": {
-    "zod": "$dependency:zod"
-  },
-  "services": [
-    {
-      "name": "storage",
-      "imports": [
-        {
-          "from": "@app/storage",
-          "names": [
-            "createStorage"
-          ]
-        }
-      ],
-      "init": "createStorage({ env: ENV, db })"
-    }
-  ],
-  "nav": [
-    {
-      "area": "dashboard",
-      "href": "/dashboard/files",
-      "labelKey": "nav.files",
-      "order": 60
-    }
-  ],
-  "sources": {
-    "dialects": true,
-    "frameworks": [
-      "http-server",
-      "next",
-      "nuxt",
-      "tanstack-start",
-      "react"
-    ],
-    "providers": {
-      "mode": "inline",
-      "source": "files/packages/storage/src/provider.ts.hbs"
-    }
-  }
+    const id = z.string().min(1).max(255).regex(/^[a-zA-Z0-9_-]+$/).safeParse(path.slice("/api/storage/".length));
+    if (!id.success) throw new StorageRequestError(404, "not_found");
+    if (request.method === "GET") return new Response(null, { status: 307, headers: { Location: await storage.downloadUrl(user.id, id.data), "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
+    if (request.method === "DELETE") { requireStorageOrigin(request); await storage.deleteFile(user.id, id.data); return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } }); }
+    return json({ error: "method_not_allowed" }, 405);
+  } catch (error) { return storageErrorResponse(error); }
 }
 `],
   ["packages/config/package.json.hbs", `{
@@ -46167,4 +46126,4 @@ export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 `]
 ]);
 
-export const TEMPLATE_COUNT = 929;
+export const TEMPLATE_COUNT = 975;

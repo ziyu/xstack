@@ -27,11 +27,12 @@ const html = computed(() => article.value ? markdown.render(article.value.post.b
 const { data: config } = await useFetch<{ siteUrl: string }>("/api/product/config");
 const title = computed(() => article.value?.post.title ?? label("Journal", "博客"));
 const description = computed(() => article.value?.post.excerpt ?? label("News and ideas from {{projectName}}.", "{{projectName}} 的新闻与想法。"));
-useSeoMeta({ title: () => `${title.value} · {{projectName}}`, description: () => description.value, ogTitle: () => title.value, ogDescription: () => description.value, ogType: () => article.value ? "article" : "website", twitterCard: "summary", twitterTitle: () => title.value, twitterDescription: () => description.value });
-useHead(() => ({ link: !article.value || !config.value?.siteUrl ? [] : [
-  { rel: "canonical" as const, href: `${config.value.siteUrl}/${article.value.post.locale}/blog/${article.value.post.slug}` },
-  ...article.value.translations.map((entry) => ({ rel: "alternate" as const, hreflang: entry.locale, href: `${config.value!.siteUrl}/${entry.locale}/blog/${entry.slug}` })),
-  ...article.value.translations.filter((entry) => entry.locale === defaultLocale).map((entry) => ({ rel: "alternate" as const, hreflang: "x-default", href: `${config.value!.siteUrl}/${entry.locale}/blog/${entry.slug}` })),
+const canonical = computed(() => config.value?.siteUrl ? new URL(article.value ? `/${article.value.post.locale}/blog/${article.value.post.slug}` : `/${locale.value}/blog${page > 1 ? `?page=${page}` : ""}`, config.value.siteUrl).href : undefined);
+useSeoMeta({ title: () => `${title.value} · {{projectName}}`, description: () => description.value, ogTitle: () => title.value, ogDescription: () => description.value, ogUrl: () => canonical.value, ogLocale: () => locale.value.replaceAll("-", "_"), ogType: () => article.value ? "article" : "website", twitterCard: "summary", twitterTitle: () => title.value, twitterDescription: () => description.value });
+useHead(() => ({ link: !canonical.value ? [] : [
+  { rel: "canonical" as const, href: canonical.value },
+  ...(article.value?.translations ?? []).map((entry) => ({ rel: "alternate" as const, hreflang: entry.locale, href: new URL(`/${entry.locale}/blog/${entry.slug}`, config.value!.siteUrl).href })),
+  ...(article.value?.translations ?? []).filter((entry) => entry.locale === defaultLocale).map((entry) => ({ rel: "alternate" as const, hreflang: "x-default", href: new URL(`/${entry.locale}/blog/${entry.slug}`, config.value!.siteUrl).href })),
 ] }));
 useHead(() => ({ script: !article.value || !config.value?.siteUrl ? [] : [{ type: "application/ld+json", innerHTML: JSON.stringify({ "@context": "https://schema.org", "@type": "BlogPosting", headline: article.value.post.title, description: article.value.post.excerpt, author: { "@type": "Person", name: article.value.post.authorName }, datePublished: article.value.post.publishedAt, dateModified: article.value.post.updatedAt, inLanguage: article.value.post.locale, mainEntityOfPage: `${config.value.siteUrl}/${article.value.post.locale}/blog/${article.value.post.slug}` }).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029") }] }));
 </script>

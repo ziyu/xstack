@@ -1,0 +1,11 @@
+import { backendRequest, privateHeaders } from "@/lib/backend.server";
+import { isAdminClient } from "@/lib/client-role";
+
+/** Crawl files belong to the public frontend, never the admin origin. */
+export async function publicSeoResponse(request: Request, path: "/robots.txt" | "/sitemap.xml") {
+  if (isAdminClient) {
+    if (path === "/robots.txt") return new Response("User-agent: *\nDisallow: /\n", { headers: { ...privateHeaders, "Content-Type": "text/plain; charset=utf-8" } });
+    throw new Response("Not found", { status: 404, headers: privateHeaders });
+  }
+  return backendRequest(request, path, false, true);
+}

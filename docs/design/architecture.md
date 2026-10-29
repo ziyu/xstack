@@ -754,3 +754,17 @@ C2 与应用声明驱动改动已提交 `fb26ce4`。C3 通过 adapter 声明扩�
 本次浏览器实际验证模板预设切换、后端改名与绑定同步，以及生成预览出现 `apps/service-api`；扩展回归通过自定义声明和真实生成器验证，不以模板目录存在代替行为验收。
 
 验收结果：80 项生成器回归、33 项 Web 回归、48 项 CLI/MCP/产品回归通过；generator、Web、CLI 及 CLI 测试类型检查通过，定向 lint 通过，generator/CLI 构建通过。贡献审计 929 个来源、零分类问题，三个浏览器目录入口均可独立打包。自定义 `automation` 应用类型、`custom-engine` adapter、`custom-meter` 模块和默认预设由同一测试的模板集合提供；生成后的计量模块实际执行，配置倍率 7 时输入 6 返回 42，并保留所选 provider。未重跑全部框架安装/部署矩阵，也未宣称外部服务验收。
+
+### 27.11 C4 内容与 AI 拆分闭环
+
+声明解耦检查点提交为 `66c43cd`。C4 将 storage/ai/blog/seo 接入 React Router 前台及管理端 + Hono 后端；Next/Start/Nuxt 继续复用同一领域服务。HTTP handler、请求校验、AI 积分/存储集成、博客编辑/Markdown 和 SEO 元数据抽为共享 partial，按应用贡献输出，不在 Builder 添加名称分支。
+
+声明增加 `sources.integrations.<id>.serverOnly`，区分后端集成与真实客户端贡献，不用空文件满足预检；`EnvSpec.originRole` 从实际角色归属解析公开站点 origin。客户端框架依赖按声明生成，服务包、数据库、provider 凭据和账本只在后端 owner。BFF 直接转发请求流，保留 Cookie、下载重定向和响应流，不先无限缓存上传体。
+
+拆分前台提供私有文件、AI 工作室、公开博客列表/详情；管理端提供草稿/发布/编辑/删除。页面和 API 分别鉴权，草稿/未发布翻译不公开，版本冲突拒绝覆盖。公开 SSR 输出 canonical/hreflang/OG/Twitter 和安全真实文章 JSON-LD；SITE_URL 指向前台，管理端 robots 全禁用且 sitemap 404，私有页与错误保留 noindex。
+
+六组真实 CLI 项目已通过安装、所有 workspace 类型检查、生产构建、迁移生成与重复应用：Next/Start/Nuxt SQLite、拆分 SQLite/PostgreSQL、改名拆分+独立 CLI。存储/AI/blog/seo 四种独立选择也实际生成成功；这不等同于所有 provider 的云端验收。浏览器实际注册、上传/删除、AI 对话、管理端创建/发布文章以及前台 canonical 已验证。
+
+持久入口为 `bun apps/cli/live-tests/c4.ts plan|prepare|check|runtime|report|cleanup`。使用实际生成应用、数据库和 SDK，只把指定 AI/S3 远端传输替换为隔离本地协议；Nuxt 字体发现使用空离线目录，Next npm advisory 查询在离线环境返回不可用并单独记录，不能解读为安全审计通过。未调用付费模型、真实桶或远端部署。C5/C6 未在本批扩展。
+
+最终六组 C4 runtime 全部通过：真实会话/管理员隔离、文件限额/越权/签名下载/删除、AI 多 provider 对话/图片/异步视频/重放/私有媒体、博客草稿/发布/翻译/修订冲突/删除、canonical/hreflang/OG/Twitter/JSON-LD/sitemap。五组 SQLite 另通过生成 AI+积分服务的并发、扣费/退款/取消及不确定结果协议回归；PostgreSQL 本批通过 HTTP 与持久化流程，不将 SQLite 扩展协议结果冒充 PG 并发覆盖。仓库回归 83 项 generator、33 项 Web、48 项 CLI/MCP/产品通过，相关类型检查与定向 lint 通过，贡献审计 975 个来源、零分类问题。运行报告保存在忽略目录 `.smoke/c4-acceptance-results.json`，真实云端状态保持 unverified。

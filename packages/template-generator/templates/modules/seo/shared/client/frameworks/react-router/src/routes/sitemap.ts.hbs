@@ -1,0 +1,3 @@
+import type { LoaderFunctionArgs } from "react-router";
+import { publicSeoResponse } from "@/lib/seo.server";
+export function loader({ request }: LoaderFunctionArgs) { return publicSeoResponse(request, "/sitemap.xml"); }

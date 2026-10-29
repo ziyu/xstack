@@ -322,6 +322,7 @@ export function processModuleTemplates(
           target,
         );
       for (const other of client.modules.includes(manifest.id) ? module.integrations : []) {
+        if (manifest.sources?.integrations?.[other]?.serverOnly) continue;
         renderPrefix(
           vfs,
           templates,
@@ -330,6 +331,13 @@ export function processModuleTemplates(
           stackFiles,
           target,
         );
+      }
+      if (client.modules.includes(manifest.id)) {
+        const dependencies =
+          manifest.frameworkAppDependencies?.[
+            client.framework as keyof NonNullable<typeof manifest.frameworkAppDependencies>
+          ];
+        if (dependencies) addAppDependencies(vfs, dependencies, config);
       }
       if (manifest.id === "i18n")
         addAppDependencies(

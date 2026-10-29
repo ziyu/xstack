@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
+import { aiSchema } from "@/lib/ai-contract";
 import { AIStudio } from "@/components/ai/studio";
 import { useT } from "@/components/i18n-provider";
 import { loadProduct } from "@/lib/product-data";
-const schema = z.object({ jobs: z.array(z.object({ id: z.string(), requestId: z.string(), provider: z.string(), kind: z.enum(["chat", "image", "video"]), model: z.string(), prompt: z.string(), cost: z.number(), status: z.enum(["queued", "starting", "running", "saving", "unknown", "completed", "failed", "cancelled"]), text: z.string().nullable(), error: z.string().nullable(), mediaUrl: z.string().nullable(), cancellable: z.boolean() })), capabilities: z.array(z.object({ id: z.string(), models: z.object({ chat: z.string().optional(), image: z.string().optional(), video: z.string().optional() }), costs: z.object({ chat: z.number(), image: z.number(), video: z.number() }) })) });
-export const Route = createFileRoute("/$lang/dashboard/ai")({ loader: ({ params }) => loadProduct("/api/product/ai", params.lang, schema), component: Studio });
+export const Route = createFileRoute("/$lang/dashboard/ai")({ loader: ({ params }) => loadProduct("/api/product/ai", params.lang, aiSchema), component: Studio });
 function Studio() { const data = Route.useLoaderData(); const t = useT(); return <section className="space-y-8"><header className="space-y-3"><h1 className="font-serif text-4xl">{t("ai.title")}</h1><p className="text-muted-foreground">{t("ai.subtitle")}</p></header><AIStudio initialJobs={data.jobs} capabilities={data.capabilities} /></section>; }

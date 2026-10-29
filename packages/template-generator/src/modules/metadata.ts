@@ -34,6 +34,7 @@ const environment = z.array(
     type: z.enum(["string", "url", "number", "boolean", "secret", "enum"]).optional(),
     values: strings.optional(),
     example: z.string().optional(),
+    originRole: identifier.optional(),
     default: z.string().optional(),
     comment: z.string().optional(),
   }),
@@ -132,6 +133,7 @@ const manifestSchema = z
           .record(
             z.string(),
             z.strictObject({
+              serverOnly: z.boolean().optional(),
               base: z.string().optional(),
               frameworks: z.record(z.string(), z.string()).optional(),
               required: strings.optional(),

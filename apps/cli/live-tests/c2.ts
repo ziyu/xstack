@@ -14,10 +14,13 @@ import {
   readC2Applications,
   type C2Applications,
 } from "./c2-applications";
+import type { ApplicationEnvironment } from "./c2-applications";
 import { c2Cases, c2Input, type C2Case } from "./c2-cases";
 import { C2Database, exerciseC2, type C2Result } from "./c2-http";
 import { c3Cases, c3Input } from "./c3-cases";
 import { exerciseC3Http } from "./c3-http";
+import { c4Cases, c4Input } from "./c4-cases";
+import { exerciseC4Http } from "./c4-http";
 import { Commands } from "./command";
 
 const { values, positionals } = parseArgs({
@@ -30,10 +33,13 @@ const { values, positionals } = parseArgs({
   },
 });
 const action = positionals[0] ?? "plan";
-assert.ok(values.stage === "c2" || values.stage === "c3", "Expected --stage c2|c3");
+assert.ok(
+  values.stage === "c2" || values.stage === "c3" || values.stage === "c4",
+  "Expected --stage c2|c3|c4",
+);
 const stage = values.stage;
-const cases: readonly C2Case[] = stage === "c3" ? c3Cases : c2Cases;
-const createInput = stage === "c3" ? c3Input : c2Input;
+const cases: readonly C2Case[] = stage === "c4" ? c4Cases : stage === "c3" ? c3Cases : c2Cases;
+const createInput = stage === "c4" ? c4Input : stage === "c3" ? c3Input : c2Input;
 assert.ok(
   ["plan", "prepare", "check", "runtime", "run", "report", "cleanup"].includes(action),
   "Expected plan|prepare|check|runtime|run|report|cleanup",
@@ -82,26 +88,35 @@ if (action === "plan") {
         requirements: [
           "Built CLI and generated template bundles (bun run build:cli)",
           "Bun, Node, package registry access",
-          "Exclusive loopback application ports from generated applications.json, plus fixture port 4399",
+          "Exclusive loopback application ports from generated applications.json, plus protocol fixture port 4399",
           "Postgres: empty disposable database via C2_DATABASE_URL and C2_DISPOSABLE_POSTGRES=1",
         ],
         evidence:
-          stage === "c3"
+          stage === "c4"
             ? {
-                payment:
-                  "signed Stripe/Polar/WeChat/Alipay callbacks and authenticated development mock; no live purchases",
-                credits:
-                  "actual generated SQLite/Postgres atomic ledger and concurrent debit/refund",
-                affiliate: "actual signed attribution and duplicate-safe commission integrations",
-                auth: "real signup/login with explicitly DB-seeded verified state; C2 owns email verification coverage",
+                storage:
+                  "real owned files and S3 signing with explicit local exact-domain transport; no cloud bucket",
+                ai: "real jobs, generated credit ledger and media with local OpenAI/Google/compatible protocol; no cloud generation",
+                content:
+                  "real admin CRUD, revisions, localized published pages and SEO metadata over HTTP",
+                auth: "real signup/login; explicitly DB-seeded development verified/admin state",
               }
-            : {
-                email: "development console hooks",
-                sms: "development console hooks",
-                captcha: "local Siteverify protocol fixture",
-                oauth:
-                  "authorization/state + isolated WeChat exchange; no cloud credential verification",
-              },
+            : stage === "c3"
+              ? {
+                  payment:
+                    "signed Stripe/Polar/WeChat/Alipay callbacks and authenticated development mock; no live purchases",
+                  credits:
+                    "actual generated SQLite/Postgres atomic ledger and concurrent debit/refund",
+                  affiliate: "actual signed attribution and duplicate-safe commission integrations",
+                  auth: "real signup/login with explicitly DB-seeded verified state; C2 owns email verification coverage",
+                }
+              : {
+                  email: "development console hooks",
+                  sms: "development console hooks",
+                  captcha: "local Siteverify protocol fixture",
+                  oauth:
+                    "authorization/state + isolated WeChat exchange; no cloud credential verification",
+                },
       },
       null,
       2,
@@ -187,6 +202,7 @@ if (action === "plan") {
               ]);
             });
             resolved = await readC2Applications(project);
+            if (stage === "c4") prepared.env.SITE_URL = resolved.targets.public.origin;
             prepared.env = c2ApplicationEnvironment(
               resolved.targets.backend,
               resolved.targets,
@@ -194,16 +210,7 @@ if (action === "plan") {
             );
             await writeFile(manifestPath, JSON.stringify(prepared, null, 2), { mode: 0o600 });
             await step("write-disposable-environment", async () => {
-              for (const app of resolved.applications) {
-                const appEnv = c2ApplicationEnvironment(app, resolved.targets, prepared.env);
-                await writeFile(
-                  path.join(project, app.directory, ".env"),
-                  Object.entries(appEnv)
-                    .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
-                    .join("\n") + "\n",
-                  { mode: 0o600 },
-                );
-              }
+              await writeApplicationEnvironment(project, resolved, prepared.env);
               await writeFile(
                 path.join(project, "packages/db/.env"),
                 `DATABASE_URL=${JSON.stringify(databaseUrl)}\n`,
@@ -239,6 +246,11 @@ if (action === "plan") {
             assert.equal(prepared.id, test.id);
             assert.equal(prepared.project, project);
             resolved = await readC2Applications(project);
+            // Refresh harness-owned per-app values for retained fixtures, including
+            // ports required by their generated Varlock schema. Never bypass validation.
+            await step("refresh-disposable-application-environment", async () => {
+              await writeApplicationEnvironment(project, resolved, prepared.env);
+            });
           }
           if (action === "check" || action === "run") {
             await step("generated-typecheck", async () => {
@@ -265,13 +277,16 @@ if (action === "plan") {
                 ) as { dependencies?: Record<string, string> };
                 for (const dependency of Object.keys(packageJson.dependencies ?? {}))
                   assert.ok(
-                    !/\/(?:db|auth|sms|email|captcha|events|payment|credits|affiliate)$/.test(
+                    !/\/(?:db|auth|sms|email|captcha|events|payment|credits|affiliate|storage|ai|blog|seo)$/.test(
                       dependency,
                     ),
                     `${app.id} imports server workspace ${dependency}`,
                   );
                 const contents = await readFile(path.join(project, app.directory, ".env"), "utf8");
-                assert.doesNotMatch(contents, /SECRET|TOKEN|PASSWORD|DATABASE_URL/);
+                assert.doesNotMatch(
+                  contents,
+                  /SECRET|TOKEN|PASSWORD|DATABASE_URL|API_KEY|ACCESS_KEY|S3_BUCKET|S3_REGION/,
+                );
               }
             });
             assert.ok(
@@ -281,21 +296,35 @@ if (action === "plan") {
             for (const port of [...resolved.runtime.map((app) => app.port), 4399])
               await available(port);
             const fixture = commands.start(
-              "captcha-fixture",
+              stage === "c4" ? "c4-local-protocol" : "captcha-fixture",
               root,
               "bun",
-              [path.join(import.meta.dir, "captcha-provider.ts"), "4399"],
+              [
+                path.join(
+                  import.meta.dir,
+                  stage === "c4" ? "c4-protocol.ts" : "captcha-provider.ts",
+                ),
+                "4399",
+              ],
               { CAPTCHA_FIXTURE_SIGNING_KEY: randomBytes(32).toString("hex") },
             );
-            await ready("http://127.0.0.1:4399/siteverify", fixture, signal.signal, false);
+            await ready(
+              `http://127.0.0.1:4399/${stage === "c4" ? "health" : "siteverify"}`,
+              fixture,
+              signal.signal,
+              stage === "c4",
+            );
             let output = "";
-            const preload = pathToFileURL(path.join(import.meta.dir, "c2-preload.mjs")).href;
+            const preload = pathToFileURL(
+              path.join(import.meta.dir, stage === "c4" ? "c4-preload.mjs" : "c2-preload.mjs"),
+            ).href;
             const runtimeEnv = {
               NODE_ENV: "development",
               HOST: "127.0.0.1",
               HOSTNAME: "127.0.0.1",
               NITRO_HOST: "127.0.0.1",
               CAPTCHA_FIXTURE_ORIGIN: "http://127.0.0.1:4399",
+              C4_FIXTURE_ORIGIN: "http://127.0.0.1:4399",
               NODE_OPTIONS: `--import=${preload}`,
             };
             for (const app of resolved.runtime) {
@@ -322,7 +351,30 @@ if (action === "plan") {
               );
             }
             database = new C2Database(prepared.databaseUrl);
-            if (stage === "c3") {
+            if (stage === "c4") {
+              await exerciseC4Http({
+                targets: resolved.targets,
+                database,
+                administrator: prepared.env.ADMIN_EMAILS!,
+                fixture: "http://127.0.0.1:4399",
+                results: report.results,
+                save,
+                signal: signal.signal,
+                secrets: Object.entries(prepared.env)
+                  .filter(([key]) => /SECRET|API_KEY|ACCESS_KEY|DATABASE_URL/.test(key))
+                  .map(([, value]) => value)
+                  .filter(Boolean),
+                provisionCredits: async (userId) => {
+                  await commands.run(
+                    "c4-credit",
+                    root,
+                    "bun",
+                    [path.join(import.meta.dir, "c4-credit.ts"), project, userId],
+                    { ...prepared.env, NODE_ENV: "test" },
+                  );
+                },
+              });
+            } else if (stage === "c3") {
               await exerciseC3Http({
                 project,
                 administrator: prepared.env.ADMIN_EMAILS!,
@@ -381,6 +433,17 @@ if (action === "plan") {
                   });
               }
             }
+            if (stage === "c4" && test.database === "sqlite") {
+              await step("c4-extended-generated-AI-credit-protocol-local-only", async () => {
+                await commands.run(
+                  "c4-ai-protocol",
+                  root,
+                  "bun",
+                  [path.join(import.meta.dir, "ai.ts"), project, prepared.databaseUrl.slice(5)],
+                  { ...prepared.env, NODE_ENV: "test" },
+                );
+              });
+            }
             report.status = "passed";
           } else report.status = action === "prepare" ? "prepared" : "checked";
         }
@@ -411,7 +474,46 @@ if (action === "plan") {
   console.log(JSON.stringify(reports, null, 2));
 }
 
-function environment(test: C2Case, databaseUrl: string) {
+async function writeApplicationEnvironment(
+  project: string,
+  resolved: C2Applications,
+  environment: ApplicationEnvironment,
+) {
+  for (const app of resolved.applications) {
+    const appEnv = c2ApplicationEnvironment(app, resolved.targets, environment);
+    let schema = "";
+    try {
+      schema = await readFile(path.join(project, app.directory, ".env.schema"), "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    if (/^PORT\s*=/m.test(schema)) appEnv.PORT = String(app.port);
+    await writeFile(
+      path.join(project, app.directory, ".env"),
+      Object.entries(appEnv)
+        .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+        .join("\n") + "\n",
+      { mode: 0o600 },
+    );
+  }
+}
+
+function environment(test: C2Case, databaseUrl: string): ApplicationEnvironment {
+  if (stage === "c4")
+    return {
+      NODE_ENV: "development",
+      DATABASE_URL: databaseUrl,
+      BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
+      ADMIN_EMAILS: "admin-c4@example.test",
+      SITE_URL: "http://localhost:3001",
+      S3_REGION: "us-east-1",
+      S3_BUCKET: "c4-protocol-bucket",
+      S3_ACCESS_KEY_ID: "C4" + "LOCALACCESS",
+      S3_SECRET_ACCESS_KEY: "c4-" + "local-storage-secret",
+      OPENAI_API_KEY: "c4-" + "local-openai",
+      GEMINI_API_KEY: "c4-" + "local-google",
+      AI_COMPATIBLE_API_KEY: "c4-" + "local-compatible",
+    };
   const providerEnv: Record<string, string> = {};
   if (test.email === "resend") providerEnv.RESEND_API_KEY = "";
   else {
@@ -550,6 +652,16 @@ async function cleanPostgres(url: string, caseDirectory: string) {
             "affiliate_profile",
             "affiliate_referral",
             "affiliate_commission",
+          ]
+        : []),
+      ...(stage === "c4"
+        ? [
+            "credit_balance",
+            "credit_transaction",
+            "storage_file",
+            "ai_job",
+            "ai_media_chunk",
+            "blog_post",
           ]
         : []),
     ]);
