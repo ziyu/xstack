@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { inflateRawSync } from "node:zlib";
 
 import { createORPCClient, ORPCError } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -6,6 +7,7 @@ import type { RouterClient } from "@orpc/server";
 import type { VirtualNode } from "@xstack/template-generator";
 import type { ApplicationSelection } from "@xstack/types";
 
+import { POST as exportProject } from "../src/app/api/export/route";
 import { POST } from "../src/app/api/rpc/[[...rest]]/route";
 import { DEFAULT_STACK, PRESET_TEMPLATES } from "../src/lib/constant";
 import { findMatchingPreset } from "../src/lib/preset-stacks";
@@ -399,5 +401,68 @@ describe("explicit application state", () => {
     expect(output.has("apps/server/src/services.ts")).toBe(true);
     expect(output.has("apps/site/src/routes/login.tsx")).toBe(true);
     expect(output.has("packages/permission/package.json")).toBe(false);
+  });
+});
+
+/** Minimal reader for the archives this app writes: local headers, deflate or stored payloads. */
+function readZip(bytes: Uint8Array) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const entries = new Map<string, Uint8Array>();
+  let offset = 0;
+  while (offset + 30 <= bytes.byteLength && view.getUint32(offset, true) === 0x04034b50) {
+    const method = view.getUint16(offset + 8, true);
+    const compressedSize = view.getUint32(offset + 18, true);
+    const nameLength = view.getUint16(offset + 26, true);
+    const extraLength = view.getUint16(offset + 28, true);
+    const name = new TextDecoder().decode(bytes.subarray(offset + 30, offset + 30 + nameLength));
+    const start = offset + 30 + nameLength + extraLength;
+    const payload = bytes.subarray(start, start + compressedSize);
+    entries.set(name, method === 8 ? new Uint8Array(inflateRawSync(payload)) : payload);
+    offset = start + compressedSize;
+  }
+  return entries;
+}
+
+describe("project source export", () => {
+  const exportRequest = (body: string) =>
+    new Request("http://localhost/api/export", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+
+  test("archives every generated file with real binary assets", async () => {
+    const stack = StackStateSchema.parse(DEFAULT_STACK);
+    const response = await exportProject(exportRequest(JSON.stringify(stack)));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/zip");
+    expect(response.headers.get("content-disposition")).toBe(
+      'attachment; filename="my-xstack-app.zip"',
+    );
+
+    const archive = readZip(new Uint8Array(await response.arrayBuffer()));
+    const preview = files((await client.preview(stack)).root);
+    const prefix = "my-xstack-app/";
+    expect(archive.has(`${prefix}package.json`)).toBe(true);
+    expect(response.headers.get("x-file-count")).toBe(String(preview.size));
+    for (const [path, content] of preview) {
+      if (content === "[Binary file]") continue;
+      expect(new TextDecoder().decode(archive.get(`${prefix}${path}`))).toBe(content);
+    }
+    const favicon = archive.get(`${prefix}apps/web/src/app/favicon.ico`)!;
+    expect([...favicon.subarray(0, 4)]).toEqual([0, 0, 1, 0]);
+  });
+
+  test("rejects stacks that cannot be generated", async () => {
+    const invalidName = await exportProject(
+      exportRequest(JSON.stringify({ ...DEFAULT_STACK, projectName: "-bad" })),
+    );
+    expect(invalidName.status).toBe(400);
+    expect(await invalidName.json()).toEqual({
+      message: "Project name cannot start with a dash",
+    });
+
+    const malformed = await exportProject(exportRequest("null"));
+    expect(malformed.status).toBe(400);
   });
 });

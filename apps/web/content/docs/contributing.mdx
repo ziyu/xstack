@@ -70,7 +70,7 @@ bunx --no-install convex env set GITHUB_WEBHOOK_SECRET
 
 The first command reuses an authenticated GitHub CLI account for local development. The second prompts for a separate webhook signing secret. Do not commit credentials or the local `.convex/` database. Start the website in another terminal with `bun dev:web` from the repository root; open `/new` to use the Template Builder.
 
-Builder presets, provider controls and previews share the generator module catalog. Keep URL state, command generation and preview conversion aligned. Logos are local SVG files in `apps/web/public/icons/`, rendered by the shared `TechIcon` component with CSS-selected theme variants.
+Builder presets, provider controls and previews share the generator module catalog. Keep URL state, command generation, preview conversion and the ZIP export aligned; binary assets are embedded by `bun run generate-templates` in `packages/template-generator`. Logos are local SVG files in `apps/web/public/icons/`, rendered by the shared `TechIcon` component with CSS-selected theme variants.
 
 ## Contribution Flow
 

@@ -5,6 +5,7 @@ import { RefreshCw, Settings, Star } from "lucide-react";
 import type { StackState } from "@/lib/constant";
 import { cn } from "@/lib/utils";
 
+import { ExportButton } from "./export-button";
 import { ShareButton } from "./share-button";
 
 type ActionButtonsProps = {
@@ -12,6 +13,7 @@ type ActionButtonsProps = {
   onSave: () => void;
   onLoad: () => void;
   hasSavedStack: boolean;
+  exportDisabled: boolean;
   stackUrl: string;
   stackState: StackState;
 };
@@ -24,6 +26,7 @@ export function ActionButtons({
   onSave,
   onLoad,
   hasSavedStack,
+  exportDisabled,
   stackUrl,
   stackState,
 }: ActionButtonsProps) {
@@ -66,8 +69,9 @@ export function ActionButtons({
           </button>
         )}
       </div>
-      <div className="flex">
+      <div className="flex gap-1.5">
         <ShareButton stackUrl={stackUrl} stackState={stackState} />
+        <ExportButton stack={stackState} disabled={exportDisabled} variant="action" />
       </div>
     </div>
   );

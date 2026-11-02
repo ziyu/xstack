@@ -15,11 +15,20 @@ import { validateProjectName } from "@/lib/stack-validation";
 import { cn } from "@/lib/utils";
 
 import { CodeViewer, CodeViewerEmpty } from "./code-viewer";
+import { ExportButton } from "./export-button";
 import { FileExplorer, type VirtualFile, type VirtualDirectory } from "./file-explorer";
 
 type Preview = Awaited<ReturnType<typeof orpc.preview>>;
 
-export function useStackPreview(stack: StackState, enabled: boolean) {
+export interface StackPreview {
+  data: Preview | null;
+  isLoading: boolean;
+  error: string | null;
+  canRetry: boolean;
+  retry: () => void;
+}
+
+export function useStackPreview(stack: StackState, enabled: boolean): StackPreview {
   const [result, setResult] = useState<{
     key: string;
     attempt: number;
@@ -71,7 +80,8 @@ export function useStackPreview(stack: StackState, enabled: boolean) {
 }
 
 interface PreviewPanelProps {
-  preview: ReturnType<typeof useStackPreview>;
+  preview: StackPreview;
+  stack: StackState;
   selectedFilePath: string | null;
   onSelectFile: (filePath: string | null) => void;
 }
@@ -99,7 +109,12 @@ function documentationFiles(node: VirtualDirectory): VirtualFile[] {
   });
 }
 
-export function PreviewPanel({ preview, selectedFilePath, onSelectFile }: PreviewPanelProps) {
+export function PreviewPanel({
+  preview,
+  stack,
+  selectedFilePath,
+  onSelectFile,
+}: PreviewPanelProps) {
   const { data, isLoading, error, canRetry, retry } = preview;
   const tree = data?.root ?? null;
   const fileCount = data?.fileCount ?? 0;
@@ -222,6 +237,7 @@ export function PreviewPanel({ preview, selectedFilePath, onSelectFile }: Previe
           </span>
         )}
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          <ExportButton stack={stack} variant="toolbar" />
           <Tooltip>
             <TooltipTrigger className="pointer-coarse:py-2 flex items-center gap-1 font-mono text-[10px] text-fd-muted-foreground uppercase tracking-[0.10em] transition-colors duration-150 hover:text-fd-foreground">
               <Info className="h-3.5 w-3.5" />

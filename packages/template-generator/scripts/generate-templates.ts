@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename);
 const TEMPLATES_DIR = path.join(__dirname, "../templates");
 const OUTPUT_FILE = path.join(__dirname, "../src/templates.generated.ts");
 const BINARY_OUTPUT_DIR = path.join(__dirname, "../templates-binary");
+const BINARY_MODULE_FILE = path.join(__dirname, "../src/templates-binary.generated.ts");
 
 async function generateTemplates() {
   console.log("📦 Generating embedded templates...");
@@ -104,6 +105,7 @@ async function copyBinaryFiles(binaryFiles: string[]) {
   }
 
   let totalSize = 0;
+  const embeddedEntries: string[] = [];
 
   for (const file of binaryFiles) {
     const srcPath = path.join(TEMPLATES_DIR, file);
@@ -113,11 +115,28 @@ async function copyBinaryFiles(binaryFiles: string[]) {
 
     fs.copyFileSync(srcPath, destPath);
 
-    totalSize += fs.statSync(destPath).size;
+    const contents = fs.readFileSync(destPath);
+    totalSize += contents.length;
+    embeddedEntries.push(`  ["${file}", "${contents.toString("base64")}"]`);
   }
+
+  fs.writeFileSync(
+    BINARY_MODULE_FILE,
+    `// Auto-generated - DO NOT EDIT
+// Run 'bun run generate-templates' to regenerate
+
+/** Binary template bytes as base64, keyed by template path. Runtime-free for browsers and serverless. */
+export const EMBEDDED_BINARY_TEMPLATES: Map<string, string> = new Map([
+${embeddedEntries.join(",\n")}
+]);
+
+export const BINARY_TEMPLATE_COUNT = ${binaryFiles.length};
+`,
+  );
 
   const sizeKB = (totalSize / 1024).toFixed(2);
   console.log(`✅ Copied ${binaryFiles.length} binary files (${sizeKB} KB)`);
+  console.log(`✅ Generated ${BINARY_MODULE_FILE}`);
 }
 
 generateTemplates().catch((err) => {

@@ -351,7 +351,7 @@ Sets module options, for example `--module-options auth.engine=clerk i18n.locale
 
 Cloudflare native database modules require `--database sqlite --db-setup d1 --web-deploy cloudflare`. For the full preset, explicitly override its S3 selection with `--providers storage:r2-binding`. Explicit incompatible choices are rejected rather than silently removed. Generated `docs/cloudflare.md` covers local migrations, OpenNext/workerd preview, private R2 and Alchemy deployment.
 
-The [Template Builder](/new) uses these same module manifests for presets, provider controls, dependency resolution, command output, and generated-file previews. Share links and saved preferences include provider choices and module options. Provider credentials are configured in the generated project's environment, never entered into the builder.
+The [Template Builder](/new) uses these same module manifests for presets, provider controls, dependency resolution, command output, generated-file previews, and source export. **Export** downloads the generated project as a ZIP with the same text files, dotfiles and binary assets `xstack create` writes, so a configuration can be inspected without running the CLI. Share links and saved preferences include provider choices and module options. Provider credentials are configured in the generated project's environment, never entered into the builder.
 
 ### Phone-number signup and login
 

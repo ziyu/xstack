@@ -28,6 +28,12 @@ export function formatProjectName(name: string | null | undefined) {
   return (name || String(BUILDER_DEFINITION.defaults.projectName)).replace(/\s+/g, "-");
 }
 
+/** Validated project name without a path prefix; used for the project folder and archive name. */
+export function projectFolderName(name: string | null | undefined) {
+  const folder = formatProjectName(name).split(/[\\/]/).filter(Boolean).at(-1);
+  return folder && folder !== "." ? folder : "my-xstack-app";
+}
+
 function quoteShellArgument(value: string) {
   if (/^[a-zA-Z0-9_./-]+$/.test(value)) {
     return value;

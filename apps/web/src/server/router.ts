@@ -1,12 +1,8 @@
 import { ORPCError, os } from "@orpc/server";
-import { EMBEDDED_TEMPLATES, generate, type VirtualNode } from "@xstack/template-generator";
+import type { VirtualNode } from "@xstack/template-generator";
 
-import { applicationIssues } from "@/lib/stack-applications";
-import { resolveStackCompatibility } from "@/lib/stack-compatibility";
-import { productPlan } from "@/lib/stack-features";
-import { StackStateSchema, stackStateToConfig } from "@/lib/stack-schema";
-import { formatProjectName } from "@/lib/stack-utils";
-import { validateProjectName } from "@/lib/stack-validation";
+import { StackStateSchema } from "@/lib/stack-schema";
+import { generateStackProject, prepareStack } from "@/server/stack-project";
 
 function previewNode(node: VirtualNode): VirtualNode {
   if (node.type === "directory") {
@@ -18,28 +14,10 @@ function previewNode(node: VirtualNode): VirtualNode {
 
 export const router = {
   preview: os.input(StackStateSchema).handler(async ({ input }) => {
-    const compatibility = resolveStackCompatibility(input);
-    const stack = compatibility.stack;
-    const compatibilityIssues = Object.values(compatibility.notes).flatMap((entry) =>
-      entry.hasIssue ? entry.notes : [],
-    );
-    if (compatibilityIssues.length)
-      throw new ORPCError("BAD_REQUEST", { message: compatibilityIssues.join("\n") });
-    const nameError = validateProjectName(formatProjectName(stack.projectName));
-    if (nameError) throw new ORPCError("BAD_REQUEST", { message: nameError });
-    const appIssues = applicationIssues(stack);
-    if (appIssues.length) {
-      throw new ORPCError("BAD_REQUEST", { message: appIssues.join("\n") });
-    }
-    const issues = productPlan(stack).issues.filter((issue) => issue.level === "error");
-    if (issues.length) {
-      throw new ORPCError("BAD_REQUEST", {
-        message: issues.map((issue) => issue.message).join("\n"),
-      });
-    }
+    const { stack, issues } = prepareStack(input);
+    if (issues.length) throw new ORPCError("BAD_REQUEST", { message: issues.join("\n") });
 
-    const config = stackStateToConfig(stack);
-    const result = await generate({ config, templates: EMBEDDED_TEMPLATES });
+    const result = await generateStackProject(stack);
     if (result.isErr()) {
       throw new ORPCError("INTERNAL_SERVER_ERROR", {
         message: "Unable to generate this preview. Please try again.",
