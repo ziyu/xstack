@@ -31,6 +31,10 @@
       "types": "./dist/fs-writer.d.mts",
       "default": "./dist/fs-writer.mjs"
     },
+    "./templates-binary": {
+      "types": "./dist/templates-binary.d.mts",
+      "default": "./dist/templates-binary.mjs"
+    },
     "./modules": {
       "types": "./dist/modules/index.d.mts",
       "default": "./dist/modules/index.mjs"

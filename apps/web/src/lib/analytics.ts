@@ -41,6 +41,8 @@ export type AnalyticsEvents = {
   builder_mobile_tab: { tab: "build" | "preview" };
   builder_compat_adjust: { count: number; message: string };
   preview_error: { message: string };
+  preview_export: { files: number; bytes: number };
+  preview_export_error: { message: string };
   preview_file_open: { path: string; extension: string };
   preview_file_copy: { path: string };
   share_open: { page: SharePage };

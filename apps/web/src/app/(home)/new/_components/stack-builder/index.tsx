@@ -76,6 +76,7 @@ export function StackBuilder() {
       onSave={saveCurrentStack}
       onLoad={loadSavedStack}
       hasSavedStack={!!lastSavedStack}
+      exportDisabled={!!configurationError}
       stackUrl={getStackUrl()}
       stackState={effectiveStack}
     />
@@ -444,6 +445,7 @@ export function StackBuilder() {
             ) : (
               <PreviewPanel
                 preview={preview}
+                stack={effectiveStack}
                 selectedFilePath={selectedFile}
                 onSelectFile={setSelectedFile}
               />
@@ -641,6 +643,7 @@ export function StackBuilder() {
           {mobileTab === "preview" && (
             <PreviewPanel
               preview={preview}
+              stack={effectiveStack}
               selectedFilePath={selectedFile}
               onSelectFile={setSelectedFile}
             />
