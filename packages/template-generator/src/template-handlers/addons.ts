@@ -14,7 +14,18 @@ export async function processAddonTemplates(
 
     // Task runners are handled programmatically by generators.
     if (addon === "turborepo" || addon === "nx" || addon === "vite-plus") continue;
-    if (config.application && addon === "electrobun") continue; // Workspace finalizer owns the desktop package.
+    if (addon === "electrobun") {
+      if (!config.application) {
+        processTemplatesFromPrefix(
+          vfs,
+          templates,
+          "addons/electrobun/packages/desktop",
+          "apps/desktop",
+          config,
+        );
+      }
+      continue;
+    }
 
     if (addon === "pwa") {
       if (

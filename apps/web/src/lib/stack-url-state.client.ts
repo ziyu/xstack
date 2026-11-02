@@ -106,15 +106,13 @@ function getStackFromQueryState(
 export function useStackState() {
   const [queryState, setQueryState] = useQueryStates(stackParsers, stackQueryStatesOptions);
   const searchParams = useSearchParams();
-  const initialApps = useMemo(
-    () =>
-      searchParams.has("apps")
-        ? []
-        : usesDefaultApplications(searchParams)
-          ? DEFAULT_STACK.apps
-          : undefined,
-    [searchParams],
-  );
+  const initialApps = useMemo(() => {
+    const rawApps = searchParams.get("apps");
+    if (rawApps !== null) {
+      return stackParsers.apps.parse(rawApps) ?? [];
+    }
+    return usesDefaultApplications(searchParams) ? DEFAULT_STACK.apps : undefined;
+  }, [searchParams]);
 
   const stack = useMemo(
     () => getStackFromQueryState(queryState, initialApps),

@@ -10,6 +10,20 @@
       "payment": ["stripe"]
     }
   },
+  "saas-cn": {
+    "features": ["auth", "sms", "admin", "payment", "credits", "storage"],
+    "providers": {
+      "auth": ["wechat"],
+      "sms": ["aliyun"],
+      "payment": ["wechat", "alipay"],
+      "storage": ["oss"]
+    },
+    "options": {
+      "i18n": {
+        "locales": "zh-CN,en"
+      }
+    }
+  },
   "full": {
     "features": [
       "auth",

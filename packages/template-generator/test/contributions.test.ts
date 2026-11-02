@@ -89,15 +89,20 @@ test("a known application contribution is valid even when no selected app consum
 });
 
 test("legacy web branches remain explicit and desktop is not a stable application type", () => {
+  expect(queryContributions(inventoryContributions(EMBEDDED_TEMPLATES), { legacy: true })).toEqual(
+    [],
+  );
   const legacy = [
     "modules/auth/stack/better-auth/web/next/src/legacy.ts",
     "api/orpc/web/next/src/legacy.ts",
     "deploy/docker/web/next/legacy.Dockerfile",
   ];
+  const legacyDesktop = "addons/electrobun/apps/desktop/legacy.ts";
   const inventory = inventoryContributions(
     new Map([
       ...EMBEDDED_TEMPLATES,
       ...legacy.map((source) => [source, "legacy content"] as const),
+      [legacyDesktop, "legacy desktop content"],
     ]),
   );
   expect(inventory.issues).toEqual([]);
@@ -106,11 +111,17 @@ test("legacy web branches remain explicit and desktop is not a stable applicatio
       expect.objectContaining({ source, legacy: true, variant: "legacy-web" }),
     );
   }
-  const desktop = queryContributions(inventory, { owner: "addon:electrobun" });
+  const desktop = queryContributions(inventory, { owner: "addon:electrobun", legacy: false });
   expect(desktop.length).toBeGreaterThan(0);
-  expect(
-    desktop.every((entry) => entry.legacy && entry.variant === "legacy-desktop" && !entry.appType),
-  ).toBe(true);
+  expect(desktop.every((entry) => entry.variant === "package" && !entry.appType)).toBe(true);
+  expect(inventory.entries).toContainEqual(
+    expect.objectContaining({
+      source: legacyDesktop,
+      owner: "addon:electrobun",
+      legacy: true,
+      variant: "legacy-desktop",
+    }),
+  );
   expect(
     queryContributions(inventory, { module: "auth", variant: "stack" }).every(
       (entry) => !entry.provider,

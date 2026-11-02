@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 export default async function Sponsors() {
   const [sponsorsData, stats] = await Promise.all([
     fetchSponsors(),
-    fetchQuery(api.analytics.getStats, {}),
+    fetchQuery(api.analytics.getStats, {}).catch(() => null),
   ]);
   return <SponsorsPage sponsorsData={sponsorsData} totalProjects={stats?.totalProjects ?? 0} />;
 }

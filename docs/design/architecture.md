@@ -768,3 +768,10 @@ C2 与应用声明驱动改动已提交 `fb26ce4`。C3 通过 adapter 声明扩�
 持久入口为 `bun apps/cli/live-tests/c4.ts plan|prepare|check|runtime|report|cleanup`。使用实际生成应用、数据库和 SDK，只把指定 AI/S3 远端传输替换为隔离本地协议；Nuxt 字体发现使用空离线目录，Next npm advisory 查询在离线环境返回不可用并单独记录，不能解读为安全审计通过。未调用付费模型、真实桶或远端部署。C5/C6 未在本批扩展。
 
 最终六组 C4 runtime 全部通过：真实会话/管理员隔离、文件限额/越权/签名下载/删除、AI 多 provider 对话/图片/异步视频/重放/私有媒体、博客草稿/发布/翻译/修订冲突/删除、canonical/hreflang/OG/Twitter/JSON-LD/sitemap。五组 SQLite 另通过生成 AI+积分服务的并发、扣费/退款/取消及不确定结果协议回归；PostgreSQL 本批通过 HTTP 与持久化流程，不将 SQLite 扩展协议结果冒充 PG 并发覆盖。仓库回归 83 项 generator、33 项 Web、48 项 CLI/MCP/产品通过，相关类型检查与定向 lint 通过，贡献审计 975 个来源、零分类问题。运行报告保存在忽略目录 `.smoke/c4-acceptance-results.json`，真实云端状态保持 unverified。
+
+### 27.12 C6 外围旧模板清零与 saas-cn 预设补齐
+
+- **外围模板非 legacy 化**：将剩余 16 个 legacy 模板文件（`addon:electrobun` 桌面壳迁至 `addons/electrobun/packages/desktop`，`deployment:docker` 服务端与客户端分别迁至 `deploy/docker/apps/backend` 与 `deploy/docker/shared/client/frameworks/<framework>`，`deployment:prisma` 迁至 `deploy/prisma/shared/client/frameworks/<framework>`）全部纳入非 legacy 分类，并通过 `planDeployContributions` 接入 `planStackContributions` 统一贡献预检。`audit-contributions` 全量 975 个来源达成 **0 issues、0 legacyFiles**。
+- **拆分应用 Docker 构建与秘密隔离修复**：`appPath("server")` 优先解析 `application.backendRoot`，修复自定义名称拆分后端（如 `apps/gateway`）在客户端 Dockerfile 中的 schema 拷贝路径；独立后端 `Dockerfile` 仅在单应用兼容模式下挂载 `web_env`，消除拆分工作区 `docker compose` 未提供 `web_env` 秘密导致的构建失败及跨应用秘密挂载。
+- **`saas-cn` 产品预设落地**：在 `ProductPresetSchema`、`templates/modules/presets.json` 与 `templates/builder.json`（覆盖 Next.js、TanStack Start、Nuxt 三套全栈预设）中补齐 `saas-cn`（`auth[wechat]` + `sms[aliyun]` + `admin` + `payment[wechat, alipay]` + `credits` + `storage[oss]` + `i18n.locales=zh-CN,en`）。
+- **Web 站点离线构建韧性**：`apps/web` 的 `showcase`、`sponsors`、`analytics` 预渲染及 `ConvexReactClient` 初始化增加离线降级与客户端实时查询回退，避免本地 Convex 未启动时阻断 `bun build` 全量构建。

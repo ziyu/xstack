@@ -48,6 +48,11 @@ test("named Docker services and PWA ownership do not mutate independent applicat
   for (const id of ["gateway", "operations", "public-site"])
     expect(compose.services[id].build.dockerfile).toBe(`apps/${id}/Dockerfile`);
   expect(compose.services["public-site"].environment.SERVER_URL).toBe("http://gateway:3000");
+  expect(output.get("apps/public-site/Dockerfile")).toContain(
+    "target=/app/apps/gateway/.env.local",
+  );
+  expect(output.get("apps/gateway/Dockerfile")).toContain("target=/app/apps/gateway/.env.local");
+  expect(output.get("apps/gateway/Dockerfile")).not.toContain("id=web_env");
   const cli = JSON.parse(output.get("apps/maintenance/package.json")!);
   expect(cli.dependencies?.["vite-plugin-pwa"]).toBeUndefined();
   expect(output.has("apps/maintenance/Dockerfile")).toBe(false);

@@ -323,7 +323,7 @@ xstack --features none
 
 ### `--preset <name>`
 
-Selects a curated feature set: `starter` (auth), `saas-global` (auth, email, admin, payment and credits), or `full` (all modules, including SMS, storage, AI, SEO, blog, affiliate and captcha). `--features` adds to the preset. `full` requires configuration of real providers; captcha fails closed until configured, and email verification remains enabled.
+Selects a curated feature set: `starter` (auth), `saas-global` (auth, email, admin, payment and credits), `saas-cn` (WeChat auth, Aliyun SMS, admin, WeChat/Alipay payment, credits, OSS storage, and `zh-CN,en` locales), or `full` (all modules, including SMS, storage, AI, SEO, blog, affiliate and captcha). `--features` adds to the preset. `full` requires configuration of real providers; captcha fails closed until configured, and email verification remains enabled.
 
 ### `--providers <feature:provider...>`
 
@@ -369,7 +369,7 @@ After generation, run `bun install` and `bun run db:push` in `phone-app`. Set th
 
 For local development without sending paid SMS, explicitly set `SMS_DELIVERY_MODE=console` in `apps/web/.env`; codes are printed only when running the development server. The default mode is `provider`, and console mode is rejected in production. Never expose development console delivery publicly. The generated `docs/modules/sms.md` lists the selected provider's required credentials and template format.
 
-Selecting `sms` alone creates a server-side SMS service, not an authentication flow. Existing `starter` and `saas-global` presets are unchanged; add `sms` explicitly. WeChat is a separate `auth` provider; the future `saas-cn` preset is not yet available.
+Selecting `sms` alone creates a server-side SMS service, not an authentication flow. Existing `starter` and `saas-global` presets are unchanged; add `sms` explicitly or use `--preset saas-cn`. WeChat is a separate `auth` provider included in `saas-cn`.
 
 ### WeChat website login
 

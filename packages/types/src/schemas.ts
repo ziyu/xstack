@@ -616,7 +616,7 @@ export const DbSetupOptionsSchema = z
   .describe("Database setup configuration");
 
 export const ProductPresetSchema = z
-  .enum(["starter", "saas-global", "full"])
+  .enum(["starter", "saas-global", "saas-cn", "full"])
   .describe("Product preset (feature modules + providers)");
 
 export const ProductConfigSchema = z

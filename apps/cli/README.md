@@ -27,7 +27,7 @@ npx xstack@latest
 
 Follow the prompts to configure your project or use the `--yes` flag for defaults.
 
-The default is a Next.js full-stack shell with SQLite, Drizzle, Turborepo, and no optional feature modules. `--preset starter` adds authentication; `--preset saas-global` adds authentication, email, admin, payments and credits; `--preset full` selects every feature module, including AI, publishing, private storage, referral credits and Turnstile. These differ from legacy technology presets selected by `--template`.
+The default is a Next.js full-stack shell with SQLite, Drizzle, Turborepo, and no optional feature modules. `--preset starter` adds authentication; `--preset saas-global` adds authentication, email, admin, payments and credits; `--preset saas-cn` adds WeChat authentication, Aliyun SMS, admin, WeChat/Alipay payments, credits, OSS storage, and `zh-CN,en` locales; `--preset full` selects every feature module, including AI, publishing, private storage, referral credits and Turnstile. These differ from legacy technology presets selected by `--template`.
 
 ```bash
 xstack my-saas --preset saas-global \
@@ -131,7 +131,7 @@ Options:
   --orm <type>                    ORM type (none, drizzle, prisma, mongoose)
   --dry-run                       Validate configuration without writing files
   --features <modules...>         auth, email, sms, admin, payment, credits, storage, ai, seo, blog, affiliate, captcha, none
-  --preset <name>                 Feature preset (starter, saas-global, full)
+  --preset <name>                 Feature preset (starter, saas-global, saas-cn, full)
   --providers <pairs...>          Module providers (feature:provider, e.g. payment:polar)
   --module-options <pairs...>     Module options (module.key=value, e.g. auth.engine=clerk)
   --frontend <types...>           Frontend types (tanstack-router, react-router, tanstack-start, next, nuxt, svelte, solid, astro, native-bare, native-uniwind, native-unistyles, none)

@@ -4,10 +4,9 @@ import isBinaryPath from "is-binary-path";
 
 Handlebars.registerHelper("appPath", (type: string, options: Handlebars.HelperOptions) => {
   const logical = `apps/${type}`;
-  return (
-    options.data?.root?.application?.paths?.[logical] ??
-    (type === "fullstack-web" ? "apps/web" : logical)
-  );
+  const application = options.data?.root?.application;
+  if (type === "server" && application?.backendRoot) return application.backendRoot;
+  return application?.paths?.[logical] ?? (type === "fullstack-web" ? "apps/web" : logical);
 });
 Handlebars.registerHelper("eq", (a, b) => a === b);
 Handlebars.registerHelper("ne", (a, b) => a !== b);

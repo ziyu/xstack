@@ -286,6 +286,8 @@ describe("explicit application state", () => {
     expect(legacy.apps).toBeUndefined();
     const empty = await loadStackParams(Promise.resolve(new URL("https://xstack.dev/new?apps=[]")));
     expect(empty.apps).toEqual([]);
+    expect(() => productPlan(empty)).not.toThrow();
+    expect(() => generateStackCommand(empty)).not.toThrow();
     await expect(client.preview(empty)).rejects.toMatchObject({
       code: "BAD_REQUEST",
       message: applicationIssues(empty).join("\n"),

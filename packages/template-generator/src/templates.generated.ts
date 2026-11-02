@@ -100,11 +100,11 @@ export const EMBEDDED_TEMPLATES: Map<string, string> = new Map([
 	{{/if}}
 }
 `],
-  ["addons/electrobun/apps/desktop/.gitignore", `.hutch/
+  ["addons/electrobun/packages/desktop/.gitignore", `.hutch/
 /artifacts/
 /build/
 `],
-  ["addons/electrobun/apps/desktop/electrobun.config.ts.hbs", `import type { ElectrobunConfig } from "electrobun";
+  ["addons/electrobun/packages/desktop/electrobun.config.ts.hbs", `import type { ElectrobunConfig } from "electrobun";
 
 const webBuildDir =
   "{{#if application}}../../{{application.directory}}{{else}}../web{{/if}}/{{#if (includes frontend "react-router")}}build/client{{else if (includes frontend "tanstack-start")}}dist/client{{else if (includes frontend "next")}}out{{else if (includes frontend "nuxt")}}.output/public{{else if (includes frontend "svelte")}}build{{else}}dist{{/if}}";
@@ -142,7 +142,7 @@ export default {
   },
 } satisfies ElectrobunConfig;
 `],
-  ["addons/electrobun/apps/desktop/package.json.hbs", `{
+  ["addons/electrobun/packages/desktop/package.json.hbs", `{
   "name": "desktop",
   "private": true,
   "type": "module",
@@ -155,7 +155,7 @@ export default {
   }
 }
 `],
-  ["addons/electrobun/apps/desktop/src/bun/index.ts.hbs", `import { BrowserWindow, Updater } from "electrobun/main";
+  ["addons/electrobun/packages/desktop/src/bun/index.ts.hbs", `import { BrowserWindow, Updater } from "electrobun/main";
 
 const DEV_SERVER_PORT = {{#if application.port}}{{application.port}}{{else}}{{#if (or (includes frontend "react-router") (includes frontend "svelte"))}}5173{{else if (includes frontend "astro")}}4321{{else}}3001{{/if}}{{/if}};
 const DEV_SERVER_URL = \`http://localhost:\${DEV_SERVER_PORT}\`;
@@ -193,7 +193,7 @@ new BrowserWindow({
 
 console.log("Electrobun desktop shell started.");
 `],
-  ["addons/electrobun/apps/desktop/tsconfig.json.hbs", `{
+  ["addons/electrobun/packages/desktop/tsconfig.json.hbs", `{
   "extends": ["../../packages/config/tsconfig.base.json", "./.hutch/devkit/tsconfig.json"],
   "compilerOptions": {
     "ignoreDeprecations": "6.0",
@@ -4834,6 +4834,16 @@ temp
       }
     },
     {
+      "id": "saas-cn",
+      "name": "Next.js · CN SaaS · PostgreSQL",
+      "description": "WeChat and phone OTP authentication, Aliyun SMS, WeChat Pay/Alipay, credits, OSS private files and admin",
+      "group": "Next.js",
+      "productPreset": "saas-cn",
+      "stack": {
+        "database": "postgres"
+      }
+    },
+    {
       "id": "full",
       "name": "Next.js · Full · PostgreSQL",
       "description": "All modules: AI, private files, publishing, referrals and protected authentication",
@@ -4888,6 +4898,27 @@ temp
       "description": "Authentication, email, admin, payments and credits",
       "group": "TanStack Start",
       "productPreset": "saas-global",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "tanstack-start"
+            }
+          }
+        ],
+        "webFrontend": ["tanstack-start"],
+        "backend": "self-tanstack-start",
+        "database": "postgres"
+      }
+    },
+    {
+      "id": "tanstack-start-saas-cn",
+      "name": "TanStack Start · CN SaaS · PostgreSQL",
+      "description": "WeChat and phone OTP authentication, Aliyun SMS, WeChat Pay/Alipay, credits, OSS private files and admin",
+      "group": "TanStack Start",
+      "productPreset": "saas-cn",
       "stack": {
         "apps": [
           {
@@ -4969,6 +5000,27 @@ temp
       "description": "Authentication, email, admin, payments and credits",
       "group": "Nuxt",
       "productPreset": "saas-global",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "nuxt"
+            }
+          }
+        ],
+        "webFrontend": ["nuxt"],
+        "backend": "self-nuxt",
+        "database": "postgres"
+      }
+    },
+    {
+      "id": "nuxt-saas-cn",
+      "name": "Nuxt · CN SaaS · PostgreSQL",
+      "description": "WeChat and phone OTP authentication, Aliyun SMS, WeChat Pay/Alipay, credits, OSS private files and admin",
+      "group": "Nuxt",
+      "productPreset": "saas-cn",
       "stack": {
         "apps": [
           {
@@ -6036,6 +6088,46 @@ export function createPrismaClient(env: DatabaseConfig) {
 
 export type Database = ReturnType<typeof createPrismaClient>;
 `],
+  ["deploy/docker/apps/backend/Dockerfile.hbs", `{{#if (eq packageManager "bun")}}
+FROM oven/bun:1 AS builder
+{{else}}
+FROM node:24-slim AS builder
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN {{#unless application}}--mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{/unless}}{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN {{#unless application}}--mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{/unless}}{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN {{#unless application}}--mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{/unless}}{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+ENV NODE_ENV=production
+RUN {{#unless application}}--mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{/unless}}{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "server"}} && {{packageManager}} run build
+
+{{#if (eq runtime "bun")}}
+FROM oven/bun:1 AS runner
+{{else}}
+FROM node:24-slim AS runner
+{{/if}}
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app /app
+
+EXPOSE 3000
+
+WORKDIR /app/{{appPath "server"}}
+{{#if (eq runtime "bun")}}
+CMD ["bun", "dist/index.mjs"]
+{{else}}
+CMD ["node", "dist/index.mjs"]
+{{/if}}
+`],
   ["deploy/docker/compose/_dockerignore", `**/node_modules
 .git
 
@@ -6340,47 +6432,7 @@ secrets:
     file: apps/server/.env
 {{/if}}
 `],
-  ["deploy/docker/server/Dockerfile.hbs", `{{#if (eq packageManager "bun")}}
-FROM oven/bun:1 AS builder
-{{else}}
-FROM node:24-slim AS builder
-{{/if}}
-{{#if (eq packageManager "pnpm")}}
-RUN npm install -g pnpm@11
-{{/if}}
-WORKDIR /app
-
-COPY . .
-{{#if (eq packageManager "bun")}}
-RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
-{{else if (eq packageManager "pnpm")}}
-RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
-{{else}}
-RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
-{{/if}}
-
-ENV NODE_ENV=production
-RUN --mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "server"}} && {{packageManager}} run build
-
-{{#if (eq runtime "bun")}}
-FROM oven/bun:1 AS runner
-{{else}}
-FROM node:24-slim AS runner
-{{/if}}
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app /app
-
-EXPOSE 3000
-
-WORKDIR /app/{{appPath "server"}}
-{{#if (eq runtime "bun")}}
-CMD ["bun", "dist/index.mjs"]
-{{else}}
-CMD ["node", "dist/index.mjs"]
-{{/if}}
-`],
-  ["deploy/docker/web/astro/Dockerfile.hbs", `FROM node:24-slim AS base
+  ["deploy/docker/shared/client/frameworks/astro/Dockerfile.hbs", `FROM node:24-slim AS base
 {{#if (eq packageManager "bun")}}
 COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 {{/if}}
@@ -6419,7 +6471,7 @@ EXPOSE 3001
 WORKDIR /app/{{appPath "web"}}
 CMD ["node", "dist/server/entry.mjs"]
 `],
-  ["deploy/docker/web/nuxt/Dockerfile.hbs", `FROM node:24-slim AS builder
+  ["deploy/docker/shared/client/frameworks/nuxt/Dockerfile.hbs", `FROM node:24-slim AS builder
 {{#if (eq packageManager "bun")}}
 COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 {{/if}}
@@ -6458,7 +6510,7 @@ EXPOSE 3001
 
 CMD ["node", "server/index.mjs"]
 `],
-  ["deploy/docker/web/react/next/Dockerfile.hbs", `FROM node:24-slim AS builder
+  ["deploy/docker/shared/client/frameworks/react/next/Dockerfile.hbs", `FROM node:24-slim AS builder
 {{#if (eq packageManager "bun")}}
 COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 {{/if}}
@@ -6511,7 +6563,7 @@ EXPOSE 3001
 WORKDIR /app/{{appPath "web"}}
 CMD ["node", "--import", "varlock/auto-load", "server.js"]
 `],
-  ["deploy/docker/web/react/react-router/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
+  ["deploy/docker/shared/client/frameworks/react/react-router/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
 {{#if (eq packageManager "bun")}}
 COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 {{/if}}
@@ -6553,7 +6605,7 @@ ENV HOST=0.0.0.0
 EXPOSE 3001
 CMD ["sh", "-c", "cd {{appPath "web"}} && npm run start"]
 `],
-  ["deploy/docker/web/react/tanstack-router/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
+  ["deploy/docker/shared/client/frameworks/react/tanstack-router/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
 {{#if (eq packageManager "bun")}}
 COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 {{/if}}
@@ -6592,7 +6644,7 @@ COPY {{appPath "web"}}/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 `],
-  ["deploy/docker/web/react/tanstack-router/nginx.conf", `server {
+  ["deploy/docker/shared/client/frameworks/react/tanstack-router/nginx.conf", `server {
     listen 80;
     server_name _;
     root /usr/share/nginx/html;
@@ -6611,7 +6663,7 @@ CMD ["nginx", "-g", "daemon off;"]
     }
 }
 `],
-  ["deploy/docker/web/react/tanstack-start/Dockerfile.hbs", `{{#if (and (eq packageManager "bun") (eq runtime "bun") (not (includes addons "vite-plus")))}}
+  ["deploy/docker/shared/client/frameworks/react/tanstack-start/Dockerfile.hbs", `{{#if (and (eq packageManager "bun") (eq runtime "bun") (not (includes addons "vite-plus")))}}
 FROM oven/bun:1 AS builder
 {{else}}
 FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
@@ -6672,7 +6724,7 @@ CMD ["bun", ".output/server/index.mjs"]
 CMD ["node", ".output/server/index.mjs"]
 {{/if}}
 `],
-  ["deploy/docker/web/solid/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
+  ["deploy/docker/shared/client/frameworks/solid/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS builder
 {{#if (and (eq orm "prisma") (not (includes addons "vite-plus")))}}
 RUN apt-get update -y \\
   && apt-get install -y --no-install-recommends openssl \\
@@ -6728,7 +6780,7 @@ EXPOSE 3001
 
 CMD ["node", ".output/server/index.mjs"]
 `],
-  ["deploy/docker/web/svelte/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS base
+  ["deploy/docker/shared/client/frameworks/svelte/Dockerfile.hbs", `FROM node:24{{#unless (includes addons "vite-plus")}}-slim{{/unless}} AS base
 {{#if (eq packageManager "bun")}}
 COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 {{/if}}
@@ -6767,7 +6819,7 @@ EXPOSE 3001
 WORKDIR /app/{{appPath "web"}}
 CMD ["node", "build/index.js"]
 `],
-  ["deploy/prisma/web/react/react-router/prisma.server.ts", `import path from "node:path";
+  ["deploy/prisma/shared/client/frameworks/react/react-router/prisma.server.ts", `import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createRequestHandler } from "@react-router/express";
@@ -41970,6 +42022,20 @@ export async function handle(request: Request, path: string): Promise<Response |
       "auth": ["google", "github"],
       "email": ["resend"],
       "payment": ["stripe"]
+    }
+  },
+  "saas-cn": {
+    "features": ["auth", "sms", "admin", "payment", "credits", "storage"],
+    "providers": {
+      "auth": ["wechat"],
+      "sms": ["aliyun"],
+      "payment": ["wechat", "alipay"],
+      "storage": ["oss"]
+    },
+    "options": {
+      "i18n": {
+        "locales": "zh-CN,en"
+      }
     }
   },
   "full": {

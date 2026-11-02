@@ -85,6 +85,33 @@ describe("product mode", () => {
     expect(await read("README.md")).toContain("[docs](docs/modules/credits.md)");
   });
 
+  it("wires the saas-cn modules together", async () => {
+    const { result, read, exists } = await createProduct("product-saas-cn", {
+      preset: "saas-cn",
+    });
+    expect(result.isOk()).toBe(true);
+
+    for (const file of [
+      "packages/payment/src/providers/wechat.ts",
+      "packages/payment/src/providers/alipay.ts",
+      "packages/sms/src/providers/aliyun.ts",
+      "packages/storage/src/provider.ts",
+      "packages/db/src/schema/credits.ts",
+    ]) {
+      expect(await exists(file)).toBe(true);
+    }
+
+    const schema = await read("apps/web/.env.schema");
+    expect(schema).toContain("WECHAT_CLIENT_ID");
+    expect(schema).toContain("ALIYUN_SMS_ACCESS_KEY_ID");
+    expect(schema).toContain("WECHAT_PAY_MCH_ID");
+    expect(schema).toContain("ALIPAY_APP_ID");
+    expect(schema).toContain("OSS_BUCKET");
+
+    const xstackConfig = await read("xstack.jsonc");
+    expect(xstackConfig).toContain('"locales": "zh-CN,en"');
+  });
+
   it("honors database, deploy and locale choices", async () => {
     const { result, read, exists } = await createProduct("product-postgres-docker", {
       product: { features: [], options: { i18n: { locales: "zh-CN" } } },

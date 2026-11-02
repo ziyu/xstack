@@ -3,6 +3,7 @@ import type { ProjectConfig } from "@xstack/types";
 import { toRenderConfig, getModulePlan } from "../modules/pipeline";
 import { planAuthContributions } from "../modules/stack/auth";
 import { planApiContributions } from "../template-handlers/api";
+import { planDeployContributions } from "../template-handlers/deploy";
 import { GeneratorError, type RenderConfig } from "../types";
 import { assertContributionInventory } from "./inventory";
 import { requiredModuleContributions } from "./requirements";
@@ -37,7 +38,11 @@ export function planStackContributions(
     )
       ? planAuthContributions(context.config)
       : [];
-    for (const item of [...planApiContributions(context.config), ...auth]) {
+    for (const item of [
+      ...planApiContributions(context.config),
+      ...auth,
+      ...planDeployContributions(context.config),
+    ]) {
       const suffix = item.target.split("/").slice(2).join("/");
       const output =
         context.root && item.target.startsWith("apps/")

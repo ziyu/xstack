@@ -1,7 +1,12 @@
-import type { ProjectConfig } from "@xstack/types";
 import { parse, stringify } from "yaml";
 
-import { appOutputPath } from "../contributions/context";
+import {
+  acceptsStackRoles,
+  renderStackContributions,
+  stackClientContributions,
+  WEB_CLIENT_ROLES,
+  type StackContribution,
+} from "../contributions/stack";
 import { processTemplateString } from "../core/template-processor";
 import type { VirtualFileSystem } from "../core/virtual-fs";
 import { generateWorkspaceAlchemyRun } from "../generators/alchemy/render";
@@ -15,8 +20,68 @@ import { addPackageDependency } from "../utils/add-deps";
 import { isDatabaseConsumedByDocker } from "../utils/docker-database";
 import { type TemplateData, processTemplatesFromPrefix } from "./utils";
 
-function hasOwnKey<T extends object>(object: T, key: PropertyKey): key is keyof T {
-  return Object.hasOwn(object, key);
+/** Select declared client families and backend roles for deployment contributions. */
+export function planDeployContributions(config: RenderConfig): StackContribution[] {
+  const plan: StackContribution[] = [];
+  const target = config.application?.directory ?? "apps/web";
+  const ownsBackend = config.backend !== "none" && acceptsStackRoles(config, ["backend"]);
+  function add(
+    owner: string,
+    source: string,
+    destination: string,
+    roles?: readonly string[],
+    kind: StackContribution["kind"] = "prefix",
+  ) {
+    plan.push({ source, target: destination, owner, roles, kind, required: true });
+  }
+
+  if (config.webDeploy === "prisma") {
+    for (const { framework, family } of stackClientContributions(config)) {
+      if (family === "native" || !acceptsStackRoles(config, WEB_CLIENT_ROLES)) continue;
+      if (framework === "react-router") {
+        add(
+          "deployment:prisma",
+          "deploy/prisma/shared/client/frameworks/react/react-router",
+          target,
+          WEB_CLIENT_ROLES,
+        );
+      }
+    }
+  }
+
+  if (
+    config.webDeploy !== "none" &&
+    config.webDeploy !== "cloudflare" &&
+    config.webDeploy !== "prisma" &&
+    config.webDeploy !== "vercel"
+  ) {
+    for (const { framework, family } of stackClientContributions(config)) {
+      if (family === "native" || !acceptsStackRoles(config, WEB_CLIENT_ROLES)) continue;
+      const frameworkPath = family === "react" ? `react/${framework}` : framework;
+      add(
+        `deployment:${config.webDeploy}`,
+        `deploy/${config.webDeploy}/shared/client/frameworks/${frameworkPath}`,
+        target,
+        WEB_CLIENT_ROLES,
+      );
+    }
+  }
+
+  if (
+    config.serverDeploy !== "none" &&
+    config.serverDeploy !== "cloudflare" &&
+    config.serverDeploy !== "prisma" &&
+    config.serverDeploy !== "vercel" &&
+    config.backend !== "self" &&
+    ownsBackend
+  ) {
+    const server = config.application?.directory ?? "apps/server";
+    add(`deployment:${config.serverDeploy}`, `deploy/${config.serverDeploy}/apps/backend`, server, [
+      "backend",
+    ]);
+  }
+
+  return plan;
 }
 
 export async function processDeployTemplates(
@@ -24,8 +89,6 @@ export async function processDeployTemplates(
   templates: TemplateData,
   config: RenderConfig,
 ): Promise<void> {
-  const isBackendSelf = config.backend === "self";
-
   if (
     !config.application &&
     (["cloudflare", "prisma"].includes(config.webDeploy) ||
@@ -51,70 +114,7 @@ export async function processDeployTemplates(
     processTemplatesFromPrefix(vfs, templates, "deploy/vercel", "", config);
   }
 
-  if (config.webDeploy === "prisma") {
-    const templateMap = {
-      "react-router": "react/react-router",
-    } satisfies Partial<Record<ProjectConfig["frontend"][number], string>>;
-
-    for (const frontend of config.frontend) {
-      if (hasOwnKey(templateMap, frontend)) {
-        const templatePath = templateMap[frontend];
-        processTemplatesFromPrefix(
-          vfs,
-          templates,
-          `deploy/prisma/web/${templatePath}`,
-          appOutputPath(config, "web"),
-          config,
-        );
-      }
-    }
-  }
-
-  if (
-    config.webDeploy !== "none" &&
-    config.webDeploy !== "cloudflare" &&
-    config.webDeploy !== "prisma" &&
-    config.webDeploy !== "vercel"
-  ) {
-    const templateMap = {
-      "tanstack-router": "react/tanstack-router",
-      "tanstack-start": "react/tanstack-start",
-      "react-router": "react/react-router",
-      solid: "solid",
-      next: "react/next",
-      nuxt: "nuxt",
-      svelte: "svelte",
-      astro: "astro",
-    } satisfies Record<string, string>;
-
-    for (const f of config.frontend) {
-      if (hasOwnKey(templateMap, f)) {
-        processTemplatesFromPrefix(
-          vfs,
-          templates,
-          `deploy/${config.webDeploy}/web/${templateMap[f]}`,
-          appOutputPath(config, "web"),
-          config,
-        );
-      }
-    }
-  }
-
-  if (
-    config.serverDeploy !== "none" &&
-    config.serverDeploy !== "cloudflare" &&
-    config.serverDeploy !== "prisma" &&
-    config.serverDeploy !== "vercel" &&
-    !isBackendSelf
-  ) {
-    processTemplatesFromPrefix(
-      vfs,
-      templates,
-      `deploy/${config.serverDeploy}/server`,
-      appOutputPath(config, "server"),
-      config,
-    );
-  }
+  renderStackContributions(vfs, templates, config, planDeployContributions(config));
 }
 
 type ComposeService = {
@@ -291,7 +291,7 @@ export function processWorkspaceDeployTemplates(
     processTemplatesFromPrefix(
       vfs,
       templates,
-      "addons/electrobun/apps/desktop",
+      "addons/electrobun/packages/desktop",
       "packages/desktop",
       target,
     );

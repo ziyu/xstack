@@ -1,0 +1,39 @@
+{{#if (eq packageManager "bun")}}
+FROM oven/bun:1 AS builder
+{{else}}
+FROM node:24-slim AS builder
+{{/if}}
+{{#if (eq packageManager "pnpm")}}
+RUN npm install -g pnpm@11
+{{/if}}
+WORKDIR /app
+
+COPY . .
+{{#if (eq packageManager "bun")}}
+RUN {{#unless application}}--mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{/unless}}{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.bun/install/cache bun install
+{{else if (eq packageManager "pnpm")}}
+RUN {{#unless application}}--mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{/unless}}{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+{{else}}
+RUN {{#unless application}}--mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{/unless}}{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} --mount=type=cache,target=/root/.npm npm install
+{{/if}}
+
+ENV NODE_ENV=production
+RUN {{#unless application}}--mount=type=secret,id=web_env,target=/app/{{appPath "web"}}/.env.local {{/unless}}{{#if (and (ne backend "self") (ne backend "none") (ne backend "convex"))}}--mount=type=secret,id=server_env,target=/app/{{appPath "server"}}/.env.local{{/if}} cd {{appPath "server"}} && {{packageManager}} run build
+
+{{#if (eq runtime "bun")}}
+FROM oven/bun:1 AS runner
+{{else}}
+FROM node:24-slim AS runner
+{{/if}}
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app /app
+
+EXPOSE 3000
+
+WORKDIR /app/{{appPath "server"}}
+{{#if (eq runtime "bun")}}
+CMD ["bun", "dist/index.mjs"]
+{{else}}
+CMD ["node", "dist/index.mjs"]
+{{/if}}

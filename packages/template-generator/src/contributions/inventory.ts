@@ -389,10 +389,20 @@ export function inventoryContributions(templates: Map<string, string>): Contribu
           entry.appType = parts[3];
           validateApp(source, entry.appType);
         }
+      } else if (parts[2] === "packages") {
+        entry.variant = "package";
       }
     } else if (root === "deploy" && parts.length > 2) {
       entry = create("deployment", `deployment:${parts[1]}`, parts[2]);
-      if (parts[2] === "web" || parts[2] === "server") {
+      if (parts[2] === "apps") {
+        entry.appType = parts[3];
+        validateApp(source, entry.appType);
+      } else if (parts[2] === "shared" && parts[3] === "client" && parts[4] === "frameworks") {
+        entry.framework = parts[5] === "react" ? parts[6] : parts[5];
+        if (!entry.framework || !frameworks.has(entry.framework)) {
+          issue("unknown-framework", source, `Unknown deployment client framework at ${source}`);
+        }
+      } else if (parts[2] === "web" || parts[2] === "server") {
         entry.variant = `legacy-${parts[2]}`;
         entry.legacy = true;
       }
@@ -447,8 +457,10 @@ export function queryContributions(
       (!sourcePrefix ||
         entry.source === sourcePrefix ||
         entry.source.startsWith(`${sourcePrefix}/`)) &&
-      Object.entries(fields).every(
-        ([key, value]) => entry[key as keyof ContributionEntry] === value,
+      Object.entries(fields).every(([key, value]) =>
+        key === "legacy"
+          ? Boolean(entry.legacy) === value
+          : entry[key as keyof ContributionEntry] === value,
       ),
   );
 }

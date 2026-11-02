@@ -1,7 +1,12 @@
 "use client";
 
 import { api } from "@xstack/backend/convex/_generated/api";
-import { type Preloaded, useConvexConnectionState, usePreloadedQuery } from "convex/react";
+import {
+  type Preloaded,
+  useConvexConnectionState,
+  usePreloadedQuery,
+  useQuery,
+} from "convex/react";
 import { useEffect, useState } from "react";
 
 import {
@@ -341,7 +346,7 @@ const emptyData: AggregatedAnalyticsData = {
   },
 };
 
-export function AnalyticsClient({
+function PreloadedAnalyticsClient({
   preloadedStats,
   preloadedDailyStats,
   preloadedMonthlyStats,
@@ -365,4 +370,47 @@ export function AnalyticsClient({
   const data = stats ? buildFromPrecomputed(stats, dailyStats, monthlyStats) : emptyData;
 
   return <AnalyticsPage data={data} connectionStatus={connectionStatus} />;
+}
+
+function LiveAnalyticsClient() {
+  const stats = useQuery(api.analytics.getStats, {});
+  const dailyStats = useQuery(api.analytics.getDailyStats, { days: 30 });
+  const monthlyStats = useQuery(api.analytics.getMonthlyStats, {});
+  const connectionState = useConvexConnectionState();
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
+  const connectionStatus = hasHydrated ? getConnectionStatus(connectionState) : "connecting";
+
+  const data =
+    stats && dailyStats && monthlyStats
+      ? buildFromPrecomputed(stats, dailyStats, monthlyStats)
+      : emptyData;
+
+  return <AnalyticsPage data={data} connectionStatus={connectionStatus} />;
+}
+
+export function AnalyticsClient({
+  preloadedStats,
+  preloadedDailyStats,
+  preloadedMonthlyStats,
+}: {
+  preloadedStats: Preloaded<typeof api.analytics.getStats> | null;
+  preloadedDailyStats: Preloaded<typeof api.analytics.getDailyStats> | null;
+  preloadedMonthlyStats: Preloaded<typeof api.analytics.getMonthlyStats> | null;
+}) {
+  if (preloadedStats && preloadedDailyStats && preloadedMonthlyStats) {
+    return (
+      <PreloadedAnalyticsClient
+        preloadedStats={preloadedStats}
+        preloadedDailyStats={preloadedDailyStats}
+        preloadedMonthlyStats={preloadedMonthlyStats}
+      />
+    );
+  }
+
+  return <LiveAnalyticsClient />;
 }

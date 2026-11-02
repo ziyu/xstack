@@ -187,9 +187,11 @@ export function useStackBuilder() {
     [
       ...(projectNameError ? [projectNameError] : []),
       ...applicationIssues(effectiveStack),
-      ...productPlan(effectiveStack)
-        .issues.filter((issue) => issue.level === "error")
-        .map((issue) => issue.message),
+      ...(effectiveStack.apps !== undefined && effectiveStack.apps.length === 0
+        ? []
+        : productPlan(effectiveStack)
+            .issues.filter((issue) => issue.level === "error")
+            .map((issue) => issue.message)),
     ]
       .filter((message, index, messages) => messages.indexOf(message) === index)
       .join("\n") || null;

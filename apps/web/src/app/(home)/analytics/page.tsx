@@ -35,9 +35,9 @@ export const metadata: Metadata = {
 
 export default async function Analytics() {
   const [preloadedStats, preloadedDailyStats, preloadedMonthlyStats] = await Promise.all([
-    preloadQuery(api.analytics.getStats, {}),
-    preloadQuery(api.analytics.getDailyStats, { days: 30 }),
-    preloadQuery(api.analytics.getMonthlyStats, {}),
+    preloadQuery(api.analytics.getStats, {}).catch(() => null),
+    preloadQuery(api.analytics.getDailyStats, { days: 30 }).catch(() => null),
+    preloadQuery(api.analytics.getMonthlyStats, {}).catch(() => null),
   ]);
 
   return (

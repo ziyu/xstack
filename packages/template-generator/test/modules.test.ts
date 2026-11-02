@@ -60,6 +60,16 @@ describe("module resolver", () => {
       payment: "native",
       credits: "native",
     });
+    expect(variants(PRODUCT_PRESETS["saas-cn"])).toEqual({
+      i18n: "native",
+      core: "native",
+      auth: "native",
+      sms: "native",
+      admin: "native",
+      payment: "native",
+      credits: "native",
+      storage: "native",
+    });
   });
 
   it("adds the shell only when it is supported", () => {

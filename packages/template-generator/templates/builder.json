@@ -745,6 +745,16 @@
       }
     },
     {
+      "id": "saas-cn",
+      "name": "Next.js · CN SaaS · PostgreSQL",
+      "description": "WeChat and phone OTP authentication, Aliyun SMS, WeChat Pay/Alipay, credits, OSS private files and admin",
+      "group": "Next.js",
+      "productPreset": "saas-cn",
+      "stack": {
+        "database": "postgres"
+      }
+    },
+    {
       "id": "full",
       "name": "Next.js · Full · PostgreSQL",
       "description": "All modules: AI, private files, publishing, referrals and protected authentication",
@@ -799,6 +809,27 @@
       "description": "Authentication, email, admin, payments and credits",
       "group": "TanStack Start",
       "productPreset": "saas-global",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "tanstack-start"
+            }
+          }
+        ],
+        "webFrontend": ["tanstack-start"],
+        "backend": "self-tanstack-start",
+        "database": "postgres"
+      }
+    },
+    {
+      "id": "tanstack-start-saas-cn",
+      "name": "TanStack Start · CN SaaS · PostgreSQL",
+      "description": "WeChat and phone OTP authentication, Aliyun SMS, WeChat Pay/Alipay, credits, OSS private files and admin",
+      "group": "TanStack Start",
+      "productPreset": "saas-cn",
       "stack": {
         "apps": [
           {
@@ -880,6 +911,27 @@
       "description": "Authentication, email, admin, payments and credits",
       "group": "Nuxt",
       "productPreset": "saas-global",
+      "stack": {
+        "apps": [
+          {
+            "id": "web",
+            "type": "fullstack-web",
+            "stack": {
+              "framework": "nuxt"
+            }
+          }
+        ],
+        "webFrontend": ["nuxt"],
+        "backend": "self-nuxt",
+        "database": "postgres"
+      }
+    },
+    {
+      "id": "nuxt-saas-cn",
+      "name": "Nuxt · CN SaaS · PostgreSQL",
+      "description": "WeChat and phone OTP authentication, Aliyun SMS, WeChat Pay/Alipay, credits, OSS private files and admin",
+      "group": "Nuxt",
+      "productPreset": "saas-cn",
       "stack": {
         "apps": [
           {

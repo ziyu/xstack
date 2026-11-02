@@ -1,4 +1,8 @@
-import { resolveApplicationConfig } from "@xstack/template-generator/apps";
+import {
+  APPLICATION_TEMPLATES,
+  resolveApplicationConfig,
+  resolveApplications,
+} from "@xstack/template-generator/apps";
 import {
   MODULE_CATALOG,
   resolveModules,
@@ -18,31 +22,46 @@ export function selectedFeatures(stack: Pick<StackState, "features">): string[] 
 
 function stackContext(stack: StackState): StackContext {
   stack = projectApplicationStack(stack);
+  const backend = getStackBackend(stack.backend);
+  const plan = stack.apps ? resolveApplications(stack.apps, APPLICATION_TEMPLATES) : undefined;
+  const productApps = plan?.apps.filter((app) => app.manifest.scope === "product") ?? [];
+  const backendApp = plan?.apps.find((app) => app.manifest.roles.includes("backend"));
   const context: StackContext = {
     projectName: stack.projectName ?? "my-xstack-app",
     apps: stack.apps,
     runtime: stack.runtime,
     frontend: getStackFrontends(stack),
-    backend: getStackBackend(stack.backend),
-    database: stack.database,
-    orm: stack.orm,
+    backend,
+    database: stack.apps && backend === "none" ? "none" : stack.database,
+    orm: stack.apps && backend === "none" ? "none" : stack.orm,
     api: stack.api,
     webDeploy: stack.webDeploy,
-    dbSetup: stack.dbSetup,
+    dbSetup: stack.apps && backend === "none" ? "none" : stack.dbSetup,
+    productContributions:
+      productApps.length > 0 && productApps.every((app) => app.adapter.productContribution)
+        ? productApps.flatMap((app) =>
+            app.adapter.productContribution ? [app.adapter.productContribution] : [],
+          )
+        : undefined,
+    productRuntime: stack.apps ? (backendApp?.adapter.stack.runtime ?? "none") : undefined,
   };
   if (!stack.apps) return context;
-  return resolveApplicationConfig({
-    ...context,
-    projectDir: "/virtual",
-    relativePath: "./virtual",
-    runtime: stack.runtime,
-    dbSetup: stack.dbSetup,
-    serverDeploy: stack.serverDeploy,
-    addons: stack.addons.filter((addon) => addon !== "none"),
-    packageManager: stack.packageManager,
-    git: false,
-    install: false,
-  });
+  try {
+    return resolveApplicationConfig({
+      ...context,
+      projectDir: "/virtual",
+      relativePath: "./virtual",
+      runtime: stack.runtime,
+      dbSetup: stack.dbSetup,
+      serverDeploy: stack.serverDeploy,
+      addons: stack.addons.filter((addon) => addon !== "none"),
+      packageManager: stack.packageManager,
+      git: false,
+      install: false,
+    });
+  } catch {
+    return context;
+  }
 }
 
 /** The generator's complete plan, including provider and option validation. */
